@@ -5,6 +5,7 @@
 
 import UIKit
 import SwiftUI
+import PhotoDeskCore
 
 final class LibraryViewController: UIViewController {
     // MARK: - 依赖
@@ -24,6 +25,8 @@ final class LibraryViewController: UIViewController {
 
     private var currentSections: [MonthSection] = []
     private var currentItemsBySection: [[PhotoItem]] = []
+    /// 上一次布局时配置 cell 所用的像素尺寸（变化时重配可视 cell）
+    private var lastConfiguredPixelSize: CGSize = .zero
 
     init(viewModel: LibraryViewModel, pipeline: ImagePipelineProtocol, settings: SettingsStore) {
         self.viewModel = viewModel

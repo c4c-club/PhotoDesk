@@ -187,7 +187,7 @@ private extension Array where Element == String {
         var cursor = 0
         for section in sections {
             let next = cursor + section.count
-            let slice = (cursor..<min(next, count)).map { lookup[$0] }.compactMap { $0 }
+            let slice = (cursor..<min(next, count)).compactMap { lookup[self[$0]] }
             result.append(slice)
             cursor = next
         }

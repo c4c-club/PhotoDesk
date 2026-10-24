@@ -145,7 +145,7 @@ final class AssetRepository: AssetRepositoryProtocol {
         if subtypes.contains(.photoScreenshot) { result.insert(.photoScreenshot) }
         if subtypes.contains(.photoLive)       { result.insert(.photoLive) }
         if subtypes.contains(.photoHDR)        { result.insert(.photoHDR) }
-        if subtypes.contains(.videoSlowMo)     { result.insert(.videoSlowMo) }
+        if subtypes.contains(.videoSlomo)      { result.insert(.videoSlowMo) }
         if subtypes.contains(.videoTimelapse)  { result.insert(.videoTimelapse) }
         return result
     }
