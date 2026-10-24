@@ -28,12 +28,12 @@ targets:
           - "Resources/Info.plist"
     dependencies:
       - package: PhotoDeskCore
-    info:
-      path: PhotoDesk/Resources/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.PhotoDesk
         GENERATE_INFOPLIST_FILE: NO
+        # 手写 plist 直连（不用 xcodegen 的 info: 块——空属性会把既有 plist 覆盖成默认模板，丢失权限文案）
+        INFOPLIST_FILE: PhotoDesk/Resources/Info.plist
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
     scheme:
