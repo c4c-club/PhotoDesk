@@ -52,6 +52,8 @@ final class PerformanceUITests: XCTestCase {
 
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现")
+        // 网格必须有内容——空网格不代表数据管线健康（快照时序 bug 曾靠此断言暴露）
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格没有任何 cell")
 
         let options = XCTMeasureOptions()
         options.iterationCount = 3

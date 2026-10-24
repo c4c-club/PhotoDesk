@@ -106,7 +106,8 @@ final class LibraryViewController: UIViewController {
     }
 
     private func wireViewModel() {
-        viewModel.onSnapshotUpdate = { [weak self] sections, itemsBySection, animated in
+        // attachSnapshotHandler：接入即重放当前快照（VM 可能先于本 VC 完成加载）
+        viewModel.attachSnapshotHandler { [weak self] sections, itemsBySection, animated in
             self?.applySnapshot(sections: sections, itemsBySection: itemsBySection, animated: animated)
         }
     }

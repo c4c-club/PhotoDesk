@@ -27,8 +27,14 @@ final class LibraryViewModel: ObservableObject {
     @Published private(set) var isLoadingMore = false
     @Published private(set) var isLimitedAccess = false
 
-    /// VC 注册：快照数据推送（主线程）
-    var onSnapshotUpdate: ((_ sections: [MonthSection], _ itemsBySection: [[PhotoItem]], _ animated: Bool) -> Void)?
+    /// VC 注册：快照数据推送（主线程）。已在加载完成的 VC 接入时立即重放当前快照——
+    /// 否则 VM 先于 VC 完成加载，回调错过唯一一次推送，网格永远空白（CI 实测的根因）。
+    func attachSnapshotHandler(_ handler: @escaping ([MonthSection], [[PhotoItem]], Bool) -> Void) {
+        onSnapshotUpdate = handler
+        if viewState == .ready {
+            handler(sections, itemsBySection, false)
+        }
+    }
     /// VC 注册：调起系统 limited 选择器（需要 VC 锚点）
     var onManageLimitedPhotos: (() -> Void)?
 
@@ -183,6 +189,8 @@ final class LibraryViewModel: ObservableObject {
         itemsBySection = orderedIDs.groupedBy(sections: newSections, lookup: byID)
         onSnapshotUpdate?(newSections, itemsBySection, animated)
     }
+
+    private var onSnapshotUpdate: ((_ sections: [MonthSection], _ itemsBySection: [[PhotoItem]], _ animated: Bool) -> Void)?
 }
 
 private extension Array where Element == String {
