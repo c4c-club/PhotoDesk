@@ -4,7 +4,16 @@
 #   build     ：macos-14 上 xcodegen → 模拟器 build/test（iOS 15.5）→ 产物两件：模拟器 .app.zip + 未签名 ipa（AltServer 签名装真机用）
 name: Build & Test
 
-on: [push, pull_request]
+# docs-only 变更不触发（省 macOS 时长）
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 # 私有仓库 macOS 按 10× 计费，快速连续 push 时取消过期 run 省额度
 concurrency:
