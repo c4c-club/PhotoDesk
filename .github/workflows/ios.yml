@@ -150,8 +150,9 @@ jobs:
             -derivedDataPath build/DerivedData \
             -only-testing:PhotoDeskUITests/PerformanceUITests test
           # 授权已在 UI 测试中完成（弹窗自动点允许）且持久化：此时启动直达网格
+          # CI 虚拟机冷启动 5,300 张库较慢（首帧前要建 PHFetchResult），给足 25s
           xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
-          sleep 8
+          sleep 25
           xcrun simctl io CI-iPhone13 screenshot build/screenshots/m1-grid.png
 
       - uses: actions/upload-artifact@v4

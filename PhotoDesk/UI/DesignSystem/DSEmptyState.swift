@@ -94,9 +94,10 @@ private struct SkeletonGridView: View {
             LazyVGrid(columns: columns, spacing: DSSpacing.gridSpacing) {
                 ForEach(0..<36, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: DSSpacing.gridCornerRadius)
-                        .fill(Color(ds: DSColor.bgSecondary))
+                        // 分隔线 token 做骨架底色（bgSecondary #F2F2F7 在白底上几乎不可见）
+                        .fill(Color(ds: DSColor.separator))
                         .aspectRatio(1, contentMode: .fit)
-                        .opacity(phase ? 0.45 : 1.0)
+                        .opacity(phase ? 0.55 : 1.0)
                 }
             }
             .padding(DSSpacing.gridSpacing)
