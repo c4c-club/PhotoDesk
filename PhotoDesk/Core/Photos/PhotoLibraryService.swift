@@ -3,6 +3,7 @@
 // .denied 引导前往系统设置。@Published access 驱动根视图状态切换（PermissionIntroView / 网格）。
 
 import Photos
+import PhotosUI   // presentLimitedLibraryPicker(from:) 声明在 PhotosUI 对 PHPhotoLibrary 的扩展里
 import UIKit
 
 /// 库访问状态（docs/03 §5.6）

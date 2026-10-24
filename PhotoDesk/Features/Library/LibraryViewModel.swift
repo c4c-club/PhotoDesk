@@ -187,7 +187,8 @@ private extension Array where Element == String {
         var cursor = 0
         for section in sections {
             let next = cursor + section.count
-            let slice = (cursor..<min(next, count)).compactMap { lookup[self[$0]] }
+            // Swift.min：Array 扩展内裸写 min 会命中 Sequence.min() 实例方法（遮蔽全局函数）
+            let slice = (cursor..<Swift.min(next, count)).compactMap { lookup[self[$0]] }
             result.append(slice)
             cursor = next
         }
