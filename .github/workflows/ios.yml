@@ -78,7 +78,8 @@ jobs:
         run: |
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
-            -derivedDataPath build/DerivedData test
+            -derivedDataPath build/DerivedData \
+            -skip-testing:PhotoDeskUITests/PerformanceUITests test
 
       - name: Package simulator app
         run: |
@@ -129,12 +130,22 @@ jobs:
           xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
           sleep 5
           mkdir -p build/screenshots
-          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m0-launch.png
+          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m1-library.png
 
       - uses: actions/upload-artifact@v4
         with:
-          name: m0-screenshots
+          name: m1-screenshots
           path: build/screenshots
+
+      # M1 性能验收（docs/05 §3）：5,000+ 张库 冷启动 / 滚动内存（docs/06 §6.3，Instruments 不可用时的 CI 替代）
+      - name: Performance tests (5,000+ photos)
+        run: |
+          rm -rf /tmp/simphotos
+          bash scripts/sim-photos.sh 5000
+          xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+            -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
+            -derivedDataPath build/DerivedData \
+            -only-testing:PhotoDeskUITests/PerformanceUITests test
 
       - name: Upload logs on failure
         if: failure()

@@ -1,13 +1,27 @@
-// MARK: - 职责说明：DI 容器占位（docs/03 §3 App/AppContainer）——服务装配的唯一入口。
-// 装配约定（AGENTS.md §3）：Service 全部 protocol 化，ViewModel 经构造器注入，不在 View 层直取单例；
-// 纯逻辑一律来自 PhotoDeskCore 本包，本容器只做类型适配，不重复实现（红线 2）。
+// MARK: - 职责说明：DI 组合根（docs/03 §3 App/AppContainer）——服务装配唯一入口。
+// 装配约定（AGENTS.md §3）：Service 全部 protocol 化，ViewModel 经构造器注入；纯逻辑来自 PhotoDeskCore（红线 2）。
 // 依赖方向：Features → Domain(ViewModel) → Core(Service) → System（docs/03 §1），本容器是组合根。
+// @MainActor：App/UI 侧组合发生在主线程。
 
 import Foundation
 
-final class AppContainer {
-    /// TODO(P1): 装配 PhotoLibraryServiceProtocol / AssetRepositoryProtocol / ImagePipelineProtocol
-    /// TODO(P2): 装配 ViewerVM 的手势管线（SwipeResolverAdapter + UndoCenter + PhotoWriter）
-    /// TODO(P3): 装配 TrashBin / VaultService / PersistenceController
-    /// TODO(P4): 装配 ScanCoordinator（去重扫描）
+@MainActor
+final class AppContainer: ObservableObject {
+    static let shared = AppContainer()
+
+    let settings = SettingsStore()
+    let libraryService = PhotoLibraryService()
+    let assetRepository: AssetRepositoryProtocol
+    let imagePipeline: ImagePipelineProtocol
+
+    lazy var libraryViewModel = LibraryViewModel(service: libraryService,
+                                                 repository: assetRepository,
+                                                 pipeline: imagePipeline)
+
+    private init() {
+        assetRepository = AssetRepository()
+        // 捕获 settings 实例本身（不能引用 AppContainer.shared：静态 let 初始化进行中会死锁）
+        let settingsRef = settings
+        imagePipeline = ImagePipeline(allowsNetworkAccess: { settingsRef.autoDownloadOriginal })
+    }
 }
