@@ -151,9 +151,10 @@ final class AssetRepository: AssetRepositoryProtocol {
         return result
     }
 
-    /// iCloud-only 判定：KVC "locallyAvailable"（非公开键，失败回退 false）。
-    /// M2 以 requestImage 失败 + PHImageResultIsInCloudKey 兜底（docs/03 §5.8）。
+    /// iCloud-only 判定：M1 一律 false。
+    /// 原因：私有 KVC 键（"locallyAvailable"）在 iOS 17.5 模拟器上直接终止进程（CI 实测）；
+    /// P2 改由 ImagePipeline 的 requestImage 失败 + PHImageResultIsInCloudKey 判定后回填（docs/03 §5.8）。
     private static func isCloudOnly(_ asset: PHAsset) -> Bool {
-        (asset.value(forKey: "locallyAvailable") as? Bool) == false
+        false
     }
 }
