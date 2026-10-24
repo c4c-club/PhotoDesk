@@ -125,10 +125,10 @@ jobs:
           xcrun simctl bootstatus CI-iPhone13 -b
           # Pillow 由脚本自管（venv 优先，PEP 668 兼容）
           bash scripts/sim-photos.sh
-          # 预授权相册（模拟器无真人点弹窗）：网格与截图才有真实内容
-          xcrun simctl privacy CI-iPhone13 grant photos com.example.PhotoDesk || true
           APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
           xcrun simctl install CI-iPhone13 "$APP"
+          # 预授权相册必须在 install 之后（TCC 记录随安装刷新）；模拟器无真人点弹窗
+          xcrun simctl privacy CI-iPhone13 grant photos com.example.PhotoDesk
           xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
           sleep 5
           mkdir -p build/screenshots
@@ -144,6 +144,7 @@ jobs:
         run: |
           rm -rf /tmp/simphotos
           bash scripts/sim-photos.sh 5000
+          xcrun simctl privacy CI-iPhone13 grant photos com.example.PhotoDesk
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData \
