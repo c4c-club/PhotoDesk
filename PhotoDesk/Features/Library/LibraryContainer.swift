@@ -45,6 +45,19 @@ struct LibraryRootView: View {
         .onReceive(service.$access) { _ in
             Task { await viewModel.start() }
         }
+        #if DEBUG
+        // CI 截图自诊断：网格异常时可直接读出 VM 状态（Release 不编译）
+        .overlay(alignment: .top) {
+            Text(viewModel.debugSummary)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(Color(ds: DSColor.textPrimary))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(ds: DSColor.accentFavorite))
+                .cornerRadius(4)
+                .padding(.top, 2)
+        }
+        #endif
     }
 }
 

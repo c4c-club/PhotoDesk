@@ -82,6 +82,11 @@ final class LibraryViewModel: ObservableObject {
         onManageLimitedPhotos?()
     }
 
+    /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
+    var debugSummary: String {
+        "state=\(viewState) items=\(items.count)/\(totalCount) sections=\(sections.count) loadingMore=\(isLoadingMore)"
+    }
+
     // MARK: - 加载与分页
 
     private func loadIfNeeded() async {

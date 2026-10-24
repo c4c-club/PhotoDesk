@@ -1,10 +1,12 @@
 // MARK: - 职责说明：照片库分批查询仓库（docs/05 M1 任务 1.2 / AGENTS.md §4.7）——
 // prepare(scope:) 建立懒加载 PHFetchResult 并返回总数；fetch(scope:offset:limit:) 只枚举请求窗口（每批 ≤ 500），
-// 禁止一次性 enumerateObjects 全库。映射为 PhotoItem（docs/03 §4.1）；PHAsset 访问全部在后台队列。
+// 禁止一次性 enumerateObjects 全库。映射为 PhotoItem（docs/03 §4.1）；PHAsset 枚举/映射走后台（detached Task）。
+// @MainActor：results 字典只在主线程读写（曾存在跨线程读写竞态）；重活全部下沉后台，不在主线程枚举资产。
 // protocol 化供 Mock（AGENTS.md §3.2）；主网格 includeHiddenAssets = false（AGENTS.md §4.2）。
 
 import Photos
 
+@MainActor
 protocol AssetRepositoryProtocol: AnyObject {
     /// 建立查询并返回总数（后续 fetch 使用同一 fetchResult 切片）
     func prepare(scope: PhotoScope) async -> Int
@@ -12,27 +14,28 @@ protocol AssetRepositoryProtocol: AnyObject {
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem]
     /// 当前 scope 的底层结果（PhotoChangeObserver 监听用）
     var latestResult: PHFetchResult<PHAsset>? { get }
-    /// 变更同步：用 objectAfterChanges 替换当前结果（增量，不重建查询）
+    /// 变更同步：用 fetchResultAfterChanges 替换当前结果（增量，不重建查询）
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope)
     /// PHAsset → PhotoItem（变更增量时 ViewModel 复用同一映射）
     func map(_ asset: PHAsset) -> PhotoItem
 }
 
+@MainActor
 final class AssetRepository: AssetRepositoryProtocol {
     /// 每批上限（AGENTS.md §4.7：每批 500）
     static let batchSize = 500
 
-    /// scope → fetchResult（主线程读写；枚举/映射走后台）
+    /// scope → fetchResult（仅主线程读写；重枚举走 detached）
     private var results: [PhotoScope: PHFetchResult<PHAsset>] = [:]
+
+    nonisolated init() {}
 
     var latestResult: PHFetchResult<PHAsset>? {
         results[.all]
     }
 
     func prepare(scope: PhotoScope) async -> Int {
-        let result = await Task.detached(priority: .userInitiated) {
-            Self.makeFetchResult(scope: scope)
-        }.value
+        let result = await Self.makeResultInBackground(scope: scope)
         results[scope] = result
         return result.count
     }
@@ -42,18 +45,17 @@ final class AssetRepository: AssetRepositoryProtocol {
         if let cached = results[scope] {
             result = cached
         } else {
-            result = await Task.detached(priority: .userInitiated) {
-                Self.makeFetchResult(scope: scope)
-            }.value
+            result = await Self.makeResultInBackground(scope: scope)
             results[scope] = result
         }
         let count = result.count
         guard offset < count, limit > 0 else { return [] }
         let upper = min(offset + limit, count)
         let indexSet = IndexSet(integersIn: offset..<upper)
-        return await Task.detached(priority: .userInitiated) { [weak self] in
-            let assets = result.objects(at: indexSet)
-            return assets.compactMap { self?.map($0) }
+        let repository = self
+        return await Task.detached(priority: .userInitiated) {
+            // map 为 nonisolated 纯映射：PHAsset 属性读取线程安全，无需回主线程
+            result.objects(at: indexSet).map { repository.map($0) }
         }.value
     }
 
@@ -61,9 +63,17 @@ final class AssetRepository: AssetRepositoryProtocol {
         results[scope] = result
     }
 
-    // MARK: - 查询构造
+    // MARK: - 后台重活（不触碰 results）
 
-    private static func makeFetchResult(scope: PhotoScope) -> PHFetchResult<PHAsset> {
+    private nonisolated static func makeResultInBackground(scope: PhotoScope) async -> PHFetchResult<PHAsset> {
+        await Task.detached(priority: .userInitiated) {
+            Self.makeFetchResult(scope: scope)
+        }.value
+    }
+
+    // MARK: - 查询构造（后台线程调用）
+
+    nonisolated private static func makeFetchResult(scope: PhotoScope) -> PHFetchResult<PHAsset> {
         let options = PHFetchOptions()
         options.includeAllBurstAssets = false
         // 仅「已隐藏」scope 可见隐藏资源；主网格一律不含隐藏（AGENTS.md §4.2）
@@ -107,15 +117,16 @@ final class AssetRepository: AssetRepositoryProtocol {
         }
     }
 
-    private static let FALSE_PREDICATE_OPTIONS: PHFetchOptions = {
+    private nonisolated static let FALSE_PREDICATE_OPTIONS: PHFetchOptions = {
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "FALSEPREDICATE")
         return options
     }()
 
-    // MARK: - PHAsset → PhotoItem（docs/03 §4.1）
+    // MARK: - PHAsset → PhotoItem（docs/03 §4.1；nonisolated 纯映射，主线程/后台均可调用）
 
-    func map(_ asset: PHAsset) -> PhotoItem {        PhotoItem(
+    nonisolated func map(_ asset: PHAsset) -> PhotoItem {
+        PhotoItem(
             id: asset.localIdentifier,
             mediaType: mapMediaType(asset.mediaType),
             mediaSubtypes: mapSubtypes(asset.mediaSubtypes),
@@ -132,7 +143,7 @@ final class AssetRepository: AssetRepositoryProtocol {
         )
     }
 
-    private func mapMediaType(_ type: PHAssetMediaType) -> MediaType {
+    nonisolated private func mapMediaType(_ type: PHAssetMediaType) -> MediaType {
         switch type {
         case .image: return .image
         case .video: return .video
@@ -140,7 +151,7 @@ final class AssetRepository: AssetRepositoryProtocol {
         }
     }
 
-    private func mapSubtypes(_ subtypes: PHAssetMediaSubtype) -> MediaSubtypes {
+    nonisolated private func mapSubtypes(_ subtypes: PHAssetMediaSubtype) -> MediaSubtypes {
         var result: MediaSubtypes = []
         if subtypes.contains(.photoScreenshot) { result.insert(.photoScreenshot) }
         if subtypes.contains(.photoLive)       { result.insert(.photoLive) }
@@ -154,7 +165,7 @@ final class AssetRepository: AssetRepositoryProtocol {
     /// iCloud-only 判定：M1 一律 false。
     /// 原因：私有 KVC 键（"locallyAvailable"）在 iOS 17.5 模拟器上直接终止进程（CI 实测）；
     /// P2 改由 ImagePipeline 的 requestImage 失败 + PHImageResultIsInCloudKey 判定后回填（docs/03 §5.8）。
-    private static func isCloudOnly(_ asset: PHAsset) -> Bool {
+    private nonisolated static func isCloudOnly(_ asset: PHAsset) -> Bool {
         false
     }
 }
