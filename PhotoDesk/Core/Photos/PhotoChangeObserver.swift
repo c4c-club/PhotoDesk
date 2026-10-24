@@ -49,7 +49,7 @@ final class PhotoChangeObserver: NSObject, PHPhotoLibraryChangeObserver {
             changedIndexes: details.changedIndexes ?? IndexSet(),
             insertedIndexes: details.insertedIndexes ?? IndexSet(),
             changedObjects: details.changedObjects,
-            resultAfterChanges: details.resultAfterChanges
+            resultAfterChanges: details.fetchResultAfterChanges
         )
         DispatchQueue.main.async { [onChange] in
             onChange(changeSet)
