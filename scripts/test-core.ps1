@@ -1,4 +1,4 @@
-# scripts/test-core.ps1
+﻿# scripts/test-core.ps1
 # 职责说明：本机一键跑完 PhotoDeskCore 的 swift test —— 唯一容器 swift:6.0-noble，用完即弃，不引入任何 Linux 系统（docs/06 §7.2）。
 # 用法（PowerShell 或 Git Bash 均可，任意工作目录）：
 #   powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
