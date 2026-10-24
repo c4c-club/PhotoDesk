@@ -87,6 +87,14 @@ jobs:
           cd "$(dirname "$APP")"
           zip -qry "$GITHUB_WORKSPACE/build/PhotoDesk-Simulator.app.zip" "$(basename "$APP")"
 
+      # 部署目标红线校验（AGENTS.md 常见陷阱 #1：Deployment Target 被依赖抬高 → 老设备 dyld 崩溃）
+      - name: Verify deployment target (minos must be 15.0)
+        run: |
+          APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          otool -l "$APP/PhotoDesk" | grep -A3 LC_BUILD_VERSION
+          otool -l "$APP/PhotoDesk" | grep -A3 LC_BUILD_VERSION | grep -q "minos 15.0" || {
+            echo "::error::LC_BUILD_VERSION minos != 15.0"; exit 1; }
+
       # 未签名 ipa（手机验证用，docs/06 §7.4）：CODE_SIGNING_ALLOWED=NO 产出未签名 .app，Payload 打包成 ipa；
       # Windows 上由 AltServer 用免费 Apple ID 现场签名安装
       - name: Build unsigned ipa
@@ -108,6 +116,25 @@ jobs:
         with:
           name: PhotoDesk-unsigned-ipa
           path: build/PhotoDesk-unsigned.ipa
+
+      # M0 冒烟（docs/05 M0 验收）：装包 → 启动 → 导入 300 张测试图 → 截图存档
+      - name: Simulator smoke (install / launch / photos / screenshot)
+        run: |
+          xcrun simctl boot CI-iPhone13 2>/dev/null || true
+          xcrun simctl bootstatus CI-iPhone13 -b
+          python3 -c "import PIL" 2>/dev/null || python3 -m pip install --quiet Pillow
+          bash scripts/sim-photos.sh
+          APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          xcrun simctl install CI-iPhone13 "$APP"
+          xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
+          sleep 5
+          mkdir -p build/screenshots
+          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m0-launch.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m0-screenshots
+          path: build/screenshots
 
       - name: Upload logs on failure
         if: failure()

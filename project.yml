@@ -35,6 +35,8 @@ targets:
         # 手写 plist 直连（不用 xcodegen 的 info: 块——空属性会把既有 plist 覆盖成默认模板，丢失权限文案）
         INFOPLIST_FILE: PhotoDesk/Resources/Info.plist
         CODE_SIGN_STYLE: Automatic
+        # 团队号从环境变量注入，不入库（AGENTS.md §1）；真机签名时由外部 env / xcodebuild 覆盖（docs/06 §4.3）
+        DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
         TARGETED_DEVICE_FAMILY: "1,2"
     scheme:
       testTargets: [PhotoDeskTests, PhotoDeskUITests]
