@@ -45,7 +45,7 @@ targets:
     dependencies:
       - target: PhotoDesk
   PhotoDeskUITests:
-    type: bundle.ui-test
+    type: bundle.ui-testing
     platform: iOS
     sources: [PhotoDeskUITests]
     dependencies:
