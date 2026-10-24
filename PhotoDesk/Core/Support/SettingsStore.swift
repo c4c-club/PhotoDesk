@@ -2,6 +2,7 @@
 // 纯 UserDefaults 包装（主线程使用）；M7 设置页全量接线，M1/M2 先用 gridColumns 与手势组。
 
 import SwiftUI
+import PhotoDeskCore
 
 /// 上滑/下滑可绑定的动作（docs/03 §4.3）
 enum SwipeAction: String, CaseIterable, Codable {

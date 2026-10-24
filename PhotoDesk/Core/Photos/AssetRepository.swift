@@ -140,7 +140,7 @@ final class AssetRepository: AssetRepositoryProtocol {
         }
     }
 
-    private func mapSubtypes(_ subtypes: PHAssetMediaSubtypes) -> MediaSubtypes {
+    private func mapSubtypes(_ subtypes: PHAssetMediaSubtype) -> MediaSubtypes {
         var result: MediaSubtypes = []
         if subtypes.contains(.photoScreenshot) { result.insert(.photoScreenshot) }
         if subtypes.contains(.photoLive)       { result.insert(.photoLive) }

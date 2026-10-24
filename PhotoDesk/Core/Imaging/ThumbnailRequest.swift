@@ -11,6 +11,18 @@ struct ThumbnailRequest: Hashable {
     let size: CGSize
     let scale: CGFloat
 
+    // 手写 Hashable：不对 CGSize/CGFloat 的协议合成做假设（对 Double 做 combine，跨工具链稳定）
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(Double(size.width))
+        hasher.combine(Double(size.height))
+        hasher.combine(Double(scale))
+    }
+
+    static func == (lhs: ThumbnailRequest, rhs: ThumbnailRequest) -> Bool {
+        lhs.id == rhs.id && lhs.size == rhs.size && lhs.scale == rhs.scale
+    }
+
     /// 像素尺寸（requestImage targetSize 按像素传入）
     var pixelSize: CGSize {
         CGSize(width: max(1, size.width * scale),

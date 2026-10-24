@@ -12,7 +12,7 @@ final class PhotoGridCell: UICollectionViewCell {
 
     private let imageView: UIImageView = {
         let view = UIImageView()
-        view.contentMode = .aspectFill
+        view.contentMode = .scaleAspectFill
         view.clipsToBounds = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
