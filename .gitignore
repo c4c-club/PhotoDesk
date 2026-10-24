@@ -1,0 +1,15 @@
+# Xcode 工程（由 project.yml 经 xcodegen generate 生成，不入库）
+*.xcodeproj
+xcuserdata/
+
+# SwiftPM / 构建产物
+.build/
+build/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# 本机会话与工具状态（不入库）
+.zcode/
+.workbuddy/

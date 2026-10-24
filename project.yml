@@ -1,0 +1,52 @@
+# project.yml —— XcodeGen 工程定义（docs/06 §2.1）
+# 职责说明：P-1 最小可编译骨架——仅验证「CI macos-14 编译/测试 + 未签名 ipa」通道；完整目录结构自 M0 起按 docs/03 §3 落位。
+# 用法：xcodegen generate（生成 PhotoDesk.xcodeproj；.xcodeproj 不入库）
+name: PhotoDesk
+options:
+  deploymentTarget:
+    iOS: "15.0"
+  bundleIdPrefix: com.example
+  createIntermediateGroups: true
+packages:
+  PhotoDeskCore:
+    path: PhotoDeskCore
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    GENERATE_INFOPLIST_FILE: YES        # 测试 bundle 用生成 plist；App target 下方覆盖为 NO
+targets:
+  PhotoDesk:
+    type: application
+    platform: iOS
+    sources:
+      - path: PhotoDesk
+        excludes:
+          - "Resources/Info.plist"
+    dependencies:
+      - package: PhotoDeskCore
+    info:
+      path: PhotoDesk/Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.PhotoDesk
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      testTargets: [PhotoDeskTests, PhotoDeskUITests]
+  PhotoDeskTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [PhotoDeskTests]
+    dependencies:
+      - target: PhotoDesk
+  PhotoDeskUITests:
+    type: bundle.ui-test
+    platform: iOS
+    sources: [PhotoDeskUITests]
+    dependencies:
+      - target: PhotoDesk

@@ -1,0 +1,102 @@
+# .github/workflows/ios.yml —— CI 编译/测试/出包通道（docs/06 §5 + §7.4）
+# 职责说明：
+#   core-linux：无 Mac 验证 PhotoDeskCore 纯逻辑（与本地 scripts/test-core.ps1 同一条命令）
+#   build     ：macos-14 上 xcodegen → 模拟器 build/test（iOS 15.5）→ 产物两件：模拟器 .app.zip + 未签名 ipa（AltServer 签名装真机用）
+name: Build & Test
+
+on: [push, pull_request]
+
+# 私有仓库 macOS 按 10× 计费，快速连续 push 时取消过期 run 省额度
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test PhotoDeskCore
+        run: swift test --package-path PhotoDeskCore
+
+  build:
+    runs-on: macos-14
+    needs: core-linux
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      # macos-14 镜像可能未预装 iOS 15.5 运行时；没有则现场下载（一次约 7GB，之后走 runner 缓存无此步）
+      - name: Ensure iOS 15.5 simulator runtime
+        run: |
+          if xcrun simctl list runtimes | grep -q "iOS 15.5"; then
+            echo "iOS 15.5 runtime 已就绪"
+          else
+            echo "iOS 15.5 runtime 未预装，开始下载安装（需数分钟）..."
+            command -v xcodes >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodes
+            xcodes runtimes install "iOS 15.5"
+          fi
+
+      - name: Create simulator
+        run: xcrun simctl create CI-iPhone13 "iPhone 13" "com.apple.CoreSimulator.SimRuntime.iOS-15-5" || true
+
+      - name: Build (simulator)
+        run: |
+          xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
+            -derivedDataPath build/DerivedData build
+
+      - name: Test (simulator)
+        run: |
+          xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+            -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
+            -derivedDataPath build/DerivedData test
+
+      - name: Package simulator app
+        run: |
+          APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          echo "APP=$APP"
+          cd "$(dirname "$APP")"
+          zip -qry "$GITHUB_WORKSPACE/build/PhotoDesk-Simulator.app.zip" "$(basename "$APP")"
+
+      # 未签名 ipa（手机验证用，docs/06 §7.4）：CODE_SIGNING_ALLOWED=NO 产出未签名 .app，Payload 打包成 ipa；
+      # Windows 上由 AltServer 用免费 Apple ID 现场签名安装
+      - name: Build unsigned ipa
+        run: |
+          xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk -sdk iphoneos -configuration Release \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            -archivePath build/PhotoDesk.xcarchive archive
+          mkdir -p build/Payload
+          cp -R build/PhotoDesk.xcarchive/Products/Applications/PhotoDesk.app build/Payload/
+          cd build && zip -qry PhotoDesk-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhotoDesk-Simulator-app-zip
+          path: build/PhotoDesk-Simulator.app.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhotoDesk-unsigned-ipa
+          path: build/PhotoDesk-unsigned.ipa
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build/DerivedData/Logs

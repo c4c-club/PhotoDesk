@@ -1,0 +1,6 @@
+# 仓库内一律 LF 存储；Windows 检出时按文件类型区分，避免 CRLF 弄坏 CI 里的 bash 脚本
+* text=auto
+*.sh  text eol=lf
+*.yml text eol=lf
+*.swift text eol=lf
+*.ps1 text eol=crlf
