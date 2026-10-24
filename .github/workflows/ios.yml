@@ -127,12 +127,13 @@ jobs:
           bash scripts/sim-photos.sh
           APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
           xcrun simctl install CI-iPhone13 "$APP"
-          # 预授权相册必须在 install 之后（TCC 记录随安装刷新）；模拟器无真人点弹窗
-          xcrun simctl privacy CI-iPhone13 grant photos com.example.PhotoDesk
+          # 注：iOS 17.5 上 Photos 授权不走 TCC（simctl privacy 无效），
+          # 授权由性能测试的中断监视器自动点系统弹窗完成（docs/06 §6.2 模式）
           xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
           sleep 5
           mkdir -p build/screenshots
-          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m1-library.png
+          # 授权前截图 = 授权引导页（M1 验收项：授权引导文案）
+          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m1-intro.png
 
       - uses: actions/upload-artifact@v4
         with:
@@ -144,11 +145,19 @@ jobs:
         run: |
           rm -rf /tmp/simphotos
           bash scripts/sim-photos.sh 5000
-          xcrun simctl privacy CI-iPhone13 grant photos com.example.PhotoDesk
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData \
             -only-testing:PhotoDeskUITests/PerformanceUITests test
+          # 授权已在 UI 测试中完成（弹窗自动点允许）且持久化：此时启动直达网格
+          xcrun simctl launch CI-iPhone13 com.example.PhotoDesk
+          sleep 8
+          xcrun simctl io CI-iPhone13 screenshot build/screenshots/m1-grid.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m1-grid-screenshot
+          path: build/screenshots/m1-grid.png
 
       - name: Upload logs on failure
         if: failure()
