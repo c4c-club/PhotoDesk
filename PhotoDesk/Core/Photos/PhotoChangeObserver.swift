@@ -8,11 +8,11 @@ import Photos
 final class PhotoChangeObserver: NSObject, PHPhotoLibraryChangeObserver {
     /// 已解析的增量（主线程回调）
     struct ChangeSet {
-        /// 旧索引（含 moved 处理：视作移除）
+        /// 旧索引：被移除的条目
         let removedIndexes: IndexSet
         /// 旧索引：内容变化（收藏/隐藏标志等），原位替换
         let changedIndexes: IndexSet
-        /// 新索引：新插入条目（配 objectAfterChanges 取 PHAsset）
+        /// 新索引：新插入条目（配 resultAfterChanges 取 PHAsset）
         let insertedIndexes: IndexSet
         let changedObjects: [PHAsset]
         let resultAfterChanges: PHFetchResult<PHAsset>?
@@ -42,12 +42,14 @@ final class PhotoChangeObserver: NSObject, PHPhotoLibraryChangeObserver {
         guard let result = monitoredResult,
               let details = changeInstance.changeDetails(for: result) else { return }
 
+        // removed/inserted/changed 索引均为可选 IndexSet；moved 经 enumerateMoves 暴露（M1 不处理，
+        // 移动场景由 VM 的分组重建兜底——组内顺序按 fetchResult 刷新后再对齐）
         let changeSet = ChangeSet(
-            removedIndexes: details.removedIndexes.union(details.movedIndexes),
-            changedIndexes: details.changedIndexes,
-            insertedIndexes: details.insertedIndexes,
+            removedIndexes: details.removedIndexes ?? IndexSet(),
+            changedIndexes: details.changedIndexes ?? IndexSet(),
+            insertedIndexes: details.insertedIndexes ?? IndexSet(),
             changedObjects: details.changedObjects,
-            resultAfterChanges: details.objectAfterChanges
+            resultAfterChanges: details.resultAfterChanges
         )
         DispatchQueue.main.async { [onChange] in
             onChange(changeSet)

@@ -145,7 +145,8 @@ final class AssetRepository: AssetRepositoryProtocol {
         if subtypes.contains(.photoScreenshot) { result.insert(.photoScreenshot) }
         if subtypes.contains(.photoLive)       { result.insert(.photoLive) }
         if subtypes.contains(.photoHDR)        { result.insert(.photoHDR) }
-        if subtypes.contains(.videoSlomo)      { result.insert(.videoSlowMo) }
+        // PhotoKit 无独立 slow-mo 常量：慢动作即高帧率视频（docs/03 §4.1 的 videoSlowMo 域概念由此映射）
+        if subtypes.contains(.videoHighFrameRate) { result.insert(.videoSlowMo) }
         if subtypes.contains(.videoTimelapse)  { result.insert(.videoTimelapse) }
         return result
     }
