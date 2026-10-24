@@ -46,7 +46,8 @@ jobs:
           else
             echo "iOS 15.5 runtime 未预装，开始下载安装（需数分钟）..."
             command -v xcodes >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodes
-            xcodes runtimes install "iOS 15.5"
+            # 安装 runtime 需要 root；sudo 会重置 PATH，用绝对路径调用
+            sudo "$(command -v xcodes)" runtimes install "iOS 15.5"
           fi
 
       - name: Create simulator
