@@ -122,7 +122,7 @@ jobs:
         run: |
           xcrun simctl boot CI-iPhone13 2>/dev/null || true
           xcrun simctl bootstatus CI-iPhone13 -b
-          python3 -c "import PIL" 2>/dev/null || python3 -m pip install --quiet Pillow
+          # Pillow 由脚本自管（venv 优先，PEP 668 兼容）
           bash scripts/sim-photos.sh
           APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
           xcrun simctl install CI-iPhone13 "$APP"
