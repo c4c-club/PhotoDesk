@@ -7,7 +7,6 @@ import PhotoDeskCore
 import Photos
 import UIKit
 
-@MainActor
 final class ExportViewModel: ObservableObject {
     let item: PhotoItem
 
