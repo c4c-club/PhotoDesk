@@ -10,6 +10,14 @@ struct ToolsView: View {
             List {
                 Section {
                     NavigationLink {
+                        CleanupView(viewModel: AppContainer.shared.makeCleanupViewModel(),
+                                    coordinator: AppContainer.shared.scanCoordinator)
+                    } label: {
+                        Label("智能清理", systemImage: "sparkles")
+                    }
+                    .accessibilityIdentifier("Tools-Cleanup")
+
+                    NavigationLink {
                         VaultView(vault: AppContainer.shared.vaultService,
                                   repository: AppContainer.shared.assetRepository,
                                   pipeline: AppContainer.shared.imagePipeline)
@@ -38,7 +46,7 @@ struct ToolsView: View {
                     }
                 }
                 Section {
-                    Text("智能清理 · 存储统计将在 M4/M5 开放")
+                    Text("存储统计将在 M5 开放")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
                 }

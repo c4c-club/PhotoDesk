@@ -17,6 +17,8 @@ final class AppContainer: ObservableObject {
     let undoCenter: UndoCenter
     let trashBin: TrashBin
     let vaultService = VaultService()
+    let fingerprintService: FingerprintService
+    let scanCoordinator: ScanCoordinator
 
     lazy var libraryViewModel = LibraryViewModel(service: libraryService,
                                                  repository: assetRepository,
@@ -36,6 +38,11 @@ final class AppContainer: ObservableObject {
                         undoCenter: undoCenter)
     }
 
+    /// 清理页每次打开新建（扫描结果在 coordinator 单例上，重进不丢）
+    func makeCleanupViewModel() -> CleanupViewModel {
+        CleanupViewModel(coordinator: scanCoordinator, libraryViewModel: libraryViewModel)
+    }
+
     private init() {
         let persistence = PersistenceController.shared
         assetRepository = AssetRepository()
@@ -45,5 +52,10 @@ final class AppContainer: ObservableObject {
         imagePipeline = ImagePipeline(allowsNetworkAccess: { settingsRef.autoDownloadOriginal })
         trashBin = TrashBin(persistence: persistence, settings: settingsRef)
         undoCenter = UndoCenter(writer: writerRef, trashBin: trashBin, persistence: persistence)
+        fingerprintService = FingerprintService(persistence: persistence)
+        scanCoordinator = ScanCoordinator(repository: assetRepository,
+                                          fingerprintService: fingerprintService,
+                                          persistence: persistence,
+                                          settings: settingsRef)
     }
 }

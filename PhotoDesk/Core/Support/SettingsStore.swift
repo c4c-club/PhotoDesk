@@ -87,6 +87,12 @@ final class SettingsStore: ObservableObject {
     @AppStorage("trash.safetyCopyEnabled") var safetyCopyEnabled = true
     @AppStorage("trash.limitMB")           var trashLimitMB = 2048
 
+    // MARK: 清理阈值（docs/04 §3.3：阈值可调；M7 设置页接线）
+    /// 去重汉明距离阈值（≤4 高置信 / ≤8 疑似；默认 8）
+    @AppStorage("dedup.hammingDistance")   var dedupHammingDistance = 8
+    /// 模糊方差阈值（默认 60，低于判模糊）
+    @AppStorage("blur.varianceThreshold")  var blurVarianceThreshold = 60.0
+
     // MARK: 便捷读取（PhotoDeskCore 类型经这里适配，红线 2：App 侧做类型转换）
     var sensitivity: Sensitivity {
         get { Sensitivity(rawValue: sensitivityRaw) ?? .standard }

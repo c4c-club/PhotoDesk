@@ -72,7 +72,53 @@ final class PersistenceController {
         ]
         trashItem.indexes = [makeIndex(name: "idx_createdAt", property: createdAtAttr)]
 
-        model.entities = [actionLog, trashItem]
+        // Fingerprint：去重指纹缓存（docs/03 §4.2；dhash/phash 各按高低 32bit 拆两个 Int64 存储）
+        let fingerprint = NSEntityDescription()
+        fingerprint.name = "Fingerprint"
+        fingerprint.managedObjectClassName = "NSManagedObject"
+        fingerprint.properties = [
+            attribute("localIdentifier", .stringAttributeType, optional: false),
+            attribute("dhashLo", .integer64AttributeType, optional: false, defaultValue: 0),
+            attribute("dhashHi", .integer64AttributeType, optional: false, defaultValue: 0),
+            attribute("phashLo", .integer64AttributeType, optional: true, defaultValue: 0),
+            attribute("phashHi", .integer64AttributeType, optional: true, defaultValue: 0),
+            attribute("aspect", .doubleAttributeType, optional: false, defaultValue: 1.0),
+            attribute("pixelArea", .integer64AttributeType, optional: false, defaultValue: 0),
+            attribute("hasEdits", .booleanAttributeType, optional: false, defaultValue: false),
+            attribute("createdAt", .dateAttributeType, optional: false),
+            attribute("algoVersion", .integer16AttributeType, optional: false, defaultValue: 0),
+        ]
+
+        // DuplicateGroup：重复组结果（docs/03 §4.2）
+        let duplicateGroup = NSEntityDescription()
+        duplicateGroup.name = "DuplicateGroup"
+        duplicateGroup.managedObjectClassName = "NSManagedObject"
+        duplicateGroup.properties = [
+            attribute("id", .UUIDAttributeType, optional: false),
+            attribute("bestAssetID", .stringAttributeType, optional: false, defaultValue: ""),
+            attribute("memberIDsJSON", .stringAttributeType, optional: false, defaultValue: "[]"),
+            attribute("minHammingDistance", .integer16AttributeType, optional: false, defaultValue: 64),
+            attribute("status", .integer16AttributeType, optional: false, defaultValue: 0),
+            attribute("kind", .integer16AttributeType, optional: false, defaultValue: 0),
+            attribute("createdAt", .dateAttributeType, optional: false),
+        ]
+
+        // ScanSession：扫描进度（可中断恢复，docs/03 §4.2）
+        let scanSession = NSEntityDescription()
+        scanSession.name = "ScanSession"
+        scanSession.managedObjectClassName = "NSManagedObject"
+        scanSession.properties = [
+            attribute("id", .UUIDAttributeType, optional: false),
+            attribute("kind", .integer16AttributeType, optional: false, defaultValue: 0),
+            attribute("startedAt", .dateAttributeType, optional: false),
+            attribute("finishedAt", .dateAttributeType, optional: true),
+            attribute("scanned", .integer32AttributeType, optional: false, defaultValue: 0),
+            attribute("total", .integer32AttributeType, optional: false, defaultValue: 0),
+            attribute("cursor", .integer32AttributeType, optional: false, defaultValue: 0),
+            attribute("status", .integer16AttributeType, optional: false, defaultValue: 0),
+        ]
+
+        model.entities = [actionLog, trashItem, fingerprint, duplicateGroup, scanSession]
         return model
     }
 
