@@ -32,10 +32,12 @@ final class PhotoWriter: PhotoWriterProtocol {
     enum PhotoWriterError: LocalizedError {
         case changeRejected
         case albumNotFound
+        case cannotLoadImage
         var errorDescription: String? {
             switch self {
-            case .changeRejected: return "照片库写入被系统拒绝，请检查照片访问权限"
-            case .albumNotFound:  return "目标相簿不存在或已被删除"
+            case .changeRejected:   return "照片库写入被系统拒绝，请检查照片访问权限"
+            case .albumNotFound:    return "目标相簿不存在或已被删除"
+            case .cannotLoadImage:  return "无法读取原件（iCloud 原件可能未下载）"
             }
         }
     }

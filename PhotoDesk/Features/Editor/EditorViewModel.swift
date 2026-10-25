@@ -14,7 +14,7 @@ final class EditorViewModel: ObservableObject {
     let item: PhotoItem
 
     @Published private(set) var transform = PhotoDeskCore.EditorTransform()
-    @Published private(set) var adjustments = .neutral
+    @Published private(set) var adjustments = RenderAdjustments.neutral
     /// 当前渲染预览（含几何+调整，不含裁剪遮罩——遮罩由 VC 叠加）
     @Published private(set) var preview: UIImage?
     @Published private(set) var selectedAspect: PhotoDeskCore.CropAspectRatio = .free
@@ -213,7 +213,7 @@ final class EditorViewModel: ObservableObject {
 /// PHAdjustmentData 载荷（重启后系统把 data 交回 App 才能复现编辑；M6 先保证可序列化）
 struct EditorAdjustmentData: Codable {
     var transform: TransformPayload
-    var adjustments: Adjustments
+    var adjustments: RenderAdjustments
 
     struct TransformPayload: Codable {
         var cropX: Double, cropY: Double, cropWidth: Double, cropHeight: Double
