@@ -23,28 +23,7 @@ enum ExportError: LocalizedError {
     }
 }
 
-/// 编辑调整的滤镜值（Core Image 映射在此，值结构可序列化）
-public struct RenderAdjustments: Equatable, Codable {
-    var brightness: Double = 0     // -0.3...0.3
-    var contrast: Double = 1       // 0.5...1.5
-    var saturation: Double = 1     // 0...2
-    var temperature: Double = 6500 // 4000...8000
-    var sharpness: Double = 0      // 0...2
-
-    var isNeutral: Bool {
-        brightness == 0 && contrast == 1 && saturation == 1 && temperature == 6500 && sharpness == 0
-    }
-
-    /// 滑杆 UI（-1...1 归一）→ 参数
-    static func fromSliders(brightness: Double, contrast: Double, saturation: Double,
-                            temperature: Double, sharpness: Double) -> RenderAdjustments {
-        RenderAdjustments(brightness: brightness * 0.3,
-                          contrast: 1 + contrast * 0.5,
-                          saturation: max(0, 1 + saturation),
-                          temperature: 6500 + temperature * 1500,
-                          sharpness: max(0, sharpness))
-    }
-}
+// RenderAdjustments 定义于 Features/Editor/Adjustments.swift（五滑杆值结构，全模块共享）
 
 enum ExportRenderer {
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
