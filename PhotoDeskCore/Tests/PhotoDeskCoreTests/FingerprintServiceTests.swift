@@ -6,7 +6,7 @@ import XCTest
 import Foundation
 @testable import PhotoDeskCore
 
-final class HashAlgorithmTests: XCTestCase {
+final class FingerprintServiceTests: XCTestCase {
     /// 构造水平渐变 9×8（列号越大盘越亮）
     private func gradientDHashInput() -> [UInt8] {
         (0..<8).flatMap { _ in (0..<9).map { UInt8($0 * 28) } }
