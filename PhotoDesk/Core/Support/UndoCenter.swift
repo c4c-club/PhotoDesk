@@ -144,7 +144,6 @@ final class UndoCenter: ObservableObject {
 
     // MARK: - 过期计时
 
-    var onExpire: ((Entry) -> Void)?
 
     private func startTicker() {
         stopTicker()

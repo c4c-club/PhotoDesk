@@ -30,7 +30,7 @@ enum TrashError: LocalizedError {
 }
 
 /// 副本元数据（metaJSON 编解码；恢复 creationDate / GPS 用）
-struct TrashMeta: Codable {
+struct TrashMeta: Codable, Equatable {
     var creationDate: Date?
     var latitude: Double?
     var longitude: Double?
