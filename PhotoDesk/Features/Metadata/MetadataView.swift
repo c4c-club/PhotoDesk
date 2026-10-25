@@ -89,15 +89,12 @@ struct MetadataView: View {
         .accessibilityLabel("\(title) \(value)")
     }
 
+    /// GPS 小地图（MKMapView 单针包装——SwiftUI Map 的注解重载在 iOS 15 SDK 下歧义，UIKit 包装最稳）
     private func miniMap(latitude: Double, longitude: Double) -> some View {
-        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        return Map(coordinateRegion: .constant(MKCoordinateRegion(
-            center: coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-        ))) {   // SwiftUI Map + 单针（iOS 14+，AGENTS.md 允许 MapKit）
-            MapMarker(coordinate: coordinate, tint: UIColor(ds: DSColor.tint))
-        }
-        .allowsHitTesting(false)   // 面板内地图禁手势（不与列表滚动冲突）
+        MiniMapView(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+            .frame(height: 140)
+            .listRowInsets(EdgeInsets())
+            .accessibilityLabel("位置小地图，坐标 \(String(format: "%.2f", latitude)), \(String(format: "%.2f", longitude))")
     }
 
     private var durationText: String? {
@@ -132,8 +129,9 @@ struct MetadataView: View {
         byteSize = (try? resource.value(forKey: "fileSize") as? Int64) ?? 0
         let filename = resource.originalFilename
         let ext = (filename as NSString).pathExtension
-        if let uti = resource.uniformTypeIdentifier, let type = UTType(uti) {
-            formatText = type.preferredLocalizedString ?? ext.uppercased()
+        let uti = resource.uniformTypeIdentifier
+        if let type = UTType(uti) {
+            formatText = type.localizedDescription.isEmpty ? ext.uppercased() : type.localizedDescription
         } else if !ext.isEmpty {
             formatText = ext.uppercased()
         }
@@ -157,4 +155,28 @@ struct MetadataView: View {
         }
         fields = MetadataParser.parse(properties: properties)
     }
+}
+
+/// MKMapView 单针小地图（信息面板用；禁交互，只读展示）
+private struct MiniMapView: UIViewRepresentable {
+    let coordinate: CLLocationCoordinate2D
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView()
+        map.isZoomEnabled = false
+        map.isScrollEnabled = false
+        map.isPitchEnabled = false
+        map.isRotateEnabled = false
+        map.isUserInteractionEnabled = false
+        map.backgroundColor = DSColor.bgSecondary
+        let annotation = MKPointAnnotation()
+        annotation.coordinate = coordinate
+        map.addAnnotation(annotation)
+        map.setRegion(MKCoordinateRegion(center: coordinate,
+                                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)),
+                       animated: false)
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {}
 }
