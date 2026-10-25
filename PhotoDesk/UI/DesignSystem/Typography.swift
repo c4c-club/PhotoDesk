@@ -39,8 +39,14 @@ enum DSTypography {
                            compatibleWith traits: UITraitCollection? = nil) -> UIFont {
         let scaledFont = font(style, compatibleWith: traits)
         guard scaledFont.pointSize > maxPoint else { return scaledFont }
-        // 封顶：保持字重，仅钳制点数
-        return UIFont.systemFont(ofSize: maxPoint, weight: scaledFont.fontWeight)
+        // 封顶：钳制点数、保持字重（UIFont 无 fontWeight 属性，按语义样式映射回字重）
+        let weight: UIFont.Weight
+        switch style {
+        case .largeTitle, .sectionHeader, .toast: weight = .semibold
+        case .body:                             weight = .regular
+        case .badge:                            weight = .medium
+        }
+        return UIFont.systemFont(ofSize: maxPoint, weight: style == .largeTitle ? .bold : weight)
     }
 
     private static func scaled(_ base: UIFont, _ textStyle: UIFont.TextStyle,
