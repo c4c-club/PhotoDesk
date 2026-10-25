@@ -48,6 +48,12 @@ final class GestureUITests: XCTestCase {
         let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
         start.press(forDuration: 0.05, thenDragTo: end)
 
+        // 拖拽后立即截图（诊断：浮层/Toast/弹窗的真实状态）
+        let afterDrag = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        afterDrag.name = "m2-after-drag"
+        afterDrag.lifetime = .keepAlways
+        add(afterDrag)
+
         // Toast「已收藏 · 撤销」
         let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
         XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")

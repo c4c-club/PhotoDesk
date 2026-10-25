@@ -83,12 +83,14 @@ jobs:
             -skip-testing:PhotoDeskUITests/PerformanceUITests test
 
       - name: Extract UI test attachments
+        if: always()
         run: |
           mkdir -p build/attachments
           xcrun xcresulttool export attachments --path build/TestResults.xcresult \
             --output-path build/attachments || echo "附件提取失败（非致命）"
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ui-test-attachments
           path: build/attachments
