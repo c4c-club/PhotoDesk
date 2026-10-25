@@ -161,39 +161,49 @@ struct StorageStatsView: View {
         .accessibilityLabel("\(slice.name) \(Self.byteFormatter.string(fromByteCount: slice.bytes))，占 \(percent(of: slice.bytes))%")
     }
 
-    // MARK: - 自绘柱状（Path 矩形）
+    // MARK: - 自绘柱状（Path 矩形；几何计算拆分为小函数避免表达式类型检查超时）
+
+    private var barChartMaxBytes: Int64 {
+        max(1, bars.map(\.bytes).max() ?? 1)
+    }
+
+    /// 单根柱的矩形（heights 基于 proxy 尺寸预计算传入）
+    private func barRect(index: Int, count: Int, bar: YearBar,
+                         size: CGSize, maxBytes: Int64) -> CGRect {
+        let step = size.width / CGFloat(max(1, count))
+        let barWidth = step * 0.6
+        let plotHeight = size.height - 34
+        let barHeight = max(2, CGFloat(bar.bytes) / CGFloat(maxBytes) * plotHeight)
+        let x = CGFloat(index) * step + (step - barWidth) / 2
+        return CGRect(x: x, y: size.height - 14 - barHeight, width: barWidth, height: barHeight)
+    }
 
     private var barChart: some View {
-        let maxBytes = max(1, bars.map(\.bytes).max() ?? 1)
+        let maxBytes = barChartMaxBytes
+        let count = bars.count
         return GeometryReader { proxy in
-            let count = max(1, bars.count)
-            let step = proxy.size.width / CGFloat(count)
-            let barWidth = step * 0.6
             ZStack(alignment: .bottomLeading) {
                 // 基线
                 Path { path in
-                    path.move(to: CGPoint(x: 0, y: proxy.size.height - 14))
-                    path.addLine(to: CGPoint(x: proxy.size.width, y: proxy.size.height - 14))
+                    let y = proxy.size.height - 14
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: proxy.size.width, y: y))
                 }
                 .stroke(Color(ds: DSColor.separator), lineWidth: 1)
 
                 ForEach(Array(bars.enumerated()), id: \.element.id) { index, bar in
-                    let height = CGFloat(bar.bytes) / CGFloat(maxBytes) * (proxy.size.height - 34)
-                    let x = CGFloat(index) * step + (step - barWidth) / 2
+                    let rect = barRect(index: index, count: count, bar: bar,
+                                        size: proxy.size, maxBytes: maxBytes)
                     Path { path in
-                        let rect = CGRect(x: x,
-                                          y: proxy.size.height - 14 - height,
-                                          width: barWidth,
-                                          height: max(2, height))
                         path.addRoundedRect(in: rect, cornerSize: CGSize(width: 2, height: 2))
                     }
                     .fill(Color(uiColor: DSColor.tint))
 
-                    // 年份标签（每根柱下方）
-                    Text(String(bar.year % 100).formatted(.number.precision(.integerLength(2))))
+                    // 年份标签（每根柱下方，两位年）
+                    Text(String(format: "%02d", bar.year % 100))
                         .font(.system(size: 8))
                         .foregroundColor(Color(ds: DSColor.textSecondary))
-                        .position(x: x + barWidth / 2, y: proxy.size.height - 6)
+                        .position(x: rect.midX, y: proxy.size.height - 6)
                 }
             }
         }
