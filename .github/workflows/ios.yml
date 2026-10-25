@@ -79,7 +79,20 @@ jobs:
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults.xcresult \
             -skip-testing:PhotoDeskUITests/PerformanceUITests test
+
+      - name: Extract UI test attachments
+        run: |
+          mkdir -p build/attachments
+          xcrun xcresulttool export attachments --path build/TestResults.xcresult \
+            --output-path build/attachments || echo "附件提取失败（非致命）"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-attachments
+          path: build/attachments
+          if-no-files-found: ignore
 
       - name: Package simulator app
         run: |

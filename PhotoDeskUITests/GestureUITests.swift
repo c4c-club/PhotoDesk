@@ -1,0 +1,61 @@
+// MARK: - 职责说明：M2 核心手势 UI 测试（docs/05 M2 任务 2.12 / docs/06 §6.2）——
+// 真实用户路径：授权（中断监视器）→ 网格 → 进全屏浏览器 → press(forDuration:thenDragTo:) 慢速垂直上滑
+// → 断言 Toast「已收藏」出现 → 附加关键帧截图（CI 经 xcresulttool 提取上传 artifact）。
+
+import XCTest
+
+final class GestureUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    func testSwipeUpFavoritesShowsToast() throws {
+        let app = XCUIApplication()
+        addUIInterruptionMonitor(withDescription: "Photos permission") { alert in
+            for index in 0..<alert.buttons.count {
+                let button = alert.buttons.element(boundBy: index)
+                let label = button.label
+                let isAllow = label.contains("Allow") || label.contains("允许")
+                let isDeny = label.contains("Don't") || label.contains("不允许")
+                if isAllow && !isDeny {
+                    button.tap()
+                    return true
+                }
+            }
+            return false
+        }
+        app.launch()
+
+        // 授权引导 → 系统弹窗（已授权则跳过）
+        let introButton = app.buttons["允许访问照片"]
+        if introButton.waitForExistence(timeout: 10) {
+            introButton.tap()
+            app.tap()
+        }
+
+        // 网格就绪
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现")
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格没有任何 cell")
+
+        // 进全屏浏览器
+        collection.cells.firstMatch.tap()
+        let viewer = app.otherElements["ViewerRoot"]
+        XCTAssertTrue(viewer.waitForExistence(timeout: 10), "全屏浏览器未出现")
+
+        // 慢速垂直上滑（docs/06 §6.2：慢速拖拽确保被识别）→ 默认上滑 = 收藏
+        let start = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+        let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        // Toast「已收藏 · 撤销」
+        let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
+        XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")
+
+        // 关键帧截图（CI 提取 artifact，验收报告用）
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "m2-gesture-toast"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

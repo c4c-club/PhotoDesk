@@ -27,6 +27,8 @@ final class LibraryViewController: UIViewController {
     private var currentItemsBySection: [[PhotoItem]] = []
     /// 上一次布局时配置 cell 所用的像素尺寸（变化时重配可视 cell）
     private var lastConfiguredPixelSize: CGSize = .zero
+    /// 网格点击 → 打开全屏浏览器（扁平 index：Section=月份 → 全序换算）
+    var onOpenViewer: ((Int) -> Void)?
 
     init(viewModel: LibraryViewModel, pipeline: ImagePipelineProtocol, settings: SettingsStore) {
         self.viewModel = viewModel
@@ -65,6 +67,7 @@ final class LibraryViewController: UIViewController {
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         collectionView.backgroundColor = .clear
         collectionView.delegate = self
+        collectionView.allowsSelection = true
         view.addSubview(collectionView)
     }
 
@@ -214,6 +217,16 @@ final class LibraryViewController: UIViewController {
 // MARK: - Delegate（分页 + 预取）
 
 extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        // 扁平 index：按 section 累加前缀 + 组内偏移（Viewer 以 items 全序定位起始页）
+        var flatIndex = 0
+        for section in 0..<indexPath.section {
+            flatIndex += currentItemsBySection[safe: section]?.count ?? 0
+        }
+        flatIndex += indexPath.item
+        onOpenViewer?(flatIndex)
+    }
+
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         // 接近底部 → 续页（每批 500）
         let threshold = scrollView.contentSize.height - scrollView.bounds.height * 2

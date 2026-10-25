@@ -9,6 +9,7 @@ import UIKit
 struct LibraryRootView: View {
     @ObservedObject var viewModel: LibraryViewModel
     @ObservedObject var service: PhotoLibraryService
+    @State private var viewerAnchor: ViewerAnchor?
 
     var body: some View {
         Group {
@@ -29,7 +30,9 @@ struct LibraryRootView: View {
                 DSEmptyState(kind: .empty)
             case .ready:
                 ZStack(alignment: .bottom) {
-                    LibraryContainer(viewModel: viewModel)
+                    LibraryContainer(viewModel: viewModel) { index in
+                        viewerAnchor = ViewerAnchor(startIndex: index)
+                    }
                     if viewModel.isLimitedAccess {
                         DSEmptyState(kind: .limited) {
                             viewModel.requestManageLimitedPhotos()
@@ -38,6 +41,9 @@ struct LibraryRootView: View {
                     }
                 }
             }
+        }
+        .fullScreenCover(item: $viewerAnchor) { anchor in
+            ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(startIndex: anchor.startIndex))
         }
         .onAppear {
             Task { await viewModel.start() }
@@ -63,6 +69,8 @@ struct LibraryRootView: View {
 
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel
+    /// 点击 cell → 打开全屏浏览器（flatIndex）
+    let onOpenViewer: (Int) -> Void
     @AppStorage("grid.columns") private var gridColumns = 3
 
     func makeUIViewController(context: Context) -> LibraryViewController {
@@ -70,6 +78,7 @@ struct LibraryContainer: UIViewControllerRepresentable {
                                                pipeline: AppContainer.shared.imagePipeline,
                                                settings: AppContainer.shared.settings)
         controller.setColumns(gridColumns)
+        controller.onOpenViewer = onOpenViewer
         return controller
     }
 

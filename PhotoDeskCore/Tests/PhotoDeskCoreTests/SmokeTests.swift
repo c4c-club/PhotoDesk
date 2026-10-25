@@ -8,13 +8,14 @@ final class SmokeTests: XCTestCase {
     func testPackageImportsAndAllPlaceholdersLink() {
         XCTAssertFalse(PhotoDeskCoreInfo.placeholderVersion.isEmpty)
 
-        // 手势判定占位：stub 约定（direction=nil / locked=false）
+        // 手势判定（P2 已实现）：横向不判向；500pt 垂直位移必锁
         let resolver = SwipeResolver(config: SwipeConfig(distanceThreshold: 120,
                                                          velocityThreshold: 700,
                                                          minDistanceForVelocity: 40,
                                                          confirmRequired: true))
         XCTAssertNil(resolver.direction(dx: 100, dy: 0))
-        XCTAssertFalse(resolver.isLocked(dx: 0, dy: 500, vx: 0, vy: 1000))
+        XCTAssertTrue(resolver.isLocked(dx: 0, dy: 500, vx: 0, vy: 1000))
+        XCTAssertEqual(resolver.direction(dx: 0, dy: -500), .up)
         XCTAssertEqual(Sensitivity.allCases.count, 3)
 
         // 撤销 / 分组占位

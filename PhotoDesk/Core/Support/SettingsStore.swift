@@ -7,24 +7,55 @@ import PhotoDeskCore
 /// 上滑/下滑可绑定的动作（docs/03 §4.3）
 enum SwipeAction: String, CaseIterable, Codable {
     case favorite, unfavorite, toggleFavorite
-    case hide, unhide, delete
+    case hide, unhide, moveToRecentlyDeleted
     case addToAlbum, share, showInfo, rotate, dismiss, none
 
-    /// 展示名（docs/04 §7 文案口径：删除一律「移到最近删除」）
+    /// 展示名（docs/04 §7 文案口径：删除一律「移到最近删除」，禁用「彻底删除」）
     var displayName: String {
         switch self {
-        case .favorite:        return "收藏"
-        case .unfavorite:      return "取消收藏"
-        case .toggleFavorite:  return "切换收藏"
-        case .hide:            return "隐藏"
-        case .unhide:          return "取消隐藏"
-        case .delete:          return "移到最近删除"
-        case .addToAlbum:      return "加入相簿"
-        case .share:           return "分享"
-        case .showInfo:        return "查看信息"
-        case .rotate:          return "旋转"
-        case .dismiss:         return "退出浏览"
-        case .none:            return "无"
+        case .favorite:               return "收藏"
+        case .unfavorite:             return "取消收藏"
+        case .toggleFavorite:         return "切换收藏"
+        case .hide:                   return "隐藏"
+        case .unhide:                 return "取消隐藏"
+        case .moveToRecentlyDeleted:  return "移到最近删除"
+        case .addToAlbum:             return "加入相簿"
+        case .share:                  return "分享"
+        case .showInfo:               return "查看信息"
+        case .rotate:                 return "旋转"
+        case .dismiss:                return "退出浏览"
+        case .none:                   return "无"
+        }
+    }
+
+    /// Toast 文案（docs/04 §7：「已收藏 · 撤销」「已隐藏 · 撤销」「已移到最近删除 · 撤销」）
+    var toastText: String {
+        switch self {
+        case .favorite:              return "已收藏"
+        case .unfavorite:            return "已取消收藏"
+        case .toggleFavorite:        return "已切换收藏"
+        case .hide:                  return "已隐藏"
+        case .unhide:                return "已取消隐藏"
+        case .moveToRecentlyDeleted: return "已移到最近删除"
+        case .addToAlbum:            return "已加入相簿"
+        case .share:                 return "已分享"
+        case .showInfo:              return "信息"
+        case .rotate:                return "已旋转"
+        case .dismiss:               return "已退出"
+        case .none:                  return ""
+        }
+    }
+
+    /// 浮层「松手…」文案（docs/04 §3.2）
+    var overlayPrompt: String {
+        "松手" + displayName
+    }
+
+    /// 破坏性动作：需要二次确认（设置 gesture.confirmDestructive 开启时）
+    var isDestructive: Bool {
+        switch self {
+        case .hide, .moveToRecentlyDeleted: return true
+        default: return false
         }
     }
 }

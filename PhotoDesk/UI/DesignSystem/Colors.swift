@@ -32,6 +32,12 @@ enum DSColor {
     static let accentHide = dynamic(light: 0x5C6BC0, dark: 0x8C9EFF)
     /// 移到最近删除（红）
     static let accentDelete = dynamic(light: 0xE53935, dark: 0xFF5252)
+    /// 加入相簿（青，docs/04 §3.2；文档未定义深色变体，两态同色）
+    static let accentAlbum = dynamic(light: 0x26A69A, dark: 0x26A69A)
+    /// 分享（蓝，docs/04 §3.2；文档未定义深色变体，两态同色）
+    static let accentShare = dynamic(light: 0x42A5F5, dark: 0x42A5F5)
+    /// 信息（灰，docs/04 §3.2；文档未定义深色变体，两态同色）
+    static let accentInfo = dynamic(light: 0x78909C, dark: 0x78909C)
     /// 分割线（浅色 30% / 深色 60%）
     static let separator = dynamic(light: 0xC6C6C8, lightAlpha: 0.3, dark: 0x38383A, darkAlpha: 0.6)
 }

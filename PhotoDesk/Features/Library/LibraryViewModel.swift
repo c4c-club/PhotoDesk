@@ -93,6 +93,9 @@ final class LibraryViewModel: ObservableObject {
         "state=\(viewState) items=\(items.count)/\(totalCount) sections=\(sections.count) loadingMore=\(isLoadingMore)"
     }
 
+    /// 浏览页快照入口：当前已加载条目的扁平拷贝（浏览页内自管；关闭后库侧经 observer 增量同步）
+    var itemsSnapshot: [PhotoItem] { items }
+
     // MARK: - 加载与分页
 
     private func loadIfNeeded() async {

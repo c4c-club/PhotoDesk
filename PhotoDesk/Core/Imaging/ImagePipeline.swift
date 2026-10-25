@@ -3,6 +3,7 @@
 // 同 id+size 在途请求合并（TaskBox）；解码并发上限 4（AGENTS.md §3.5，AsyncSemaphore）；
 // iCloud-only 未下载时返回 nil（isNetworkAccessAllowed 由设置控制，docs/03 §5.8）。
 
+import AVFoundation
 import Photos
 import UIKit
 
@@ -13,8 +14,11 @@ protocol ImagePipelineProtocol: AnyObject {
     func prefetch(ids: [String], size: CGSize)
     /// 取消某 id 的在途请求与预取（cell 离屏）
     func cancel(id: String)
-    /// 大图（浏览页，M2）：opportunistic 先低清后高清，progress 上报下载进度
-    func fullImage(for id: String, progress: @escaping (Double) -> Void) async -> UIImage?
+    /// 大图（浏览页）：opportunistic 先低清后高清，progress 上报下载进度。
+    /// allowNetwork：iCloud 手动下载时由「下载」按钮置 true，否则跟随设置（docs/03 §5.8）
+    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage?
+    /// 视频播放资产（浏览页视频 cell；用 iOS 8+ 的 requestAVAsset，兼容 iOS 15）
+    func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)?
 }
 
 /// 在途任务包装（Task 是结构体，用类做身份比较以便合并/清理）
@@ -140,12 +144,12 @@ final class ImagePipeline: ImagePipelineProtocol {
         }
     }
 
-    func fullImage(for id: String, progress: @escaping (Double) -> Void) async -> UIImage? {
+    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
         guard let asset = assets.firstObject else { return nil }
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic           // 先低清后高清（docs/02 §3.2）
-        options.isNetworkAccessAllowed = allowsNetworkAccess()
+        options.isNetworkAccessAllowed = allowsNetworkAccess() || allowNetwork
         options.resizeMode = .none
         options.progressHandler = { fraction, _, _, _ in
             progress(fraction)
@@ -159,10 +163,24 @@ final class ImagePipeline: ImagePipelineProtocol {
             ) { image, info in
                 let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                 guard !isDegraded else { return }        // 只在最终结果恢复 continuation
-                // iCloud-only 且未允许联网：image 为 nil + PHImageResultIsInCloudKey（M2 上「下载」按钮与环形进度）
+                // iCloud-only 且未允许联网：image 为 nil + PHImageResultIsInCloudKey（「下载」按钮与环形进度）
                 continuation.resume(returning: image)
             }
-            _ = requestID   // M2：浏览页持有 requestID 以便切页取消
+            _ = requestID   // 浏览页切页取消：M3 随批量取消一并完善
+        }
+    }
+
+    func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)? {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+        guard let asset = assets.firstObject, asset.mediaType == .video else { return nil }
+        return await withCheckedContinuation { continuation in
+            PHImageManager.default().requestAVAsset(forVideo: asset, options: nil) { avAsset, audioMix, _ in
+                guard let avAsset else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: (avAsset, audioMix))
+            }
         }
     }
 
