@@ -131,7 +131,8 @@ struct MetadataView: View {
         let ext = (filename as NSString).pathExtension
         let uti = resource.uniformTypeIdentifier
         if let type = UTType(uti) {
-            formatText = type.localizedDescription.isEmpty ? ext.uppercased() : type.localizedDescription
+            let localized = type.localizedDescription ?? ""
+            formatText = localized.isEmpty ? ext.uppercased() : localized
         } else if !ext.isEmpty {
             formatText = ext.uppercased()
         }
