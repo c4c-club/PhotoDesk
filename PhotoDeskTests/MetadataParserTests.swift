@@ -94,10 +94,10 @@ final class MetadataParserTests: XCTestCase {
     }
 
     func testDecimalGPSFallback() {
-        // 部分来源直接给十进制（无 DMS 元组）
+        // 部分来源直接给十进制（无 DMS 元组）：符号语义与 DMS 路径一致（Ref 决定正负）
         let properties: [String: Any] = [
             kCGImagePropertyGPSDictionary as String: [
-                kCGImagePropertyGPSLatitude as String: -33.8688,
+                kCGImagePropertyGPSLatitude as String: 33.8688,
                 kCGImagePropertyGPSLatitudeRef as String: "S",
             ],
         ]

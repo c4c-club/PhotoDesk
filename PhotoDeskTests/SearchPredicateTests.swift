@@ -165,7 +165,8 @@ final class SearchPredicateTests: XCTestCase {
     func testTenThousandItemsUnderHalfSecond() {
         var items: [PhotoItem] = []
         items.reserveCapacity(10_000)
-        let base = calendar.date(from: DateComponents(year: 2015, month: 6, day: 15))!
+        // 基值 2021-01-01，每张 +1h → 跨度约 416 天，2021 年内必有大量命中
+        let base = calendar.date(from: DateComponents(year: 2021, month: 1, day: 1))!
         for index in 0..<10_000 {
             let date = base.addingTimeInterval(Double(index) * 3_600)
             items.append(PhotoItem(id: "item-\(index)",
@@ -191,7 +192,7 @@ final class SearchPredicateTests: XCTestCase {
         let results = PhotoFilter.apply(items, predicate: predicate, calendar: calendar)
         let elapsed = Date().timeIntervalSince(start)
 
-        XCTAssertFalse(results.isEmpty)
+        XCTAssertFalse(results.isEmpty, "2021 年应有命中（合成数据覆盖 2021 全年）")
         XCTAssertLessThan(elapsed, 0.5, "10,000 张组合筛选耗时 \(elapsed * 1000)ms，预算 500ms")
     }
 }
