@@ -5,6 +5,7 @@
 
 import XCTest
 import ImageIO
+import PhotoDeskCore
 import UniformTypeIdentifiers
 @testable import PhotoDesk
 
