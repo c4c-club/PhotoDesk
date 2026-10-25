@@ -70,7 +70,6 @@ final class ViewerViewController: UIViewController {
         }
         viewModel.onUndoApplied = { [weak self] in
             self?.refreshChrome()
-            self?.reloadCurrentCell()
         }
 
         modalPresentationStyle = .fullScreen
@@ -120,7 +119,7 @@ final class ViewerViewController: UIViewController {
 
     private func setupTopBar() {
         topBar.translatesAutoresizingMaskIntoConstraints = false
-        topBar.setBackgroundImage(UIImage(), forToolbarPosition: .any)
+        topBar.setBackgroundImage(UIImage(), forToolbarPosition: .any, barMetrics: .default)
         topBar.setShadowImage(UIImage(), forToolbarPosition: .any)
         topBar.barTintColor = .clear
         view.addSubview(topBar)
@@ -192,8 +191,11 @@ final class ViewerViewController: UIViewController {
     // MARK: - Pan 手势（docs/03 §5.1）
 
     @objc private func onPan(_ gesture: UIPanGestureRecognizer) {
-        let translation = gesture.translation(in: view)
-        let velocity = gesture.velocity(in: view)
+        let rawTranslation = gesture.translation(in: view)
+        let rawVelocity = gesture.velocity(in: view)
+        // UIPanGestureRecognizer 返回 CGPoint；核心包判定接口为 Double（docs/03 §5.10），统一转 CGSize
+        let translation = CGSize(width: rawTranslation.x, height: rawTranslation.y)
+        let velocity = CGSize(width: rawVelocity.x, height: rawVelocity.y)
         switch gesture.state {
         case .began:
             engine.begin()
@@ -255,7 +257,8 @@ final class ViewerViewController: UIViewController {
         }
 
         let proceed = { [weak self] in
-            self?.perform(action: action, direction: direction, translationY: translationY)
+            guard let self else { return }
+            self.perform(action: action, direction: direction, translationY: translationY)
         }
 
         // 破坏性动作二次确认（docs/04 §7 文案；系统对删除另有一次性确认弹窗，无法绕过）
@@ -294,7 +297,7 @@ final class ViewerViewController: UIViewController {
             guard let self else { return }
             let outcome = await self.viewModel.execute(action, for: item)
             switch outcome {
-            case .success(let updated, let toastText, _):
+            case .success(let updated, _, _):
                 self.flyOut(direction: direction, action: action) {
                     self.finishAfterAction(updated: updated)
                 }
@@ -492,7 +495,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                 Task { @MainActor in cell.updateDownloadProgress(fraction) }
             }, allowNetwork: true)
             if let image {
-                cell.applyDownloadedImage(image, token: self.loadTokens[self.viewModel.currentIndex] ?? 0)
+                cell.applyDownloadedImage(image)
             }
         }
     }

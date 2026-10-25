@@ -73,8 +73,9 @@ final class UndoCenter: ObservableObject {
     private func startTicker() {
         stopTicker()
         ticker = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            guard let weakSelf = self else { return }
             Task { @MainActor in
-                self?.expireIfNeeded()
+                weakSelf.expireIfNeeded()
             }
         }
     }
