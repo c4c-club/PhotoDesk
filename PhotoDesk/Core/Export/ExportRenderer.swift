@@ -24,7 +24,7 @@ enum ExportError: LocalizedError {
 }
 
 /// 编辑调整的滤镜值（Core Image 映射在此，值结构可序列化）
-struct RenderAdjustments: Equatable {
+public struct RenderAdjustments: Equatable, Codable {
     var brightness: Double = 0     // -0.3...0.3
     var contrast: Double = 1       // 0.5...1.5
     var saturation: Double = 1     // 0...2

@@ -66,9 +66,6 @@ final class EditorViewController: UIViewController {
         cropOverlay.onCropChanged = { [weak self] rect in
             self?.applyCrop(viewRect: rect)
         }
-        cropOverlay.onCropCommitted = { [weak self] in
-            self?.syncTransformFromOverlay()
-        }
 
         NSLayoutConstraint.activate([
             previewView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -86,7 +83,7 @@ final class EditorViewController: UIViewController {
         for preset in PhotoDeskCore.CropAspectRatio.presets {
             let button = UIButton(type: .system)
             button.setTitle(preset.name, for: .normal)
-            button.titleLabel?.font = DSTypography.font(.caption)
+            button.titleLabel?.font = DSTypography.font(.badge)
             button.setTitleColor(DSColor.textPrimary, for: .normal)
             button.backgroundColor = DSColor.bgSecondary
             button.layer.cornerRadius = 12
@@ -132,7 +129,7 @@ final class EditorViewController: UIViewController {
         for (index, name) in sliderNames.enumerated() {
             let label = UILabel()
             label.text = name
-            label.font = DSTypography.font(.caption)
+            label.font = DSTypography.font(.badge)
             label.textColor = DSColor.textSecondary
             label.translatesAutoresizingMaskIntoConstraints = false
             label.widthAnchor.constraint(equalToConstant: 44).isActive = true

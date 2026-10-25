@@ -13,7 +13,7 @@ final class EditorViewModel: ObservableObject {
     let item: PhotoItem
 
     @Published private(set) var transform = PhotoDeskCore.EditorTransform()
-    @Published private(set) var adjustments = RenderAdjustments()
+    @Published private(set) var adjustments = .neutral
     /// 当前渲染预览（含几何+调整，不含裁剪遮罩——遮罩由 VC 叠加）
     @Published private(set) var preview: UIImage?
     @Published private(set) var selectedAspect: PhotoDeskCore.CropAspectRatio = .free

@@ -223,7 +223,6 @@ final class PhotoWriter: PhotoWriterProtocol {
                 }
             }
         }
-        guard input.canPerformAdjustment else { throw PhotoWriterError.changeRejected }
 
         let output = PHContentEditingOutput(contentEditingInput: input)
         try await render(output.renderedContentURL)
