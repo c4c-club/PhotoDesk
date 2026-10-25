@@ -54,6 +54,34 @@ final class PhotoGridCell: UICollectionViewCell {
 
     private var loadTask: Task<Void, Never>?
     private var configureToken = 0
+    /// 多选选中角标（docs/05 M3 任务 5）
+    private let selectionBadge: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        view.tintColor = DSColor.tint
+        view.backgroundColor = UIColor.white
+        view.layer.cornerRadius = 11
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+
+    /// 多选模式可见性 / 选中态（VC 在进入/退出多选时批量刷新）
+    func setSelectionVisible(_ visible: Bool) {
+        selectionBadge.isHidden = !visible || !isSelectedCell
+    }
+
+    private var isSelectedCell = false {
+        didSet {
+            selectionBadge.isHidden = !isSelectingVisible || !isSelectedCell
+        }
+    }
+    private var isSelectingVisible = false
+
+    func setSelected(_ selected: Bool) {
+        isSelectedCell = selected
+        contentView.layer.borderWidth = selected ? 2 : 0
+        contentView.layer.borderColor = DSColor.tint.cgColor
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -65,6 +93,7 @@ final class PhotoGridCell: UICollectionViewCell {
         contentView.addSubview(liveBadge)
         contentView.addSubview(screenshotBadge)
         contentView.addSubview(durationLabel)
+        contentView.addSubview(selectionBadge)
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -84,6 +113,11 @@ final class PhotoGridCell: UICollectionViewCell {
             durationLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             durationLabel.heightAnchor.constraint(equalToConstant: 14),
             durationLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 26),
+
+            selectionBadge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+            selectionBadge.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            selectionBadge.widthAnchor.constraint(equalToConstant: 22),
+            selectionBadge.heightAnchor.constraint(equalToConstant: 22),
         ])
         isAccessibilityElement = true
         accessibilityTraits = [.image, .button]

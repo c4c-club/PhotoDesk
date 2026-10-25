@@ -43,6 +43,9 @@ final class LibraryViewModel: ObservableObject {
     private let service: PhotoLibraryService
     private let repository: AssetRepositoryProtocol
     private let pipeline: ImagePipelineProtocol
+    private let writer: PhotoWriterProtocol
+    private let trashBin: TrashBin
+    private let undoCenter: UndoCenter
     private let batchSize = AssetRepository.batchSize
 
     // MARK: - 内部状态
@@ -54,10 +57,16 @@ final class LibraryViewModel: ObservableObject {
 
     init(service: PhotoLibraryService,
          repository: AssetRepositoryProtocol,
-         pipeline: ImagePipelineProtocol) {
+         pipeline: ImagePipelineProtocol,
+         writer: PhotoWriterProtocol,
+         trashBin: TrashBin,
+         undoCenter: UndoCenter) {
         self.service = service
         self.repository = repository
         self.pipeline = pipeline
+        self.writer = writer
+        self.trashBin = trashBin
+        self.undoCenter = undoCenter
     }
 
     // MARK: - 生命周期
@@ -95,6 +104,90 @@ final class LibraryViewModel: ObservableObject {
 
     /// 浏览页快照入口：当前已加载条目的扁平拷贝（浏览页内自管；关闭后库侧经 observer 增量同步）
     var itemsSnapshot: [PhotoItem] { items }
+
+    /// 库侧撤销（批量操作 Toast / 重启恢复横幅共用）：PhotoKit 反向写后经 observer 增量同步网格
+    func undoLatest() async {
+        _ = await undoCenter.undo()
+    }
+
+    // MARK: - 批量操作（docs/05 M3 任务 5）
+
+    enum BatchAction {
+        case setFavorite(Bool)
+        case setHidden(Bool)
+        case moveToRecentlyDeleted
+        case addToAlbum(albumID: String)
+    }
+
+    struct BatchOutcome {
+        let succeeded: Int
+        let needsDownload: Int
+        var message: String {
+            var text = "已完成 \(succeeded) 项"
+            if needsDownload > 0 {
+                text += "；\(needsDownload) 张在 iCloud，请先下载原件"
+            }
+            return text
+        }
+    }
+
+    /// 批量执行（移到最近删除前逐张落 TrashBin 副本；iCloud-only 计入 needsDownload 不执行）
+    func performBatch(_ action: BatchAction, ids: [String]) async -> BatchOutcome {
+        guard !ids.isEmpty else { return BatchOutcome(succeeded: 0, needsDownload: 0) }
+        do {
+            switch action {
+            case .setFavorite(let favorite):
+                try await writer.setFavorite(ids: ids, isFavorite: favorite)
+                undoCenter.push(kind: favorite ? .favorite(ids) : .unfavorite(ids),
+                                assetIDs: ids,
+                                toastText: favorite ? "已收藏" : "已取消收藏",
+                                window: settings.undoWindow)
+                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
+
+            case .setHidden(let hidden):
+                try await writer.setHidden(ids: ids, isHidden: hidden)
+                undoCenter.push(kind: hidden ? .hide(ids) : .unhide(ids),
+                                assetIDs: ids,
+                                toastText: hidden ? "已隐藏" : "已取消隐藏",
+                                window: settings.undoWindow)
+                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
+
+            case .addToAlbum(let albumID):
+                try await writer.add(ids: ids, toAlbum: albumID)
+                undoCenter.push(kind: .addToAlbum(assetIDs: ids, albumID: albumID),
+                                assetIDs: ids,
+                                albumID: albumID,
+                                toastText: "已加入相簿",
+                                window: settings.undoWindow)
+                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
+
+            case .moveToRecentlyDeleted:
+                // 红线 1：逐张落撤销保险副本（iCloud-only 拒绝并计数）→ deleteAssets（唯一删除实现）
+                var records: [TrashRecord] = []
+                var needsDownload = 0
+                for id in ids {
+                    do {
+                        records.append(try await trashBin.storeCopy(forAssetID: id))
+                    } catch TrashError.needsDownload {
+                        needsDownload += 1
+                    }
+                }
+                let originIDs = records.map(\.originLocalID)
+                guard !originIDs.isEmpty else {
+                    return BatchOutcome(succeeded: 0, needsDownload: needsDownload)
+                }
+                try await writer.moveToRecentlyDeleted(ids: originIDs)
+                undoCenter.push(kind: .moveToRecentlyDeleted(trashRecordIDs: records.map(\.id), originIDs: originIDs),
+                                assetIDs: originIDs,
+                                trashRecordIDs: records.map(\.id),
+                                toastText: "已移到最近删除",
+                                window: settings.undoWindow)
+                return BatchOutcome(succeeded: originIDs.count, needsDownload: needsDownload)
+            }
+        } catch {
+            return BatchOutcome(succeeded: 0, needsDownload: 0)
+        }
+    }
 
     // MARK: - 加载与分页
 

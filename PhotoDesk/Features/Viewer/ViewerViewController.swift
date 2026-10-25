@@ -334,11 +334,14 @@ final class ViewerViewController: UIViewController {
             }
             #endif
             switch outcome {
-            case .success(let updated, _, _):
+            case .success(let updated, _):
                 self.flyOut(direction: direction, action: action) {
                     self.finishAfterAction(updated: updated)
                 }
                 self.showToast(for: action, allowUndo: true)
+                #if DEBUG
+                self.updateDebugLabel("exec:\(action) ✓ \(self.toast.debugState)")
+                #endif
 
             case .rejected(let message):
                 guard !message.isEmpty else { return }

@@ -15,26 +15,34 @@ final class AppContainer: ObservableObject {
     let imagePipeline: ImagePipelineProtocol
     let photoWriter = PhotoWriter()
     let undoCenter: UndoCenter
+    let trashBin: TrashBin
+    let vaultService = VaultService()
 
     lazy var libraryViewModel = LibraryViewModel(service: libraryService,
                                                  repository: assetRepository,
-                                                 pipeline: imagePipeline)
+                                                 pipeline: imagePipeline,
+                                                 writer: photoWriter,
+                                                 trashBin: trashBin,
+                                                 undoCenter: undoCenter)
 
-    /// 浏览页每次打开新建（持有 items 快照与起始页）；写操作共享 photoWriter / undoCenter
+    /// 浏览页每次打开新建（持有 items 快照与起始页）；写操作共享 photoWriter / undoCenter / trashBin
     func makeViewerViewModel(startIndex: Int) -> ViewerViewModel {
         ViewerViewModel(items: libraryViewModel.itemsSnapshot,
                         startIndex: startIndex,
                         settings: settings,
                         writer: photoWriter,
+                        trashBin: trashBin,
                         undoCenter: undoCenter)
     }
 
     private init() {
+        let persistence = PersistenceController.shared
         assetRepository = AssetRepository()
         // 捕获 settings 实例本身（不能引用 AppContainer.shared：静态 let 初始化进行中会死锁）
         let settingsRef = settings
         let writerRef = photoWriter
         imagePipeline = ImagePipeline(allowsNetworkAccess: { settingsRef.autoDownloadOriginal })
-        undoCenter = UndoCenter(writer: writerRef)
+        trashBin = TrashBin(persistence: persistence, settings: settingsRef)
+        undoCenter = UndoCenter(writer: writerRef, trashBin: trashBin, persistence: persistence)
     }
 }

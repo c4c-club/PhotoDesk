@@ -158,6 +158,11 @@ final class DSToast: UIView {
         }, completion: { _ in finish() })
     }
 
+    /// DEBUG 诊断（Viewer 横幅用；Release 无引用）
+    var debugState: String {
+        "toast a=\(String(format: "%.1f", alpha)) hidden=\(isHidden) text=\(messageLabel.text ?? "-")"
+    }
+
     // MARK: - 环形倒计时（每帧刷新 strokeEnd）
 
     private func startRingTimer() {

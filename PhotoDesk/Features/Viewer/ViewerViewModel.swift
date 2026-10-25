@@ -1,7 +1,8 @@
-// MARK: - 职责说明：全屏浏览器 ViewModel（docs/05 M2 任务 2.6 执行管线）——
+// MARK: - 职责说明：全屏浏览器 ViewModel（docs/05 M2 任务 2.6 执行管线 / M3 任务 3.2）——
 // 持有照片快照（LibraryViewModel.items 的值拷贝，关闭浏览器后由库侧 observer 增量同步）；
-// 方向 → 动作解析（设置 gesture.up/down）；动作执行（PhotoWriter）→ 撤销入栈（UndoCenter）→ autoAdvance 标记。
-// 红线 1：moveToRecentlyDeleted 在 TrashBin（M3）就绪前不执行，明确拒绝而非假装成功。
+// 方向 → 动作解析（设置 gesture.up/down）；动作执行（PhotoWriter / TrashBin）→ 撤销入栈（UndoCenter）。
+// 红线 1：moveToRecentlyDeleted 前必经 TrashBin 落副本（iCloud 未下载 → .needsDownload 拒绝并提示
+// 「请先下载原件」）；副本开关关闭时直接删除（系统「最近删除」30 天兜底，撤销窗口内不提供恢复）。
 
 import Foundation
 import PhotoDeskCore
@@ -10,9 +11,9 @@ import PhotoDeskCore
 final class ViewerViewModel: ObservableObject {
     /// 动作执行结果
     enum ActionOutcome {
-        /// 成功：更新后的 item + Toast 文案 + 可撤销条目
-        case success(PhotoItem, toastText: String, undo: UndoCenter.Entry.Kind?)
-        /// 拒绝执行（含「后续版本开放」），展示 message
+        /// 成功：更新后的 item + Toast 文案
+        case success(PhotoItem, toastText: String)
+        /// 拒绝执行，展示 message
         case rejected(String)
     }
 
@@ -20,7 +21,7 @@ final class ViewerViewModel: ObservableObject {
     @Published private(set) var currentIndex: Int
     @Published private(set) var isFavoriteCurrent = false
 
-    /// VC 注册：撤销成功后还原本地状态（favorite/hidden 取反）
+    /// VC 注册：撤销成功后还原本地状态
     var onUndoApplied: (() -> Void)?
 
     var current: PhotoItem? {
@@ -29,18 +30,21 @@ final class ViewerViewModel: ObservableObject {
     }
 
     private let settings: SettingsStore
-    private let writer: PhotoWriter
+    private let writer: PhotoWriterProtocol
+    private let trashBin: TrashBin
     private let undoCenter: UndoCenter
 
     init(items: [PhotoItem],
          startIndex: Int,
          settings: SettingsStore,
-         writer: PhotoWriter,
+         writer: PhotoWriterProtocol,
+         trashBin: TrashBin,
          undoCenter: UndoCenter) {
         self.items = items
         self.currentIndex = max(0, min(startIndex, max(0, items.count - 1)))
         self.settings = settings
         self.writer = writer
+        self.trashBin = trashBin
         self.undoCenter = undoCenter
         isFavoriteCurrent = current?.isFavorite ?? false
     }
@@ -62,31 +66,29 @@ final class ViewerViewModel: ObservableObject {
             switch action {
             case .favorite:
                 try await writer.setFavorite(ids: [item.id], isFavorite: true)
-                return success(item, isFavorite: true, isHidden: item.isHidden,
-                               kind: .favorite([item.id]), toastText: action.toastText)
+                return await success(item, isFavorite: true, isHidden: item.isHidden,
+                                     kind: .favorite, toastText: action.toastText)
 
             case .unfavorite:
                 try await writer.setFavorite(ids: [item.id], isFavorite: false)
-                return success(item, isFavorite: false, isHidden: item.isHidden,
-                               kind: .unfavorite([item.id]), toastText: action.toastText)
+                return await success(item, isFavorite: false, isHidden: item.isHidden,
+                                     kind: .unfavorite, toastText: action.toastText)
 
             case .toggleFavorite:
                 return await execute(item.isFavorite ? .unfavorite : .favorite, for: item)
 
             case .hide:
                 try await writer.setHidden(ids: [item.id], isHidden: true)
-                return success(item, isFavorite: item.isFavorite, isHidden: true,
-                               kind: .hide([item.id]), toastText: action.toastText)
+                return await success(item, isFavorite: item.isFavorite, isHidden: true,
+                                     kind: .hide, toastText: action.toastText)
 
             case .unhide:
                 try await writer.setHidden(ids: [item.id], isHidden: false)
-                return success(item, isFavorite: item.isFavorite, isHidden: false,
-                               kind: .unhide([item.id]), toastText: action.toastText)
+                return await success(item, isFavorite: item.isFavorite, isHidden: false,
+                                     kind: .unhide, toastText: action.toastText)
 
             case .moveToRecentlyDeleted:
-                // 红线 1：唯一删除实现是 deleteAssets（移入系统「最近删除」30 天），
-                // 且执行前必须先落 TrashBin 撤销保险副本（M3）。就绪前明确拒绝，不做假删除。
-                return .rejected("「移到最近删除」将在撤销保险副本就绪后开放（当前版本）")
+                return await moveToRecentlyDeleted(item)
 
             case .addToAlbum, .share, .showInfo, .rotate:
                 return .rejected("该动作将在后续里程碑开放")
@@ -97,33 +99,72 @@ final class ViewerViewModel: ObservableObject {
             case .none:
                 return .rejected("")
             }
+        } catch let error as TrashError {
+            return .rejected(error.localizedDescription)   // 含「请先下载原件」（docs/04 §7）
         } catch {
             return .rejected("操作失败：\(error.localizedDescription)")
         }
     }
 
-    private func success(_ item: PhotoItem, isFavorite: Bool, isHidden: Bool,
-                         kind: UndoCenter.Entry.Kind, toastText: String) -> ActionOutcome {
-        let updated = PhotoItem(id: item.id,
-                                mediaType: item.mediaType,
-                                mediaSubtypes: item.mediaSubtypes,
-                                creationDate: item.creationDate,
-                                modificationDate: item.modificationDate,
-                                pixelWidth: item.pixelWidth,
-                                pixelHeight: item.pixelHeight,
-                                duration: item.duration,
-                                isFavorite: isFavorite,
-                                isHidden: isHidden,
-                                location: item.location,
-                                burstIdentifier: item.burstIdentifier,
-                                isCloudOnly: item.isCloudOnly)
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index] = updated
+    /// 红线 1 流程：TrashBin 落副本 → writer.moveToRecentlyDeleted（唯一删除实现）
+    private func moveToRecentlyDeleted(_ item: PhotoItem) async -> ActionOutcome {
+        var trashRecordIDs: [UUID] = []
+        if trashBin.isSafetyCopyEnabled {
+            let record = try await trashBin.storeCopy(forAssetID: item.id)
+            trashRecordIDs = [record.id]
         }
-        isFavoriteCurrent = isFavorite
-        let entry = undoCenter.push(kind: kind, toastText: toastText,
-                                    window: settings.undoWindow)
-        return .success(updated, toastText: toastText, undo: entry.kind)
+        // 副本开关关闭：直接删除（撤销窗口内不提供恢复，docs/04 §3.4「撤销保险副本」说明）
+        try await writer.moveToRecentlyDeleted(ids: [item.id])
+        removeLocally([item.id])
+
+        if !trashRecordIDs.isEmpty {
+            undoCenter.push(kind: .moveToRecentlyDeleted(trashRecordIDs: trashRecordIDs, originIDs: [item.id]),
+                            assetIDs: [item.id],
+                            trashRecordIDs: trashRecordIDs,
+                            toastText: SwipeAction.moveToRecentlyDeleted.toastText,
+                            window: settings.undoWindow)
+        }
+        return .success(item, toastText: SwipeAction.moveToRecentlyDeleted.toastText)
+    }
+
+    private func success(_ item: PhotoItem, isFavorite: Bool, isHidden: Bool,
+                         kind: UndoCenter.ActionKind, toastText: String) async -> ActionOutcome {
+        applyLocal(item: item, isFavorite: isFavorite, isHidden: isHidden)
+        undoCenter.push(kind: kind,
+                        assetIDs: [item.id],
+                        toastText: toastText,
+                        window: settings.undoWindow)
+        return .success(item, toastText: toastText)
+    }
+
+    // MARK: - 本地状态
+
+    private func applyLocal(item target: PhotoItem, isFavorite: Bool, isHidden: Bool) {
+        guard let index = items.firstIndex(where: { $0.id == target.id }) else { return }
+        let old = items[index]
+        items[index] = PhotoItem(id: old.id,
+                                 mediaType: old.mediaType,
+                                 mediaSubtypes: old.mediaSubtypes,
+                                 creationDate: old.creationDate,
+                                 modificationDate: old.modificationDate,
+                                 pixelWidth: old.pixelWidth,
+                                 pixelHeight: old.pixelHeight,
+                                 duration: old.duration,
+                                 isFavorite: isFavorite,
+                                 isHidden: isHidden,
+                                 location: old.location,
+                                 burstIdentifier: old.burstIdentifier,
+                                 isCloudOnly: old.isCloudOnly)
+        isFavoriteCurrent = current?.isFavorite ?? false
+    }
+
+    /// 删除后从快照移除（photo 已进系统「最近删除」）
+    private func removeLocally(_ ids: [String]) {
+        items.removeAll { ids.contains($0.id) }
+        if currentIndex >= items.count {
+            currentIndex = max(0, items.count - 1)
+        }
+        isFavoriteCurrent = current?.isFavorite ?? false
     }
 
     // MARK: - 翻页
@@ -144,15 +185,24 @@ final class ViewerViewModel: ObservableObject {
     /// Toast「撤销」：反向写库并还原本地状态
     func undoLast() async {
         guard let entry = await undoCenter.undo() else { return }
-        let ids: [String]
-        let isFavorite: Bool?
-        let isHidden: Bool?
         switch entry.kind {
-        case .favorite(let list):  ids = list; isFavorite = false; isHidden = nil
-        case .unfavorite(let list): ids = list; isFavorite = true; isHidden = nil
-        case .hide(let list):       ids = list; isFavorite = nil; isHidden = false
-        case .unhide(let list):     ids = list; isFavorite = nil; isHidden = true
+        case .favorite(let ids):
+            applyFlag(ids: ids, isFavorite: false, isHidden: nil)
+        case .unfavorite(let ids):
+            applyFlag(ids: ids, isFavorite: true, isHidden: nil)
+        case .hide(let ids):
+            applyFlag(ids: ids, isFavorite: nil, isHidden: false)
+        case .unhide(let ids):
+            applyFlag(ids: ids, isFavorite: nil, isHidden: true)
+        case .moveToRecentlyDeleted:
+            break   // 重建的新资源经库侧 observer 增量同步；快照中旧 id 已在删除时移除
+        case .addToAlbum:
+            break   // 相簿引用变化不影响快照
         }
+        onUndoApplied?()
+    }
+
+    private func applyFlag(ids: [String], isFavorite: Bool?, isHidden: Bool?) {
         for id in ids {
             guard let index = items.firstIndex(where: { $0.id == id }) else { continue }
             let old = items[index]
@@ -171,6 +221,5 @@ final class ViewerViewModel: ObservableObject {
                                      isCloudOnly: old.isCloudOnly)
         }
         isFavoriteCurrent = current?.isFavorite ?? false
-        onUndoApplied?()
     }
 }
