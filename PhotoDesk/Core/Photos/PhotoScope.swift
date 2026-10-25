@@ -15,7 +15,62 @@ enum PhotoScope: Hashable {
     case search(SearchPredicate)
 }
 
-/// 搜索谓词占位：字段随 M5 筛选维度（日期下钻 / 媒体类型 / 状态）定型
+/// 多维筛选谓词（docs/05 M5 任务 5.1/5.2）——日期三级下钻 + 媒体类型多选 + 状态。
+/// 匹配引擎见 PhotoFilter（纯函数可单测）；OCR 关键词随 P2 的 OCRText 索引接入（TODO(P5-P2)）。
 struct SearchPredicate: Hashable {
-    // TODO(P5): 关键词 / 日期区间 / 媒体类型 / 收藏与隐藏状态
+    /// 媒体类型维度（照片/视频/Live/截图/人像/全景/慢动作/延时）。
+    /// RAW 无公开 subtype（需逐资源枚举 PHAssetResource，万级库不可承受），TODO(P5) 随元数据管道接入
+    enum MediaFilter: String, CaseIterable, Identifiable, Hashable {
+        case photo, video, live, screenshot, portrait, panorama, slowMotion, timeLapse
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .photo:      return "照片"
+            case .video:      return "视频"
+            case .live:       return "Live Photo"
+            case .screenshot: return "截图"
+            case .portrait:   return "人像"
+            case .panorama:   return "全景"
+            case .slowMotion: return "慢动作"
+            case .timeLapse:  return "延时"
+            }
+        }
+    }
+
+    /// 状态维度
+    enum StatusFilter: String, CaseIterable, Identifiable, Hashable {
+        case favorite
+        case unorganized
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .favorite:     return "已收藏"
+            case .unorganized:  return "未整理"   // 口径：未收藏（docs/01 §E 简化定义）
+            }
+        }
+    }
+
+    /// 日期下钻（年 → 月 → 日；nil = 该级不限）
+    var year: Int?
+    var month: Int?
+    var day: Int?
+
+    /// 媒体多选（空 = 全部）
+    var media: Set<MediaFilter> = []
+
+    /// 状态（多选）
+    var status: Set<StatusFilter> = []
+
+    /// 至少一个维度被设置才视为有效筛选
+    var isActive: Bool {
+        year != nil || month != nil || day != nil || !media.isEmpty || !status.isEmpty
+    }
+
+    var isDefault: Bool { !isActive }
+
+    static let `default` = SearchPredicate()
 }

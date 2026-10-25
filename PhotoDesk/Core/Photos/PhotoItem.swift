@@ -20,6 +20,10 @@ struct MediaSubtypes: OptionSet, Hashable {
     static let photoHDR         = MediaSubtypes(rawValue: 1 << 2)
     static let videoSlowMo      = MediaSubtypes(rawValue: 1 << 3)
     static let videoTimelapse   = MediaSubtypes(rawValue: 1 << 4)
+    /// 人像（深度虚化）
+    static let photoDepthEffect = MediaSubtypes(rawValue: 1 << 5)
+    /// 全景
+    static let photoPanorama    = MediaSubtypes(rawValue: 1 << 6)
 }
 
 struct PhotoItem: Identifiable, Hashable {

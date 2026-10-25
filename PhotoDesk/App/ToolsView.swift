@@ -40,13 +40,20 @@ struct ToolsView: View {
                 }
                 Section {
                     NavigationLink {
+                        StorageStatsView()
+                    } label: {
+                        Label("存储统计", systemImage: "chart.pie")
+                    }
+                }
+                Section {
+                    NavigationLink {
                         GestureTutorialView()
                     } label: {
                         Label("手势教学", systemImage: "hand.draw")
                     }
                 }
                 Section {
-                    Text("存储统计将在 M5 开放")
+                    Text("搜索历史 · 智能视图将在后续版本开放")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
                 }

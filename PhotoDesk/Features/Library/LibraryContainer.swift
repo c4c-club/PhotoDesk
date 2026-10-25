@@ -11,41 +11,61 @@ struct LibraryRootView: View {
     @ObservedObject var service: PhotoLibraryService
     @ObservedObject var undoCenter: UndoCenter
     @State private var viewerAnchor: ViewerAnchor?
+    @State private var showSearch = false
     /// 重启恢复横幅（docs/05 M3 验收：重启后 10 秒内提示「上次有 N 个操作可撤销」）
     @State private var recoveryCount = 0
     @State private var showRecovery = false
     @State private var hadActiveEntry = false
 
     var body: some View {
-        Group {
-            switch viewModel.viewState {
-            case .notDetermined:
-                PermissionIntroView(mode: .intro) {
-                    Task { await viewModel.requestAccess() }
-                }
-            case .denied:
-                PermissionIntroView(mode: .denied) {
-                    Task { await viewModel.requestAccess() }
-                }
-            case .restricted:
-                PermissionIntroView(mode: .restricted, action: nil)
-            case .loading:
-                DSEmptyState(kind: .loading)
-            case .empty:
-                DSEmptyState(kind: .empty)
-            case .ready:
-                ZStack(alignment: .bottom) {
-                    LibraryContainer(viewModel: viewModel) { index in
-                        viewerAnchor = ViewerAnchor(startIndex: index)
+        NavigationView {
+            Group {
+                switch viewModel.viewState {
+                case .notDetermined:
+                    PermissionIntroView(mode: .intro) {
+                        Task { await viewModel.requestAccess() }
                     }
-                    if viewModel.isLimitedAccess {
-                        DSEmptyState(kind: .limited) {
-                            viewModel.requestManageLimitedPhotos()
+                case .denied:
+                    PermissionIntroView(mode: .denied) {
+                        Task { await viewModel.requestAccess() }
+                    }
+                case .restricted:
+                    PermissionIntroView(mode: .restricted, action: nil)
+                case .loading:
+                    DSEmptyState(kind: .loading)
+                case .empty:
+                    DSEmptyState(kind: .empty)
+                case .ready:
+                    ZStack(alignment: .bottom) {
+                        LibraryContainer(viewModel: viewModel) { index in
+                            viewerAnchor = ViewerAnchor(startIndex: index)
                         }
-                        .padding(.bottom, DSSpacing.toastBottomOffset)
+                        if viewModel.isLimitedAccess {
+                            DSEmptyState(kind: .limited) {
+                                viewModel.requestManageLimitedPhotos()
+                            }
+                            .padding(.bottom, DSSpacing.toastBottomOffset)
+                        }
                     }
                 }
             }
+            .navigationTitle("照片管家")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .accessibilityLabel("搜索与筛选")
+                    .disabled(viewModel.viewState != .ready)
+                }
+            }
+        }
+        .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
+        .sheet(isPresented: $showSearch) {
+            SearchView(items: viewModel.itemsSnapshot)
         }
         .overlay(alignment: .top) {
             if showRecovery, recoveryCount > 0 {

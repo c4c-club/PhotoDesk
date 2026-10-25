@@ -6,6 +6,7 @@
 
 import UIKit
 import PhotoDeskCore
+import SwiftUI
 
 final class ViewerViewController: UIViewController {
     // MARK: - 依赖
@@ -463,7 +464,12 @@ final class ViewerViewController: UIViewController {
     }
 
     @objc private func infoTapped() {
-        showToast(text: "元数据面板将在 M5 开放", icon: "info.circle", allowUndo: false)
+        guard let item = viewModel.current else { return }
+        // 信息面板（M5）：SwiftUI 宿主包裹呈现
+        let host = UIHostingController(rootView: NavigationView {
+            MetadataView(item: item)
+        }.navigationViewStyle(.stack))
+        present(host, animated: usesMotion)
     }
 
     @objc private func moreTapped() {
