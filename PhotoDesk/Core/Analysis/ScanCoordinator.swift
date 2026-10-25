@@ -22,7 +22,7 @@ final class ScanCoordinator: ObservableObject {
     }
 
     /// 扫描结果摘要（结果卡片数据，docs/04 §3.3）
-    struct ScanSummary {
+    struct ScanSummary: Equatable {
         var duplicateGroups: [DuplicateGroup] = []
         var screenshotIDs: [String] = []
         var largeFileIDs: [String] = []
@@ -73,20 +73,21 @@ final class ScanCoordinator: ObservableObject {
                                 distanceThreshold: settings.dedupHammingDistance,
                                 blurThreshold: settings.blurVarianceThreshold)
         phase = .running(scanned: 0, total: 0)
-        scanTask = Task.detached(priority: .utility) { [weak self] in
+        // 强持有至扫描结束（取消经 scanTask?.cancel() 生效，引用不妨碍取消）
+        let coordinator = self
+        scanTask = Task.detached(priority: .utility) {
             let summary = await ScanPipeline.run(inputs: inputs) { scanned, total in
                 Task { @MainActor in
-                    self?.phase = .running(scanned: scanned, total: total)
+                    coordinator.phase = .running(scanned: scanned, total: total)
                 }
             }
             await MainActor.run {
-                guard let self else { return }
                 if Task.isCancelled {
-                    self.phase = .cancelled
+                    coordinator.phase = .cancelled
                 } else if let summary {
-                    self.phase = .completed(summary)
+                    coordinator.phase = .completed(summary)
                 } else {
-                    self.phase = .cancelled
+                    coordinator.phase = .cancelled
                 }
             }
         }
@@ -108,6 +109,7 @@ private enum ScanPipeline {
     static func run(inputs: ScanInputs,
                     onProgress: @escaping @Sendable (Int, Int) -> Void) async -> ScanCoordinator.ScanSummary? {
         var summary = ScanCoordinator.ScanSummary()
+        let persistence = inputs.persistence
 
         // 1. 会话（断点续扫：cursor 记录已处理条数；指纹缓存幂等，重扫自动续接）
         let total = await inputs.repository.prepare(scope: .all)
@@ -164,8 +166,10 @@ private enum ScanPipeline {
         }
 
         // 4. 合并缓存 → 分组（阈值设置可调）
-        let merged = cached
-        for (id, value) in fresh { merged[id] = value }
+        var merged = cached
+        for (id, value) in fresh {
+            merged[id] = FingerprintService.Cached(dhash: value.dhash, phash: value.phash)
+        }
         let candidates = inputs.fingerprintService.candidates(items: items, cache: merged)
         summary.duplicateGroups = DuplicateGrouper.groups(from: candidates,
                                                           distanceThreshold: inputs.distanceThreshold)
@@ -191,6 +195,15 @@ private enum ScanPipeline {
         }
         return summary
     }
+}
+
+extension Array {
+    /// 按固定大小分批（扫描批处理用）
+    func chunked(by size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
+    }
+}
 
     // MARK: - helpers（nonisolated）
 

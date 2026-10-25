@@ -33,7 +33,7 @@ public struct DuplicateCandidate {
 }
 
 /// 一个重复组：members 为组内全部 id，recommendedKeepID 为推荐保留项
-public struct DuplicateGroup {
+public struct DuplicateGroup: Equatable {
     public let members: [String]
     public let recommendedKeepID: String
     /// 组内最小汉明距离（≤ 4 高置信 / ≤ 8 疑似，docs/02 §3.3）

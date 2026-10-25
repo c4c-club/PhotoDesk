@@ -8,6 +8,7 @@ import CoreData
 import Foundation
 import Photos
 import PhotoDeskCore
+import UIKit
 
 final class FingerprintService {
     static let algoVersion: Int16 = 1
