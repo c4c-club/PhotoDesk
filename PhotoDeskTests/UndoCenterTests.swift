@@ -43,6 +43,10 @@ private final class MockPhotoWriter: PhotoWriterProtocol {
                                  render: @escaping (URL) async throws -> Void) async throws {}
 
     func revertToOriginal(assetID: String) async throws {}
+
+    func requestInputURL(assetID: String) async throws -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("mock-\(assetID).jpg")
+    }
 }
 
 /// 可拨动的假时钟（docs/03 §8）
