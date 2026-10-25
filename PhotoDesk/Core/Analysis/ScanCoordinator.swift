@@ -195,15 +195,6 @@ private enum ScanPipeline {
         }
         return summary
     }
-}
-
-extension Array {
-    /// 按固定大小分批（扫描批处理用）
-    func chunked(by size: Int) -> [[Element]] {
-        guard size > 0 else { return [self] }
-        return stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
-    }
-}
 
     // MARK: - helpers（nonisolated）
 
@@ -253,4 +244,12 @@ extension Array {
         return sessionID
     }
 
+}
+
+extension Array {
+    /// 按固定大小分批（扫描批处理用）
+    func chunked(by size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
+    }
 }

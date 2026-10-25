@@ -33,7 +33,7 @@ final class FingerprintService {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
         guard let asset = assets.firstObject else { return nil }
         let options = PHImageRequestOptions()
-        options.deliveryMode = .fast
+        options.deliveryMode = .fastFormat
         options.isNetworkAccessAllowed = false     // 扫描不触网；iCloud-only 本轮跳过
         options.resizeMode = .fast
 
