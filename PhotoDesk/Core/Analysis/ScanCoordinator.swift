@@ -244,6 +244,30 @@ private enum ScanPipeline {
         return sessionID
     }
 
+    private static func updateSession(persistence: PersistenceController,
+                                      sessionID: UUID, scanned: Int, cursor: Int) {
+        persistence.performSync { context in
+            let request = NSFetchRequest<NSManagedObject>(entityName: "ScanSession")
+            request.predicate = NSPredicate(format: "id == %@", sessionID as CVarArg)
+            if let row = (try? context.fetch(request))?.first {
+                row.setValue(Int32(scanned), forKey: "scanned")
+                row.setValue(Int32(cursor), forKey: "cursor")
+                try? context.save()
+            }
+        }
+    }
+
+    private static func finishSession(persistence: PersistenceController, sessionID: UUID) {
+        persistence.performSync { context in
+            let request = NSFetchRequest<NSManagedObject>(entityName: "ScanSession")
+            request.predicate = NSPredicate(format: "id == %@", sessionID as CVarArg)
+            if let row = (try? context.fetch(request))?.first {
+                row.setValue(Date(), forKey: "finishedAt")
+                row.setValue(Int16(2), forKey: "status")   // 2 = completed
+                try? context.save()
+            }
+        }
+    }
 }
 
 extension Array {
