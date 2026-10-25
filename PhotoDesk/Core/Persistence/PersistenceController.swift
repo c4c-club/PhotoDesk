@@ -40,6 +40,7 @@ final class PersistenceController {
         let actionLog = NSEntityDescription()
         actionLog.name = "ActionLog"
         actionLog.managedObjectClassName = "NSManagedObject"
+        let expiresAtAttr = attribute("expiresAt", .dateAttributeType, optional: false)
         actionLog.properties = [
             attribute("id", .UUIDAttributeType, optional: false),
             attribute("kind", .integer16AttributeType, optional: false, defaultValue: 0),
@@ -47,17 +48,18 @@ final class PersistenceController {
             attribute("prevStateJSON", .stringAttributeType, optional: true),
             attribute("toastText", .stringAttributeType, optional: false, defaultValue: ""),
             attribute("createdAt", .dateAttributeType, optional: false),
-            attribute("expiresAt", .dateAttributeType, optional: false),
+            expiresAtAttr,
             attribute("isUndone", .booleanAttributeType, optional: false, defaultValue: false),
             attribute("undoKindRaw", .stringAttributeType, optional: true),
         ]
         // 索引：expiresAt（docs/03 §4.2）
-        actionLog.indexes = [makeIndex("expiresAt")]
+        actionLog.indexes = [makeIndex(name: "idx_expiresAt", property: expiresAtAttr)]
 
         // TrashItem：撤销保险副本索引（非备份）
         let trashItem = NSEntityDescription()
         trashItem.name = "TrashItem"
         trashItem.managedObjectClassName = "NSManagedObject"
+        let createdAtAttr = attribute("createdAt", .dateAttributeType, optional: false)
         trashItem.properties = [
             attribute("id", .UUIDAttributeType, optional: false),
             attribute("originLocalID", .stringAttributeType, optional: false),
@@ -65,9 +67,9 @@ final class PersistenceController {
             attribute("mediaType", .integer16AttributeType, optional: false, defaultValue: 0),
             attribute("byteSize", .integer64AttributeType, optional: false, defaultValue: 0),
             attribute("metaJSON", .stringAttributeType, optional: false, defaultValue: "{}"),
-            attribute("createdAt", .dateAttributeType, optional: false),
+            createdAtAttr,
         ]
-        trashItem.indexes = [makeIndex("createdAt")]
+        trashItem.indexes = [makeIndex(name: "idx_createdAt", property: createdAtAttr)]
 
         model.entities = [actionLog, trashItem]
         return model
@@ -83,9 +85,9 @@ final class PersistenceController {
         return attr
     }
 
-    private static func makeIndex(_ property: String) -> NSFetchIndexDescription {
+    private static func makeIndex(name: String, property: NSPropertyDescription) -> NSFetchIndexDescription {
         let element = NSFetchIndexElementDescription(property: property, collationType: .binary)
-        return NSFetchIndexDescription(name: "idx_\(property)", elements: [element])
+        return NSFetchIndexDescription(name: name, elements: [element])
     }
 
     // MARK: - 便捷存取

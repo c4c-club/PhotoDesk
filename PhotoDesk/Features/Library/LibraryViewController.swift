@@ -265,7 +265,10 @@ final class LibraryViewController: UIViewController {
                               height: abs(start.y - location.y))
             selectionOverlay.frame = rect
             selectionOverlay.isHidden = false
-            for indexPath in collectionView.indexPathsForElements(in: rect) {
+            // 公开 API 没有 indexPathsForElements(in:)：经 layout 查询矩形内的元素
+            let attributes = collectionView.collectionViewLayout
+                .layoutAttributesForElements(in: rect) ?? []
+            for indexPath in attributes.map(\.indexPath) {
                 guard let id = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id else { continue }
                 if !selectedIDs.contains(id) {
                     selectedIDs.insert(id)

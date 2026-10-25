@@ -88,17 +88,18 @@ final class UndoCenter: ObservableObject {
         stopTicker()
         do {
             switch entry.kind {
-            case .favorite(let ids):           try await writer.setFavorite(ids: ids, isFavorite: false)
-            case .unfavorite(let ids):         try await writer.setFavorite(ids: ids, isFavorite: true)
-            case .hide(let ids):               try await writer.setHidden(ids: ids, isHidden: false)
-            case .unhide(let ids):             try await writer.setHidden(ids: ids, isHidden: true)
-            case .moveToRecentlyDeleted(let recordIDs, _):
+            case .favorite:           try await writer.setFavorite(ids: entry.assetIDs, isFavorite: false)
+            case .unfavorite:         try await writer.setFavorite(ids: entry.assetIDs, isFavorite: true)
+            case .hide:               try await writer.setHidden(ids: entry.assetIDs, isHidden: false)
+            case .unhide:             try await writer.setHidden(ids: entry.assetIDs, isHidden: true)
+            case .moveToRecentlyDeleted:
                 guard let trashBin else { throw PhotoWriter.PhotoWriterError.changeRejected }
-                for recordID in recordIDs {
-                    _ = try await trashBin.restore(recordID: recordID)   // 重建照片（新 localID 经 observer 同步回网格）
+                for recordID in entry.trashRecordIDs {
+                    // 重建照片（新 localID 经 observer 同步回网格）；副本保留供再次恢复
+                    _ = try await trashBin.restore(recordID: recordID)
                 }
-            case .addToAlbum(let ids, let albumID):
-                try await writer.remove(ids: ids, fromAlbum: albumID)
+            case .addToAlbum:
+                try await writer.remove(ids: entry.assetIDs, fromAlbum: entry.albumID ?? "")
             }
             markUndone(entry)
             return entry
