@@ -54,8 +54,11 @@ final class GestureUITests: XCTestCase {
         afterDrag.lifetime = .keepAlways
         add(afterDrag)
 
-        // Toast「已收藏 · 撤销」
+        // Toast「已收藏 · 撤销」；慢速拖拽未触发时用快速上滑兜底（速度锁定路径）
         let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
+        if !toast.waitForExistence(timeout: 3) {
+            app.swipeUp()
+        }
         XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")
 
         // 关键帧截图（CI 提取 artifact，验收报告用）

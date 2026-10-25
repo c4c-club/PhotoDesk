@@ -115,7 +115,33 @@ final class ViewerViewController: UIViewController {
         view.addSubview(downOverlay)
         upOverlay.hide()
         downOverlay.hide()
+        #if DEBUG
+        // CI 截图自诊断：手势链路断点定位（Release 不编译，与 LibraryContainer 横幅同款思路）
+        debugLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(debugLabel)
+        NSLayoutConstraint.activate([
+            debugLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
+            debugLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+        ])
+        #endif
     }
+
+    #if DEBUG
+    private let debugLabel: UILabel = {
+        let label = UILabel()
+        label.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
+        label.textColor = .black
+        label.backgroundColor = .systemYellow
+        label.layer.cornerRadius = 4
+        label.clipsToBounds = true
+        label.text = "viewer:ready"
+        return label
+    }()
+
+    private func updateDebugLabel(_ text: String) {
+        debugLabel.text = text
+    }
+    #endif
 
     private func setupTopBar() {
         topBar.translatesAutoresizingMaskIntoConstraints = false
@@ -196,6 +222,10 @@ final class ViewerViewController: UIViewController {
         // UIPanGestureRecognizer 返回 CGPoint；核心包判定接口为 Double（docs/03 §5.10），统一转 CGSize
         let translation = CGSize(width: rawTranslation.x, height: rawTranslation.y)
         let velocity = CGSize(width: rawVelocity.x, height: rawVelocity.y)
+        #if DEBUG
+        updateDebugLabel("pan:\(gesture.state == .began ? "began" : gesture.state == .changed ? "move" : "end") " +
+            "t=\(Int(translation.height)) v=\(Int(velocity.height))")
+        #endif
         switch gesture.state {
         case .began:
             engine.begin()
@@ -297,6 +327,12 @@ final class ViewerViewController: UIViewController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             let outcome = await self.viewModel.execute(action, for: item)
+            #if DEBUG
+            switch outcome {
+            case .success: self.updateDebugLabel("exec:\(action) ✓")
+            case .rejected(let message): self.updateDebugLabel("exec:\(action) ✗ \(message)")
+            }
+            #endif
             switch outcome {
             case .success(let updated, _, _):
                 self.flyOut(direction: direction, action: action) {

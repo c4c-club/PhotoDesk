@@ -88,10 +88,10 @@ jobs:
           mkdir -p build/attachments
           # Xcode 16+ 用 export attachments；15.x 退回 export diagnostics（含失败自动截图）
           xcrun xcresulttool export attachments --path build/TestResults.xcresult \
-            --output-path build/attachments 2>/dev/null \
+            --output-path build/attachments \
           || xcrun xcresulttool export diagnostics --path build/TestResults.xcresult \
-            --output-path build/attachments 2>/dev/null \
-          || echo "附件提取失败（非致命）"
+            --output-path build/attachments \
+          || echo "附件提取失败（非致命，见上方报错）"
 
       - uses: actions/upload-artifact@v4
         if: always()
