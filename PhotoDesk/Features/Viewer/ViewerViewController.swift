@@ -31,6 +31,8 @@ final class ViewerViewController: UIViewController {
     private let filmStrip = FilmStripView(frame: .zero)
     private let toast = DSToast(frame: .zero)
     private var topBarItems: [UIBarButtonItem] = []
+    /// ⋯ 菜单按钮（actionSheet popover 锚点）
+    private var moreButtonItem: UIBarButtonItem?
     private var favoriteButton: UIBarButtonItem!
     private var chromeVisible = true
     private var chromeTimer: Timer?
@@ -166,6 +168,7 @@ final class ViewerViewController: UIViewController {
         more.accessibilityLabel = "更多"
         let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         topBarItems = [close, flexibleSpace, favoriteButton, info, more]
+        moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
         // 点击屏幕切换 chrome 显隐（与双击缩放共存：双击会先触发一次切换，M6 一并优化）
@@ -473,7 +476,56 @@ final class ViewerViewController: UIViewController {
     }
 
     @objc private func moreTapped() {
-        showToast(text: "更多操作将在后续里程碑开放", icon: "ellipsis.circle", allowUndo: false)
+        guard let item = viewModel.current else { return }
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "编辑", style: .default) { [weak self] _ in
+            self?.openEditor(for: item)
+        })
+        alert.addAction(UIAlertAction(title: "导出…", style: .default) { [weak self] _ in
+            self?.openExport(for: item)
+        })
+        alert.addAction(UIAlertAction(title: "分享…", style: .default) { [weak self] _ in
+            self?.shareCurrent()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    /// 编辑器（UIKit 全屏；关闭回调刷新预览与收藏状态）
+    private func openEditor(for item: PhotoItem) {
+        let editor = EditorViewController(viewModel: AppContainer.shared.makeEditorViewModel(item: item),
+                                          item: item)
+        editor.onClose = { [weak self] in
+            self?.viewModel.updateIndex(self?.viewModel.currentIndex ?? 0)
+        }
+        editor.modalPresentationStyle = .fullScreen
+        present(editor, animated: usesMotion)
+    }
+
+    /// 导出页（SwiftUI Form）
+    private func openExport(for item: PhotoItem) {
+        let host = UIHostingController(rootView: NavigationView {
+            ExportView(item: item,
+                       writer: AppContainer.shared.photoWriter,
+                       settings: AppContainer.shared.settings)
+        }.navigationViewStyle(.stack))
+        present(host, animated: usesMotion)
+    }
+
+    /// 分享（iCloud 原件自动下载后弹出系统分享面板）
+    private func shareCurrent() {
+        guard let item = viewModel.current else { return }
+        let more = moreButtonItem
+        Task { @MainActor in
+            do {
+                let url = try await AppContainer.shared.photoWriter.requestInputURL(assetID: item.id)
+                let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                share.popoverPresentationController?.barButtonItem = more
+                present(share, animated: true)
+            } catch {
+                showToast(text: error.localizedDescription, icon: "info.circle", allowUndo: false)
+            }
+        }
     }
 
     // MARK: - 翻页与图片加载

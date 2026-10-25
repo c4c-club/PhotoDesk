@@ -43,6 +43,11 @@ final class AppContainer: ObservableObject {
         CleanupViewModel(coordinator: scanCoordinator, libraryViewModel: libraryViewModel)
     }
 
+    /// 编辑页每次打开新建
+    func makeEditorViewModel(item: PhotoItem) -> EditorViewModel {
+        EditorViewModel(item: item, writer: photoWriter, settings: settings)
+    }
+
     private init() {
         let persistence = PersistenceController.shared
         assetRepository = AssetRepository()

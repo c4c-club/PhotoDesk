@@ -16,6 +16,15 @@ protocol PhotoWriterProtocol: AnyObject {
     func deleteAlbum(localID: String) async throws
     func add(ids: [String], toAlbum albumID: String) async throws
     func remove(ids: [String], fromAlbum albumID: String) async throws
+    /// 编辑结果另存为新照片（docs/05 M6 任务 6.1，默认另存不破坏原图）→ 新 localIdentifier
+    func saveNewImage(fromFile fileURL: URL, creationDate: Date?) async throws -> String
+    /// 编辑结果覆盖原件（PHContentEditingOutput，系统保留可还原；docs/05 M6 任务 6.1）
+    func overwriteWithAdjustment(assetID: String, adjustmentData: Data,
+                                 render: @escaping (URL) async throws -> Void) async throws
+    /// 还原到原始状态（清除本 App 的编辑调整；系统「最近删除」语义不受影响）
+    func revertToOriginal(assetID: String) async throws
+    /// 分享用原件 URL（iCloud 自动下载；fullSizeImageURL）
+    func requestInputURL(assetID: String) async throws -> URL
 }
 
 @MainActor
@@ -172,6 +181,109 @@ final class PhotoWriter: PhotoWriterProtocol {
                 }
             }
         }
+    }
+
+    // MARK: - 编辑（M6：另存 / 覆盖 / 还原）
+
+    /// 编辑结果另存为新照片（默认保存方式，不破坏原图）→ 新 localIdentifier
+    func saveNewImage(fromFile fileURL: URL, creationDate: Date?) async throws -> String {
+        final class IDBox: @unchecked Sendable { var id: String? }
+        let box = IDBox()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+                request?.creationDate = creationDate
+                box.id = request?.placeholderForCreatedAsset?.localIdentifier
+            } completionHandler: { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success, let id = box.id {
+                    continuation.resume(returning: id)
+                } else {
+                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                }
+            }
+        }
+    }
+
+    /// 编辑结果覆盖原件：PHContentEditingOutput + adjustmentData（系统相册保留「还原」能力，docs/05 M6）
+    /// - Parameter render: 在 output.renderedContentURL 写入完整渲染结果（全尺寸像素）
+    func overwriteWithAdjustment(assetID: String, adjustmentData: Data,
+                                 render: @escaping (URL) async throws -> Void) async throws {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+        guard let asset = assets.firstObject else { throw PhotoWriterError.albumNotFound }
+        let options = PHContentEditingInputRequestOptions()
+        options.isNetworkAccessAllowed = false
+        let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
+            asset.requestContentEditingInput(with: options) { input, _ in
+                if let input {
+                    continuation.resume(returning: input)
+                } else {
+                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                }
+            }
+        }
+        guard input.canPerformAdjustment else { throw PhotoWriterError.changeRejected }
+
+        let output = PHContentEditingOutput(contentEditingInput: input)
+        try await render(output.renderedContentURL)
+        output.adjustmentData = PHAdjustmentData(formatIdentifier: Self.adjustmentFormatIdentifier,
+                                                 formatVersion: "1.0",
+                                                 data: adjustmentData)
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest(for: asset).contentEditingOutput = output
+            } completionHandler: { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                }
+            }
+        }
+    }
+
+    /// 还原到原始状态（清除本 App 的编辑调整；不触碰系统「最近删除」语义）
+    func revertToOriginal(assetID: String) async throws {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+        guard let asset = assets.firstObject else { throw PhotoWriterError.albumNotFound }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest(for: asset).revertAssetContentToOriginal()
+            } completionHandler: { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                }
+            }
+        }
+    }
+
+    static let adjustmentFormatIdentifier = "com.example.PhotoDesk.editor"
+
+    /// 分享用原件 URL（iCloud 自动下载；fullSizeImageURL）
+    func requestInputURL(assetID: String) async throws -> URL {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+        guard let asset = assets.firstObject else { throw PhotoWriterError.albumNotFound }
+        let options = PHContentEditingInputRequestOptions()
+        options.isNetworkAccessAllowed = true
+        let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
+            asset.requestContentEditingInput(with: options) { input, info in
+                if let input, let url = input.fullSizeImageURL {
+                    continuation.resume(returning: input)
+                } else {
+                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                }
+            }
+        }
+        guard let url = input.fullSizeImageURL else { throw PhotoWriterError.cannotLoadImage }
+        return url
     }
 
     // MARK: - 私有

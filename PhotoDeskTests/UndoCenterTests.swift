@@ -34,6 +34,15 @@ private final class MockPhotoWriter: PhotoWriterProtocol {
     func remove(ids: [String], fromAlbum albumID: String) async throws {
         removedFromAlbums.append((ids, albumID))
     }
+
+    func saveNewImage(fromFile fileURL: URL, creationDate: Date?) async throws -> String {
+        UUID().uuidString
+    }
+
+    func overwriteWithAdjustment(assetID: String, adjustmentData: Data,
+                                 render: @escaping (URL) async throws -> Void) async throws {}
+
+    func revertToOriginal(assetID: String) async throws {}
 }
 
 /// 可拨动的假时钟（docs/03 §8）
