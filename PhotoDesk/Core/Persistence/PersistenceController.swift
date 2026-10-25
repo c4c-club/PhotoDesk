@@ -46,6 +46,7 @@ final class PersistenceController {
             attribute("kind", .stringAttributeType, optional: false, defaultValue: ""),
             attribute("assetIDsJSON", .stringAttributeType, optional: false, defaultValue: "[]"),
             attribute("prevStateJSON", .stringAttributeType, optional: true),
+            attribute("albumID", .stringAttributeType, optional: true),
             attribute("toastText", .stringAttributeType, optional: false, defaultValue: ""),
             attribute("createdAt", .dateAttributeType, optional: false),
             expiresAtAttr,
