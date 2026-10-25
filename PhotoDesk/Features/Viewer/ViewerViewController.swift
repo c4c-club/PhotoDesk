@@ -293,7 +293,8 @@ final class ViewerViewController: UIViewController {
 
     private func perform(action: SwipeAction, direction: SwipeDirection, translationY: CGFloat) {
         guard let item = viewModel.current else { return }
-        Task { [weak self] in
+        // @MainActor：await 之后回到主线程再操作 UI（flyOut/showToast），不依赖隐式执行器恢复
+        Task { @MainActor [weak self] in
             guard let self else { return }
             let outcome = await self.viewModel.execute(action, for: item)
             switch outcome {
