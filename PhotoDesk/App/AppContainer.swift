@@ -23,7 +23,8 @@ final class AppContainer: ObservableObject {
                                                  pipeline: imagePipeline,
                                                  writer: photoWriter,
                                                  trashBin: trashBin,
-                                                 undoCenter: undoCenter)
+                                                 undoCenter: undoCenter,
+                                                 settings: settings)
 
     /// 浏览页每次打开新建（持有 items 快照与起始页）；写操作共享 photoWriter / undoCenter / trashBin
     func makeViewerViewModel(startIndex: Int) -> ViewerViewModel {

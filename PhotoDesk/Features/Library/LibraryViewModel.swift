@@ -46,6 +46,7 @@ final class LibraryViewModel: ObservableObject {
     private let writer: PhotoWriterProtocol
     private let trashBin: TrashBin
     private let undoCenter: UndoCenter
+    private let settings: SettingsStore
     private let batchSize = AssetRepository.batchSize
 
     // MARK: - 内部状态
@@ -60,13 +61,15 @@ final class LibraryViewModel: ObservableObject {
          pipeline: ImagePipelineProtocol,
          writer: PhotoWriterProtocol,
          trashBin: TrashBin,
-         undoCenter: UndoCenter) {
+         undoCenter: UndoCenter,
+         settings: SettingsStore) {
         self.service = service
         self.repository = repository
         self.pipeline = pipeline
         self.writer = writer
         self.trashBin = trashBin
         self.undoCenter = undoCenter
+        self.settings = settings
     }
 
     // MARK: - 生命周期
