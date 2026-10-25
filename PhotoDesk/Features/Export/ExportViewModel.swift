@@ -39,8 +39,9 @@ final class ExportViewModel: ObservableObject {
 
         let options = PHContentEditingInputRequestOptions()
         options.isNetworkAccessAllowed = true
-        // PHContentEditingInputRequestOptions 的进度回调只有 fraction 一个参数（与 PHImageRequestOptions 的四参不同）
-        options.progressHandler = { [weak self] fraction in
+        // progressHandler 为三参签名（fraction, viewportSize, stopPointer）——单参/四参闭包都会触发
+        // image/video 两个重载间的歧义
+        options.progressHandler = { [weak self] fraction, _, _ in
             // 先把 weak self 绑定为局部 let（@Sendable 闭包内直接用 self? 的属性赋值会报类型歧义，M3 同款坑）
             guard let weakSelf = self else { return }
             let progress = Double(fraction)
