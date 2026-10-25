@@ -3,6 +3,7 @@
 // 加相簿撤销（移出引用）。PhotoKit 全流程由真机/P-3 验证。
 
 import XCTest
+import PhotoDeskCore
 @testable import PhotoDesk
 
 /// 记录型 Mock（AGENTS.md §3.2 protocol 化；协议为 @MainActor，Mock 必须同隔离）
