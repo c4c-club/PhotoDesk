@@ -59,7 +59,16 @@ final class GestureUITests: XCTestCase {
         if !toast.waitForExistence(timeout: 3) {
             app.swipeUp()
         }
-        XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")
+        let toastOk = toast.waitForExistence(timeout: 5)
+        if !toastOk {
+            // 诊断：Viewer 状态横幅（pan/exec 链路）+ 屏上全部静态文本，随断言消息进日志
+            let banner = app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS 'pan:' OR label CONTAINS 'exec:' OR label CONTAINS 'viewer:'")
+            ).firstMatch
+            let allTexts = app.staticTexts.allElementsBoundByIndex.prefix(8).map(\.label)
+            XCTFail("收藏 Toast 未出现；banner=\(banner.exists ? banner.label : "(无)") texts=\(allTexts)")
+            return
+        }
 
         // 关键帧截图（CI 提取 artifact，验收报告用）
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
