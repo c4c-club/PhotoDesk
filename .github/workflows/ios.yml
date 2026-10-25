@@ -185,3 +185,4 @@ jobs:
         with:
           name: build-logs
           path: build/DerivedData/Logs
+          if-no-files-found: ignore

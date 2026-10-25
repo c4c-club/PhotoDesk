@@ -183,7 +183,7 @@ final class UndoCenter: ObservableObject {
     }
 
     private func persist(_ entry: Entry) {
-        persistence.performBackground { context in
+        persistence.performSync { context in
             let object = NSEntityDescription.insertNewObject(forEntityName: "ActionLog", into: context)
             object.setValue(entry.id, forKey: "id")
             object.setValue(entry.kind.rawValue, forKey: "kind")
@@ -199,7 +199,7 @@ final class UndoCenter: ObservableObject {
     }
 
     private func markUndone(_ entry: Entry) {
-        persistence.performBackground { context in
+        persistence.performSync { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: "ActionLog")
             request.predicate = NSPredicate(format: "id == %@", entry.id as CVarArg)
             (try? context.fetch(request))?.forEach {
@@ -210,7 +210,7 @@ final class UndoCenter: ObservableObject {
     }
 
     private func removeRow(id: UUID) {
-        persistence.performBackground { context in
+        persistence.performSync { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: "ActionLog")
             request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
             (try? context.fetch(request))?.forEach { context.delete($0) }

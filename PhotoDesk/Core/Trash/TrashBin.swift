@@ -194,7 +194,7 @@ final class TrashBin {
     }
 
     func upsert(_ record: TrashRecord) {
-        persistence.performBackground { context in
+        persistence.performSync { context in
             let object = NSEntityDescription.insertNewObject(forEntityName: "TrashItem", into: context)
             object.setValue(record.id, forKey: "id")
             object.setValue(record.originLocalID, forKey: "originLocalID")
@@ -211,7 +211,7 @@ final class TrashBin {
     }
 
     private func deleteRow(id: UUID) {
-        persistence.performBackground { context in
+        persistence.performSync { context in
             let request = NSFetchRequest<NSManagedObject>(entityName: "TrashItem")
             request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
             (try? context.fetch(request))?.forEach { context.delete($0) }

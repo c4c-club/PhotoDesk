@@ -97,6 +97,14 @@ final class PersistenceController {
         container.performBackgroundTask(block)
     }
 
+    /// 元数据小行的同步写（撤销栈/副本索引等；写完即可读，消除后台合并竞态。
+    /// 仅限低频小数据——照片流数据不走 Core Data）
+    func performSync(_ block: (NSManagedObjectContext) -> Void) {
+        container.viewContext.performAndWait {
+            block(container.viewContext)
+        }
+    }
+
     func newBackgroundContext() -> NSManagedObjectContext {
         container.newBackgroundContext()
     }
