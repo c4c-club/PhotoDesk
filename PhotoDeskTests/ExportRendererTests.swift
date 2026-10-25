@@ -23,9 +23,11 @@ final class ExportRendererTests: XCTestCase {
         try? FileManager.default.removeItem(at: sourceURL)
     }
 
-    /// 合成 JPEG：纯色 800×600 + EXIF（含 GPS DMS）
+    /// 合成 JPEG：纯色 800×600（scale=1，避免 Retina 3× 放大）+ EXIF（含 GPS DMS）
     private static func writeSampleJPEG(to url: URL, width: Int, height: Int, withGPS: Bool) throws {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1   // 关键：默认跟随屏幕 scale（模拟器 3×），像素会变 2400×1800
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format)
         let image = renderer.image { context in
             UIColor.systemBlue.setFill()
             context.fill(CGRect(x: 0, y: 0, width: width, height: height))
@@ -53,11 +55,20 @@ final class ExportRendererTests: XCTestCase {
         XCTAssertTrue(CGImageDestinationFinalize(destination))
     }
 
+    /// 读回 GPS 纬度（DMS 数组 → 十进制；十进制直读；无 GPS 返回 nil）
     private func gpsLatitude(of url: URL) -> Double? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-              let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else { return nil }
-        return gps[kCGImagePropertyGPSLatitude as String] as? Double
+              let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+              let latitude = gps[kCGImagePropertyGPSLatitude as String] else { return nil }
+        if let value = latitude as? Double { return value }
+        if let dms = latitude as? [Any], dms.count >= 2,
+           let deg = dms[0] as? Double ?? (dms[0] as? NSNumber)?.doubleValue,
+           let min = dms[1] as? Double ?? (dms[1] as? NSNumber)?.doubleValue {
+            let sec = dms.count >= 3 ? ((dms[2] as? Double) ?? (dms[2] as? NSNumber)?.doubleValue ?? 0) : 0
+            return deg + min / 60 + sec / 3600
+        }
+        return nil
     }
 
     private func pixelSize(of url: URL) -> (width: Int, height: Int)? {
