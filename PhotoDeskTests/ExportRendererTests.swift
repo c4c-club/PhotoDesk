@@ -44,10 +44,11 @@ final class ExportRendererTests: XCTestCase {
             ],
         ]
         if withGPS {
+            // ImageIO 写入端 GPSLatitude 只接受 NSNumber（十进制）；DMS 数组会被静默丢弃
             properties[kCGImagePropertyGPSDictionary as String] = [
-                kCGImagePropertyGPSLatitude as String: [37, 20, 24.0],
+                kCGImagePropertyGPSLatitude as String: 37.34,
                 kCGImagePropertyGPSLatitudeRef as String: "N",
-                kCGImagePropertyGPSLongitude as String: [121, 28, 48.0],
+                kCGImagePropertyGPSLongitude as String: 121.48,
                 kCGImagePropertyGPSLongitudeRef as String: "E",
             ]
         }
