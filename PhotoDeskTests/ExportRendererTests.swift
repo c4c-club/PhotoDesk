@@ -82,7 +82,13 @@ final class ExportRendererTests: XCTestCase {
     // MARK: - 用例
 
     func testExportLongEdge2048PreservesGPS() throws {
-        let url = try ExportRenderer.export(from: sourceURL,
+        // 大图源（4000×3000）验证缩小路径；小图受「只缩不放」保护不放大（见 testOriginalLongEdgeKeepsSize）
+        let largeSource = FileManager.default.temporaryDirectory
+            .appendingPathComponent("export-test-large-\(UUID().uuidString).jpg")
+        try Self.writeSampleJPEG(to: largeSource, width: 4000, height: 3000, withGPS: true)
+        defer { try? FileManager.default.removeItem(at: largeSource) }
+
+        let url = try ExportRenderer.export(from: largeSource,
                                             options: ExportOptions(format: .jpeg,
                                                                    longEdge: .edge2048,
                                                                    quality: 0.8,
