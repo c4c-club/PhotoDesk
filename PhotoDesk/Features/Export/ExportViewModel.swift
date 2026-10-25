@@ -42,8 +42,11 @@ final class ExportViewModel: ObservableObject {
         options.isNetworkAccessAllowed = true
         // PHContentEditingInputRequestOptions 的进度回调只有 fraction 一个参数（与 PHImageRequestOptions 的四参不同）
         options.progressHandler = { [weak self] fraction in
+            // 先把 weak self 绑定为局部 let（@Sendable 闭包内直接用 self? 的属性赋值会报类型歧义，M3 同款坑）
+            guard let weakSelf = self else { return }
+            let progress = Double(fraction)
             DispatchQueue.main.async {
-                self?.downloadProgress = Double(fraction)
+                weakSelf.downloadProgress = progress
             }
         }
         let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
