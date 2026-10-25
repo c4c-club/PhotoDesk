@@ -72,8 +72,8 @@ struct DiagnosticsView: View {
             var lines: [String] = ["PhotoDesk 诊断日志 — \(Date())"]
             var count = 0
             for entry in entries {
-                // OSLogEntry 只有 date；消息在 OSLogEntryWithPayload 子类（向下转型后取）
-                let message = (entry as? OSLogEntryWithPayload)?.composeMessage() ?? ""
+                // 消息文本：OSLogEntryWithPayload.composedMessage（String 属性）
+                let message = (entry as? OSLogEntryWithPayload)?.composedMessage ?? ""
                 lines.append("\(entry.date) \(message)")
                 count += 1
                 if count > 5_000 { break }   // 防超大文件
