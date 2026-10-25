@@ -25,7 +25,17 @@ public enum TrashPolicy {
     /// - Returns: 超出容量上限时应淘汰的记录 id（按 createdAt 从旧到新），不超限则返回空
     public static func evictionCandidates(from records: [TrashRecord],
                                           limitBytes: Int64 = TrashPolicy.defaultLimitBytes) -> [UUID] {
-        // TODO(P4): 按时间升序累加至超限，给出需要移除的前缀
-        return []
+        guard limitBytes >= 0 else { return [] }
+        let sorted = records.sorted { $0.createdAt < $1.createdAt }   // 最旧优先
+        var total = records.reduce(Int64(0)) { $0 + $1.byteSize }
+        guard total > limitBytes else { return [] }
+
+        var candidates: [UUID] = []
+        for record in sorted {
+            guard total > limitBytes else { break }
+            candidates.append(record.id)
+            total -= record.byteSize
+        }
+        return candidates
     }
 }

@@ -43,7 +43,7 @@ final class PersistenceController {
         let expiresAtAttr = attribute("expiresAt", .dateAttributeType, optional: false)
         actionLog.properties = [
             attribute("id", .UUIDAttributeType, optional: false),
-            attribute("kind", .integer16AttributeType, optional: false, defaultValue: 0),
+            attribute("kind", .stringAttributeType, optional: false, defaultValue: ""),
             attribute("assetIDsJSON", .stringAttributeType, optional: false, defaultValue: "[]"),
             attribute("prevStateJSON", .stringAttributeType, optional: true),
             attribute("toastText", .stringAttributeType, optional: false, defaultValue: ""),

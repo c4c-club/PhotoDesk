@@ -179,6 +179,19 @@ jobs:
           name: m1-grid-screenshot
           path: build/screenshots/m1-grid.png
 
+      - name: Collect crash reports on failure
+        if: failure()
+        run: |
+          mkdir -p build/crashes
+          cp -R ~/Library/Logs/DiagnosticReports build/crashes/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: crash-reports
+          path: build/crashes
+          if-no-files-found: ignore
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
