@@ -114,7 +114,7 @@ struct ExportView: View {
         .navigationViewStyle(.stack)
         .sheet(isPresented: $showShareSheet) {
             if let url = viewModel.exportedFileURL {
-                ActivityViewWrapper(items: [url])
+                ActivityViewWrapper(items: [url], isPresented: $showShareSheet)
             }
         }
         .confirmationDialog("包含位置信息", isPresented: $showGPSAsk, titleVisibility: .visible) {

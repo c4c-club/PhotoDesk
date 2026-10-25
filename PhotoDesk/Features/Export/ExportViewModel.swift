@@ -17,7 +17,7 @@ final class ExportViewModel: ObservableObject {
     /// 导出结果（分享用临时 URL）
     @Published private(set) var exportedFileURL: URL?
     @Published private(set) var savedToLibrary = false
-    @Published private(set) var errorMessage: String?
+    @Published var errorMessage: String?
 
     private let writer: PhotoWriterProtocol
     private let settings: SettingsStore

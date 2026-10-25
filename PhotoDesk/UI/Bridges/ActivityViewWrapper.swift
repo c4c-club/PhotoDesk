@@ -22,10 +22,10 @@ struct ActivityViewWrapper: UIViewControllerRepresentable {
             isPresented = false
             context.coordinator.isPresenting = false
         }
-        // iPad popover 锚点
-        activity.popoverPresentationController?.sourceView = view
-        activity.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX,
-                                                                    y: view.bounds.maxY,
+        // iPad popover 锚点（挂在宿主控制器视图上）
+        activity.popoverPresentationController?.sourceView = controller.view
+        activity.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX,
+                                                                    y: controller.view.bounds.maxY,
                                                                     width: 0, height: 0)
         topViewController()?.present(activity, animated: true)
     }
