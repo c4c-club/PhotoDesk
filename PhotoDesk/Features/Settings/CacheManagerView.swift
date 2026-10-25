@@ -60,14 +60,14 @@ struct CacheManagerView: View {
     private func reload() async {
         let container = AppContainer.shared
         diskBytes = await container.imagePipeline.diskCacheBytes
-        let records = container.trashBin.allRecords()
+        let records = await container.trashBin.allRecords()
         trashBytes = records.reduce(0) { $0 + $1.byteSize }
         trashCount = records.count
         isClearing = false
     }
 
     private func purgeTrash() async {
-        AppContainer.shared.trashBin.purgeAll()
+        await AppContainer.shared.trashBin.purgeAll()
         await reload()
     }
 }
