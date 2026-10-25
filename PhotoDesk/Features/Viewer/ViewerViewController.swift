@@ -502,12 +502,10 @@ final class ViewerViewController: UIViewController {
         present(editor, animated: usesMotion)
     }
 
-    /// 导出页（SwiftUI Form）
+    /// 导出页（SwiftUI Form；viewModel 由组合根装配）
     private func openExport(for item: PhotoItem) {
         let host = UIHostingController(rootView: NavigationView {
-            ExportView(item: item,
-                       writer: AppContainer.shared.photoWriter,
-                       settings: AppContainer.shared.settings)
+            ExportView(viewModel: AppContainer.shared.makeExportViewModel(item: item))
         }.navigationViewStyle(.stack))
         present(host, animated: usesMotion)
     }

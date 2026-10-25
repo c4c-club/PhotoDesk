@@ -13,10 +13,8 @@ struct ExportView: View {
     @State private var showGPSAsk = false
     @State private var savedToast = false
 
-    init(item: PhotoItem, writer: PhotoWriterProtocol, settings: SettingsStore) {
-        _viewModel = StateObject(wrappedValue: ExportViewModel(item: item,
-                                                               writer: writer,
-                                                               settings: settings))
+    init(viewModel: ExportViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     var body: some View {

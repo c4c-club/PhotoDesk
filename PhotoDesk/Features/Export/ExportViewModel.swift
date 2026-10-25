@@ -18,11 +18,14 @@ final class ExportViewModel: ObservableObject {
     @Published private(set) var savedToLibrary = false
     @Published var errorMessage: String?
 
+    private let pipeline: ImagePipelineProtocol
     private let writer: PhotoWriterProtocol
     private let settings: SettingsStore
 
-    init(item: PhotoItem, writer: PhotoWriterProtocol, settings: SettingsStore) {
+    init(item: PhotoItem, pipeline: ImagePipelineProtocol,
+         writer: PhotoWriterProtocol, settings: SettingsStore) {
         self.item = item
+        self.pipeline = pipeline
         self.writer = writer
         self.settings = settings
     }
@@ -32,26 +35,25 @@ final class ExportViewModel: ObservableObject {
         item.location != nil
     }
 
-    /// 取原件 URL（iCloud 自动下载；进度回 downloadProgress）
+    /// 取原件 URL。iCloud-only：先经 pipeline.fullImage 下载（真实进度），系统缓存后
+    /// 再以禁网络方式取 input.fullSizeImageURL（保留完整 EXIF）；本地原件直接走 input。
     func requestSourceURL() async throws -> URL {
+        if item.isCloudOnly {
+            let image = await pipeline.fullImage(for: item.id, progress: { [weak self] fraction in
+                DispatchQueue.main.async {
+                    self?.downloadProgress = fraction
+                }
+            }, allowNetwork: true)
+            guard image != nil else { throw ExportError.cannotLoadImage }
+        }
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
         guard let asset = assets.firstObject else { throw ExportError.cannotLoadImage }
 
         let options = PHContentEditingInputRequestOptions()
-        options.isNetworkAccessAllowed = true
-        // progressHandler 为三参签名（fraction, viewportSize, stopPointer）——单参/四参闭包都会触发
-        // image/video 两个重载间的歧义
-        options.progressHandler = { [weak self] fraction, _, _ in
-            // 先把 weak self 绑定为局部 let（@Sendable 闭包内直接用 self? 的属性赋值会报类型歧义，M3 同款坑）
-            guard let weakSelf = self else { return }
-            let progress = Double(fraction)
-            DispatchQueue.main.async {
-                weakSelf.downloadProgress = progress
-            }
-        }
+        options.isNetworkAccessAllowed = false   // 上一步已确保原件在本地（或本就本地）
         let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
             asset.requestContentEditingInput(with: options) { input, info in
-                if let input, input.fullSizeImageURL != nil {
+                if let input {
                     continuation.resume(returning: input)
                 } else {
                     continuation.resume(throwing: ExportError.cannotLoadImage)

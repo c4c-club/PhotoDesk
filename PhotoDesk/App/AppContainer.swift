@@ -43,6 +43,14 @@ final class AppContainer: ObservableObject {
         CleanupViewModel(coordinator: scanCoordinator, libraryViewModel: libraryViewModel)
     }
 
+    /// 导出页每次打开新建
+    func makeExportViewModel(item: PhotoItem) -> ExportViewModel {
+        ExportViewModel(item: item,
+                        pipeline: imagePipeline,
+                        writer: photoWriter,
+                        settings: settings)
+    }
+
     /// 编辑页每次打开新建
     func makeEditorViewModel(item: PhotoItem) -> EditorViewModel {
         EditorViewModel(item: item, writer: photoWriter, settings: settings)
