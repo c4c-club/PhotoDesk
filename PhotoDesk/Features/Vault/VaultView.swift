@@ -15,7 +15,8 @@ struct VaultView: View {
 
     var body: some View {
         Group {
-            if vault.isUnlocked {
+            // Face ID 开关（设置-隐私）：关闭后直接进入（docs/05 M7 任务 3）
+            if vault.isUnlocked || !AppContainer.shared.settings.vaultLockEnabled {
                 gridView
             } else {
                 lockView

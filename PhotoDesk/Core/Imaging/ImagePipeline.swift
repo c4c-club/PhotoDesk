@@ -19,6 +19,10 @@ protocol ImagePipelineProtocol: AnyObject {
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage?
     /// 视频播放资产（浏览页视频 cell；用 iOS 8+ 的 requestAVAsset，兼容 iOS 15）
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)?
+    /// 磁盘缓存占用（设置页显示）
+    var diskCacheBytes: Int64 { get }
+    /// 清空内存 + 磁盘缓存（设置页「清理缓存」）
+    func clearCaches()
 }
 
 /// 在途任务包装（Task 是结构体，用类做身份比较以便合并/清理）
@@ -182,6 +186,15 @@ final class ImagePipeline: ImagePipelineProtocol {
                 continuation.resume(returning: (avAsset, audioMix))
             }
         }
+    }
+
+    var diskCacheBytes: Int64 {
+        disk.totalBytes()
+    }
+
+    func clearCaches() {
+        memory.clear()
+        disk.clear()
     }
 
     // MARK: - PhotoKit 请求

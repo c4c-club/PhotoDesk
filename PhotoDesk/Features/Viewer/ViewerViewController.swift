@@ -87,6 +87,11 @@ final class ViewerViewController: UIViewController {
         upOverlay.setBaseCenter(y: height * 0.25)
         downOverlay.frame = CGRect(x: 0, y: height * 0.75 - 70, width: width, height: 140)
         downOverlay.setBaseCenter(y: height * 0.75)
+        // 无障碍替代栏：手势关闭时常驻（@AppStorage 实时读取，设置改动即时生效）
+        let showBar = !settings.gesturesEnabled
+        accessibilityBar.isHidden = !showBar
+        filmStrip.isHidden = showBar ? true : filmStrip.isHidden
+        view.bringSubviewToFront(accessibilityBar)
     }
 
     // MARK: - 构建
@@ -198,7 +203,57 @@ final class ViewerViewController: UIViewController {
                          pipeline: pipeline) { [weak self] index in
             self?.scrollTo(index: index)
         }
+        setupAccessibilityBar()
     }
+
+    /// 无障碍替代路径（docs/04 §6 / docs/05 M7 任务 5）：关闭手势时底部常驻三按钮
+    ///（收藏 / 隐藏 / 移到最近删除），与手势共用 executeAction（含破坏性确认）
+    private func setupAccessibilityBar() {
+        accessibilityBar.translatesAutoresizingMaskIntoConstraints = false
+        accessibilityBar.axis = .horizontal
+        accessibilityBar.distribution = .fillEqually
+        accessibilityBar.backgroundColor = UIColor.black.withAlphaComponent(0.45)
+        view.addSubview(accessibilityBar)
+
+        func barButton(_ symbol: String, label: String, action: @escaping () -> Void) -> UIButton {
+            let button = UIButton(type: .system)
+            var config = UIButton.Configuration.plain()
+            config.image = UIImage(systemName: symbol)
+            config.imagePadding = 4
+            config.title = label
+            button.configuration = config
+            button.tintColor = .white
+            button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+            button.accessibilityLabel = label
+            return button
+        }
+
+        accessibilityBar.addArrangedSubview(barButton("heart", label: "收藏") { [weak self] in
+            self?.executeAction(.toggleFavorite, direction: .up, translationY: 0)
+        })
+        accessibilityBar.addArrangedSubview(barButton("eye.slash", label: "隐藏") { [weak self] in
+            self?.executeAction(.hide, direction: .down, translationY: 0)
+        })
+        accessibilityBar.addArrangedSubview(barButton("trash", label: "移到最近删除") { [weak self] in
+            self?.executeAction(.moveToRecentlyDeleted, direction: .down, translationY: 0)
+        })
+
+        NSLayoutConstraint.activate([
+            accessibilityBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            accessibilityBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            accessibilityBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            accessibilityBar.heightAnchor.constraint(equalToConstant: 52),
+        ])
+        // 胶片条上移让位
+        filmStrip.bottomAnchor.constraint(equalTo: accessibilityBar.topAnchor, constant: -8).isActive = true
+    }
+
+    /// 手势开关实时生效（@AppStorage 读取即最新值）
+    private var accessibilityBar: UIStackView = {
+        let stack = UIStackView()
+        stack.isHidden = true
+        return stack
+    }()
 
     private func setupToast() {
         toast.translatesAutoresizingMaskIntoConstraints = false
@@ -281,6 +336,11 @@ final class ViewerViewController: UIViewController {
 
     private func triggerAction(direction: SwipeDirection, translationY: CGFloat) {
         let action = viewModel.action(for: direction)
+        executeAction(action, direction: direction, translationY: translationY)
+    }
+
+    /// 统一执行入口（手势 / 底部无障碍按钮共用）：破坏性确认 → 执行
+    private func executeAction(_ action: SwipeAction, direction: SwipeDirection, translationY: CGFloat) {
         hideOverlays()
         collectionView.isScrollEnabled = true
 
@@ -393,10 +453,20 @@ final class ViewerViewController: UIViewController {
 
     private func showToast(for action: SwipeAction, allowUndo: Bool) {
         guard action != .none else { return }
+        let undoAvailable = allowUndo && undoCenter.hasActiveEntry
+        // 副本关闭/已过期：删除类 Toast 引导去系统相册恢复（docs/04 §3.4 口径）
+        let suffix: String
+        if undoAvailable {
+            suffix = " · 撤销"
+        } else if action == .moveToRecentlyDeleted {
+            suffix = " · 可在系统相册恢复"
+        } else {
+            suffix = ""
+        }
         toast.show(icon: ActionOverlayView.symbol(for: action),
-                   text: action.toastText + (allowUndo ? " · 撤销" : ""),
+                   text: action.toastText + suffix,
                    duration: settings.undoWindow,
-                   allowUndo: allowUndo && undoCenter.hasActiveEntry,
+                   allowUndo: undoAvailable,
                    onUndo: { [weak self] in
             Task { await self?.viewModel.undoLast() }
         },
@@ -632,6 +702,7 @@ extension ViewerViewController: UIGestureRecognizerDelegate {
     /// 放大状态（> 1.01）或双指操作时禁用上下滑（AGENTS.md §7 常见陷阱）
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+        guard settings.gesturesEnabled else { return false }                 // 无障碍：手势总开关关闭
         if pan.numberOfTouches > 1 { return false }                       // 双指 → 捏合
         if let cell = collectionView.cellForItem(
             at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell,

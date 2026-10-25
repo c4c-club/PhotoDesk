@@ -67,6 +67,7 @@ enum Appearance: String, CaseIterable {
 
 final class SettingsStore: ObservableObject {
     // MARK: 手势（docs/04 §3.4 手势设置 ★）
+    @AppStorage("gesture.enabled")          var gesturesEnabled = true
     @AppStorage("gesture.up")              var swipeUpAction: SwipeAction = .favorite
     @AppStorage("gesture.down")            var swipeDownAction: SwipeAction = .hide
     @AppStorage("gesture.sensitivity")     var sensitivityRaw: String = Sensitivity.standard.rawValue

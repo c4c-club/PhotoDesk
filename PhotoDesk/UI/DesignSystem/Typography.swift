@@ -34,6 +34,15 @@ enum DSTypography {
         }
     }
 
+    /// 动态字体 + 封顶（docs/04 §6：浏览页浮层文案上限 20pt——放大会遮挡照片主体）
+    static func fontCapped(_ style: DSTextStyle, maxPoint: CGFloat,
+                           compatibleWith traits: UITraitCollection? = nil) -> UIFont {
+        let scaledFont = font(style, compatibleWith: traits)
+        guard scaledFont.pointSize > maxPoint else { return scaledFont }
+        // 封顶：保持字重，仅钳制点数
+        return UIFont.systemFont(ofSize: maxPoint, weight: scaledFont.fontWeight)
+    }
+
     private static func scaled(_ base: UIFont, _ textStyle: UIFont.TextStyle,
                                _ traits: UITraitCollection?) -> UIFont {
         UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, compatibleWith: traits)

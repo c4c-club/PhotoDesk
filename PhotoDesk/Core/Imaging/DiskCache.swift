@@ -59,6 +59,18 @@ final class DiskCache {
         }
     }
 
+    /// 当前占用字节数（设置页显示）
+    func totalBytes() -> Int64 {
+        guard let files = try? fileManager.contentsOfDirectory(at: directory,
+                                                               includingPropertiesForKeys: [.fileSizeKey]) else {
+            return 0
+        }
+        return files.reduce(Int64(0)) { total, url in
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            return total + Int64(size)
+        }
+    }
+
     // MARK: - LRU 淘汰
 
     private func evictIfNeeded() {

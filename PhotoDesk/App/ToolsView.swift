@@ -53,6 +53,14 @@ struct ToolsView: View {
                     }
                 }
                 Section {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Label("设置", systemImage: "gearshape")
+                    }
+                    .accessibilityIdentifier("Tools-Settings")
+                }
+                Section {
                     Text("搜索历史 · 智能视图将在后续版本开放")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))

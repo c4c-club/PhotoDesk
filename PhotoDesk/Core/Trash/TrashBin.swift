@@ -245,6 +245,19 @@ final class TrashBin {
         deleteRow(id: id)
     }
 
+    /// 沙盒副本总占用（设置页显示）
+    func usageBytes() -> Int64 {
+        allRecords().reduce(0) { $0 + $1.byteSize }
+    }
+
+    /// 清空全部撤销副本（设置页「清空撤销副本」；用户显式操作，此后仅能经系统「最近删除」找回）
+    func purgeAll() {
+        for record in allRecords() {
+            try? fileManager.removeItem(at: directory.appendingPathComponent(record.fileRelativePath))
+            deleteRow(id: record.id)
+        }
+    }
+
     // MARK: - 原件获取
 
     /// 图片：requestContentEditingInput（禁网络——拿不到 URL 即 iCloud 未下载）

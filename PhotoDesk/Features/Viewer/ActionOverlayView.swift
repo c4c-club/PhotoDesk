@@ -22,7 +22,8 @@ final class ActionOverlayView: UIView {
     }()
     private let promptLabel: UILabel = {
         let label = UILabel()
-        label.font = DSTypography.font(.toast)   // 15pt Semibold（docs/04 §3.2 文案 15pt）
+        // 浮层文案 15pt 起步、动态字体、上限 20pt（docs/04 §3.2 + §6）
+        label.font = DSTypography.fontCapped(.toast, maxPoint: 20)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
