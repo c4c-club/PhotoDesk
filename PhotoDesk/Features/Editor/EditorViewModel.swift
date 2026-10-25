@@ -6,6 +6,7 @@
 import Foundation
 import CoreImage
 import PhotoDeskCore
+import Photos
 import UIKit
 
 @MainActor
