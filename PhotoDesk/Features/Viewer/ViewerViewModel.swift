@@ -110,15 +110,25 @@ final class ViewerViewModel: ObservableObject {
     private func moveToRecentlyDeleted(_ item: PhotoItem) async -> ActionOutcome {
         var trashRecordIDs: [UUID] = []
         if trashBin.isSafetyCopyEnabled {
-            let record = try await trashBin.storeCopy(forAssetID: item.id)
-            trashRecordIDs = [record.id]
+            do {
+                let record = try await trashBin.storeCopy(forAssetID: item.id)
+                trashRecordIDs = [record.id]
+            } catch let error as TrashError {
+                return .rejected(error.localizedDescription)   // 「请先下载原件」等
+            } catch {
+                return .rejected("操作失败：\(error.localizedDescription)")
+            }
         }
         // 副本开关关闭：直接删除（撤销窗口内不提供恢复，docs/04 §3.4「撤销保险副本」说明）
-        try await writer.moveToRecentlyDeleted(ids: [item.id])
+        do {
+            try await writer.moveToRecentlyDeleted(ids: [item.id])
+        } catch {
+            return .rejected("操作失败：\(error.localizedDescription)")
+        }
         removeLocally([item.id])
 
         if !trashRecordIDs.isEmpty {
-            undoCenter.push(kind: .moveToRecentlyDeleted(trashRecordIDs: trashRecordIDs, originIDs: [item.id]),
+            undoCenter.push(kind: .moveToRecentlyDeleted,
                             assetIDs: [item.id],
                             trashRecordIDs: trashRecordIDs,
                             toastText: SwipeAction.moveToRecentlyDeleted.toastText,
@@ -186,18 +196,12 @@ final class ViewerViewModel: ObservableObject {
     func undoLast() async {
         guard let entry = await undoCenter.undo() else { return }
         switch entry.kind {
-        case .favorite(let ids):
-            applyFlag(ids: ids, isFavorite: false, isHidden: nil)
-        case .unfavorite(let ids):
-            applyFlag(ids: ids, isFavorite: true, isHidden: nil)
-        case .hide(let ids):
-            applyFlag(ids: ids, isFavorite: nil, isHidden: false)
-        case .unhide(let ids):
-            applyFlag(ids: ids, isFavorite: nil, isHidden: true)
-        case .moveToRecentlyDeleted:
-            break   // 重建的新资源经库侧 observer 增量同步；快照中旧 id 已在删除时移除
-        case .addToAlbum:
-            break   // 相簿引用变化不影响快照
+        case .favorite:   applyFlag(ids: entry.assetIDs, isFavorite: false, isHidden: nil)
+        case .unfavorite: applyFlag(ids: entry.assetIDs, isFavorite: true, isHidden: nil)
+        case .hide:       applyFlag(ids: entry.assetIDs, isFavorite: nil, isHidden: false)
+        case .unhide:     applyFlag(ids: entry.assetIDs, isFavorite: nil, isHidden: true)
+        case .moveToRecentlyDeleted, .addToAlbum:
+            break   // 重建资源/相簿引用经库侧 observer 同步；快照中旧项已在删除时移除
         }
         onUndoApplied?()
     }

@@ -138,7 +138,7 @@ final class LibraryViewModel: ObservableObject {
             switch action {
             case .setFavorite(let favorite):
                 try await writer.setFavorite(ids: ids, isFavorite: favorite)
-                undoCenter.push(kind: favorite ? .favorite(ids) : .unfavorite(ids),
+                undoCenter.push(kind: favorite ? .favorite : .unfavorite,
                                 assetIDs: ids,
                                 toastText: favorite ? "已收藏" : "已取消收藏",
                                 window: settings.undoWindow)
@@ -146,7 +146,7 @@ final class LibraryViewModel: ObservableObject {
 
             case .setHidden(let hidden):
                 try await writer.setHidden(ids: ids, isHidden: hidden)
-                undoCenter.push(kind: hidden ? .hide(ids) : .unhide(ids),
+                undoCenter.push(kind: hidden ? .hide : .unhide,
                                 assetIDs: ids,
                                 toastText: hidden ? "已隐藏" : "已取消隐藏",
                                 window: settings.undoWindow)
@@ -154,7 +154,7 @@ final class LibraryViewModel: ObservableObject {
 
             case .addToAlbum(let albumID):
                 try await writer.add(ids: ids, toAlbum: albumID)
-                undoCenter.push(kind: .addToAlbum(assetIDs: ids, albumID: albumID),
+                undoCenter.push(kind: .addToAlbum,
                                 assetIDs: ids,
                                 albumID: albumID,
                                 toastText: "已加入相簿",
@@ -177,7 +177,7 @@ final class LibraryViewModel: ObservableObject {
                     return BatchOutcome(succeeded: 0, needsDownload: needsDownload)
                 }
                 try await writer.moveToRecentlyDeleted(ids: originIDs)
-                undoCenter.push(kind: .moveToRecentlyDeleted(trashRecordIDs: records.map(\.id), originIDs: originIDs),
+                undoCenter.push(kind: .moveToRecentlyDeleted,
                                 assetIDs: originIDs,
                                 trashRecordIDs: records.map(\.id),
                                 toastText: "已移到最近删除",
