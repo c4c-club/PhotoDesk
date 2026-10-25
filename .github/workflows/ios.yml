@@ -27,8 +27,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Test PhotoDeskCore
-        run: swift test --package-path PhotoDeskCore
+      - name: Test PhotoDeskCore (with coverage)
+        run: |
+          swift test --enable-code-coverage --package-path PhotoDeskCore
+      - name: Coverage report
+        run: |
+          cd PhotoDeskCore
+          PROFDATA=$(find .build -name '*.profdata' | head -1)
+          BINARY=$(find .build -type f -name 'PhotoDeskCorePackageTests.xctest' | head -1)
+          if [ -n "$PROFDATA" ] && [ -n "$BINARY" ]; then
+            llvm-cov report --instr-profile="$PROFDATA" "$BINARY" | tail -8
+          else
+            echo "coverage artifacts not found (non-fatal)"
+          fi
 
   build:
     runs-on: macos-14
