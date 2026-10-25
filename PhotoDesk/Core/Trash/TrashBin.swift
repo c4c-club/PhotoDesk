@@ -277,10 +277,11 @@ final class TrashBin {
         try? fileManager.removeItem(at: outputURL)
 
         if #available(iOS 16.0, *) {
-            try await session.export(to: outputURL, as: .mov)
+            // SDK 仅有无参 async export（使用上方已配置的 outputURL / outputFileType）
+            try await session.export()
             return outputURL
         } else {
-            // iOS 15 回退：exportAsynchronously + 轮询状态
+            // iOS 15 回退：exportAsynchronously + 状态检查
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 session.exportAsynchronously {
                     continuation.resume()
