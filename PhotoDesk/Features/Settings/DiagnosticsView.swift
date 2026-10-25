@@ -72,9 +72,8 @@ struct DiagnosticsView: View {
             var lines: [String] = ["PhotoDesk 诊断日志 — \(Date())"]
             var count = 0
             for entry in entries {
-                // 消息文本：OSLogEntryWithPayload.message（本地化替换后的字符串）
-                let message = (entry as? OSLogEntryWithPayload)?.message ?? ""
-                lines.append("\(entry.date) \(message)")
+                // iOS SDK 下 OSLogEntryWithPayload 的载荷属性不可见——用条目描述（NSObject 描述含时间与内容）
+                lines.append(String(describing: entry))
                 count += 1
                 if count > 5_000 { break }   // 防超大文件
             }
