@@ -174,9 +174,21 @@ private enum ScanPipeline {
         summary.duplicateGroups = DuplicateGrouper.groups(from: candidates,
                                                           distanceThreshold: inputs.distanceThreshold)
 
-        // 5. 专项：截图 / 大文件 / 模糊
+        // 5. 专项：截图 / 大文件 / 模糊（fileSize 并发取——PHAssetResource 逐张串行是 CI 慢的主因）
+        let ids = items.map(\.id)
+        let sizes = await withTaskGroup(of: (String, Int64).self,
+                                        returning: [String: Int64].self) { group in
+            for id in ids {
+                group.addTask(priority: .utility) {
+                    (id, fileSize(of: id))
+                }
+            }
+            var result: [String: Int64] = [:]
+            for await (id, size) in group { result[id] = size }
+            return result
+        }
         for item in items {
-            let size = fileSize(of: item.id)
+            let size = sizes[item.id] ?? 0
             if item.mediaSubtypes.contains(.photoScreenshot) {
                 summary.screenshotIDs.append(item.id)
                 summary.screenshotBytes += size

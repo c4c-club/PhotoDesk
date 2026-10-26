@@ -398,11 +398,11 @@ final class ViewerViewController: UIViewController {
             }
             #endif
             switch outcome {
-            case .success(let updated, _):
+            case .success(let updated, _, let undoKind):
                 self.flyOut(direction: direction, action: action) {
                     self.finishAfterAction(updated: updated)
                 }
-                self.showToast(for: action, allowUndo: true)
+                self.showToast(for: action, allowUndo: undoKind != nil)
                 #if DEBUG
                 self.updateDebugLabel("exec:\(action) ✓ \(self.toast.debugState)")
                 #endif
@@ -453,7 +453,8 @@ final class ViewerViewController: UIViewController {
 
     private func showToast(for action: SwipeAction, allowUndo: Bool) {
         guard action != .none else { return }
-        let undoAvailable = allowUndo && undoCenter.hasActiveEntry
+        // allowUndo 来自执行结果的 undoKind（推送刚发生，确定性判定），不再依赖 hasActiveEntry 反推
+        let undoAvailable = allowUndo
         // 副本关闭/已过期：删除类 Toast 引导去系统相册恢复（docs/04 §3.4 口径）
         let suffix: String
         if undoAvailable {

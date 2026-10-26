@@ -11,8 +11,8 @@ import PhotoDeskCore
 final class ViewerViewModel: ObservableObject {
     /// 动作执行结果
     enum ActionOutcome {
-        /// 成功：更新后的 item + Toast 文案
-        case success(PhotoItem, toastText: String)
+        /// 成功：更新后的 item + Toast 文案 + 可撤销类型（nil=该动作不可撤销；推送刚发生，判定确定性）
+        case success(PhotoItem, toastText: String, undoKind: UndoCenter.ActionKind?)
         /// 拒绝执行，展示 message
         case rejected(String)
     }
@@ -127,14 +127,19 @@ final class ViewerViewModel: ObservableObject {
         }
         removeLocally([item.id])
 
-        if !trashRecordIDs.isEmpty {
-            undoCenter.push(kind: .moveToRecentlyDeleted,
+        let undoKind: UndoCenter.ActionKind? = trashRecordIDs.isEmpty
+            ? nil
+            : .moveToRecentlyDeleted
+        if let undoKind {
+            undoCenter.push(kind: undoKind,
                             assetIDs: [item.id],
                             trashRecordIDs: trashRecordIDs,
                             toastText: SwipeAction.moveToRecentlyDeleted.toastText,
                             window: settings.undoWindow)
         }
-        return .success(item, toastText: SwipeAction.moveToRecentlyDeleted.toastText)
+        return .success(item,
+                        toastText: SwipeAction.moveToRecentlyDeleted.toastText,
+                        undoKind: undoKind)
     }
 
     private func success(_ item: PhotoItem, isFavorite: Bool, isHidden: Bool,
@@ -144,7 +149,7 @@ final class ViewerViewModel: ObservableObject {
                         assetIDs: [item.id],
                         toastText: toastText,
                         window: settings.undoWindow)
-        return .success(item, toastText: toastText)
+        return .success(item, toastText: toastText, undoKind: kind)
     }
 
     // MARK: - 本地状态
