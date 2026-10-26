@@ -193,6 +193,15 @@ final class LibraryViewController: UIViewController {
         collectionView.addGestureRecognizer(longPress)
     }
 
+    /// 工具栏「多选」按钮（docs/04 §3.1）：切换多选模式（与长按进入等价）
+    func toggleSelectionMode() {
+        if isSelecting {
+            exitSelectionMode()
+        } else {
+            enterSelectionMode(selecting: nil)
+        }
+    }
+
     private func enterSelectionMode(selecting id: String?) {
         guard !isSelecting else { return }
         isSelecting = true

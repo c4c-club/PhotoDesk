@@ -12,6 +12,8 @@ struct LibraryRootView: View {
     @ObservedObject var undoCenter: UndoCenter
     @State private var viewerAnchor: ViewerAnchor?
     @State private var showSearch = false
+    /// 「多选」工具栏按钮 → UIKit 控制器桥
+    @StateObject private var selectionBridge = SelectionModeBridge()
     /// 重启恢复横幅（docs/05 M3 验收：重启后 10 秒内提示「上次有 N 个操作可撤销」）
     @State private var recoveryCount = 0
     @State private var showRecovery = false
@@ -37,9 +39,11 @@ struct LibraryRootView: View {
                     DSEmptyState(kind: .empty)
                 case .ready:
                     ZStack(alignment: .bottom) {
-                        LibraryContainer(viewModel: viewModel) { index in
+                        LibraryContainer(viewModel: viewModel,
+                                         onOpenViewer: { index in
                             viewerAnchor = ViewerAnchor(startIndex: index)
-                        }
+                                         },
+                                         selectionBridge: selectionBridge)
                         if viewModel.isLimitedAccess {
                             DSEmptyState(kind: .limited) {
                                 viewModel.requestManageLimitedPhotos()
@@ -59,6 +63,17 @@ struct LibraryRootView: View {
                         Image(systemName: "magnifyingglass")
                     }
                     .accessibilityLabel("搜索与筛选")
+                    .disabled(viewModel.viewState != .ready)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // docs/04 §3.1 底部工具栏「多选」入口（导航栏承载；与长按进入等价）
+                    Button {
+                        selectionBridge.controller?.toggleSelectionMode()
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                    .accessibilityIdentifier("Library-Select")
+                    .accessibilityLabel("多选")
                     .disabled(viewModel.viewState != .ready)
                 }
             }
@@ -131,10 +146,17 @@ struct LibraryRootView: View {
     }
 }
 
+/// 多选模式桥（docs/04 §3.1 底部工具栏「多选」入口）：SwiftUI 工具栏按钮 → UIKit 控制器
+final class SelectionModeBridge: ObservableObject {
+    weak var controller: LibraryViewController?
+}
+
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel
     /// 点击 cell → 打开全屏浏览器（flatIndex）
     let onOpenViewer: (Int) -> Void
+    /// 工具栏「多选」按钮与 UIKit 控制器的桥
+    let selectionBridge: SelectionModeBridge
     @AppStorage("grid.columns") private var gridColumns = 3
 
     func makeUIViewController(context: Context) -> LibraryViewController {
@@ -143,10 +165,12 @@ struct LibraryContainer: UIViewControllerRepresentable {
                                                settings: AppContainer.shared.settings)
         controller.setColumns(gridColumns)
         controller.onOpenViewer = onOpenViewer
+        selectionBridge.controller = controller
         return controller
     }
 
     func updateUIViewController(_ controller: LibraryViewController, context: Context) {
         controller.setColumns(gridColumns)
+        selectionBridge.controller = controller
     }
 }

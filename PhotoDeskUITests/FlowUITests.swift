@@ -27,9 +27,10 @@ final class FlowUITests: XCTestCase {
         }
     }
 
-    /// 启动并进入网格（授权 → cell 就绪）
-    private func launchToGrid(_ app: XCUIApplication) {
+    /// 启动并进入网格（授权 → cell 就绪）；undoWindow 经 launchArguments 覆盖（消除 Toast 5s 窗口竞态）
+    private func launchToGrid(_ app: XCUIApplication, undoWindow: Double = 30) {
         installPermissionMonitor(for: app)
+        app.launchArguments += ["-gesture.undoWindow", "\(undoWindow)"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -47,12 +48,13 @@ final class FlowUITests: XCTestCase {
         let app = XCUIApplication()
         launchToGrid(app)
 
-        // 长按进入多选
-        let firstCell = app.collectionViews.cells.firstMatch
-        firstCell.press(forDuration: 1.2)
+        // 工具栏「多选」按钮进入（docs/04 §3.1；与长按等价、UI 稳定）
+        let selectButton = app.buttons["Library-Select"]
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "导航栏缺「多选」按钮")
+        selectButton.tap()
 
         let selectAll = app.buttons["全选"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "长按后批量工具栏未出现")
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "进入多选后批量工具栏未出现")
 
         selectAll.tap()
         let deleteButton = app.buttons["移到最近删除"]
@@ -110,11 +112,11 @@ final class FlowUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5), "清理页缺开始扫描")
         start.tap()
 
-        // 扫描完成：五类卡片或"没有可清理内容"（5,300 张模拟器库约需 10–40s）
+        // 扫描完成：五类卡片或"没有可清理内容"（5,300 张模拟器库约需 4–7 分钟，CI 实测放宽到 420s）
         let doneMarker = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS '没有发现可清理的内容' OR label CONTAINS '重复照片'")
         ).firstMatch
-        XCTAssertTrue(doneMarker.waitForExistence(timeout: 180), "扫描未在 180s 内完成")
+        XCTAssertTrue(doneMarker.waitForExistence(timeout: 420), "扫描未在 420s 内完成")
 
         // 有重复组则走完整确认链；没有则本用例以空结果通过
         guard app.staticTexts.matching(NSPredicate(format: "label CONTAINS '重复照片'")).firstMatch.exists
