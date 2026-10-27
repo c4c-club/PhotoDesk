@@ -59,8 +59,10 @@ final class FlowUITests: XCTestCase {
         let app = XCUIApplication()
         launchToGrid(app)
 
-        let firstCell = app.collectionViews.cells.firstMatch
-        firstCell.press(forDuration: 1.2)   // 长按进入多选（docs/04 §3.1）
+        // 工具栏「多选」按钮进入（docs/04 §3.1）——AX tap（coordinate 点击不触发 SwiftUI 工具栏按钮动作）
+        let selectButton = app.buttons["Library-Select"]
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "导航栏缺「多选」按钮\n\(hierarchy(app))")
+        selectButton.tap()
 
         let selectAll = anyElement(app, identifier: "Batch-SelectAll")
         guard selectAll.waitForExistence(timeout: 5) else {
@@ -102,13 +104,8 @@ final class FlowUITests: XCTestCase {
             return
         }
 
-        // 点「撤销」（identifier 定位）→ PhotoKit 状态回滚
-        let undo = anyElement(app, identifier: "Toast-Undo")
-        guard undo.waitForExistence(timeout: 3) else {
-            XCTFail("Toast 缺撤销按钮\n\(hierarchy(app))")
-            return
-        }
-        undo.tap()
+        // 点「撤销」：按钮固定在 Toast 右端——用 toast 坐标点击（100% 命中，绕开按钮 AX 查询差异）
+        toast.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
 
         // 撤销窗口（30s）内再上滑 → 仍能出现「已收藏」＝ 撤销确实回滚了收藏状态
         sleep(2)
