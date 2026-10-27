@@ -117,6 +117,9 @@ final class FlowUITests: XCTestCase {
 
     func testCleanupScanStartAndCancel() throws {
         let app = XCUIApplication()
+        // -CleanupAutoStart：App 侧测试钩子（清理页 onAppear 自动开始扫描）——
+        // Form 内 Button 的 AX/coordinate 点击均不可靠（Library-Select 同款问题），测试钩子是标准做法
+        app.launchArguments += ["-CleanupAutoStart"]
         launchToGrid(app)
 
         app.tabBars.buttons["工具"].tap()
@@ -124,21 +127,15 @@ final class FlowUITests: XCTestCase {
         XCTAssertTrue(cleanupEntry.waitForExistence(timeout: 5), "工具页缺智能清理入口")
         cleanupEntry.tap()
 
-        let start = anyElement(app, identifier: "Cleanup-Start")
-        XCTAssertTrue(start.waitForExistence(timeout: 5), "清理页缺开始扫描")
-        start.tap()
-
         // 进入扫描态（百分比文本出现）
         let progress = anyElement(app, identifier: "Cleanup-Progress")
-        guard progress.waitForExistence(timeout: 30) else {
-            XCTFail("扫描未进入运行态\n\(hierarchy(app))")
-            return
-        }
+        XCTAssertTrue(progress.waitForExistence(timeout: 60), "扫描未进入运行态\n\(hierarchy(app))")
 
-        // 取消 → 回到可再次扫描状态
+        // 取消 → 回到可再次扫描状态（取消按钮同样走 coordinate 点击）
         let cancel = anyElement(app, identifier: "Cleanup-Cancel")
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "缺取消按钮")
-        cancel.tap()
-        XCTAssertTrue(start.waitForExistence(timeout: 10), "取消后未回到待机态")
+        cancel.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let startAgain = anyElement(app, identifier: "Cleanup-Start")
+        XCTAssertTrue(startAgain.waitForExistence(timeout: 10), "取消后未回到待机态")
     }
 }

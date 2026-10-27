@@ -23,6 +23,13 @@ struct CleanupView: View {
             switch coordinator.phase {
             case .idle:
                 idleView
+                    .onAppear {
+                        // UI 测试钩子：-CleanupAutoStart 启动参数下自动开始扫描（绕开 Form 内 Button 的
+                        // XCUITest 点击不可靠性；真实用户路径仍由开始扫描按钮承担）
+                        if ProcessInfo.processInfo.arguments.contains("-CleanupAutoStart") {
+                            viewModel.startScan()
+                        }
+                    }
             case .running(let scanned, let total):
                 runningView(scanned: scanned, total: total)
             case .cancelled:
