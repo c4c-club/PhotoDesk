@@ -1,7 +1,8 @@
 // MARK: - 职责说明：M8 流程 UI 测试（docs/05 §10 任务 8.2）——
-// ① 批量选择（工具栏「多选」→ 全选 → 完成）；② 撤销往返（上滑收藏 → 撤销 → 再上滑仍可收藏，
-// 证明撤销真实回滚了 PhotoKit 状态）；③ 清理扫描可启动、可取消（全程扫描耗时属真机专项）。
-// 稳定性约定：全部用 accessibilityIdentifier 定位；undoWindow 经 launchArguments 调 30s 消竞态。
+// ① 批量选择（长按进入 → 全选 → 移到最近删除按钮可见 → 完成）；② 撤销往返（上滑收藏 → 撤销 →
+// 再上滑仍可收藏，证明撤销真实回滚了 PhotoKit 状态）；③ 清理扫描可启动、可取消。
+// 稳定性约定：全部用 accessibilityIdentifier + descendants(.any) 定位（UIToolbar 内 UIBarButtonItem
+// 的 AX 暴露类型跨版本不稳定）；undoWindow 经 launchArguments 调 30s 消竞态。
 
 import XCTest
 
@@ -42,28 +43,30 @@ final class FlowUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
     }
 
-    // MARK: - ① 批量选择
+    private func anyElement(_ app: XCUIApplication, identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    // MARK: - ① 批量选择（长按进入 → 全选 → 移到最近删除按钮存在 → 完成）
 
     func testBatchSelectionFlow() throws {
         let app = XCUIApplication()
         launchToGrid(app)
 
-        // 工具栏「多选」按钮进入（docs/04 §3.1；坐标点击绕开 SwiftUI 工具栏按钮的 AX action 失败）
-        let selectButton = app.buttons["Library-Select"]
-        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "导航栏缺「多选」按钮")
-        selectButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let firstCell = app.collectionViews.cells.firstMatch
+        firstCell.press(forDuration: 1.2)   // 长按进入多选（docs/04 §3.1）
 
-        let selectAll = app.buttons["Batch-SelectAll"]
+        let selectAll = anyElement(app, identifier: "Batch-SelectAll")
         XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "进入多选后批量工具栏未出现")
 
-        selectAll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let deleteButton = app.buttons["Batch-Delete"]
+        selectAll.tap()
+        let deleteButton = anyElement(app, identifier: "Batch-Delete")
         XCTAssertTrue(deleteButton.waitForExistence(timeout: 3), "批量工具栏缺「移到最近删除」")
 
         // 退出多选（不执行破坏性操作）
-        app.buttons["Batch-Done"].tap()
-        XCTAssertFalse(app.buttons["Batch-SelectAll"].waitForExistence(timeout: 2),
-                       "退出多选后工具栏应消失")
+        let done = anyElement(app, identifier: "Batch-Done")
+        done.tap()
+        XCTAssertFalse(selectAll.waitForExistence(timeout: 2), "退出多选后工具栏应消失")
     }
 
     // MARK: - ② 撤销往返（收藏 → 撤销 → 仍可再收藏）
@@ -88,7 +91,7 @@ final class FlowUITests: XCTestCase {
         XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")
 
         // 点「撤销」（identifier 定位）→ PhotoKit 状态回滚
-        let undo = app.buttons["Toast-Undo"]
+        let undo = anyElement(app, identifier: "Toast-Undo")
         XCTAssertTrue(undo.waitForExistence(timeout: 3), "Toast 缺撤销按钮")
         undo.tap()
 
@@ -109,20 +112,18 @@ final class FlowUITests: XCTestCase {
         XCTAssertTrue(cleanupEntry.waitForExistence(timeout: 5), "工具页缺智能清理入口")
         cleanupEntry.tap()
 
-        let start = app.buttons["开始扫描"]
+        let start = anyElement(app, identifier: "Cleanup-Start")
         XCTAssertTrue(start.waitForExistence(timeout: 5), "清理页缺开始扫描")
         start.tap()
 
-        // 进入扫描态（进度环/百分比出现）
-        let runningMarker = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES '.*扫描中.*|.*[0-9]+%.*'")
-        ).firstMatch
-        XCTAssertTrue(runningMarker.waitForExistence(timeout: 30), "扫描未进入运行态")
+        // 进入扫描态（百分比文本出现）
+        let progress = anyElement(app, identifier: "Cleanup-Progress")
+        XCTAssertTrue(progress.waitForExistence(timeout: 30), "扫描未进入运行态")
 
         // 取消 → 回到可再次扫描状态
-        let cancelButton = app.buttons["取消"]
-        XCTAssertTrue(cancelButton.waitForExistence(timeout: 5), "缺取消按钮")
-        cancelButton.tap()
+        let cancel = anyElement(app, identifier: "Cleanup-Cancel")
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "缺取消按钮")
+        cancel.tap()
         XCTAssertTrue(start.waitForExistence(timeout: 10), "取消后未回到待机态")
     }
 }

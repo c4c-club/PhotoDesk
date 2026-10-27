@@ -62,6 +62,7 @@ struct CleanupView: View {
                     .foregroundColor(.white)
                     .cornerRadius(DSSpacing.buttonCornerRadius)
             }
+            .accessibilityIdentifier("Cleanup-Start")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -86,10 +87,12 @@ struct CleanupView: View {
             Text("扫描中…  \(scanned) / \(total)")
                 .font(.body)
                 .foregroundColor(Color(ds: DSColor.textSecondary))
+                .accessibilityIdentifier("Cleanup-Progress")
 
             Button("取消") {
                 viewModel.cancelScan()
             }
+            .accessibilityIdentifier("Cleanup-Cancel")
             .foregroundColor(Color(ds: DSColor.accentDelete))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

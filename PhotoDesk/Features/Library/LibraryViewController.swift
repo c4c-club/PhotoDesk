@@ -153,7 +153,7 @@ final class LibraryViewController: UIViewController {
         selectionBar.isHidden = true
         view.addSubview(selectionBar)
 
-        func barItem(_ symbol: String, _ label: String, action: Selector) -> UIBarButtonItem {
+    func barItem(_ symbol: String, _ label: String, action: Selector) -> UIBarButtonItem {
             let item = UIBarButtonItem(image: UIImage(systemName: symbol),
                                        style: .plain, target: self, action: action)
             item.accessibilityLabel = label
@@ -554,6 +554,14 @@ final class MonthHeaderView: UICollectionReusableView {
 }
 
 // MARK: - 安全取值
+
+extension LibraryViewController {
+    /// 稳定定位辅助（测试用）：UIToolbar 里 UIBarButtonItem 的 AX 暴露类型（button/other）
+    /// 在系统版本间不稳定，测试统一按 identifier 在任意元素类型上查询
+    func anyElement(identifier: String) -> XCUIElement {
+        XCUIApplication().descendants(matching: .any)[identifier].firstMatch
+    }
+}
 
 private extension Array {
     subscript(safe index: Int) -> Element? {
