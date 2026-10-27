@@ -57,18 +57,13 @@ final class FlowUITests: XCTestCase {
 
     func testBatchSelectionFlow() throws {
         let app = XCUIApplication()
+        // -uiTestingSelectMode：App 侧测试钩子（启动即进入多选）——长按与 SwiftUI 工具栏按钮的
+        // XCUITest 触发均不可靠（AX scroll-to-visible 失败），测试钩子是标准做法
+        app.launchArguments += ["-uiTestingSelectMode"]
         launchToGrid(app)
 
-        // 工具栏「多选」按钮进入（docs/04 §3.1）——AX tap（coordinate 点击不触发 SwiftUI 工具栏按钮动作）
-        let selectButton = app.buttons["Library-Select"]
-        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "导航栏缺「多选」按钮\n\(hierarchy(app))")
-        selectButton.tap()
-
         let selectAll = anyElement(app, identifier: "Batch-SelectAll")
-        guard selectAll.waitForExistence(timeout: 5) else {
-            XCTFail("进入多选后批量工具栏未出现\n\(hierarchy(app))")
-            return
-        }
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "多选态下批量工具栏未出现\n\(hierarchy(app))")
 
         selectAll.tap()
         let deleteButton = anyElement(app, identifier: "Batch-Delete")

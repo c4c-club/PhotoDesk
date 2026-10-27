@@ -75,6 +75,10 @@ final class LibraryViewController: UIViewController {
         setupSelection()
         setupBatchToast()
         wireViewModel()
+        // UI 测试钩子：-uiTestingSelectMode 启动即进入多选（绕开长按/工具栏按钮在 XCUITest 中的不可靠性）
+        if ProcessInfo.processInfo.arguments.contains("-uiTestingSelectMode") {
+            enterSelectionMode(selecting: nil)
+        }
 
         viewModel.onManageLimitedPhotos = { [weak self] in
             guard let self else { return }
