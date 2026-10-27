@@ -18,6 +18,7 @@ final class DSToast: UIView {
         button.setTitle("撤销", for: .normal)
         button.setTitleColor(DSColor.tint, for: .normal)
         button.titleLabel?.font = DSTypography.font(.toast)
+        button.accessibilityIdentifier = "Toast-Undo"
         return button
     }()
     /// 环形倒计时描边

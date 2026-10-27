@@ -160,7 +160,11 @@ final class LibraryViewController: UIViewController {
             return item
         }
         selectAllItem = barItem("checkmark.circle", "全选", action: #selector(selectAllTapped))
+        selectAllItem.accessibilityIdentifier = "Batch-SelectAll"
         doneItem = barItem("xmark.circle.fill", "完成", action: #selector(doneSelectingTapped))
+        doneItem.accessibilityIdentifier = "Batch-Done"
+        let deleteItem = barItem("trash", "移到最近删除", action: #selector(batchDeleteTapped))
+        deleteItem.accessibilityIdentifier = "Batch-Delete"
         selectionBar.setItems([
             doneItem,
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
@@ -170,7 +174,7 @@ final class LibraryViewController: UIViewController {
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
             barItem("eye.slash", "隐藏", action: #selector(batchHideTapped)),
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            barItem("trash", "移到最近删除", action: #selector(batchDeleteTapped)),
+            deleteItem,
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
             barItem("folder.badge.plus", "加相簿", action: #selector(batchAddToAlbumTapped)),
         ], animated: false)
