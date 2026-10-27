@@ -492,7 +492,7 @@ final class ViewerViewController: UIViewController {
         let alpha: CGFloat = visible ? 1 : 0
         let animate = usesMotion
         if animate {
-            UIView.animate(withDuration: DSMotion.fadeDuration, options: DSMotion.fadeOptions) {
+            UIView.animate(withDuration: DSMotion.fadeDuration, delay: 0, options: DSMotion.fadeOptions) {
                 self.topBar.alpha = alpha
                 self.filmStrip.alpha = alpha
             }
