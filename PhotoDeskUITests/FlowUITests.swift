@@ -47,6 +47,12 @@ final class FlowUITests: XCTestCase {
         app.descendants(matching: .any)[identifier].firstMatch
     }
 
+    /// 失败取证：把当前 AX 层级（截断）塞进断言消息——CI 日志可直接读出真实元素树
+    private func hierarchy(_ app: XCUIApplication) -> String {
+        let tree = app.debugDescription
+        return tree.count > 8000 ? String(tree.prefix(8000)) + "…(截断)" : tree
+    }
+
     // MARK: - ① 批量选择（长按进入 → 全选 → 移到最近删除按钮存在 → 完成）
 
     func testBatchSelectionFlow() throws {
@@ -57,7 +63,10 @@ final class FlowUITests: XCTestCase {
         firstCell.press(forDuration: 1.2)   // 长按进入多选（docs/04 §3.1）
 
         let selectAll = anyElement(app, identifier: "Batch-SelectAll")
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "进入多选后批量工具栏未出现")
+        guard selectAll.waitForExistence(timeout: 5) else {
+            XCTFail("进入多选后批量工具栏未出现\n\(hierarchy(app))")
+            return
+        }
 
         selectAll.tap()
         let deleteButton = anyElement(app, identifier: "Batch-Delete")
@@ -88,11 +97,17 @@ final class FlowUITests: XCTestCase {
         // 第一次上滑 → 已收藏
         swipeUp()
         let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
-        XCTAssertTrue(toast.waitForExistence(timeout: 5), "收藏 Toast 未出现")
+        guard toast.waitForExistence(timeout: 5) else {
+            XCTFail("收藏 Toast 未出现\n\(hierarchy(app))")
+            return
+        }
 
         // 点「撤销」（identifier 定位）→ PhotoKit 状态回滚
         let undo = anyElement(app, identifier: "Toast-Undo")
-        XCTAssertTrue(undo.waitForExistence(timeout: 3), "Toast 缺撤销按钮")
+        guard undo.waitForExistence(timeout: 3) else {
+            XCTFail("Toast 缺撤销按钮\n\(hierarchy(app))")
+            return
+        }
         undo.tap()
 
         // 撤销窗口（30s）内再上滑 → 仍能出现「已收藏」＝ 撤销确实回滚了收藏状态
@@ -118,7 +133,10 @@ final class FlowUITests: XCTestCase {
 
         // 进入扫描态（百分比文本出现）
         let progress = anyElement(app, identifier: "Cleanup-Progress")
-        XCTAssertTrue(progress.waitForExistence(timeout: 30), "扫描未进入运行态")
+        guard progress.waitForExistence(timeout: 30) else {
+            XCTFail("扫描未进入运行态\n\(hierarchy(app))")
+            return
+        }
 
         // 取消 → 回到可再次扫描状态
         let cancel = anyElement(app, identifier: "Cleanup-Cancel")
