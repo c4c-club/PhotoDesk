@@ -422,9 +422,11 @@ final class ViewerViewController: UIViewController {
             completion()
             return
         }
-        UIView.animate(withDuration: 0.3,
+        UIView.animate(withDuration: DSMotion.flyOutDuration,
                        delay: 0,
-                       options: [.curveEaseIn, .beginFromCurrentState],
+                       usingSpringWithDamping: DSMotion.springDamping,
+                       initialSpringVelocity: DSMotion.springVelocity,
+                       options: [.beginFromCurrentState],
                        animations: {
             cell.transform = CGAffineTransform(translationX: 0, y: flyDistance)
             cell.alpha = 0
@@ -490,7 +492,7 @@ final class ViewerViewController: UIViewController {
         let alpha: CGFloat = visible ? 1 : 0
         let animate = usesMotion
         if animate {
-            UIView.animate(withDuration: 0.2) {
+            UIView.animate(withDuration: DSMotion.fadeDuration, options: DSMotion.fadeOptions) {
                 self.topBar.alpha = alpha
                 self.filmStrip.alpha = alpha
             }

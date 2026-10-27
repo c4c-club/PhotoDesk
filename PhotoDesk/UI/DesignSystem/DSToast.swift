@@ -138,7 +138,7 @@ final class DSToast: UIView {
         }
         alpha = 0
         transform = CGAffineTransform(translationX: 0, y: 20)
-        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+        UIView.animate(withDuration: DSMotion.toastDuration, delay: 0, options: DSMotion.fadeOptions) {
             self.alpha = 1
             self.transform = .identity
         }
@@ -154,7 +154,7 @@ final class DSToast: UIView {
             finish()
             return
         }
-        UIView.animate(withDuration: 0.2, animations: {
+        UIView.animate(withDuration: DSMotion.toastDuration, animations: {
             self.alpha = 0
         }, completion: { _ in finish() })
     }

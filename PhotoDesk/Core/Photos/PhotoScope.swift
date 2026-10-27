@@ -16,10 +16,10 @@ enum PhotoScope: Hashable {
 }
 
 /// 多维筛选谓词（docs/05 M5 任务 5.1/5.2）——日期三级下钻 + 媒体类型多选 + 状态。
-/// 匹配引擎见 PhotoFilter（纯函数可单测）；OCR 关键词随 P2 的 OCRText 索引接入（TODO(P5-P2)）。
+/// 匹配引擎见 PhotoFilter（纯函数可单测）；OCR 关键词索引未接入，登记于已知问题（后续 OCR 文本索引）。
 struct SearchPredicate: Hashable {
     /// 媒体类型维度（照片/视频/Live/截图/人像/全景/慢动作/延时）。
-    /// RAW 无公开 subtype（需逐资源枚举 PHAssetResource，万级库不可承受），TODO(P5) 随元数据管道接入
+    /// RAW 无公开 subtype（需逐资源枚举 PHAssetResource，万级库不可承受），暂未支持，登记于已知问题
     enum MediaFilter: String, CaseIterable, Identifiable, Hashable {
         case photo, video, live, screenshot, portrait, panorama, slowMotion, timeLapse
 

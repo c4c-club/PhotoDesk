@@ -1,7 +1,7 @@
 // MARK: - 职责说明：搜索/筛选 ViewModel（docs/05 M5 任务 5.1/5.2）——
 // 谓词（@Published）→ PhotoFilter 纯函数 → 结果集；筛选在主线程对已加载快照执行
 // （万级 < 500ms，SearchPredicateTests 实测），不触碰 PhotoKit。
-/// OCR 关键词随 P2 的 OCRText 索引接入（TODO(P5-P2)）；搜索历史/智能视图同属 P2。
+/// OCR 关键词索引与搜索历史/智能视图为后续增强，登记于已知问题。
 
 import Foundation
 import SwiftUI

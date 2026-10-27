@@ -205,10 +205,10 @@ final class ZoomableImageCell: UICollectionViewCell {
             scrollView.zoom(to: rect, animated: false)
             scrollView.setZoomScale(target, animated: false)
         } else {
-            UIView.animate(withDuration: 0.25,
+            UIView.animate(withDuration: DSMotion.zoomDuration,
                            delay: 0,
-                           usingSpringWithDamping: 0.8,
-                           initialSpringVelocity: 0.3,
+                           usingSpringWithDamping: DSMotion.springDamping,
+                           initialSpringVelocity: DSMotion.springVelocity,
                            options: [.beginFromCurrentState]) {
                 self.scrollView.zoom(to: rect, animated: false)
                 self.scrollView.setZoomScale(target, animated: false)

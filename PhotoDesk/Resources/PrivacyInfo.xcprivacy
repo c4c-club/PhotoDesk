@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- P9 隐私清单：PhotoDesk 完全离线、零采集、零追踪（docs/02 §2 红线）。
+	     required-reason API 实测仅用文件时间戳（DiskCache LRU：
+	     setAttributes(.modificationDate) 写 + contentModificationDateKey 读，
+	     均在 App 容器内 → C617.1）；
+	     磁盘空间 / 系统启动时长 / 键盘状态 API 未使用，故不声明。
+	     照片库访问不属于 required-reason API 类别，权限声明在 Info.plist
+	     （NSPhotoLibraryUsageDescription / NSPhotoLibraryAddUsageDescription）。 -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

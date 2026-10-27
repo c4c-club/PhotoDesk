@@ -1,6 +1,6 @@
 // MARK: - 职责说明：手势灵敏度档位常量（docs/03 §5.1 / docs/04 §3.4 舒适·标准·保守）。
 // 灵敏度越高（阈值越小）越易触发；与设置项 gesture.sensitivity 一一对应。
-// TODO(P1): 与 SettingsStore 联动（App 侧做 SwipeAction 选择，本文件只管阈值常量）。
+// 设置联动已于 M7 落地：App 侧 SwipeGestureEngine.config(for:) 每次判定时实时读取 gesture.sensitivity。
 
 public enum Sensitivity: String, CaseIterable {
     /// 舒适：轻滑即触发

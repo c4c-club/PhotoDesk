@@ -112,7 +112,8 @@ final class AssetRepository: AssetRepositoryProtocol {
             // smartAlbum 回退实现。当前返回空集，不视为错误。
             return PHAsset.fetchAssets(with: FALSE_PREDICATE_OPTIONS)
         case .search:
-            // TODO(P5): 随筛选维度实现 SearchPredicate → NSPredicate
+            // search 维度不走 PhotoKit fetch：M5 起搜索/筛选在已加载快照上用
+            // PhotoFilter 纯函数执行（SearchViewModel），此 case 仅为作用域枚举完整性回退空集。
             return PHAsset.fetchAssets(with: FALSE_PREDICATE_OPTIONS)
         }
     }

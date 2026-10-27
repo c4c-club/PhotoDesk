@@ -1,7 +1,7 @@
 // MARK: - 职责说明：dHash 感知哈希（docs/02 §3.3）——9×8 灰度差值 → 64 bit 指纹。
 // 输入约定：行优先灰度 [UInt8]（0...255）且尺寸恰为 9×8（App 侧用 CGContext 渲染到该尺寸；
 // 尺寸变换属于取图准备，不属于算法内核——红线 2 下核心包保持 Foundation-only）。
-// TODO(P4) 已实现：M2 占位逻辑由本实现取代；单测见 HashAlgorithmTests（同图距离 0 / 旋转 / 加噪）。
+// 实现说明：M2 占位逻辑已由本实现取代（M4）；单测见 HashAlgorithmTests（同图距离 0 / 旋转 / 加噪）。
 
 public enum DHash {
     public static let requiredWidth = 9
