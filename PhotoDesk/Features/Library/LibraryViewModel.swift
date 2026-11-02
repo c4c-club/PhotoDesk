@@ -84,6 +84,10 @@ final class LibraryViewModel: ObservableObject {
         self.undoCenter = undoCenter
         self.settings = settings
         self.reviewSession = reviewSession
+        // 初始排序跟随设置（grid.sortAsc，docs/09 D10 接线）
+        query.sortAscending = settings.sortAscending
+        // 筛选持久化（docs/09 D10：library.filter.<scope>，各 scope 独立保留）
+        query.filter = Self.loadPersistedFilter(for: query.scope)
         reviewSession.onSessionChanged = { [weak self] session in
             self?.applyPendingChanges(session)
         }
@@ -139,14 +143,22 @@ final class LibraryViewModel: ObservableObject {
     func setScope(_ scope: PhotoScope) async {
         guard scope != query.scope else { return }
         query.scope = scope
+        // 切换 scope：各自记住自己的筛选（docs/09 D10 §6）
+        query.filter = Self.loadPersistedFilter(for: scope)
         await reloadForQuery()
     }
 
-    /// 筛选变化：内存全集上应用（不重查 PhotoKit，<500ms 预算内）
+    /// 筛选变化：内存全集上应用（不重查 PhotoKit，<500ms 预算内）+ 持久化
     func setFilter(_ filter: SearchPredicate) {
         guard filter != query.filter else { return }
         query.filter = filter
+        Self.persistFilter(filter, for: query.scope)
         rebuildDerived(animated: false)
+    }
+
+    /// 清除筛选（空态「清除筛选」按钮）
+    func clearFilter() {
+        setFilter(.default)
     }
 
     /// 排序（docs/09 D10：sortAscending 下推 fetch + 分组顺序）
@@ -386,6 +398,34 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private var onSnapshotUpdate: ((_ sections: [MonthSection], _ itemsBySection: [[PhotoItem]], _ animated: Bool) -> Void)?
+
+    // MARK: - 筛选持久化（library.filter.<scope>；docs/09 D10）
+
+    private static let filterPrefix = "library.filter."
+
+    private static func loadPersistedFilter(for scope: PhotoScope) -> SearchPredicate {
+        let key = filterPrefix + LibraryQuery.scopeKey(scope)
+        guard let json = UserDefaults.standard.string(forKey: key),
+              let data = json.data(using: .utf8),
+              let filter = try? JSONDecoder().decode(SearchPredicate.self, from: data) else {
+            return .default
+        }
+        return filter
+    }
+
+    private static func persistFilter(_ filter: SearchPredicate, for scope: PhotoScope) {
+        let key = filterPrefix + LibraryQuery.scopeKey(scope)
+        guard !filter.isDefault else {
+            UserDefaults.standard.removeObject(forKey: key)
+            return
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        if let data = try? encoder.encode(filter),
+           let json = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(json, forKey: key)
+        }
+    }
 }
 
 private extension Array where Element == String {

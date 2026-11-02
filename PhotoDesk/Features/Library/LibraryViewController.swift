@@ -13,6 +13,7 @@ final class LibraryViewController: UIViewController {
     private let viewModel: LibraryViewModel
     private let pipeline: ImagePipelineProtocol
     private let settings: SettingsStore
+    private let positionStore: LibraryPositionStore
 
     // MARK: - UI
 
@@ -48,13 +49,27 @@ final class LibraryViewController: UIViewController {
     private var currentItemsBySection: [[PhotoItem]] = []
     /// 上一次布局时配置 cell 所用的像素尺寸（变化时重配可视 cell）
     private var lastConfiguredPixelSize: CGSize = .zero
-    /// 网格点击 → 打开全屏浏览器（扁平 index：Section=月份 → 全序换算）
-    var onOpenViewer: ((Int) -> Void)?
+    /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
+    var onOpenViewer: ((PhotoItem) -> Void)?
 
-    init(viewModel: LibraryViewModel, pipeline: ImagePipelineProtocol, settings: SettingsStore) {
+    // MARK: - 下拉刷新（docs/09 D15）
+
+    private let refreshControl = UIRefreshControl()
+
+    // MARK: - 位置记忆（docs/09 D08）
+
+    private var isRestoringPosition = false
+    private var didRestorePosition = false
+    private var positionSaveTimer: Timer?
+
+    init(viewModel: LibraryViewModel,
+         pipeline: ImagePipelineProtocol,
+         settings: SettingsStore,
+         positionStore: LibraryPositionStore) {
         self.viewModel = viewModel
         self.pipeline = pipeline
         self.settings = settings
+        self.positionStore = positionStore
         self.columns = max(2, min(5, settings.gridColumns))
         super.init(nibName: nil, bundle: nil)
     }
@@ -87,6 +102,14 @@ final class LibraryViewController: UIViewController {
         }
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 切 Tab / 进设置 / 返回前强制保存位置（docs/09 D08）
+        positionSaveTimer?.invalidate()
+        positionSaveTimer = nil
+        savePositionIfNeeded()
+    }
+
     // MARK: - 构建
 
     private func setupCollectionView() {
@@ -95,7 +118,18 @@ final class LibraryViewController: UIViewController {
         collectionView.backgroundColor = .clear
         collectionView.delegate = self
         collectionView.allowsSelection = true
+        // 下拉刷新（docs/09 D15）：保留当前筛选与位置
+        refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
+        collectionView.refreshControl = refreshControl
         view.addSubview(collectionView)
+    }
+
+    @objc private func didPullToRefresh() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.viewModel.reload()
+            self.refreshControl.endRefreshing()
+        }
     }
 
     private func setupDataSource() {
@@ -390,6 +424,61 @@ final class LibraryViewController: UIViewController {
         }
         dataSource.apply(snapshot, animatingDifferences: animated)
         syncIndexBar()
+        // 位置记忆恢复（docs/09 D08）：首次非空快照后按 assetID 恢复（找不到用 offsetRatio 回退）
+        restorePositionIfNeeded()
+    }
+
+    // MARK: - 位置记忆（docs/09 D08）
+
+    /// 首个可见 item + 偏移比例 → 按查询键保存（滚动停止 0.5s / viewWillDisappear）
+    private func savePositionIfNeeded() {
+        guard positionStore.isEnabled, !isRestoringPosition,
+              !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
+        guard let indexPath = collectionView.indexPathsForVisibleItems.min(),
+              let section = currentSections[safe: indexPath.section],
+              let item = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item] else { return }
+        let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
+        let ratio = min(1, max(0, collectionView.contentOffset.y / scrollable))
+        positionStore.save(LibraryPosition(assetID: item.id,
+                                           sectionID: section.id,
+                                           offsetRatio: ratio,
+                                           savedAt: Date()),
+                           queryKey: viewModel.query.key)
+    }
+
+    /// 快照首次非空后恢复（恢复过程 isRestoringPosition 防写回；docs/09 D08）
+    private func restorePositionIfNeeded() {
+        guard !didRestorePosition, !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
+        didRestorePosition = true
+        guard let position = positionStore.load(queryKey: viewModel.query.key) else { return }
+
+        func finishRestore() {
+            isRestoringPosition = false
+            batchToast.show(icon: "arrow.uturn.backward.circle.fill",
+                            text: "已回到上次整理的位置",
+                            duration: 3,
+                            allowUndo: false,
+                            onUndo: nil,
+                            onDismissFinished: nil)
+        }
+
+        // 首选：按 assetID 精确定位
+        for (sectionIndex, items) in currentItemsBySection.enumerated() {
+            if let itemIndex = items.firstIndex(where: { $0.id == position.assetID }) {
+                isRestoringPosition = true
+                collectionView.layoutIfNeeded()
+                collectionView.scrollToItem(at: IndexPath(item: itemIndex, section: sectionIndex),
+                                            at: .centeredVertically, animated: false)
+                finishRestore()
+                return
+            }
+        }
+        // 回退：按偏移比例
+        isRestoringPosition = true
+        collectionView.layoutIfNeeded()
+        let scrollable = max(0, collectionView.contentSize.height - collectionView.bounds.height)
+        collectionView.setContentOffset(CGPoint(x: 0, y: position.offsetRatio * scrollable), animated: false)
+        finishRestore()
     }
 
     private func scrollToSection(_ index: Int) {
@@ -487,17 +576,20 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
             }
             return
         }
-        // 扁平 index：按 section 累加前缀 + 组内偏移（Viewer 以 items 全序定位起始页）
-        var flatIndex = 0
-        for section in 0..<indexPath.section {
-            flatIndex += currentItemsBySection[safe: section]?.count ?? 0
-        }
-        flatIndex += indexPath.item
-        onOpenViewer?(flatIndex)
+        // ViewerContext：当前筛选结果 + 被点条目（assetID 定位，docs/09 D01）
+        guard let item = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item] else { return }
+        onOpenViewer?(item)
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // docs/09 Phase 1：完整索引自后台补齐（500/批），不再由滚动触发续页
+        // 位置记忆：滚动停止 0.5 秒后保存首个可见 assetID（docs/09 D08）
+        guard !isRestoringPosition else { return }
+        positionSaveTimer?.invalidate()
+        positionSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.savePositionIfNeeded()
+            }
+        }
     }
 
     func collectionView(_ collectionView: UICollectionView,

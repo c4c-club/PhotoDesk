@@ -22,7 +22,7 @@ struct LibraryQuery: Equatable {
 
     // MARK: - 规范化
 
-    private static func scopeKey(_ scope: PhotoScope) -> String {
+    static func scopeKey(_ scope: PhotoScope) -> String {
         switch scope {
         case .all:               return "all"
         case .favorites:         return "favorites"
