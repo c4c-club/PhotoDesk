@@ -18,6 +18,10 @@ struct LibraryRootView: View {
     @State private var recoveryCount = 0
     @State private var showRecovery = false
     @State private var hadActiveEntry = false
+    #if DEBUG
+    /// UI 测试钩子：-uiTestingViewerStartIndex 启动即打开第 n 张查看器（只触发一次）
+    @State private var hookViewerOpened = false
+    #endif
 
     var body: some View {
         NavigationView {
@@ -117,6 +121,10 @@ struct LibraryRootView: View {
             recoveryCount = undoCenter.recoverableCount()
             undoCenter.restoreLatestIfNeeded()
             showRecovery = recoveryCount > 0
+            openHookViewerIfNeeded()
+        }
+        .onChange(of: viewModel.viewState) { _ in
+            openHookViewerIfNeeded()
         }
         .onReceive(service.$access) { _ in
             Task { await viewModel.start() }
@@ -150,6 +158,18 @@ struct LibraryRootView: View {
 final class SelectionModeBridge: ObservableObject {
     weak var controller: LibraryViewController?
 }
+
+/// UI 测试钩子（docs/09 Phase 0）：网格就绪后自动打开第 n 张查看器
+#if DEBUG
+private extension LibraryRootView {
+    func openHookViewerIfNeeded() {
+        guard !hookViewerOpened, viewModel.viewState == .ready,
+              let index = UITestHooks.intValue("-uiTestingViewerStartIndex") else { return }
+        hookViewerOpened = true
+        viewerAnchor = ViewerAnchor(startIndex: index)
+    }
+}
+#endif
 
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel

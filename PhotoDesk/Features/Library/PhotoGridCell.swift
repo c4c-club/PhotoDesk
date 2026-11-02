@@ -81,6 +81,13 @@ final class PhotoGridCell: UICollectionViewCell {
         isSelectedCell = selected
         contentView.layer.borderWidth = selected ? 2 : 0
         contentView.layer.borderColor = DSColor.tint.cgColor
+        #if DEBUG
+        // UI 测试（docs/09 D11）：value = "<assetID> selected/none"
+        if var value = accessibilityValue, !value.isEmpty {
+            value = value.components(separatedBy: " ").first ?? value
+            accessibilityValue = value + (selected ? " selected" : " none")
+        }
+        #endif
     }
 
     override init(frame: CGRect) {
@@ -148,6 +155,10 @@ final class PhotoGridCell: UICollectionViewCell {
         let token = configureToken
         updateBadges(item: item)
         accessibilityLabel = Self.accessibilityLabel(for: item)
+        #if DEBUG
+        // UI 测试（docs/09 D01/D11）：cell 可查询 assetID；选中态由 setSelected 追加 "selected"
+        accessibilityValue = item.id
+        #endif
 
         imageView.image = nil
         let id = item.id

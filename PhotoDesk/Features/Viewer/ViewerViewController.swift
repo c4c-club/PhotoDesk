@@ -116,6 +116,9 @@ final class ViewerViewController: UIViewController {
             collectionView.scrollToItem(at: IndexPath(item: viewModel.currentIndex, section: 0),
                                         at: .centeredHorizontally, animated: false)
         }
+        #if DEBUG
+        updateDebugBanner(page: viewModel.currentIndex)
+        #endif
     }
 
     private func setupOverlays() {
@@ -143,11 +146,19 @@ final class ViewerViewController: UIViewController {
         label.layer.cornerRadius = 4
         label.clipsToBounds = true
         label.text = "viewer:ready"
+        // UI 测试（docs/09 D01）：横幅可查询，label 内含 "id=<assetID> idx=<n>"
+        label.accessibilityIdentifier = "Viewer-Debug"
         return label
     }()
 
     private func updateDebugLabel(_ text: String) {
         debugLabel.text = text
+    }
+
+    /// 带定位信息的横幅文本（id / idx 供 UI 测试断言 assetID 一致性）
+    private func updateDebugBanner(page index: Int) {
+        guard let item = viewModel.items[safe: index] else { return }
+        updateDebugLabel("id=\(item.id) idx=\(index)")
     }
     #endif
 
@@ -695,6 +706,9 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
             viewModel.updateIndex(clamped)
             filmStrip.highlight(index: clamped, centerIfNeeded: true)
             refreshChrome()
+            #if DEBUG
+            updateDebugBanner(page: clamped)
+            #endif
         }
     }
 }
