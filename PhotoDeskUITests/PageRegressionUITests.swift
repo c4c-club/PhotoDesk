@@ -64,10 +64,11 @@ final class PageRegressionUITests: XCTestCase {
         launchToGrid(app)
 
         let collection = app.collectionViews.firstMatch
-        // 第 8 个 cell 的 accessibilityValue（DEBUG 构建 = assetID）
+        // 第 8 个 cell 的 accessibilityValue（DEBUG 构建 = "<assetID> selected/none"）
         let targetCell = collection.cells.element(boundBy: 7)
         XCTAssertTrue(targetCell.waitForExistence(timeout: 10), "网格不足 8 张")
-        let expectedID = targetCell.value as? String ?? ""
+        let fullValue = targetCell.value as? String ?? ""
+        let expectedID = fullValue.components(separatedBy: " ").first ?? ""
         XCTAssertFalse(expectedID.isEmpty, "cell 缺 DEBUG accessibilityValue(assetID)")
         targetCell.tap()
 
@@ -84,8 +85,10 @@ final class PageRegressionUITests: XCTestCase {
 
     func testDeleteKeepsDisplayedPhotoInSync() throws {
         let app = XCUIApplication()
-        // 会话 mock：滑动只入队，不真实删除
-        app.launchArguments += ["-uiTestingSessionMock", "-uiTestingViewerStartIndex", "7"]
+        // 会话 mock：滑动只入队，不真实删除；下滑动作改为移到最近删除（默认 hide）
+        app.launchArguments += ["-uiTestingSessionMock",
+                                "-uiTestingViewerStartIndex", "7",
+                                "-gesture.down", "moveToRecentlyDeleted"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
@@ -95,10 +98,8 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(banner.waitForExistence(timeout: 5))
         let before = banner.label   // "… id=<assetID> idx=7"
 
-        // 下滑 = 标记待删除（默认下滑动作）→ 立即补位，横幅应变为下一张的 id
-        let start = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-        let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        // 下滑（手指从上往下）= 标记待删除 → 立即补位，横幅应变为下一张的 id
+        swipeDown(in: viewer)
 
         XCTAssertTrue(banner.waitForExistence(timeout: 5))
         let after = banner.label
@@ -106,11 +107,20 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(after.contains("id="), "横幅缺 id 字段：\(after)")
     }
 
+    /// 下滑手势：起点在上、终点在下（swipeDown 语义；XCUITest 的 swipeUp 是「手指向上滑」）
+    private func swipeDown(in viewer: XCUIElement) {
+        let start = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+        let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
     // MARK: - D03/D16a 连续 20 次下滑 0 系统弹窗、计数 20
 
     func testSessionSwipeDoesNotPrompt() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSessionMock", "-uiTestingViewerStartIndex", "7"]
+        app.launchArguments += ["-uiTestingSessionMock",
+                                "-uiTestingViewerStartIndex", "7",
+                                "-gesture.down", "moveToRecentlyDeleted"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
@@ -127,9 +137,7 @@ final class PageRegressionUITests: XCTestCase {
         }
 
         for _ in 0..<20 {
-            let start = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
-            let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15))
-            start.press(forDuration: 0.03, thenDragTo: end)
+            swipeDown(in: viewer)
         }
 
         // 顶部待删除计数徽标 = 20
@@ -145,16 +153,16 @@ final class PageRegressionUITests: XCTestCase {
     func testSessionCommitPromptsOnce() throws {
         let app = XCUIApplication()
         // mock 模式：BatchCommitCoordinator 对 mock writer 的批量提交次数 === 真实路径的 performChanges 次数
-        app.launchArguments += ["-uiTestingSessionMock", "-uiTestingViewerStartIndex", "7"]
+        app.launchArguments += ["-uiTestingSessionMock",
+                                "-uiTestingViewerStartIndex", "7",
+                                "-gesture.down", "moveToRecentlyDeleted"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
         XCTAssertTrue(viewer.waitForExistence(timeout: 10))
 
         for _ in 0..<3 {
-            let start = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
-            let end = viewer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15))
-            start.press(forDuration: 0.03, thenDragTo: end)
+            swipeDown(in: viewer)
         }
 
         // 打开整理回顾
