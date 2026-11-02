@@ -66,7 +66,9 @@ final class PhotoGridCell: UICollectionViewCell {
     }()
 
     /// 多选模式可见性 / 选中态（VC 在进入/退出多选时批量刷新）
+    /// docs/09 D11 根因修复：必须给 isSelectingVisible 赋值（否则 didSet 永远隐藏角标 → 全选「没反应」）
     func setSelectionVisible(_ visible: Bool) {
+        isSelectingVisible = visible
         selectionBadge.isHidden = !visible || !isSelectedCell
     }
 

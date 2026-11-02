@@ -22,14 +22,24 @@ final class LibraryViewController: UIViewController {
     private let indexBar = MonthIndexBar()
     private var columns: Int
 
-    // MARK: - 多选与批量（docs/05 M3 任务 5）
+    // MARK: - 多选与批量（docs/09 D11/D12/D13 重做：SelectionState + 长按框选）
 
     private(set) var isSelecting = false
-    private var selectedIDs = Set<String>()
+    /// 选择状态（PhotoDeskCore.SelectionPolicy：scope = 当前筛选结果全集）
+    private var selectionState = SelectionState()
     private var isBatchRunning = false
-    private let selectionBar = UIToolbar()
+    /// 底部多选工具栏（两行：取消/计数/完成 + 横向滚动操作行）
+    private let selectionBar = UIView()
+    private let selectionCountLabel: UILabel = {
+        let label = UILabel()
+        label.font = DSTypography.font(.body)
+        label.textColor = DSColor.textPrimary
+        label.textAlignment = .center
+        label.accessibilityIdentifier = "Selection-Count"
+        label.accessibilityLabel = "已选择 0 项"
+        return label
+    }()
     private let batchToast = DSToast(frame: .zero)
-    private var selectionPan: UIPanGestureRecognizer!
     private let selectionOverlay: UIView = {
         let view = UIView()
         view.backgroundColor = DSColor.tint.withAlphaComponent(0.15)
@@ -39,9 +49,12 @@ final class LibraryViewController: UIViewController {
         view.isUserInteractionEnabled = false
         return view
     }()
-    private var selectionStartPoint: CGPoint?
-    private var selectAllItem: UIBarButtonItem!
-    private var doneItem: UIBarButtonItem!
+    /// 框选状态：长按起点（nil = 无长按进行中）
+    private var boxStartPoint: CGPoint?
+    /// 框选进行中（移动超过 10pt 后进入；此时滚动禁用）
+    private var isBoxSelecting = false
+    private var lastBoxPoint: CGPoint = .zero
+    private var boxAutoScrollLink: CADisplayLink?
 
     // MARK: - 快照缓存
 
@@ -137,7 +150,7 @@ final class LibraryViewController: UIViewController {
             guard let self else { return }
             cell.configure(item: item, pipeline: self.pipeline, pixelSize: self.cellPixelSize)
             cell.setSelectionVisible(self.isSelecting)
-            cell.setSelected(self.selectedIDs.contains(item.id))
+            cell.setSelected(self.selectionState.selectedSet.contains(item.id))
         }
 
         let headerRegistration = UICollectionView.SupplementaryRegistration<MonthHeaderView>(
@@ -145,6 +158,10 @@ final class LibraryViewController: UIViewController {
         ) { [weak self] header, _, indexPath in
             guard let section = self?.currentSections[safe: indexPath.section] else { return }
             header.configure(title: section.headerTitle)
+            // 月份头「选择」（docs/09 D15）：进入该月多选（scope = 该月 items）
+            header.onSelect = { [weak self] in
+                self?.enterSelectionMode(section: indexPath.section)
+            }
         }
 
         dataSource = UICollectionViewDiffableDataSource<MonthSection, PhotoItem>(collectionView: collectionView) {
@@ -182,57 +199,104 @@ final class LibraryViewController: UIViewController {
         ])
     }
 
-    // MARK: - 多选模式（点选 / 框选 / 全选；长按进入）
+    // MARK: - 多选模式（docs/09 D12：顶部取消/计数/完成；操作行可横滚；D13：长按拖拽框选）
 
     private func setupSelection() {
         selectionBar.translatesAutoresizingMaskIntoConstraints = false
-        selectionBar.setBackgroundImage(UIImage(), forToolbarPosition: .any, barMetrics: .default)
-        selectionBar.barTintColor = DSColor.bgSecondary.withAlphaComponent(0.96)
+        selectionBar.backgroundColor = DSColor.bgSecondary.withAlphaComponent(0.98)
         selectionBar.isHidden = true
         view.addSubview(selectionBar)
+        view.addSubview(selectionOverlay)
 
-    func barItem(_ symbol: String, _ label: String, action: Selector) -> UIBarButtonItem {
-            let item = UIBarButtonItem(image: UIImage(systemName: symbol),
-                                       style: .plain, target: self, action: action)
-            item.accessibilityLabel = label
-            return item
-        }
-        selectAllItem = barItem("checkmark.circle", "全选", action: #selector(selectAllTapped))
-        selectAllItem.accessibilityIdentifier = "Batch-SelectAll"
-        doneItem = barItem("xmark.circle.fill", "完成", action: #selector(doneSelectingTapped))
-        doneItem.accessibilityIdentifier = "Batch-Done"
-        let deleteItem = barItem("trash", "移到最近删除", action: #selector(batchDeleteTapped))
-        deleteItem.accessibilityIdentifier = "Batch-Delete"
-        selectionBar.setItems([
-            doneItem,
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            selectAllItem,
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            barItem("heart", "收藏", action: #selector(batchFavoriteTapped)),
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            barItem("eye.slash", "隐藏", action: #selector(batchHideTapped)),
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            deleteItem,
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            barItem("folder.badge.plus", "加相簿", action: #selector(batchAddToAlbumTapped)),
-        ], animated: false)
+        // 第一行：取消 | 已选择 N 项 | 完成
+        let cancelButton = barButton(symbol: "xmark", label: "取消", identifier: "Batch-Cancel",
+                                     action: #selector(doneSelectingTapped))
+        let doneButton = barButton(symbol: "checkmark", label: "完成", identifier: "Batch-Done",
+                                   action: #selector(doneSelectingTapped))
+        let topRow = UIStackView(arrangedSubviews: [cancelButton,
+                                                    selectionCountLabel,
+                                                    doneButton])
+        topRow.axis = .horizontal
+        topRow.alignment = .center
+        topRow.distribution = .equalSpacing
+        topRow.translatesAutoresizingMaskIntoConstraints = false
+
+        // 第二行：横向滚动操作按钮（docs/09 D12：避免 11 item 溢出）
+        let selectAllButton = barButton(symbol: "checkmark.circle", label: "全选", identifier: "Batch-SelectAll",
+                                        action: #selector(selectAllTapped))
+        let favoriteButton = barButton(symbol: "heart", label: "收藏", identifier: "Batch-Favorite",
+                                       action: #selector(batchFavoriteTapped))
+        let hideButton = barButton(symbol: "eye.slash", label: "隐藏", identifier: "Batch-Hide",
+                                   action: #selector(batchHideTapped))
+        let deleteButton = barButton(symbol: "trash", label: "移到最近删除", identifier: "Batch-Delete",
+                                     action: #selector(batchDeleteTapped))
+        let albumButton = barButton(symbol: "folder.badge.plus", label: "加相簿", identifier: "Batch-Album",
+                                    action: #selector(batchAddToAlbumTapped))
+
+        // 更多菜单：反选 / 取消全选 / 取消收藏 / 分享（docs/09 D11/D12）
+        let moreButton = barButton(symbol: "ellipsis.circle", label: "更多", identifier: "Batch-More",
+                                   action: nil)
+        moreButton.showsMenuAsPrimaryAction = true
+        moreButton.menu = UIMenu(children: [
+            UIAction(title: "反选") { [weak self] _ in self?.invertSelection() },
+            UIAction(title: "取消全选") { [weak self] _ in self?.deselectAll() },
+            UIAction(title: "取消收藏") { [weak self] _ in self?.runBatch(.setFavorite(false)) },
+            UIAction(title: "分享…") { [weak self] _ in self?.batchShareTapped() },
+        ])
+
+        let actionRow = UIScrollView()
+        actionRow.showsHorizontalScrollIndicator = false
+        actionRow.translatesAutoresizingMaskIntoConstraints = false
+        let actionStack = UIStackView(arrangedSubviews: [selectAllButton, favoriteButton, hideButton,
+                                                         deleteButton, albumButton, moreButton])
+        actionStack.axis = .horizontal
+        actionStack.spacing = 26
+        actionStack.translatesAutoresizingMaskIntoConstraints = false
+        actionRow.addSubview(actionStack)
+
+        let rowStack = UIStackView(arrangedSubviews: [topRow, actionRow])
+        rowStack.axis = .vertical
+        rowStack.spacing = 2
+        rowStack.translatesAutoresizingMaskIntoConstraints = false
+        selectionBar.addSubview(rowStack)
+
         NSLayoutConstraint.activate([
             selectionBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             selectionBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             selectionBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            selectionBar.heightAnchor.constraint(equalToConstant: 46),
+            selectionBar.heightAnchor.constraint(equalToConstant: 84),
+
+            rowStack.topAnchor.constraint(equalTo: selectionBar.topAnchor, constant: 4),
+            rowStack.leadingAnchor.constraint(equalTo: selectionBar.leadingAnchor, constant: 16),
+            rowStack.trailingAnchor.constraint(equalTo: selectionBar.trailingAnchor, constant: -16),
+            rowStack.bottomAnchor.constraint(equalTo: selectionBar.bottomAnchor, constant: -2),
+
+            actionRow.heightAnchor.constraint(equalToConstant: 40),
+            actionStack.leadingAnchor.constraint(equalTo: actionRow.contentLayoutGuide.leadingAnchor, constant: 4),
+            actionStack.trailingAnchor.constraint(equalTo: actionRow.contentLayoutGuide.trailingAnchor, constant: -4),
+            actionStack.topAnchor.constraint(equalTo: actionRow.contentLayoutGuide.topAnchor),
+            actionStack.bottomAnchor.constraint(equalTo: actionRow.contentLayoutGuide.bottomAnchor),
+            actionStack.heightAnchor.constraint(equalTo: actionRow.frameLayoutGuide.heightAnchor),
         ])
 
-        // 框选：多选模式下启用的第二把 Pan
-        selectionPan = UIPanGestureRecognizer(target: self, action: #selector(onSelectionPan(_:)))
-        selectionPan.isEnabled = false
-        selectionPan.maximumNumberOfTouches = 1
-        collectionView.addGestureRecognizer(selectionPan)
-        view.addSubview(selectionOverlay)
-
-        // 长按进入多选
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(onLongPress(_:)))
+        // D13：删除常驻 selectionPan；单个长按手势驱动「进入多选 + 拖拽框选」
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(onBoxLongPress(_:)))
+        longPress.minimumPressDuration = 0.28
+        longPress.allowableMovement = 10
         collectionView.addGestureRecognizer(longPress)
+    }
+
+    private func barButton(symbol: String, label: String, identifier: String,
+                           action: Selector?) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: symbol), for: .normal)
+        button.tintColor = DSColor.tint
+        button.accessibilityLabel = label
+        button.accessibilityIdentifier = identifier
+        if let action {
+            button.addTarget(self, action: action, for: .touchUpInside)
+        }
+        return button
     }
 
     /// 工具栏「多选」按钮（docs/04 §3.1）：切换多选模式（与长按进入等价）
@@ -244,47 +308,59 @@ final class LibraryViewController: UIViewController {
         }
     }
 
-    private func enterSelectionMode(selecting id: String?) {
+    private func enterSelectionMode(selecting id: String?, scopeOverride: Set<String>? = nil) {
         guard !isSelecting else { return }
         isSelecting = true
-        selectedIDs.removeAll()
-        selectionPan.isEnabled = true
+        let scope = scopeOverride ?? Set(currentItemsBySection.flatMap { $0.map(\.id) })
+        selectionState.begin(scope: scope, initial: id)
         selectionBar.isHidden = false
         indexBar.isHidden = true
         reloadSelectionBadges()
-        if let id {
-            selectedIDs.insert(id)
-            reloadSelectionBadges()
-        }
+        updateSelectionCount()
+    }
+
+    /// 月份头「选择」（docs/09 D15）：scope = 该月的 items
+    private func enterSelectionMode(section: Int) {
+        guard !isSelecting else { return }
+        let monthItems = currentItemsBySection[safe: section] ?? []
+        guard !monthItems.isEmpty else { return }
+        enterSelectionMode(selecting: nil, scopeOverride: Set(monthItems.map(\.id)))
     }
 
     private func exitSelectionMode() {
         isSelecting = false
-        selectedIDs.removeAll()
-        selectionPan.isEnabled = false
+        selectionState = SelectionState()
         selectionBar.isHidden = true
         indexBar.isHidden = false
         reloadSelectionBadges()
+        updateSelectionCount()
     }
 
     @objc private func doneSelectingTapped() {
         exitSelectionMode()
     }
 
-    @objc private func onLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began, !isSelecting else { return }
-        let point = gesture.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
-        enterSelectionMode(selecting: currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id)
+    private func toggleSelection(id: String) {
+        selectionState.toggle(id)
+        reloadSelectionBadges()
+        updateSelectionCount()
     }
 
-    private func toggleSelection(id: String) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
-        }
+    private func invertSelection() {
+        selectionState.invert()
         reloadSelectionBadges()
+        updateSelectionCount()
+    }
+
+    private func deselectAll() {
+        selectionState.deselectAll()
+        reloadSelectionBadges()
+        updateSelectionCount()
+    }
+
+    private func updateSelectionCount() {
+        selectionCountLabel.text = "已选择 \(selectionState.selected.count) 项"
+        selectionCountLabel.accessibilityLabel = "已选择 \(selectionState.selected.count) 项"
     }
 
     private func reloadSelectionBadges() {
@@ -292,80 +368,169 @@ final class LibraryViewController: UIViewController {
             guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell else { continue }
             cell.setSelectionVisible(isSelecting)
             let id = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id
-            cell.setSelected(id.map { selectedIDs.contains($0) } ?? false)
+            cell.setSelected(id.map { selectionState.selectedSet.contains($0) } ?? false)
         }
     }
 
+    /// 全选/取消全选切换（docs/09 D11：scope = 当前筛选结果全集，非全库）
     @objc private func selectAllTapped() {
-        selectedIDs = Set(currentItemsBySection.flatMap { $0.map(\.id) })
-        reloadSelectionBadges()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.viewModel.isIndexing {
+                // 索引未完成：等待完整索引（docs/09 D11 §5）
+                self.batchToast.show(icon: "hourglass",
+                                     text: "正在读取照片库…",
+                                     duration: 2,
+                                     allowUndo: false,
+                                     onUndo: nil, onDismissFinished: nil)
+                await self.viewModel.ensureIndexComplete()
+                let scope = Set(self.currentItemsBySection.flatMap { $0.map(\.id) })
+                self.selectionState.intersectScope(with: scope)
+            }
+            if self.selectionState.allSelected {
+                self.selectionState.deselectAll()
+            } else {
+                self.selectionState.selectAll()
+            }
+            self.reloadSelectionBadges()
+            self.updateSelectionCount()
+        }
     }
 
-    // MARK: - 框选
+    // MARK: - 框选（docs/09 D13：长按 0.28s 进入，移动 >10pt 进入框选，边缘自动滚动，只加不取消）
 
-    @objc private func onSelectionPan(_ gesture: UIPanGestureRecognizer) {
-        let location = gesture.location(in: collectionView)
+    @objc private func onBoxLongPress(_ gesture: UILongPressGestureRecognizer) {
         switch gesture.state {
         case .began:
-            selectionStartPoint = location
-        case .changed:
-            guard let start = selectionStartPoint else { return }
-            let rect = CGRect(x: min(start.x, location.x),
-                              y: min(start.y, location.y),
-                              width: abs(start.x - location.x),
-                              height: abs(start.y - location.y))
-            selectionOverlay.frame = rect
-            selectionOverlay.isHidden = false
-            // 公开 API 没有 indexPathsForElements(in:)：经 layout 查询矩形内的元素
-            let attributes = collectionView.collectionViewLayout
-                .layoutAttributesForElements(in: rect) ?? []
-            for indexPath in attributes.map(\.indexPath) {
-                guard let id = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id else { continue }
-                if !selectedIDs.contains(id) {
-                    selectedIDs.insert(id)
-                    if let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell {
-                        cell.setSelected(true)
-                    }
-                }
+            let point = gesture.location(in: collectionView)
+            if !isSelecting {
+                guard let indexPath = collectionView.indexPathForItem(at: point),
+                      let item = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item] else { return }
+                enterSelectionMode(selecting: item.id)
             }
-        case .ended, .cancelled:
-            selectionOverlay.isHidden = true
-            selectionStartPoint = nil
+            boxStartPoint = point
+            lastBoxPoint = point
+
+        case .changed:
+            guard let start = boxStartPoint else { return }
+            let location = gesture.location(in: collectionView)
+            lastBoxPoint = location
+            if !isBoxSelecting {
+                let distance = hypot(location.x - start.x, location.y - start.y)
+                guard distance > 10 else { return }   // 静止长按不触发框选（普通快速滑动更不会触发）
+                isBoxSelecting = true
+                collectionView.isScrollEnabled = false   // 此刻才禁用滚动（docs/09 D13）
+                selectionOverlay.isHidden = false
+                startBoxAutoScroll()
+            }
+            updateBoxSelection(from: start, to: location)
+
+        case .ended, .cancelled, .failed:
+            boxStartPoint = nil
+            if isBoxSelecting {
+                isBoxSelecting = false
+                selectionOverlay.isHidden = true
+                collectionView.isScrollEnabled = true   // 松手恢复滚动
+                boxAutoScrollLink?.invalidate()
+                boxAutoScrollLink = nil
+            }
+
         default:
             break
         }
     }
 
-    // MARK: - 批量动作
+    private func updateBoxSelection(from start: CGPoint, to location: CGPoint) {
+        let rect = CGRect(x: min(start.x, location.x),
+                          y: min(start.y, location.y),
+                          width: abs(start.x - location.x),
+                          height: abs(start.y - location.y))
+        selectionOverlay.frame = rect
+        // 公开 API 没有 indexPathsForElements(in:)：经 layout 查询矩形内的元素（只加选不取消）
+        let attributes = collectionView.collectionViewLayout
+            .layoutAttributesForElements(in: rect) ?? []
+        for indexPath in attributes.map(\.indexPath) {
+            guard let id = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id else { continue }
+            if !selectionState.selectedSet.contains(id) {
+                selectionState.select(id)
+                if let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell {
+                    cell.setSelected(true)
+                }
+                updateSelectionCount()
+            }
+        }
+    }
+
+    /// 边缘自动滚动（CADisplayLink：手指距顶/底 < 60pt 时 10pt/帧，docs/09 D13）
+    private func startBoxAutoScroll() {
+        boxAutoScrollLink?.invalidate()
+        let link = CADisplayLink(target: self, selector: #selector(boxAutoScrollTick))
+        link.add(to: .main, forMode: .common)
+        boxAutoScrollLink = link
+    }
+
+    @objc private func boxAutoScrollTick() {
+        guard isBoxSelecting, let start = boxStartPoint else { return }
+        let edge: CGFloat = 60
+        let step: CGFloat = 10
+        let topDistance = lastBoxPoint.y - collectionView.contentOffset.y
+        let bottomDistance = (collectionView.contentOffset.y + collectionView.bounds.height) - lastBoxPoint.y
+        var delta: CGFloat = 0
+        if topDistance < edge {
+            delta = -step
+        } else if bottomDistance < edge {
+            delta = step
+        }
+        guard delta != 0 else { return }
+        let maxY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
+        let targetY = min(max(0, collectionView.contentOffset.y + delta), maxY)
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
+        updateBoxSelection(from: start, to: lastBoxPoint)
+    }
+
+    // MARK: - 批量动作（docs/09 D12/D16：收藏即时写；隐藏/删除入队；无 App 内删除确认）
+
+    private var selectedIDs: [String] { selectionState.selected }
 
     @objc private func batchFavoriteTapped() { runBatch(.setFavorite(true)) }
-    @objc private func batchHideTapped() { runBatch(.setHidden(true)) }
 
+    /// 隐藏：入队（零 PhotoKit 写）+ 清空选择（留在多选）+ Toast「已加入待隐藏 · 撤销」
+    @objc private func batchHideTapped() {
+        let ids = selectedIDs
+        guard !ids.isEmpty else { return }
+        let session = AppContainer.shared.reviewSession
+        session.enqueueHides(ids: ids)
+        selectionState.deselectAll()
+        reloadSelectionBadges()
+        updateSelectionCount()
+        batchToast.show(icon: "eye.slash.fill",
+                        text: "已加入待隐藏 · 撤销",
+                        duration: settings.undoWindow,
+                        allowUndo: true,
+                        onUndo: {
+            for id in ids { session.undoPending(id: id, kind: .hide) }
+        },
+                        onDismissFinished: nil)
+    }
+
+    /// 删除：入队 → SessionReviewView（「全部移到最近删除」= 一次批量提交 + 一次系统确认）
     @objc private func batchDeleteTapped() {
-        // docs/09 D03/D16：无 App 内确认——入队 → 一次批量提交（系统确认由批量提交触发 1 次）
-        let ids = Array(selectedIDs)
+        let ids = selectedIDs
         guard !ids.isEmpty else { return }
         let session = AppContainer.shared.reviewSession
         session.enqueueDeletes(ids: ids)
-        selectedIDs.removeAll()
+        selectionState.deselectAll()
         reloadSelectionBadges()
-        Task { [weak self] in
-            let result = await session.commitDeletes()
-            guard let self else { return }
-            let text: String
-            if result.failed {
-                text = "系统未允许删除，\(ids.count) 张仍在待删除"
-            } else {
-                text = "已移到系统「最近删除」\(result.committed) 项"
-            }
-            self.batchToast.show(icon: "trash.fill",
-                                 text: text,
-                                 duration: 3.5,
-                                 allowUndo: false,
-                                 onUndo: nil,
-                                 onDismissFinished: nil)
-            self.exitSelectionMode()   // 已删除项随 observer 增量消失
+        updateSelectionCount()
+        let review = SessionReviewView(session: session,
+                                       pipeline: pipeline,
+                                       settings: settings) { [weak self] in
+            self?.dismiss(animated: true)
+            self?.exitSelectionMode()
         }
+        let host = UIHostingController(rootView: review)
+        host.view.backgroundColor = DSColor.bgPrimary
+        present(host, animated: true)
     }
 
     @objc private func batchAddToAlbumTapped() {
@@ -385,14 +550,50 @@ final class LibraryViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    /// 批量分享（≤10 张原件；docs/09 D15：批量导出到文件为 P2，登记于已知问题）
+    @objc private func batchShareTapped() {
+        let ids = selectedIDs
+        guard !ids.isEmpty else { return }
+        guard ids.count <= 10 else {
+            batchToast.show(icon: "info.circle",
+                            text: "分享最多支持 10 张，当前已选 \(ids.count) 张",
+                            duration: 2.5,
+                            allowUndo: false,
+                            onUndo: nil, onDismissFinished: nil)
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            var urls: [URL] = []
+            for id in ids {
+                if let url = try? await AppContainer.shared.photoWriter.requestInputURL(assetID: id) {
+                    urls.append(url)
+                }
+            }
+            guard !urls.isEmpty else {
+                self.batchToast.show(icon: "info.circle",
+                                     text: "无法读取原件（iCloud 原件可能未下载）",
+                                     duration: 2.5,
+                                     allowUndo: false, onUndo: nil, onDismissFinished: nil)
+                return
+            }
+            let share = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+            self.present(share, animated: true)
+        }
+    }
+
     private func runBatch(_ action: LibraryViewModel.BatchAction) {
         guard !isBatchRunning, !selectedIDs.isEmpty else { return }
         isBatchRunning = true
-        let ids = Array(selectedIDs)
+        let ids = selectedIDs
         Task { [weak self] in
             guard let self else { return }
             let outcome = await self.viewModel.performBatch(action, ids: ids)
             self.isBatchRunning = false
+            // docs/09 D12：批量操作后保留多选但清空选择；Toast 显示结果
+            self.selectionState.deselectAll()
+            self.reloadSelectionBadges()
+            self.updateSelectionCount()
             self.batchToast.show(icon: "checkmark.circle.fill",
                                  text: outcome.message,
                                  duration: 3.5,
@@ -426,6 +627,13 @@ final class LibraryViewController: UIViewController {
         syncIndexBar()
         // 位置记忆恢复（docs/09 D08）：首次非空快照后按 assetID 恢复（找不到用 offsetRatio 回退）
         restorePositionIfNeeded()
+        // 多选中：筛选/pending 变化 → 选中集合收敛到新 scope（docs/09 D11 §3）
+        if isSelecting {
+            let newScope = Set(currentItemsBySection.flatMap { $0.map(\.id) })
+            selectionState.intersectScope(with: newScope)
+            reloadSelectionBadges()
+            updateSelectionCount()
+        }
     }
 
     // MARK: - 位置记忆（docs/09 D08）
@@ -619,7 +827,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 }
 
-// MARK: - 月份粘性分组头
+// MARK: - 月份粘性分组头（docs/09 D15：标题 + 「选择」按钮 → 该月批量选择）
 
 final class MonthHeaderView: UICollectionReusableView {
     private let titleLabel: UILabel = {
@@ -630,14 +838,35 @@ final class MonthHeaderView: UICollectionReusableView {
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
+    private let selectButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("选择", for: .normal)
+        button.titleLabel?.font = DSTypography.font(.body)
+        button.tintColor = DSColor.tint
+        button.accessibilityLabel = "选择本月"
+        return button
+    }()
+    /// 月份头「选择」回调（VC 在 configure 时注入）
+    var onSelect: (() -> Void)? {
+        get { selectAction }
+        set { selectAction = newValue }
+    }
+    private var selectAction: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = DSColor.bgPrimary
         addSubview(titleLabel)
+        addSubview(selectButton)
+        selectButton.addAction(UIAction { [weak self] _ in
+            self?.selectAction?()
+        }, for: .touchUpInside)
         NSLayoutConstraint.activate([
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: DSSpacing.screenPadding),
             titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
+
+            selectButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -DSSpacing.screenPadding),
+            selectButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 

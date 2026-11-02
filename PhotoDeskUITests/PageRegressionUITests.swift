@@ -187,15 +187,27 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "多选工具栏未出现\n\(hierarchy(app))")
         selectAll.tap()
 
+        // 全选是异步的（可能等待完整索引）：轮询计数标签出现非 0 计数
         let count = anyElement(app, identifier: "Selection-Count")
         XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现")
-        XCTAssertFalse(count.label.contains("0"), "全选后计数为 0：\(count.label)")
+        let counted = NSPredicate { _, _ in
+            let label = count.label
+            return label.contains("已选择") && !label.contains("已选择 0 项")
+        }
+        let expectation = XCTNSPredicateExpectation(predicate: counted, object: nil)
+        let result = XCTWaiter.wait(for: [expectation], timeout: 8)
+        XCTAssertEqual(result, .completed, "全选后计数仍为 0：\(count.label)\n\(hierarchy(app))")
 
         // 角标：全选后至少一个可见 cell 的 accessibilityValue 带 "selected"
         let collection = app.collectionViews.firstMatch
         let firstCell = collection.cells.firstMatch
         XCTAssertTrue(firstCell.waitForExistence(timeout: 5))
-        let value = firstCell.value as? String ?? ""
+        let deadline = Date().addingTimeInterval(5)
+        var value = firstCell.value as? String ?? ""
+        while !value.contains("selected") && Date() < deadline {
+            usleep(300_000)
+            value = firstCell.value as? String ?? ""
+        }
         XCTAssertTrue(value.contains("selected"), "可见 cell 缺选中态标记：\(value)")
     }
 
