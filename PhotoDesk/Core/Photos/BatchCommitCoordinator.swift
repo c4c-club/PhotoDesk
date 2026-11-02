@@ -4,6 +4,7 @@
 // 隐藏：一次 setHidden 批量提交（通常无系统确认）。滑动路径绝不调用本类（0 PhotoKit 写）。
 
 import Foundation
+import PhotoDeskCore
 
 @MainActor
 final class BatchCommitCoordinator {

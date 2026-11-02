@@ -211,8 +211,6 @@ final class ViewerViewController: UIViewController {
                                            action: #selector(sessionBadgeTapped))
         sessionBadge.accessibilityIdentifier = "SessionBadge"
         sessionBadge.isEnabled = true
-        let sessionSpace = UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
-        sessionSpace.width = 4
         favoriteButton = UIBarButtonItem(image: UIImage(systemName: favoriteIconName),
                                          style: .plain, target: self,
                                          action: #selector(favoriteTapped))

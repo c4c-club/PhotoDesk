@@ -1,5 +1,5 @@
 // MARK: - 职责说明：会话整理状态机（docs/09 D16 §2 ★）——滑动入队（同步 <16ms）+ 磁盘 0.2s debounce +
-// 批量提交（删除一次 deleteAssets / 隐藏一次 setHidden，只经 BatchCommitCoordinator）+ 重启恢复。
+// 批量提交（删除一次批量请求 / 隐藏一次 setHidden，只经 BatchCommitCoordinator）+ 重启恢复。
 // 提交失败/系统确认取消 → 队列保留不丢数据；onSessionChanged 通知 LibraryViewModel 过滤 pending 项。
 
 import Foundation
@@ -80,7 +80,7 @@ final class ReviewSessionController: ObservableObject {
 
     // MARK: - 批量提交（唯一 PhotoKit 写入口）
 
-    /// 「全部移到最近删除」：副本（尊重开关）→ 分批一次 deleteAssets/批。返回 (成功, 跳过, 失败?)
+    /// 「全部移到最近删除」：副本（尊重开关）→ 分批一次批量删除请求/批。返回 (成功, 跳过, 失败?)
     @discardableResult
     func commitDeletes() async -> (committed: Int, skipped: Int, failed: Bool) {
         guard !isCommitting else { return (0, 0, false) }

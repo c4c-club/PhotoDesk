@@ -1,6 +1,6 @@
 // MARK: - 职责说明：智能清理 ViewModel（docs/05 M4 任务 4.7；docs/09 D15/D16 改造）——
 // 扫描（ScanCoordinator）→ 结果（五类卡片数据）→ 待清理清单（pendingIDs）→ 会话入队 → 一次批量提交。
-// 执行只经 ReviewSessionController（BatchCommitCoordinator 内一次 deleteAssets/批，系统确认 1 次）；
+// 执行只经 ReviewSessionController（BatchCommitCoordinator 内一次批量删除请求/批，系统确认 1 次）；
 // 本类不做任何 App 内删除二次确认（docs/09 D03 明令移除）。
 
 import Foundation

@@ -127,7 +127,7 @@ jobs:
             echo "::error::LC_BUILD_VERSION minos != 15.0"; exit 1; }
 
       # 未签名 ipa（手机验证用，docs/06 §7.4）：CODE_SIGNING_ALLOWED=NO 产出未签名 .app，Payload 打包成 ipa；
-      # Windows 上由 AltServer 用免费 Apple ID 现场签名安装
+      # Windows 上由 AltServer 用免费 Apple ID 现场签名安装（docs/09 D17：附 SHA256 + 自签说明 docs/12）
       - name: Build unsigned ipa
         run: |
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk -sdk iphoneos -configuration Release \
@@ -137,6 +137,28 @@ jobs:
           mkdir -p build/Payload
           cp -R build/PhotoDesk.xcarchive/Products/Applications/PhotoDesk.app build/Payload/
           cd build && zip -qry PhotoDesk-unsigned.ipa Payload
+          # D17：SHA256 摘要随 artifact 上传（用户下载后 certutil/shasum 比对）
+          shasum -a 256 PhotoDesk-unsigned.ipa > PhotoDesk-unsigned.ipa.sha256
+          cat PhotoDesk-unsigned.ipa.sha256
+
+      # D17：IPA 产物校验（Payload 结构 / MinimumOSVersion / minos 15.0 / 确认未签名）
+      - name: Verify unsigned ipa
+        run: |
+          cd build
+          unzip -l PhotoDesk-unsigned.ipa | grep -q "Payload/PhotoDesk.app/PhotoDesk" || {
+            echo "::error::IPA 缺 Payload/PhotoDesk.app/PhotoDesk"; exit 1; }
+          unzip -qo PhotoDesk-unsigned.ipa -d ipa-check Payload/PhotoDesk.app/Info.plist
+          plutil -p ipa-check/Payload/PhotoDesk.app/Info.plist | grep MinimumOSVersion
+          plutil -p ipa-check/Payload/PhotoDesk.app/Info.plist | grep -q '"MinimumOSVersion" => "15.0"' || {
+            echo "::error::MinimumOSVersion != 15.0"; exit 1; }
+          unzip -qo PhotoDesk-unsigned.ipa -d ipa-check Payload/PhotoDesk.app/PhotoDesk
+          otool -l ipa-check/Payload/PhotoDesk.app/PhotoDesk | grep -A3 LC_BUILD_VERSION
+          otool -l ipa-check/Payload/PhotoDesk.app/PhotoDesk | grep -A3 LC_BUILD_VERSION | grep -q "minos 15.0" || {
+            echo "::error::ipa minos != 15.0"; exit 1; }
+          if codesign -dv ipa-check/Payload/PhotoDesk.app 2>&1 | grep -qi "Signature"; then
+            echo "::error::IPA 不应是已签名包"; exit 1
+          fi
+          echo "[OK] 未签名 IPA 校验通过（Payload / MinimumOSVersion=15.0 / minos=15.0 / 未签名）"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -146,7 +168,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: PhotoDesk-unsigned-ipa
-          path: build/PhotoDesk-unsigned.ipa
+          path: |
+            build/PhotoDesk-unsigned.ipa
+            build/PhotoDesk-unsigned.ipa.sha256
 
       # M0 冒烟（docs/05 M0 验收）：装包 → 启动 → 导入 300 张测试图 → 截图存档
       - name: Simulator smoke (install / launch / photos / screenshot)

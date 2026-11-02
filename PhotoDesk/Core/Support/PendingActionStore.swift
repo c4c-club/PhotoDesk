@@ -3,6 +3,7 @@
 // 绝不 crash；不给 Core Data 加实体（程序化模型未启用自动迁移，docs/09 D07 明令）。
 
 import Foundation
+import PhotoDeskCore
 
 @MainActor
 final class PendingActionStore {
