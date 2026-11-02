@@ -93,6 +93,33 @@ final class DateSectionizerTests: XCTestCase {
         XCTAssertTrue(DateSectionizer.sections(ids: [], dates: [], granularity: .month).isEmpty)
     }
 
+    /// docs/09 Phase 1：升序分组（旧→新），供 grid.sortAsc 接线
+    func testAscendingSectionOrder() {
+        let calendar = calendar()
+        let ids = ["new", "mid", "old"]
+        let dates: [Date?] = [date(calendar, 2026, 10, 1),
+                              date(calendar, 2026, 9, 1),
+                              date(calendar, 2026, 8, 1)]
+        let ascending = DateSectionizer.sections(ids: ids, dates: dates, granularity: .month,
+                                                 ascending: true, calendar: calendar)
+        XCTAssertEqual(ascending.map(\.identifier), ["2026-08", "2026-09", "2026-10"])
+
+        let descending = DateSectionizer.sections(ids: ids, dates: dates, granularity: .month,
+                                                  ascending: false, calendar: calendar)
+        XCTAssertEqual(descending.map(\.identifier), ["2026-10", "2026-09", "2026-08"])
+    }
+
+    /// 升序时「未知时间」组仍置于末尾（docs/09：无日期条目固定末尾，不随排序翻转）
+    func testAscendingKeepsUnknownSectionAtEnd() {
+        let calendar = calendar()
+        let ids = ["a", "n1", "b"]
+        let dates: [Date?] = [date(calendar, 2026, 5, 1), nil, date(calendar, 2026, 4, 1)]
+        let sections = DateSectionizer.sections(ids: ids, dates: dates, granularity: .month,
+                                                ascending: true, calendar: calendar)
+        XCTAssertEqual(sections.map(\.identifier), ["2026-04", "2026-05", DateSectionizer.unknownIdentifier])
+        XCTAssertEqual(sections.last?.itemIDs, ["n1"])
+    }
+
     func testSingleItemWithDate() {
         let calendar = calendar()
         let sections = DateSectionizer.sections(ids: ["only"],

@@ -29,14 +29,16 @@ public enum DateSectionizer {
     public static let unknownIdentifier = "unknown"
 
     /// - Parameters:
-    ///   - ids: 与 dates 一一对应的条目标识（约定已按时间倒序）
+    ///   - ids: 与 dates 一一对应的条目标识（约定已按时间倒序或正序传入，与 ascending 一致）
     ///   - dates: 拍摄日期（可为 nil → 「未知时间」组）
     ///   - granularity: 日 / 月 / 年
+    ///   - ascending: 组间排序方向（false = 新→旧，true = 旧→新；组内顺序跟随输入）
     ///   - calendar: 注入日历（含时区），默认 Calendar.current
     ///   - locale: 注入语言，默认 zh_CN（标题如「2026年10月」）
     public static func sections(ids: [String],
                                 dates: [Date?],
                                 granularity: SectionGranularity,
+                                ascending: Bool = false,
                                 calendar: Calendar = .current,
                                 locale: Locale = Locale(identifier: "zh_CN")) -> [DateSection] {
         precondition(ids.count == dates.count, "ids 与 dates 必须一一对应")
@@ -71,7 +73,9 @@ public enum DateSectionizer {
             .compactMap { components -> (DateComponents, Bucket)? in
                 buckets[components].map { (components, $0) }
             }
-            .sorted { $0.1.sample > $1.1.sample }
+            .sorted {
+                ascending ? $0.1.sample < $1.1.sample : $0.1.sample > $1.1.sample
+            }
             .map { components, bucket in
                 DateSection(identifier: identifier(for: components, granularity: granularity),
                             title: title(for: components, granularity: granularity,
