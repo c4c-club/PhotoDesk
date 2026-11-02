@@ -115,15 +115,9 @@ final class BiometricGate: ObservableObject {
         }
         #endif
 
-        #if targetEnvironment(simulator)
-        // 模拟器无 Face ID：不再静默放行（docs/09 D06）；UI 测试走 -uiTestingFaceIDBypass
-        if !evaluator.canEvaluateBiometrics() {
-            status = .unavailable("模拟器不支持 Face ID。真机将弹出系统验证；UI 测试请加 -uiTestingFaceIDBypass 参数。")
-            return false
-        }
-        #endif
-
-        // 1. 生物识别优先
+        // 1. 生物识别优先（模拟器无 Face ID：canEvaluateBiometrics=false 自然落空 →
+        //    无密码设备进 unavailable 态，UI 给「去系统设置」+ 模拟器专属「继续」入口；
+        //    docs/09 D06：不再静默放行）
         if evaluator.canEvaluateBiometrics() {
             do {
                 try await evaluator.evaluateBiometrics(reason: reason)

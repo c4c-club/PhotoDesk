@@ -61,7 +61,8 @@ extension LocationFilter: Codable {
 }
 
 /// 多维筛选谓词（docs/05 M5 任务 5.1/5.2；docs/09 D10 扩展 location）——日期三级下钻 + 媒体类型多选 + 状态 + 位置。
-/// 匹配引擎见 PhotoFilter（纯函数可单测）；Codable 供 LibraryQuery 稳定摘要与筛选持久化。
+/// 匹配引擎见 PhotoFilter（纯函数可单测）；Codable 为自定义实现：Set 编码为排序数组（canonical JSON
+/// 字段序与集合序都稳定 → LibraryQuery 跨进程摘要可复现，docs/09 D08/D10）。
 struct SearchPredicate: Hashable, Codable {
     /// 媒体类型维度（照片/视频/Live/截图/人像/全景/慢动作/延时）。
     /// RAW 无公开 subtype（需逐资源枚举 PHAssetResource，万级库不可承受），暂未支持，登记于已知问题
@@ -124,4 +125,34 @@ struct SearchPredicate: Hashable, Codable {
     var isDefault: Bool { !isActive }
 
     static let `default` = SearchPredicate()
+
+    // MARK: - Codable（自定义：Set → 排序数组，保证 canonical JSON 稳定）
+
+    private enum CodingKeys: String, CodingKey {
+        case year, month, day, media, status, location
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        month = try container.decodeIfPresent(Int.self, forKey: .month)
+        day = try container.decodeIfPresent(Int.self, forKey: .day)
+        let mediaRaw = try container.decodeIfPresent([String].self, forKey: .media) ?? []
+        media = Set(mediaRaw.compactMap(MediaFilter.init(rawValue:)))
+        let statusRaw = try container.decodeIfPresent([String].self, forKey: .status) ?? []
+        status = Set(statusRaw.compactMap(StatusFilter.init(rawValue:)))
+        location = try container.decodeIfPresent(LocationFilter.self, forKey: .location) ?? .any
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(year, forKey: .year)
+        try container.encodeIfPresent(month, forKey: .month)
+        try container.encodeIfPresent(day, forKey: .day)
+        try container.encode(media.map(\.rawValue).sorted(), forKey: .media)
+        try container.encode(status.map(\.rawValue).sorted(), forKey: .status)
+        try container.encode(location, forKey: .location)
+    }
 }

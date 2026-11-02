@@ -69,6 +69,12 @@ final class LibraryViewModelTests: XCTestCase {
     private var snapshots: [(sections: [MonthSection], items: [[PhotoItem]])] = []
 
     override func setUp() async throws {
+        // 测试隔离：清除筛选持久化（library.filter.* 写入 standard UserDefaults，
+        // 泄漏会让后续测试/宿主 App 的网格按残留筛选过滤——CI 实测根因）
+        for key in UserDefaults.standard.dictionaryRepresentation().keys
+        where key.hasPrefix("library.filter.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         settings = SettingsStore()
         writer = MockPhotoWriter()
         persistence = PersistenceController(inMemory: true)
@@ -78,9 +84,17 @@ final class LibraryViewModelTests: XCTestCase {
                                           writer: writer, trashBin: nil, settings: settings)
     }
 
+    override func tearDown() async throws {
+        for key in UserDefaults.standard.dictionaryRepresentation().keys
+        where key.hasPrefix("library.filter.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
     private func makeItem(_ index: Int, date: Date? = nil, favorite: Bool = false) -> PhotoItem {
+        // 全部照片（媒体类型测试用 testFilterOnlyAppliesToCompleteIndex 内显式替换视频）
         PhotoItem(id: "id-\(index)",
-                  mediaType: index % 4 == 3 ? .video : .image,
+                  mediaType: .image,
                   mediaSubtypes: [],
                   creationDate: date ?? Date(timeIntervalSince1970: 1_700_000_000 + TimeInterval(index * 86_400)),
                   modificationDate: nil,

@@ -11,7 +11,8 @@ final class SwipeResolverTests: XCTestCase {
         XCTAssertEqual(standard.distanceThreshold, 120)
         XCTAssertEqual(standard.velocityThreshold, 700)
         XCTAssertEqual(standard.minDistanceForVelocity, 40)
-        XCTAssertTrue(standard.confirmRequired)
+        // docs/09 D03：App 内删除/隐藏确认移除 → confirmRequired 固定 false
+        XCTAssertFalse(standard.confirmRequired)
 
         let comfortable = SwipeGestureEngine.config(for: .comfortable)
         XCTAssertEqual(comfortable.distanceThreshold, 80)

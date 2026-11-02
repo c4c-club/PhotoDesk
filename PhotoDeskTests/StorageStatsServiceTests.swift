@@ -21,7 +21,10 @@ private final class ScriptedSizeProvider: AssetSizeProviding {
         var done = 0
         for id in ids {
             if Task.isCancelled { break }
-            result[id] = sizesToReturn[id] ?? 1_000
+            // 只返回明确提供的 id（缺失 = 取不到字节 → 未知大小计数，docs/09 D07）
+            if let size = sizesToReturn[id] {
+                result[id] = size
+            }
             done += 1
             progress(done, ids.count)
         }
