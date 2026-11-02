@@ -14,6 +14,8 @@ protocol AssetRepositoryProtocol: AnyObject {
     func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int
     /// 分批取窗口 [offset, offset + limit) 内的条目（映射 PhotoItem）
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem]
+    /// 按 id 批量取（Vault 合并待隐藏项用；docs/09 D05）
+    func fetch(ids: [String]) async -> [PhotoItem]
     /// 当前 scope 的底层结果（PhotoChangeObserver 监听用）
     var latestResult: PHFetchResult<PHAsset>? { get }
     /// 指定 scope 的底层结果（query-driven 模式下监听非 .all 范围，docs/09 Phase 1）
@@ -73,6 +75,15 @@ final class AssetRepository: AssetRepositoryProtocol {
 
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {
         results[scope] = result
+    }
+
+    func fetch(ids: [String]) async -> [PhotoItem] {
+        guard !ids.isEmpty else { return [] }
+        let repository = self
+        return await Task.detached(priority: .userInitiated) { () -> [PhotoItem] in
+            let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+            return (0..<result.count).map { repository.map(result.object(at: $0)) }
+        }.value
     }
 
     // MARK: - 后台重活（不触碰 results）

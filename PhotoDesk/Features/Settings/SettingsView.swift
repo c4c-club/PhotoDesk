@@ -31,6 +31,12 @@ struct SettingsView: View {
                     Label("隐私与锁定", systemImage: "lock.shield")
                 }
                 NavigationLink {
+                    SecuritySettingsView()
+                } label: {
+                    Label("安全与锁定", systemImage: "lock.rotation")
+                }
+                .accessibilityIdentifier("Settings-Security")
+                NavigationLink {
                     CacheManagerView()
                 } label: {
                     Label("缓存与存储", systemImage: "internaldrive")

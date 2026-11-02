@@ -30,6 +30,11 @@ private final class FakeAssetRepository: AssetRepositoryProtocol {
         return Array(store.dropFirst(offset).prefix(limit))
     }
 
+    func fetch(ids: [String]) async -> [PhotoItem] {
+        let set = Set(ids)
+        return store.filter { set.contains($0.id) }
+    }
+
     var latestResult: PHFetchResult<PHAsset>? { nil }
     func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>? { nil }
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {}

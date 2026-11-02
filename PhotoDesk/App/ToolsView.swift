@@ -18,9 +18,7 @@ struct ToolsView: View {
                     .accessibilityIdentifier("Tools-Cleanup")
 
                     NavigationLink {
-                        VaultView(vault: AppContainer.shared.vaultService,
-                                  repository: AppContainer.shared.assetRepository,
-                                  pipeline: AppContainer.shared.imagePipeline)
+                        VaultView(viewModel: AppContainer.shared.makeVaultViewModel())
                     } label: {
                         Label("已隐藏", systemImage: "lock.fill")
                     }

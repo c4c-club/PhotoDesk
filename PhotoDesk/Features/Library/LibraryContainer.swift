@@ -143,16 +143,9 @@ struct LibraryRootView: View {
             }
         }
         .fullScreenCover(isPresented: $showVault) {
-            // Phase 5 重做前沿用旧 VaultView；包导航壳提供关闭入口
             NavigationView {
-                VaultView(vault: AppContainer.shared.vaultService,
-                          repository: AppContainer.shared.assetRepository,
-                          pipeline: AppContainer.shared.imagePipeline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("完成") { showVault = false }
-                        }
-                    }
+                VaultView(viewModel: AppContainer.shared.makeVaultViewModel(),
+                          onClose: { showVault = false })
             }
             .navigationViewStyle(.stack)
         }

@@ -53,6 +53,19 @@ final class AppContainer: ObservableObject {
                          reviewSession: reviewSession)
     }
 
+    /// 已隐藏页每次打开新建（docs/09 D05：门禁状态 + 合并 pendingHide + observer）
+    func makeVaultViewModel() -> VaultViewModel {
+        VaultViewModel(vault: vaultService,
+                       repository: assetRepository,
+                       writer: photoWriter,
+                       reviewSession: reviewSession,
+                       undoCenter: undoCenter,
+                       settings: settings)
+    }
+
+    /// App 启动锁（docs/09 D06；独立门禁实例，与保险箱门禁互不干扰）
+    let appLock: AppLockController
+
     /// 导出页每次打开新建
     func makeExportViewModel(item: PhotoItem) -> ExportViewModel {
         ExportViewModel(item: item,
@@ -80,6 +93,7 @@ final class AppContainer: ObservableObject {
                                           fingerprintService: fingerprintService,
                                           persistence: persistence,
                                           settings: settingsRef)
+        appLock = AppLockController(gate: BiometricGate())
         #if DEBUG
         // UI 测试钩子（docs/09 Phase 0）：-uiTestingSessionMock 用 mock writer + 临时目录 store，
         // 避免测试真的删照片；普通启动（无参数）绝不走 mock
