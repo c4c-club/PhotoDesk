@@ -16,6 +16,7 @@ final class MockPhotoWriter: PhotoWriterProtocol {
 
     var moveToRecentlyDeletedCallCount: Int { moveToRecentlyDeletedCalls.count }
     var setHiddenCallCount: Int { setHiddenCalls.count }
+    var setFavoriteCallCount: Int { setFavoriteCalls.count }
 
     func setFavorite(ids: [String], isFavorite: Bool) async throws {
         setFavoriteCalls.append((ids, isFavorite))
