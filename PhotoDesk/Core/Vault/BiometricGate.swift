@@ -24,6 +24,8 @@ protocol BiometricEvaluating: AnyObject {
 /// 真实实现：LAContext（每次评估新建，避免缓存已失效状态）
 @MainActor
 final class LAContextEvaluator: BiometricEvaluating {
+    /// nonisolated：允许作为 BiometricGate.init 的默认参数在 nonisolated 上下文构造
+    nonisolated init() {}
     func canEvaluateBiometrics() -> Bool {
         let context = LAContext()
         var error: NSError?

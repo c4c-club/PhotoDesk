@@ -20,7 +20,8 @@ final class PendingActionStore {
         directory.appendingPathComponent("session-v1.json", isDirectory: false)
     }
 
-    init(directoryOverride: URL? = nil) {
+    /// nonisolated：允许作为默认参数在 nonisolated 上下文构造（init 内只做目录准备，无共享态）
+    nonisolated init(directoryOverride: URL? = nil) {
         if let directoryOverride {
             directory = directoryOverride
         } else {

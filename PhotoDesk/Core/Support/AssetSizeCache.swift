@@ -19,7 +19,8 @@ final class AssetSizeCache {
     private let fileURL: URL
     private(set) var payload: Payload
 
-    init(directoryOverride: URL? = nil) {
+    /// nonisolated：允许作为默认参数在 nonisolated 上下文构造（init 内只读文件到本地属性）
+    nonisolated init(directoryOverride: URL? = nil) {
         let fileManager = FileManager.default
         let directory: URL
         if let directoryOverride {

@@ -387,14 +387,14 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - 动作执行管线
 
-    private func triggerAction(direction: SwipeDirection, exitEdge: VerticalEdge?) {
+    private func triggerAction(direction: SwipeDirection, exitEdge: PhotoDeskCore.VerticalEdge?) {
         let action = viewModel.action(for: direction)
         executeAction(action, direction: direction, exitEdge: exitEdge)
     }
 
     /// 统一执行入口（手势 / 无障碍按钮 / 菜单共用）。
     /// docs/09 D03/D04：删除/隐藏不弹 App 内确认——直接会话暂存 + 飞出 + 补位。
-    private func executeAction(_ action: SwipeAction, direction: SwipeDirection, exitEdge: VerticalEdge?) {
+    private func executeAction(_ action: SwipeAction, direction: SwipeDirection, exitEdge: PhotoDeskCore.VerticalEdge?) {
         hideOverlays()
         collectionView.isScrollEnabled = true
 
@@ -413,7 +413,7 @@ final class ViewerViewController: UIViewController {
     }
 
     /// 会话暂存路径（docs/09 D16）：同步入队 → 飞出 → 批量更新删除 cell → 按补位计划进入
-    private func performStaged(action: SwipeAction, exitEdge: VerticalEdge?) {
+    private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?) {
         guard let item = viewModel.current else { return }
         guard let staged = viewModel.stage(action, forItemID: item.id, exitEdge: exitEdge) else { return }
 
@@ -455,7 +455,7 @@ final class ViewerViewController: UIViewController {
     }
 
     /// 补位进入动画：下一张从 entryEdge 以 0.96→1.0 缩放 / 16pt 位移进入（Reduce Motion 降级）
-    private func applyEntryAnimation(edge: VerticalEdge?, index: Int) {
+    private func applyEntryAnimation(edge: PhotoDeskCore.VerticalEdge?, index: Int) {
         guard usesMotion, let edge else { return }
         guard let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) else { return }
         let offset: CGFloat = edge == .top ? -16 : 16
