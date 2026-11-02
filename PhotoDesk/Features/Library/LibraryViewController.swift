@@ -123,6 +123,16 @@ final class LibraryViewController: UIViewController {
         savePositionIfNeeded()
     }
 
+    /// 旋转 / 分屏（docs/09 Phase 7）：布局随尺寸更新，保持当前锚点不跳
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            guard let self else { return }
+            self.collectionView.collectionViewLayout = self.makeLayout(columns: self.columns)
+            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+        }, completion: nil)
+    }
+
     // MARK: - 构建
 
     private func setupCollectionView() {
@@ -134,7 +144,60 @@ final class LibraryViewController: UIViewController {
         // 下拉刷新（docs/09 D15）：保留当前筛选与位置
         refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
         collectionView.refreshControl = refreshControl
+        // 双指捏合调列数（docs/09 D14）：允许与单指滚动同时识别
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(onPinch(_:)))
+        pinch.delegate = self
+        collectionView.addGestureRecognizer(pinch)
         view.addSubview(collectionView)
+    }
+
+    // MARK: - 捏合列数（docs/09 D14：2–5 列吸附、锚点保持、触觉、持久化、首次提示）
+
+    private var pinchStartColumns = 3
+    private var pinchTargetColumns = 3
+    private var pinchAnchorIndexPath: IndexPath?
+
+    @objc private func onPinch(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            pinchStartColumns = columns
+            pinchTargetColumns = columns
+            pinchAnchorIndexPath = collectionView.indexPathForItem(at: gesture.location(in: collectionView))
+
+        case .changed:
+            guard gesture.scale > 0 else { return }
+            let target = max(2, min(5, Int((CGFloat(pinchStartColumns) / gesture.scale).rounded())))
+            guard target != pinchTargetColumns else { return }
+            pinchTargetColumns = target
+            setColumns(target, animated: true, anchor: pinchAnchorIndexPath)
+            if settings.hapticsEnabled {
+                UISelectionFeedbackGenerator().selectionChanged()
+            }
+            showPinchHintOnce()
+
+        case .ended, .cancelled:
+            // 松手：scale 接近 1 回弹到起始列数；否则持久化（docs/09 D14）
+            if abs(gesture.scale - 1) < 0.08, pinchStartColumns != columns {
+                setColumns(pinchStartColumns, animated: true, anchor: pinchAnchorIndexPath)
+            }
+            settings.gridColumns = columns
+            pinchAnchorIndexPath = nil
+
+        default:
+            break
+        }
+    }
+
+    private func showPinchHintOnce() {
+        let key = "grid.pinchHintShown"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        batchToast.show(icon: "hand.draw",
+                        text: "双指捏合可调整列数",
+                        duration: 2.5,
+                        allowUndo: false,
+                        onUndo: nil,
+                        onDismissFinished: nil)
     }
 
     @objc private func didPullToRefresh() {
@@ -143,6 +206,10 @@ final class LibraryViewController: UIViewController {
             await self.viewModel.reload()
             self.refreshControl.endRefreshing()
         }
+    }
+
+    private var usesMotion: Bool {
+        !(UIAccessibility.isReduceMotionEnabled && settings.respectReduceMotion)
     }
 
     private func setupDataSource() {
@@ -696,16 +763,28 @@ final class LibraryViewController: UIViewController {
                                     animated: false)
     }
 
-    // MARK: - 列数切换（设置 grid.columns 2/3/4/5，记忆由 @AppStorage 保证）
+    // MARK: - 列数切换（docs/09 D14：设置 Stepper 与捏合手势统一入口；锚点保持）
 
-    func setColumns(_ newColumns: Int) {
+    func setColumns(_ newColumns: Int, animated: Bool = false, anchor: IndexPath? = nil) {
         let clamped = max(2, min(5, newColumns))
         guard clamped != columns else { return }
         columns = clamped
-        collectionView.collectionViewLayout = makeLayout(columns: clamped)
-        // 列宽变化 → cell 内取图尺寸变化 → 重载可视 cell（缓存键含尺寸，自动落新缓存）
-        let visible = collectionView.indexPathsForVisibleItems
-        collectionView.reloadItems(at: visible)
+        let finish = { [weak self] in
+            guard let self else { return }
+            // 列宽变化 → cell 内取图尺寸变化 → 重载可视 cell（缓存键含尺寸）
+            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+            if let anchor, anchor.section < self.currentSections.count {
+                self.collectionView.scrollToItem(at: anchor, at: .centeredVertically, animated: false)
+            }
+        }
+        if animated && usesMotion {
+            collectionView.setCollectionViewLayout(makeLayout(columns: clamped), animated: true) { _ in
+                finish()
+            }
+        } else {
+            collectionView.collectionViewLayout = makeLayout(columns: clamped)
+            finish()
+        }
     }
 
     // MARK: - 布局
@@ -773,7 +852,7 @@ final class LibraryViewController: UIViewController {
     }
 }
 
-// MARK: - Delegate（分页 + 预取）
+// MARK: - Delegate（预取）
 
 extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataSourcePrefetching {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
@@ -824,6 +903,16 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
                         didEndDisplaying cell: UICollectionViewCell,
                         forItemAt indexPath: IndexPath) {
         (cell as? PhotoGridCell)?.cancelLoad()
+    }
+}
+
+// MARK: - 手势代理（捏合与滚动同时识别，docs/09 D14）
+
+extension LibraryViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        // 双指捏合（2 touches）与单指滚动 pan 互不阻塞
+        true
     }
 }
 

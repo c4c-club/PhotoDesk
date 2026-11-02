@@ -59,7 +59,7 @@ struct ToolsView: View {
                     .accessibilityIdentifier("Tools-Settings")
                 }
                 Section {
-                    Text("搜索历史 · 智能视图将在后续版本开放")
+                    Text("搜索历史与智能视图已列入后续版本规划")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
                 }

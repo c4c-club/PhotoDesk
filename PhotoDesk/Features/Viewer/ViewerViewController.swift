@@ -104,6 +104,21 @@ final class ViewerViewController: UIViewController {
         }
     }
 
+    /// 旋转 / 分屏（docs/09 Phase 7）：更新 itemSize，按当前 assetID 保持页码不跳回第 1 张
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            guard let self,
+                  let layout = self.collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
+            layout.itemSize = size
+            layout.invalidateLayout()
+            let index = max(0, min(self.viewModel.currentIndex, max(0, self.viewModel.items.count - 1)))
+            self.isProgrammaticScroll = true
+            self.collectionView.setContentOffset(CGPoint(x: CGFloat(index) * size.width, y: 0), animated: false)
+            self.isProgrammaticScroll = false
+        }, completion: nil)
+    }
+
     // MARK: - 构建
 
     private func setupCollectionView() {

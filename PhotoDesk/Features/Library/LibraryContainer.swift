@@ -130,7 +130,10 @@ struct LibraryRootView: View {
         }
         .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
         .sheet(isPresented: $showSearch) {
-            SearchView(items: viewModel.itemsSnapshot)
+            SearchView(items: viewModel.itemsSnapshot) { predicate in
+                // 「应用筛选到主库」（docs/09 D15）
+                viewModel.setFilter(predicate)
+            }
         }
         .sheet(isPresented: $showFilterSheet) {
             LibraryFilterSheet(viewModel: viewModel)

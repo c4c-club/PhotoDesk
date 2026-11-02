@@ -1,15 +1,19 @@
-// MARK: - 职责说明：搜索/筛选页（docs/04 §2 / docs/05 M5 任务 5.1）——
+// MARK: - 职责说明：搜索/筛选页（docs/04 §2 / docs/05 M5 任务 5.1；docs/09 D10/D15 改造）——
 // 日期三级下钻（年→月→日菜单）+ 媒体类型多选 chips + 状态筛选 + 结果计数与缩略图网格。
-// 从照片库右上角放大镜进入（sheet）；谓词匹配全部在 SearchViewModel（PhotoFilter 纯函数）。
+// docs/09：结果可点开查看器（ViewerContext）；「应用筛选到主库」回调；去掉 200 上限（全量展示）。
 
 import SwiftUI
 
 struct SearchView: View {
     @StateObject private var viewModel: SearchViewModel
+    /// 「应用筛选到主库」（docs/09 D15：作用于 LibraryViewModel.setFilter）
+    var onApplyFilter: ((SearchPredicate) -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @State private var viewerContext: ViewerContext?
 
-    init(items: [PhotoItem]) {
+    init(items: [PhotoItem], onApplyFilter: ((SearchPredicate) -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: SearchViewModel(items: items))
+        self.onApplyFilter = onApplyFilter
     }
 
     private static let monthNames = ["", "1月", "2月", "3月", "4月", "5月", "6月",
@@ -28,9 +32,20 @@ struct SearchView: View {
                         Button("重置") { viewModel.reset() }
                             .disabled(viewModel.predicate.isDefault)
                     }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("应用到主库") {
+                            onApplyFilter?(viewModel.predicate)
+                            dismiss()
+                        }
+                        .disabled(viewModel.predicate.isDefault)
+                        .accessibilityIdentifier("Search-Apply")
+                    }
                 }
         }
         .navigationViewStyle(.stack)
+        .fullScreenCover(item: $viewerContext) { context in
+            ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))
+        }
     }
 
     private var content: some View {
@@ -150,10 +165,18 @@ struct SearchView: View {
     }
 
     private var resultGrid: some View {
+        // docs/09 D15：去掉 200 上限，全量懒加载展示；可点开查看器
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: DSSpacing.gridSpacing)],
                   spacing: DSSpacing.gridSpacing) {
-            ForEach(viewModel.results.prefix(200)) { item in
-                ResultThumb(item: item, pipeline: AppContainer.shared.imagePipeline)
+            ForEach(viewModel.results) { item in
+                Button {
+                    viewerContext = ViewerContext(items: viewModel.results,
+                                                  startItemID: item.id,
+                                                  queryKey: "search")
+                } label: {
+                    ResultThumb(item: item, pipeline: AppContainer.shared.imagePipeline)
+                }
+                .accessibilityLabel(PhotoGridCell.accessibilityLabel(for: item))
             }
         }
     }
