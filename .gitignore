@@ -13,3 +13,4 @@ DerivedData/
 # 本机会话与工具状态（不入库）
 .zcode/
 .workbuddy/
+artifacts/
