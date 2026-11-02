@@ -1,13 +1,15 @@
-// MARK: - 职责说明：存储统计页（docs/05 M5 任务 5.7 / docs/04 §2）——
-// 总占用 + 按类型占比（自绘环形 Shape）+ 按年份分布（自绘柱状 Path）。
-// 禁用 Swift Charts（iOS 16+，AGENTS.md §2）——全部 Path/Shape 自绘；
-// VoiceOver：图表带数值 accessibilityLabel（docs/04 §6）。
-// 数据：全量 items + PHAssetResource 字节数（KVC 失败回退 0，不中断统计）。
+// MARK: - 职责说明：存储统计页（docs/05 M5 任务 5.7；docs/09 D07 重做）——
+// 统计中：环形进度 + 已统计 N/M + 取消（不再永久转圈）；完成：总占用 + 按类型环 + 按年份柱；
+// 90s 软超时显示部分结果 + 「部分 iCloud 资源大小未知」脚注 + 继续统计；未知大小计数脚注；
+// .refreshable 强制重算。图表全部 Path/Shape 自绘（禁用 Swift Charts，iOS 16+，AGENTS §2）；
+// VoiceOver：图表带数值 accessibilityLabel。数据经 StorageStatsViewModel（批量取字节 + 缓存）。
 
 import SwiftUI
 import Photos
 
 struct StorageStatsView: View {
+    @StateObject private var viewModel: StorageStatsViewModel
+
     struct TypeSlice: Identifiable {
         let id = UUID()
         let name: String
@@ -21,11 +23,12 @@ struct StorageStatsView: View {
         let bytes: Int64
     }
 
+    init() {
+        _viewModel = StateObject(wrappedValue: AppContainer.shared.makeStorageStatsViewModel())
+    }
+
     @State private var slices: [TypeSlice] = []
     @State private var bars: [YearBar] = []
-    @State private var totalBytes: Int64 = 0
-    @State private var itemCount = 0
-    @State private var isLoading = true
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -35,39 +38,102 @@ struct StorageStatsView: View {
 
     var body: some View {
         Group {
-            if isLoading {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text("统计中…")
-                        .font(.caption)
-                        .foregroundColor(Color(ds: DSColor.textSecondary))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                statsList
+            switch viewModel.phase {
+            case .idle, .computing, .cancelled:
+                progressView
+            case .done(let partial):
+                statsList(partial: partial)
             }
         }
         .background(Color(ds: DSColor.bgPrimary))
         .navigationTitle("存储统计")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await compute() }
+        .task {
+            await viewModel.start()
+        }
+        .onChange(of: viewModel.phase) { _ in
+            rebuildCharts()
+        }
     }
 
-    private var statsList: some View {
+    // MARK: - 统计中（进度环 + 取消）
+
+    private var progressView: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .stroke(Color(ds: DSColor.bgSecondary), lineWidth: 10)
+                Circle()
+                    .trim(from: 0, to: progressFraction)
+                    .stroke(Color(ds: DSColor.tint),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(Int(progressFraction * 100))%")
+                    .font(.title2)
+                    .foregroundColor(Color(ds: DSColor.textPrimary))
+            }
+            .frame(width: 140, height: 140)
+
+            Text("已统计 \(viewModel.progress.done) / \(viewModel.progress.total)")
+                .font(.body)
+                .foregroundColor(Color(ds: DSColor.textSecondary))
+                .accessibilityIdentifier("StorageStats-Progress")
+
+            if viewModel.phase == .cancelled {
+                Text("已取消")
+                    .font(.caption)
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
+            }
+
+            Button("取消统计") {
+                viewModel.cancel()
+            }
+            .foregroundColor(Color(ds: DSColor.accentDelete))
+            .accessibilityIdentifier("StorageStats-Cancel")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var progressFraction: CGFloat {
+        guard viewModel.progress.total > 0 else { return 0 }
+        return CGFloat(viewModel.progress.done) / CGFloat(viewModel.progress.total)
+    }
+
+    // MARK: - 结果
+
+    private func statsList(partial: Bool) -> some View {
         List {
             Section("总占用") {
                 HStack {
                     Text("照片 + 视频")
                         .foregroundColor(Color(ds: DSColor.textPrimary))
                     Spacer()
-                    Text(Self.byteFormatter.string(fromByteCount: totalBytes))
+                    Text(Self.byteFormatter.string(fromByteCount: viewModel.summary.totalBytes))
                         .font(.headline)
                         .foregroundColor(Color(ds: DSColor.textPrimary))
                 }
                 .accessibilityElement(children: .combine)
-                Text("\(itemCount) 个项目")
+                .accessibilityIdentifier("StorageStats-Total")
+                Text("\(viewModel.itemCount) 个项目")
                     .font(.caption)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
+
+                if partial {
+                    // 软超时部分结果（docs/09 D07：绝不永久转圈）
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("部分 iCloud 资源大小未知（已统计 \(viewModel.partialCount)/\(viewModel.itemCount)）")
+                            .font(.caption)
+                            .foregroundColor(Color(ds: DSColor.accentDelete))
+                        Button("继续统计") {
+                            Task { await viewModel.resume() }
+                        }
+                        .font(.subheadline)
+                    }
+                } else if viewModel.summary.unknownCount > 0 {
+                    Text("\(viewModel.summary.unknownCount) 项大小未知（iCloud 原件未下载或读取失败）")
+                        .font(.caption)
+                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                }
             }
 
             if !slices.isEmpty {
@@ -102,6 +168,24 @@ struct StorageStatsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .refreshable {
+            // 强制重算（忽略缓存，docs/09 D07）
+            await viewModel.start(forceRefresh: true)
+        }
+    }
+
+    private func rebuildCharts() {
+        guard case .done = viewModel.phase else { return }
+        let summary = viewModel.summary
+        var newSlices = [
+            TypeSlice(name: "照片", bytes: summary.photoBytes, color: DSColor.tint),
+            TypeSlice(name: "视频", bytes: summary.videoBytes, color: DSColor.accentAlbum),
+        ]
+        if summary.otherBytes > 0 {
+            newSlices.append(TypeSlice(name: "其他", bytes: summary.otherBytes, color: DSColor.textSecondary))
+        }
+        slices = newSlices.filter { $0.bytes > 0 }
+        bars = summary.byYear.keys.sorted(by: >).map { YearBar(year: $0, bytes: summary.byYear[$0] ?? 0) }
     }
 
     // MARK: - 自绘环形（docs/02 §2：自绘 Path/Shape 替代 Charts）
@@ -115,7 +199,7 @@ struct StorageStatsView: View {
     }
 
     private var donutSegments: [DonutSegment] {
-        let total = max(1, totalBytes)
+        let total = max(1, viewModel.summary.totalBytes)
         var angle = -Double.pi / 2
         return slices.map { slice in
             let sweep = Double(slice.bytes) / Double(total) * 2 * .pi
@@ -133,7 +217,7 @@ struct StorageStatsView: View {
                             style: StrokeStyle(lineWidth: 26, lineCap: .butt))
             }
             VStack(spacing: 2) {
-                Text(Self.byteFormatter.string(fromByteCount: totalBytes))
+                Text(Self.byteFormatter.string(fromByteCount: viewModel.summary.totalBytes))
                     .font(.headline)
                     .foregroundColor(Color(ds: DSColor.textPrimary))
                 Text("总计")
@@ -161,13 +245,12 @@ struct StorageStatsView: View {
         .accessibilityLabel("\(slice.name) \(Self.byteFormatter.string(fromByteCount: slice.bytes))，占 \(percent(of: slice.bytes))%")
     }
 
-    // MARK: - 自绘柱状（Path 矩形；几何计算拆分为小函数避免表达式类型检查超时）
+    // MARK: - 自绘柱状（Path 矩形）
 
     private var barChartMaxBytes: Int64 {
         max(1, bars.map(\.bytes).max() ?? 1)
     }
 
-    /// 单根柱的矩形（heights 基于 proxy 尺寸预计算传入）
     private func barRect(index: Int, count: Int, bar: YearBar,
                          size: CGSize, maxBytes: Int64) -> CGRect {
         let step = size.width / CGFloat(max(1, count))
@@ -183,7 +266,6 @@ struct StorageStatsView: View {
         let count = bars.count
         return GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
-                // 基线
                 Path { path in
                     let y = proxy.size.height - 14
                     path.move(to: CGPoint(x: 0, y: y))
@@ -193,13 +275,12 @@ struct StorageStatsView: View {
 
                 ForEach(Array(bars.enumerated()), id: \.element.id) { index, bar in
                     let rect = barRect(index: index, count: count, bar: bar,
-                                        size: proxy.size, maxBytes: maxBytes)
+                                       size: proxy.size, maxBytes: maxBytes)
                     Path { path in
                         path.addRoundedRect(in: rect, cornerSize: CGSize(width: 2, height: 2))
                     }
                     .fill(Color(uiColor: DSColor.tint))
 
-                    // 年份标签（每根柱下方，两位年）
                     Text(String(format: "%02d", bar.year % 100))
                         .font(.system(size: 8))
                         .foregroundColor(Color(ds: DSColor.textSecondary))
@@ -211,66 +292,9 @@ struct StorageStatsView: View {
         .accessibilityLabel(makeBarsAccessibilityLabel())
     }
 
-    // MARK: - 数据计算（后台 utility；fileSize KVC 失败按 0）
-
-    private func compute() async {
-        let repository = AppContainer.shared.assetRepository
-        let total = await repository.prepare(scope: .all)
-        var items: [PhotoItem] = []
-        var cursor = 0
-        while cursor < total {
-            let batch = await repository.fetch(scope: .all, offset: cursor, limit: AssetRepository.batchSize)
-            guard !batch.isEmpty else { break }
-            items.append(contentsOf: batch)
-            cursor += batch.count
-        }
-
-        var photoBytes: Int64 = 0
-        var videoBytes: Int64 = 0
-        var otherBytes: Int64 = 0
-        var byYear: [Int: Int64] = [:]
-        let ids = items.map(\.id)
-        let sizes = await withTaskGroup(of: (String, Int64).self,
-                                        returning: [String: Int64].self) { group in
-            for id in ids {
-                group.addTask(priority: .utility) {
-                    let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-                    return (id, assets.firstObject?.fileSizeBytes ?? 0)
-                }
-            }
-            var result: [String: Int64] = [:]
-            for await (id, size) in group { result[id] = size }
-            return result
-        }
-        let calendar = Calendar.current
-        for item in items {
-            let size = sizes[item.id] ?? 0
-            switch item.mediaType {
-            case .image: photoBytes += size
-            case .video: videoBytes += size
-            case .unknown: otherBytes += size
-            }
-            if let date = item.creationDate {
-                byYear[calendar.component(.year, from: date), default: 0] += size
-            }
-        }
-
-        totalBytes = photoBytes + videoBytes + otherBytes
-        itemCount = items.count
-        slices = [
-            TypeSlice(name: "照片", bytes: photoBytes, color: DSColor.tint),
-            TypeSlice(name: "视频", bytes: videoBytes, color: DSColor.accentAlbum),
-        ]
-        if otherBytes > 0 {
-            slices.append(TypeSlice(name: "其他", bytes: otherBytes, color: DSColor.textSecondary))
-        }
-        bars = byYear.keys.sorted(by: >).map { YearBar(year: $0, bytes: byYear[$0] ?? 0) }
-        isLoading = false
-    }
-
     private func percent(of bytes: Int64) -> Int {
-        guard totalBytes > 0 else { return 0 }
-        return Int(Double(bytes) / Double(totalBytes) * 100)
+        guard viewModel.summary.totalBytes > 0 else { return 0 }
+        return Int(Double(bytes) / Double(viewModel.summary.totalBytes) * 100)
     }
 
     private func makeDonutAccessibilityLabel() -> String {

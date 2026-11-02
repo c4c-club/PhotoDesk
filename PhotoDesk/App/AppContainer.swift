@@ -23,6 +23,41 @@ final class AppContainer: ObservableObject {
     let reviewSession: ReviewSessionController
     /// 位置记忆（docs/09 D08）
     let positionStore = LibraryPositionStore()
+    /// 存储统计字节缓存（docs/09 D07；JSON 磁盘缓存，按 assetID + modificationDate）
+    let statsCache = AssetSizeCache()
+    /// 存储统计页每次打开新建（docs/09 D07：批量取字节 + 进度/取消/90s 软超时）
+    func makeStorageStatsViewModel() -> StorageStatsViewModel {
+        #if DEBUG
+        if UITestHooks.enabled("-uiTestingStorageMock") {
+            return StorageStatsViewModel(service: StorageStatsService(cache: nil),
+                                         provider: MockAssetSizeProvider(),
+                                         itemsProvider: { StorageStatsViewModel.mockItems() },
+                                         cacheProvider: { nil },
+                                         timeoutSeconds: 30)
+        }
+        #endif
+        return StorageStatsViewModel(service: StorageStatsService(cache: statsCache),
+                                     provider: PhotoKitAssetSizeProvider(),
+                                     itemsProvider: { [weak self] in
+            await self?.fetchAllItemsForStats() ?? []
+        },
+                                     cacheProvider: { [weak self] in self?.statsCache })
+    }
+
+    /// 全量条目（统计用；prepare + 500/批补齐，不进主库 VM 状态）
+    private func fetchAllItemsForStats() async -> [PhotoItem] {
+        let total = await assetRepository.prepare(scope: .all)
+        guard total > 0 else { return [] }
+        var items: [PhotoItem] = []
+        var cursor = 0
+        while cursor < total {
+            let batch = await assetRepository.fetch(scope: .all, offset: cursor, limit: AssetRepository.batchSize)
+            guard !batch.isEmpty else { break }
+            items.append(contentsOf: batch)
+            cursor += batch.count
+        }
+        return items
+    }
     #if DEBUG
     /// -uiTestingSessionMock：mock writer 调用计数（UI 测试断言「提交恰好 1 次」的信号源）
     let mockPhotoWriter: MockPhotoWriter?
