@@ -1,8 +1,9 @@
-// MARK: - 职责说明：全屏浏览 UIKit 分页器（docs/05 M2 任务 2.1/2.4/2.6，docs/03 §5.1）★核心——
-// UICollectionView 横向 paging（cell = 屏幕尺寸）；UIPanGestureRecognizer 经 SwipeGestureEngine 判定：
-// 垂直 → 图片本体不动、只驱动 ActionOverlay（透明度/缩放/位移），方向锁期间停用分页；水平 → 交还分页器。
-// 放大（zoomScale > 1.01）禁用上下滑；锁定触觉；松手 → 确认弹窗（破坏性）→ 飞出（Reduce Motion 降级淡出）
-// → 执行 → 撤销栈 → autoAdvance → Toast。顶栏/胶片条 3 秒无操作淡出，点击切换。
+// MARK: - 职责说明：全屏浏览 UIKit 分页器（docs/05 M2/M3；docs/09 Phase 4 重写）★——
+// UICollectionView 横向 paging；首次 viewDidLayoutSubviews 按 assetID 定位（D01）；
+// 删除/隐藏走会话暂存：同步入队 → 飞出 → performBatchUpdates 删 cell → ReplacementPlan 补位动画（D02/D16）；
+// 滚动回调只在用户手势时更新 index（isProgrammaticScroll 屏蔽程序化滚动）；cell 级加载 token；
+// 无 App 内删除/隐藏确认（D03/D04）；动作池：加相簿/分享/信息/旋转/长按菜单全部接入（D15）；
+// 视频点击暂停/继续；双击缩放不触发 chrome 切换；顶部 SessionBadge 待处理入口。
 
 import UIKit
 import PhotoDeskCore
@@ -18,8 +19,7 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - 手势与浮层
 
-    private lazy var engine = SwipeGestureEngine(config: SwipeGestureEngine.config(
-        for: settings.sensitivity, confirmDestructive: settings.confirmDestructive))
+    private lazy var engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: settings.sensitivity))
     private let upOverlay = ActionOverlayView(frame: .zero)     // 上滑 → 屏幕上方 1/4
     private let downOverlay = ActionOverlayView(frame: .zero)   // 下滑 → 屏幕下方 1/4
     private let haptics = UIImpactFeedbackGenerator(style: .medium)
@@ -36,8 +36,10 @@ final class ViewerViewController: UIViewController {
     private var favoriteButton: UIBarButtonItem!
     private var chromeVisible = true
     private var chromeTimer: Timer?
-    /// 图片加载 token（翻页竞态防护）
-    private var loadTokens: [Int: Int] = [:]
+    /// 程序化滚动标志（屏蔽 scrollViewDidScroll 的 index 写回，docs/09 D01）
+    private var isProgrammaticScroll = false
+    /// 首次布局定位（D01：viewDidLoad 时 bounds 未定，scrollToItem 无效——布局后按 assetID 定位）
+    private var needsInitialPositioning = true
 
     var onClose: (() -> Void)?
 
@@ -74,24 +76,32 @@ final class ViewerViewController: UIViewController {
         viewModel.onUndoApplied = { [weak self] in
             self?.refreshChrome()
         }
+        viewModel.onItemRestored = { [weak self] in
+            self?.reloadAfterRestore()
+        }
 
         modalPresentationStyle = .fullScreen
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // 浮层锚点：上滑 = 上方 1/4，下滑 = 下方 1/4（docs/04 §3.2）——frame 布局（浮层自带 transform，不走约束）
+        // 浮层锚点：上滑 = 上方 1/4，下滑 = 下方 1/4（docs/04 §3.2）
         let width = view.bounds.width
         let height = view.bounds.height
         upOverlay.frame = CGRect(x: 0, y: height * 0.25 - 70, width: width, height: 140)
         upOverlay.setBaseCenter(y: height * 0.25)
         downOverlay.frame = CGRect(x: 0, y: height * 0.75 - 70, width: width, height: 140)
         downOverlay.setBaseCenter(y: height * 0.75)
-        // 无障碍替代栏：手势关闭时常驻（@AppStorage 实时读取，设置改动即时生效）
+        // 无障碍替代栏：手势关闭时常驻
         let showBar = !settings.gesturesEnabled
         accessibilityBar.isHidden = !showBar
         filmStrip.isHidden = showBar ? true : filmStrip.isHidden
         view.bringSubviewToFront(accessibilityBar)
+        // D01：首次拿到有效宽度后按当前 index 定位（contentOffset 直设，不触发 didScroll 写回）
+        if needsInitialPositioning, width > 0, !collectionView.isHidden {
+            needsInitialPositioning = false
+            positionAtCurrentIndex()
+        }
     }
 
     // MARK: - 构建
@@ -107,17 +117,26 @@ final class ViewerViewController: UIViewController {
         collectionView.backgroundColor = DSColor.bgViewer
         collectionView.dataSource = self
         collectionView.delegate = self
+        collectionView.isPrefetchingEnabled = true
+        collectionView.prefetchDataSource = self
         collectionView.register(ZoomableImageCell.self, forCellWithReuseIdentifier: ZoomableImageCell.reuseID)
         collectionView.register(VideoCell.self, forCellWithReuseIdentifier: VideoCell.reuseID)
         view.addSubview(collectionView)
+    }
 
-        // 初始定位到起始页（无动画，避免白帧）
-        if viewModel.currentIndex > 0 {
-            collectionView.scrollToItem(at: IndexPath(item: viewModel.currentIndex, section: 0),
-                                        at: .centeredHorizontally, animated: false)
-        }
+    /// 首次/恢复定位（contentOffset 直设 + 显式 updateIndex，绕过 scrollViewDidScroll）
+    private func positionAtCurrentIndex() {
+        let index = max(0, min(viewModel.currentIndex, max(0, viewModel.items.count - 1)))
+        viewModel.updateIndex(index)
+        isProgrammaticScroll = true
+        collectionView.setContentOffset(CGPoint(x: CGFloat(index) * collectionView.bounds.width, y: 0),
+                                        animated: false)
+        isProgrammaticScroll = false
+        filmStrip.highlight(index: index, centerIfNeeded: true)
+        refreshChrome()
+        prefetchAround(index: index)
         #if DEBUG
-        updateDebugBanner(page: viewModel.currentIndex)
+        updateDebugBanner(page: index)
         #endif
     }
 
@@ -127,7 +146,7 @@ final class ViewerViewController: UIViewController {
         upOverlay.hide()
         downOverlay.hide()
         #if DEBUG
-        // CI 截图自诊断：手势链路断点定位（Release 不编译，与 LibraryContainer 横幅同款思路）
+        // CI 截图自诊断 + D01 断言锚点（Release 不编译）
         debugLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(debugLabel)
         NSLayoutConstraint.activate([
@@ -172,6 +191,13 @@ final class ViewerViewController: UIViewController {
         let close = UIBarButtonItem(image: UIImage(systemName: "xmark"),
                                     style: .plain, target: self, action: #selector(closeTapped))
         close.accessibilityLabel = "关闭"
+        // SessionBadge（docs/09 D16）：查看器顶部待处理入口 → SessionReviewView
+        let sessionBadge = UIBarButtonItem(title: "", style: .plain, target: self,
+                                           action: #selector(sessionBadgeTapped))
+        sessionBadge.accessibilityIdentifier = "SessionBadge"
+        sessionBadge.isEnabled = true
+        let sessionSpace = UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
+        sessionSpace.width = 4
         favoriteButton = UIBarButtonItem(image: UIImage(systemName: favoriteIconName),
                                          style: .plain, target: self,
                                          action: #selector(favoriteTapped))
@@ -183,13 +209,20 @@ final class ViewerViewController: UIViewController {
                                    style: .plain, target: self, action: #selector(moreTapped))
         more.accessibilityLabel = "更多"
         let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-        topBarItems = [close, flexibleSpace, favoriteButton, info, more]
+        topBarItems = [close, sessionBadge, flexibleSpace, favoriteButton, info, more]
         moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
-        // 点击屏幕切换 chrome 显隐（与双击缩放共存：双击会先触发一次切换，M6 一并优化）
-        let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped))
+        // 点击屏幕切换 chrome；双击缩放不触发 chrome（D15）：单击 require 双击失败
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapNoop))
+        doubleTap.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTap)
+        let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped(_:)))
+        tap.require(toFail: doubleTap)
         view.addGestureRecognizer(tap)
+        // 长按操作菜单（docs/09 D15）
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(viewLongPressed(_:)))
+        view.addGestureRecognizer(longPress)
 
         NSLayoutConstraint.activate([
             topBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -199,6 +232,8 @@ final class ViewerViewController: UIViewController {
         ])
         refreshChrome()
     }
+
+    @objc private func doubleTapNoop() {}   // 占位：只为让单击等待双击失败（缩放由 cell 处理）
 
     private func setupFilmStrip() {
         filmStrip.translatesAutoresizingMaskIntoConstraints = false
@@ -217,8 +252,7 @@ final class ViewerViewController: UIViewController {
         setupAccessibilityBar()
     }
 
-    /// 无障碍替代路径（docs/04 §6 / docs/05 M7 任务 5）：关闭手势时底部常驻三按钮
-    ///（收藏 / 隐藏 / 移到最近删除），与手势共用 executeAction（含破坏性确认）
+    /// 无障碍替代路径（docs/04 §6）：关闭手势时底部常驻三按钮；删除/隐藏走会话暂存（无确认）
     private func setupAccessibilityBar() {
         accessibilityBar.translatesAutoresizingMaskIntoConstraints = false
         accessibilityBar.axis = .horizontal
@@ -240,13 +274,13 @@ final class ViewerViewController: UIViewController {
         }
 
         accessibilityBar.addArrangedSubview(barButton("heart", label: "收藏") { [weak self] in
-            self?.executeAction(.toggleFavorite, direction: .up, translationY: 0)
+            self?.executeAction(.toggleFavorite, direction: .up, exitEdge: .top)
         })
         accessibilityBar.addArrangedSubview(barButton("eye.slash", label: "隐藏") { [weak self] in
-            self?.executeAction(.hide, direction: .down, translationY: 0)
+            self?.executeAction(.hide, direction: .down, exitEdge: .bottom)
         })
         accessibilityBar.addArrangedSubview(barButton("trash", label: "移到最近删除") { [weak self] in
-            self?.executeAction(.moveToRecentlyDeleted, direction: .down, translationY: 0)
+            self?.executeAction(.moveToRecentlyDeleted, direction: .down, exitEdge: .bottom)
         })
 
         NSLayoutConstraint.activate([
@@ -259,7 +293,7 @@ final class ViewerViewController: UIViewController {
         filmStrip.bottomAnchor.constraint(equalTo: accessibilityBar.topAnchor, constant: -8).isActive = true
     }
 
-    /// 手势开关实时生效（@AppStorage 读取即最新值）
+    /// 手势开关实时生效
     private var accessibilityBar: UIStackView = {
         let stack = UIStackView()
         stack.isHidden = true
@@ -289,13 +323,8 @@ final class ViewerViewController: UIViewController {
     @objc private func onPan(_ gesture: UIPanGestureRecognizer) {
         let rawTranslation = gesture.translation(in: view)
         let rawVelocity = gesture.velocity(in: view)
-        // UIPanGestureRecognizer 返回 CGPoint；核心包判定接口为 Double（docs/03 §5.10），统一转 CGSize
         let translation = CGSize(width: rawTranslation.x, height: rawTranslation.y)
         let velocity = CGSize(width: rawVelocity.x, height: rawVelocity.y)
-        #if DEBUG
-        updateDebugLabel("pan:\(gesture.state == .began ? "began" : gesture.state == .changed ? "move" : "end") " +
-            "t=\(Int(translation.height)) v=\(Int(velocity.height))")
-        #endif
         switch gesture.state {
         case .began:
             engine.begin()
@@ -322,7 +351,7 @@ final class ViewerViewController: UIViewController {
 
         case .ended:
             if let direction = engine.finish() {
-                triggerAction(direction: direction, translationY: translation.height)
+                triggerAction(direction: direction, exitEdge: direction == .up ? .top : .bottom)
             } else {
                 hideOverlays()
                 collectionView.isScrollEnabled = true
@@ -343,15 +372,16 @@ final class ViewerViewController: UIViewController {
         downOverlay.hide()
     }
 
-    // MARK: - 动作执行管线（docs/03 §5.1 执行流程）
+    // MARK: - 动作执行管线
 
-    private func triggerAction(direction: SwipeDirection, translationY: CGFloat) {
+    private func triggerAction(direction: SwipeDirection, exitEdge: VerticalEdge?) {
         let action = viewModel.action(for: direction)
-        executeAction(action, direction: direction, translationY: translationY)
+        executeAction(action, direction: direction, exitEdge: exitEdge)
     }
 
-    /// 统一执行入口（手势 / 底部无障碍按钮共用）：破坏性确认 → 执行
-    private func executeAction(_ action: SwipeAction, direction: SwipeDirection, translationY: CGFloat) {
+    /// 统一执行入口（手势 / 无障碍按钮 / 菜单共用）。
+    /// docs/09 D03/D04：删除/隐藏不弹 App 内确认——直接会话暂存 + 飞出 + 补位。
+    private func executeAction(_ action: SwipeAction, direction: SwipeDirection, exitEdge: VerticalEdge?) {
         hideOverlays()
         collectionView.isScrollEnabled = true
 
@@ -361,44 +391,83 @@ final class ViewerViewController: UIViewController {
             return
         }
 
-        let proceed = { [weak self] in
-            guard let self else { return }
-            self.perform(action: action, direction: direction, translationY: translationY)
-        }
-
-        // 破坏性动作二次确认（docs/04 §7 文案；系统对删除另有一次性确认弹窗，无法绕过）
-        if action.isDestructive && settings.confirmDestructive {
-            presentConfirmation(for: action, onConfirm: proceed)
-        } else {
-            proceed()
-        }
-    }
-
-    private func presentConfirmation(for action: SwipeAction, onConfirm: @escaping () -> Void) {
-        let title: String
-        let message: String
         switch action {
-        case .hide, .unhide:
-            title = "隐藏这张照片？"
-            message = "它不会再出现在照片库，可随时在「已隐藏」中查看。"
-        case .moveToRecentlyDeleted:
-            title = "移到「最近删除」？"
-            message = "照片会在那里保留 30 天，期间随时可以在系统相册恢复，不是永久删除。"
+        case .moveToRecentlyDeleted, .hide:
+            performStaged(action: action, exitEdge: exitEdge)
         default:
-            title = action.displayName + "？"
-            message = ""
+            perform(action: action, direction: direction)
         }
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: action.displayName, style: .destructive) { _ in
-            onConfirm()
-        })
-        present(alert, animated: true)
     }
 
-    private func perform(action: SwipeAction, direction: SwipeDirection, translationY: CGFloat) {
+    /// 会话暂存路径（docs/09 D16）：同步入队 → 飞出 → 批量更新删除 cell → 按补位计划进入
+    private func performStaged(action: SwipeAction, exitEdge: VerticalEdge?) {
         guard let item = viewModel.current else { return }
-        // @MainActor：await 之后回到主线程再操作 UI（flyOut/showToast），不依赖隐式执行器恢复
+        guard let staged = viewModel.stage(action, forItemID: item.id, exitEdge: exitEdge) else { return }
+
+        flyOut(direction: exitEdge == .bottom ? .down : .up,
+               index: staged.removedIndex) { [weak self] in
+            guard let self else { return }
+            self.applyRemoval(staged: staged)
+        }
+        showToast(text: staged.toastText,
+                  icon: ActionOverlayView.symbol(for: action),
+                  allowUndo: true)
+        #if DEBUG
+        updateDebugLabel("staged:\(action) n=\(staged.removedIndex)")
+        #endif
+    }
+
+    /// performBatchUpdates 删除 cell → 按计划滚到 nextIndex → entry 动画 → 刷新胶片条
+    private func applyRemoval(staged: ViewerViewModel.StagedOutcome) {
+        let removedIndexPath = IndexPath(item: staged.removedIndex, section: 0)
+        collectionView.performBatchUpdates {
+            collectionView.deleteItems(at: [removedIndexPath])
+        } completion: { [weak self] _ in
+            guard let self else { return }
+            if staged.plan.shouldClose {
+                self.closeTapped()   // 列表删空：关闭查看器（docs/09 D02）
+                return
+            }
+            guard let next = staged.plan.nextIndex else { return }
+            self.viewModel.updateIndex(next)
+            self.scrollTo(index: next, animated: false)
+            self.applyEntryAnimation(edge: staged.plan.entryEdge, index: next)
+            self.refreshFilmStrip(current: next)
+            self.refreshChrome()   // 顶部待处理计数 +1（docs/09 D16）
+            self.prefetchAround(index: next)
+            #if DEBUG
+            self.updateDebugBanner(page: next)
+            #endif
+        }
+    }
+
+    /// 补位进入动画：下一张从 entryEdge 以 0.96→1.0 缩放 / 16pt 位移进入（Reduce Motion 降级）
+    private func applyEntryAnimation(edge: VerticalEdge?, index: Int) {
+        guard usesMotion, let edge else { return }
+        guard let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) else { return }
+        let offset: CGFloat = edge == .top ? -16 : 16
+        cell.transform = CGAffineTransform(translationX: 0, y: offset).scaledBy(x: 0.96, y: 0.96)
+        cell.alpha = 0.4
+        UIView.animate(withDuration: DSMotion.fadeDuration, delay: 0, options: [.curveEaseOut]) {
+            cell.transform = .identity
+            cell.alpha = 1
+        }
+    }
+
+    /// staged 撤销（恢复 item）：全量重载集合视图并定位回恢复位置
+    private func reloadAfterRestore() {
+        collectionView.reloadData()
+        let index = max(0, min(viewModel.currentIndex, max(0, viewModel.items.count - 1)))
+        scrollTo(index: index, animated: false)
+        refreshFilmStrip(current: index)
+        refreshChrome()
+        #if DEBUG
+        updateDebugBanner(page: index)
+        #endif
+    }
+
+    private func perform(action: SwipeAction, direction: SwipeDirection) {
+        guard let item = viewModel.current else { return }
         Task { @MainActor [weak self] in
             guard let self else { return }
             let outcome = await self.viewModel.execute(action, for: item)
@@ -409,11 +478,12 @@ final class ViewerViewController: UIViewController {
             }
             #endif
             switch outcome {
-            case .success(let updated, _, let undoKind):
-                self.flyOut(direction: direction, action: action) {
-                    self.finishAfterAction(updated: updated)
-                }
-                self.showToast(for: action, allowUndo: undoKind != nil)
+            case .success(_, let toastText, let undoKind):
+                // 收藏/取消收藏/取消隐藏：不前进（docs/09 §2.4），本地状态已更新
+                self.refreshChrome()
+                self.showToast(text: toastText,
+                               icon: ActionOverlayView.symbol(for: action),
+                               allowUndo: undoKind != nil)
                 #if DEBUG
                 self.updateDebugLabel("exec:\(action) ✓ \(self.toast.debugState)")
                 #endif
@@ -425,8 +495,9 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    private func flyOut(direction: SwipeDirection, action: SwipeAction, completion: @escaping () -> Void) {
-        let cell = collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0))
+    /// 飞出动画（目标 cell 在移除生效前冻结，docs/09 D02；index = 被移除条目原 index）
+    private func flyOut(direction: SwipeDirection, index: Int, completion: @escaping () -> Void) {
+        let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0))
         let flyDistance = direction == .up ? -view.bounds.height : view.bounds.height
 
         guard usesMotion, let cell else {
@@ -452,50 +523,78 @@ final class ViewerViewController: UIViewController {
         !(UIAccessibility.isReduceMotionEnabled && settings.respectReduceMotion)
     }
 
-    /// 执行成功后：本地状态已在 VM 更新（收藏/隐藏不改图片内容，无需重载大图，缩放状态保留）
-    private func finishAfterAction(updated: PhotoItem) {
-        refreshChrome()
-        if settings.autoAdvance {
-            let next = viewModel.nextIndexAfterAction
-            viewModel.updateIndex(next)
-            scrollTo(index: next)
-        }
-    }
-
     // MARK: - Toast / 撤销
 
-    private func showToast(for action: SwipeAction, allowUndo: Bool) {
-        guard action != .none else { return }
-        // allowUndo 来自执行结果的 undoKind（推送刚发生，确定性判定），不再依赖 hasActiveEntry 反推
-        let undoAvailable = allowUndo
-        // 副本关闭/已过期：删除类 Toast 引导去系统相册恢复（docs/04 §3.4 口径）
-        let suffix: String
-        if undoAvailable {
-            suffix = " · 撤销"
-        } else if action == .moveToRecentlyDeleted {
-            suffix = " · 可在系统相册恢复"
-        } else {
-            suffix = ""
-        }
-        toast.show(icon: ActionOverlayView.symbol(for: action),
-                   text: action.toastText + suffix,
+    private func showToast(text: String, icon: String, allowUndo: Bool) {
+        // staged 撤销走 undoStaged（零 PhotoKit 写）；即时写撤销走 UndoCenter
+        let isStaged = viewModel.hasUndoableStaged
+        toast.show(icon: icon,
+                   text: text + (allowUndo ? " · 撤销" : ""),
                    duration: settings.undoWindow,
-                   allowUndo: undoAvailable,
+                   allowUndo: allowUndo,
                    onUndo: { [weak self] in
-            Task { await self?.viewModel.undoLast() }
+            guard let self else { return }
+            if isStaged {
+                self.viewModel.undoStaged()
+            } else {
+                Task { await self.viewModel.undoLast() }
+            }
         },
                    onDismissFinished: nil)
         scheduleChromeHide()
     }
 
-    private func showToast(text: String, icon: String, allowUndo: Bool) {
-        toast.show(icon: icon, text: text, duration: 2.5, allowUndo: false, onUndo: nil, onDismissFinished: nil)
-    }
-
     // MARK: - Chrome（3 秒无操作淡出，docs/04 §3.2）
 
-    @objc private func viewTapped() {
+    @objc private func viewTapped(_ gesture: UITapGestureRecognizer) {
+        // 视频点击暂停/继续（docs/09 D15）：点在视频 cell 上时切换播放，不切换 chrome
+        let point = gesture.location(in: view)
+        if let indexPath = collectionView.indexPathForItem(at: collectionView.convert(point, from: view)),
+           let cell = collectionView.cellForItem(at: indexPath) as? VideoCell {
+            cell.togglePlayback()
+            return
+        }
         setChrome(visible: !chromeVisible)
+    }
+    /// UILongPressGestureRecognizer 的 location
+    private var longPressLocation: CGPoint?
+
+    @objc private func viewLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        longPressLocation = gesture.location(in: view)
+        presentActionMenu()
+    }
+
+    /// 长按操作菜单（docs/09 D15）：收藏/隐藏/移到最近删除/加相簿/分享/信息/编辑
+    private func presentActionMenu() {
+        guard viewModel.current != nil else { return }
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        let addItem: (String, SwipeAction) -> Void = { [weak self] title, action in
+            alert.addAction(UIAlertAction(title: title, style: action == .moveToRecentlyDeleted ? .destructive : .default) { _ in
+                self?.executeAction(action, direction: .down, exitEdge: nil)
+            })
+        }
+        addItem("收藏", .favorite)
+        addItem("隐藏", .hide)
+        addItem("移到最近删除", .moveToRecentlyDeleted)
+        alert.addAction(UIAlertAction(title: "加入相簿…", style: .default) { [weak self] _ in
+            self?.addToAlbumTapped()
+        })
+        alert.addAction(UIAlertAction(title: "分享…", style: .default) { [weak self] _ in
+            self?.shareCurrent()
+        })
+        alert.addAction(UIAlertAction(title: "查看信息", style: .default) { [weak self] _ in
+            self?.infoTapped()
+        })
+        alert.addAction(UIAlertAction(title: "旋转 / 编辑", style: .default) { [weak self] _ in
+            self?.rotateTapped()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(origin: longPressLocation ?? view.center, size: .zero)
+        }
+        present(alert, animated: true)
     }
 
     private func setChrome(visible: Bool) {
@@ -534,6 +633,41 @@ final class ViewerViewController: UIViewController {
 
     private func refreshChrome() {
         favoriteButton.image = UIImage(systemName: favoriteIconName)
+        refreshSessionBadge()
+    }
+
+    /// 顶部待处理徽标（docs/09 D16）：待删除 N / 待隐藏 M，点击打开整理回顾
+    private func refreshSessionBadge() {
+        let session = AppContainer.shared.reviewSession
+        let deletes = session.pendingDeleteCount
+        let hides = session.pendingHideCount
+        let item = topBarItems.first { $0.accessibilityIdentifier == "SessionBadge" }
+        guard let item else { return }
+        if deletes == 0 && hides == 0 {
+            item.title = nil
+            item.accessibilityLabel = "没有待处理内容"
+        } else if hides == 0 {
+            item.title = "待删除 \(deletes)"
+            item.accessibilityLabel = "待删除 \(deletes) 张，点按查看整理回顾"
+        } else if deletes == 0 {
+            item.title = "待隐藏 \(hides)"
+            item.accessibilityLabel = "待隐藏 \(hides) 张，点按查看整理回顾"
+        } else {
+            item.title = "待删除 \(deletes) · 待隐藏 \(hides)"
+            item.accessibilityLabel = "待删除 \(deletes) 张，待隐藏 \(hides) 张，点按查看整理回顾"
+        }
+    }
+
+    @objc private func sessionBadgeTapped() {
+        let review = SessionReviewView(session: AppContainer.shared.reviewSession,
+                                       pipeline: pipeline,
+                                       settings: settings) { [weak self] in
+            self?.dismiss(animated: true)
+            self?.refreshChrome()
+        }
+        let host = UIHostingController(rootView: review)
+        host.view.backgroundColor = DSColor.bgViewer
+        present(host, animated: true)
     }
 
     // MARK: - 按钮
@@ -547,16 +681,46 @@ final class ViewerViewController: UIViewController {
     @objc private func favoriteTapped() {
         guard let item = viewModel.current else { return }
         let action: SwipeAction = item.isFavorite ? .unfavorite : .favorite
-        perform(action: action, direction: item.isFavorite ? .down : .up, translationY: 0)
+        perform(action: action, direction: item.isFavorite ? .down : .up)
     }
 
     @objc private func infoTapped() {
         guard let item = viewModel.current else { return }
-        // 信息面板（M5）：SwiftUI 宿主包裹呈现
         let host = UIHostingController(rootView: NavigationView {
             MetadataView(item: item)
         }.navigationViewStyle(.stack))
         present(host, animated: usesMotion)
+    }
+
+    /// 旋转/编辑（docs/09 D15：rotate 接入编辑器——旋转在编辑器内完成）
+    private func rotateTapped() {
+        guard let item = viewModel.current else { return }
+        openEditor(for: item)
+    }
+
+    /// 加入相簿（docs/09 D15：addToAlbum 接入——输入相簿名创建并加入）
+    private func addToAlbumTapped() {
+        guard let item = viewModel.current else { return }
+        let alert = UIAlertController(title: "加入相簿",
+                                      message: "将这张照片加入新相簿",
+                                      preferredStyle: .alert)
+        alert.addTextField { $0.placeholder = "相簿名称" }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "创建并加入", style: .default) { [weak self] _ in
+            guard let title = alert.textFields?.first?.text, !title.isEmpty else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    let albumID = try await AppContainer.shared.photoWriter.createAlbum(title: title)
+                    try await AppContainer.shared.photoWriter.add(ids: [item.id], toAlbum: albumID)
+                    self.showToast(text: "已加入相簿", icon: "folder.badge.plus", allowUndo: false)
+                } catch {
+                    self.showToast(text: "操作失败：\(error.localizedDescription)",
+                                   icon: "info.circle", allowUndo: false)
+                }
+            }
+        })
+        present(alert, animated: true)
     }
 
     @objc private func moreTapped() {
@@ -571,7 +735,13 @@ final class ViewerViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "分享…", style: .default) { [weak self] _ in
             self?.shareCurrent()
         })
+        alert.addAction(UIAlertAction(title: "加入相簿…", style: .default) { [weak self] _ in
+            self?.addToAlbumTapped()
+        })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.barButtonItem = moreButtonItem
+        }
         present(alert, animated: true)
     }
 
@@ -612,28 +782,52 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - 翻页与图片加载
 
-    private func scrollTo(index: Int) {
+    private func scrollTo(index: Int, animated: Bool = true) {
         guard index >= 0, index < viewModel.items.count else { return }
+        isProgrammaticScroll = true
         collectionView.scrollToItem(at: IndexPath(item: index, section: 0),
                                     at: .centeredHorizontally,
-                                    animated: usesMotion)
+                                    animated: animated && usesMotion)
+        isProgrammaticScroll = false
         filmStrip.highlight(index: index, centerIfNeeded: true)
         refreshChrome()
+        #if DEBUG
+        updateDebugBanner(page: index)
+        #endif
+    }
+
+    /// 预取当前 index 后 3 张 + 前 1 张（docs/09 D02：补位不白屏）
+    private func prefetchAround(index: Int) {
+        let ids = viewModel.items[index...].prefix(4).dropFirst().prefix(3).map(\.id)
+            + viewModel.items[..<index].suffix(1).map(\.id)
+        guard !ids.isEmpty else { return }
+        let size = collectionView.bounds.size
+        let pixel = CGSize(width: size.width * UIScreen.main.scale,
+                           height: size.height * UIScreen.main.scale)
+        pipeline.prefetch(ids: Array(ids), size: pixel)
+    }
+
+    private func refreshFilmStrip(current index: Int) {
+        filmStrip.reload(ids: viewModel.items.map(\.id),
+                         currentIndex: index,
+                         pipeline: pipeline) { [weak self] target in
+            self?.scrollTo(index: target)
+        }
     }
 
     private func loadImage(for item: PhotoItem, at index: Int, cell: ZoomableImageCell) {
-        let token = (loadTokens[index] ?? 0) + 1
-        loadTokens[index] = token
+        // cell 级 token（docs/09 D02：回填前校验 cell.itemID 与 item.id 一致且 token 未过期）
+        let token = cell.beginLoad()
         // iCloud-only 未下载：保持占位态，等用户点「下载」（docs/03 §5.8）
         guard !item.isCloudOnly else { return }
-        Task { [weak self] in
+        Task { [weak self, weak cell] in
             guard let self else { return }
             let image = await self.pipeline.fullImage(for: item.id, progress: { fraction in
                 Task { @MainActor in
-                    cell.updateDownloadProgress(fraction)
+                    cell?.updateDownloadProgress(fraction)
                 }
             }, allowNetwork: false)
-            guard token == self.loadTokens[index] else { return }
+            guard let cell, cell.itemID == item.id, cell.matches(token: token) else { return }
             if let image {
                 cell.applyDownloadedImage(image)
             }
@@ -661,19 +855,21 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                                                       for: indexPath)
         guard let imageCell = cell as? ZoomableImageCell else { return cell }
         imageCell.configure(item: item, image: nil)
-        imageCell.setDownloadHandler { [weak self] id in
-            self?.downloadFromCloud(id: id, cell: imageCell)
+        imageCell.setDownloadHandler { [weak self, weak imageCell] id in
+            guard let self, let imageCell else { return }
+            self.downloadFromCloud(id: id, cell: imageCell)
         }
         loadImage(for: item, at: indexPath.item, cell: imageCell)
         return imageCell
     }
 
     private func downloadFromCloud(id: String, cell: ZoomableImageCell) {
-        Task { [weak self] in
-            guard let self else { return }
+        let token = cell.beginLoad()
+        Task { [weak cell] in
             let image = await self.pipeline.fullImage(for: id, progress: { fraction in
-                Task { @MainActor in cell.updateDownloadProgress(fraction) }
+                Task { @MainActor in cell?.updateDownloadProgress(fraction) }
             }, allowNetwork: true)
+            guard let cell, cell.itemID == id, cell.matches(token: token) else { return }
             if let image {
                 cell.applyDownloadedImage(image)
             }
@@ -693,23 +889,42 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell,
                         forItemAt indexPath: IndexPath) {
-        loadTokens[indexPath.item] = (loadTokens[indexPath.item] ?? 0) + 1   // 使在途回填失效
-        (cell as? ZoomableImageCell)?.resetZoom()
         (cell as? VideoCell)?.stopPlayback()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard viewModel.items.count > 0 else { return }
+        // D01：只在用户手势（拖拽/减速）时更新 index；程序化滚动一律屏蔽
+        guard !isProgrammaticScroll,
+              scrollView.isTracking || scrollView.isDecelerating,
+              viewModel.items.count > 0 else { return }
         let page = Int(round(scrollView.contentOffset.x / max(1, scrollView.bounds.width)))
         let clamped = max(0, min(page, viewModel.items.count - 1))
         if clamped != viewModel.currentIndex {
             viewModel.updateIndex(clamped)
             filmStrip.highlight(index: clamped, centerIfNeeded: true)
             refreshChrome()
+            prefetchAround(index: clamped)
             #if DEBUG
             updateDebugBanner(page: clamped)
             #endif
         }
+    }
+}
+
+// MARK: - 预取（docs/09 D02：后 3 张）
+
+extension ViewerViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        let ids = indexPaths.compactMap { viewModel.items[safe: $0.item]?.id }
+        guard !ids.isEmpty else { return }
+        let size = collectionView.bounds.size
+        let pixel = CGSize(width: size.width * UIScreen.main.scale,
+                           height: size.height * UIScreen.main.scale)
+        pipeline.prefetch(ids: ids, size: pixel)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
+        indexPaths.compactMap { viewModel.items[safe: $0.item]?.id }.forEach { pipeline.cancel(id: $0) }
     }
 }
 

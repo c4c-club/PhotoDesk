@@ -41,7 +41,6 @@ struct GestureSettingsView: View {
 
             Section("触发与反馈") {
                 Toggle("触觉反馈", isOn: $settings.hapticsEnabled)
-                Toggle("破坏性操作确认", isOn: $settings.confirmDestructive)
                 Picker("撤销窗口", selection: $settings.undoWindow) {
                     Text("3 秒").tag(3.0)
                     Text("5 秒").tag(5.0)
@@ -52,7 +51,7 @@ struct GestureSettingsView: View {
             }
 
             Section("关于「移到最近删除」") {
-                Text("「移到最近删除」只会把照片放进系统「最近删除」，保留 30 天后由系统清除，本 App 不会永久删除。iOS 会弹出一次确认框且无法关闭；若想更快，建议把下滑设为「隐藏」。")
+                Text("上下滑标记不会立刻删除：先进入待删除清单，点「全部移到最近删除」时 iOS 弹一次系统确认（每批一次，不是每张一次）。照片进入系统「最近删除」保留 30 天，本 App 不提供永久删除。")
                     .font(.footnote)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
             }

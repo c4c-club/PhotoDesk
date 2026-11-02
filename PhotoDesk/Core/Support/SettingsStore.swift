@@ -51,10 +51,11 @@ enum SwipeAction: String, CaseIterable, Codable {
         "松手" + displayName
     }
 
-    /// 破坏性动作：需要二次确认（设置 gesture.confirmDestructive 开启时）
+    /// 破坏性动作标记（docs/09 D03：App 内删除/隐藏确认已全部移除；isDestructive 仅用于
+    /// 动作菜单的 destructive 样式，不再触发任何 App 内确认弹窗）
     var isDestructive: Bool {
         switch self {
-        case .hide, .moveToRecentlyDeleted: return true
+        case .moveToRecentlyDeleted: return true
         default: return false
         }
     }
@@ -72,7 +73,7 @@ final class SettingsStore: ObservableObject {
     @AppStorage("gesture.down")            var swipeDownAction: SwipeAction = .hide
     @AppStorage("gesture.sensitivity")     var sensitivityRaw: String = Sensitivity.standard.rawValue
     @AppStorage("gesture.haptics")         var hapticsEnabled = true
-    @AppStorage("gesture.confirmDestructive") var confirmDestructive = true
+    // gesture.confirmDestructive 已移除（docs/09 D03：App 内删除确认不复存在，不留开关）
     @AppStorage("gesture.undoWindow")      var undoWindow: Double = 5.0
     @AppStorage("gesture.autoAdvance")     var autoAdvance = true
     @AppStorage("gesture.reduceMotionRespected") var respectReduceMotion = true

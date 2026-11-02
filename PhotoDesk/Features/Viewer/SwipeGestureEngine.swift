@@ -40,11 +40,13 @@ final class SwipeGestureEngine {
     }
 
     /// 由设置构造判定配置（灵敏度档位 → 阈值；最小速度距离固定 40，docs/03 §5.1）
-    static func config(for sensitivity: Sensitivity, confirmDestructive: Bool) -> SwipeConfig {
+    /// docs/09 D03：confirmRequired 固定 false——App 内删除/隐藏二次确认已全部移除
+    ///（系统确认由批量提交时出现一次）；核心包 SwipeConfig 保留参数为公共 API 兼容。
+    static func config(for sensitivity: Sensitivity) -> SwipeConfig {
         SwipeConfig(distanceThreshold: sensitivity.distanceThreshold,
                     velocityThreshold: sensitivity.velocityThreshold,
                     minDistanceForVelocity: 40,
-                    confirmRequired: confirmDestructive)
+                    confirmRequired: false)
     }
 
     func begin() {

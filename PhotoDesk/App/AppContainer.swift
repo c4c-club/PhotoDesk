@@ -47,16 +47,6 @@ final class AppContainer: ObservableObject {
                         reviewSession: reviewSession)
     }
 
-    /// 旧入口（扁平 index）——Phase 4 查看器重构后移除
-    func makeViewerViewModel(startIndex: Int) -> ViewerViewModel {
-        ViewerViewModel(items: libraryViewModel.itemsSnapshot,
-                        startIndex: startIndex,
-                        settings: settings,
-                        writer: photoWriter,
-                        trashBin: trashBin,
-                        undoCenter: undoCenter)
-    }
-
     /// 清理页每次打开新建（扫描结果在 coordinator 单例上，重进不丢）
     func makeCleanupViewModel() -> CleanupViewModel {
         CleanupViewModel(coordinator: scanCoordinator,

@@ -14,6 +14,8 @@ final class VideoCell: UICollectionViewCell {
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private var loadToken = 0
     private(set) var itemID: String?
+    /// 点击暂停/继续（docs/09 D15）
+    private(set) var isPaused = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -79,11 +81,24 @@ final class VideoCell: UICollectionViewCell {
         queuePlayer.play()
     }
 
+    /// 点击暂停/继续（docs/09 D15：视频点击暂停）
+    func togglePlayback() {
+        guard let player else { return }
+        if isPaused {
+            player.play()
+            isPaused = false
+        } else {
+            player.pause()
+            isPaused = true
+        }
+    }
+
     func stopPlayback() {
         player?.pause()
         playerLayer.player = nil
         looper?.disableLooping()
         looper = nil
         player = nil
+        isPaused = false
     }
 }

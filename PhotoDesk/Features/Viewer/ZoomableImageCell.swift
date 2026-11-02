@@ -44,6 +44,18 @@ final class ZoomableImageCell: UICollectionViewCell {
     private var onZoomChanged: ((CGFloat) -> Void)?
     private var onDownloadRequested: ((String) -> Void)?
     private(set) var itemID: String?
+    /// cell 级加载 token（docs/09 D02：回填前校验 cell 未被复用给另一张照片）
+    private(set) var loadToken = 0
+
+    /// 开始一次加载：返回 token；回填前用 matches(token:) 校验
+    func beginLoad() -> Int {
+        loadToken += 1
+        return loadToken
+    }
+
+    func matches(token: Int) -> Bool {
+        token == loadToken
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -144,16 +156,17 @@ final class ZoomableImageCell: UICollectionViewCell {
     func setZoomCallback(_ callback: ((CGFloat) -> Void)?) { onZoomChanged = callback }
     func setDownloadHandler(_ handler: ((String) -> Void)?) { onDownloadRequested = handler }
 
-    /// 显示大图；image 为 nil 且 iCloud-only 时进入占位态
+    /// 显示大图；image 为 nil 且 iCloud-only 时进入占位态。
+    /// docs/09 D02：设置新 item 时必须清空 imageView + resetZoom（复用瞬间不得显示上一张）
     func configure(item: PhotoItem, image: UIImage?) {
         itemID = item.id
         configureToken += 1
+        loadToken += 1   // 使在途回填失效（新 item → 旧 token 不匹配）
         let isPlaceholder = (image == nil && item.isCloudOnly)
         cloudBox.isHidden = !isPlaceholder
         scrollView.isUserInteractionEnabled = !isPlaceholder
-        if let image {
-            imageView.image = image
-        }
+        imageView.image = image   // nil 也赋值：清空旧图
+        resetZoom()
         imageView.frame = CGRect(origin: .zero, size: scrollView.bounds.size)
     }
 

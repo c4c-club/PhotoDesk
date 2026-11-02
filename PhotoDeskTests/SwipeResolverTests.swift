@@ -7,20 +7,20 @@ import PhotoDeskCore
 
 final class SwipeResolverTests: XCTestCase {
     func testEngineConfigFromSensitivity() {
-        let standard = SwipeGestureEngine.config(for: .standard, confirmDestructive: true)
+        let standard = SwipeGestureEngine.config(for: .standard)
         XCTAssertEqual(standard.distanceThreshold, 120)
         XCTAssertEqual(standard.velocityThreshold, 700)
         XCTAssertEqual(standard.minDistanceForVelocity, 40)
         XCTAssertTrue(standard.confirmRequired)
 
-        let comfortable = SwipeGestureEngine.config(for: .comfortable, confirmDestructive: false)
+        let comfortable = SwipeGestureEngine.config(for: .comfortable)
         XCTAssertEqual(comfortable.distanceThreshold, 80)
         XCTAssertEqual(comfortable.velocityThreshold, 500)
         XCTAssertFalse(comfortable.confirmRequired)
     }
 
     func testEngineVerticalLockAndFinish() {
-        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard, confirmDestructive: true))
+        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard))
         engine.begin()
         // 慢速长距上滑：锁 up
         let output = engine.update(translation: CGSize(width: 5, height: -200), velocity: CGSize(width: 0, height: -300))
@@ -32,7 +32,7 @@ final class SwipeResolverTests: XCTestCase {
     }
 
     func testEngineFinishNilWhenNotLocked() {
-        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard, confirmDestructive: true))
+        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard))
         engine.begin()
         // 慢速短距（< 120 且速度 0）：有方向无锁定
         let output = engine.update(translation: CGSize(width: 0, height: -80), velocity: .zero)
@@ -42,7 +42,7 @@ final class SwipeResolverTests: XCTestCase {
     }
 
     func testEngineHorizontalHandoff() {
-        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard, confirmDestructive: true))
+        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard))
         engine.begin()
         let output = engine.update(translation: CGSize(width: 150, height: 10), velocity: CGSize(width: 800, height: 0))
         XCTAssertTrue(output.isHorizontal)
@@ -51,7 +51,7 @@ final class SwipeResolverTests: XCTestCase {
     }
 
     func testEngineDirectionLockIsSticky() {
-        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard, confirmDestructive: true))
+        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard))
         engine.begin()
         // 先判向 up（|dy| > 1.5|dx|）；随后横向位移变大也不改判（方向锁，docs/03 §5.1）
         _ = engine.update(translation: CGSize(width: 2, height: -60), velocity: .zero)
@@ -61,7 +61,7 @@ final class SwipeResolverTests: XCTestCase {
     }
 
     func testEngineLockEdgeFiresOnce() {
-        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard, confirmDestructive: true))
+        let engine = SwipeGestureEngine(config: SwipeGestureEngine.config(for: .standard))
         engine.begin()
         let first = engine.update(translation: CGSize(width: 0, height: -130), velocity: .zero)   // 越过阈值
         XCTAssertTrue(first.lockEdge)
