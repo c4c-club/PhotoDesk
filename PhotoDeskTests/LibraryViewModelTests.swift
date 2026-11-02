@@ -4,6 +4,7 @@
 
 import XCTest
 import AVFoundation
+import Photos
 import CoreLocation
 import PhotoDeskCore
 @testable import PhotoDesk
