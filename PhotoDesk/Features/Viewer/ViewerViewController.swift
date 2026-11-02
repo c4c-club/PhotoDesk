@@ -632,6 +632,10 @@ final class ViewerViewController: UIViewController {
     }
 
     private func scheduleChromeHide() {
+        // UI 测试钩子（docs/09 Phase 0）：禁用 chrome 自动淡出，保证顶栏徽标可点（仅 DEBUG + 启动参数）
+        #if DEBUG
+        if UITestHooks.enabled("-uiTestingKeepChrome") { return }
+        #endif
         chromeTimer?.invalidate()
         chromeTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
             Task { @MainActor in

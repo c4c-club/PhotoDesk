@@ -88,7 +88,8 @@ final class PageRegressionUITests: XCTestCase {
         // 会话 mock：滑动只入队，不真实删除；下滑动作改为移到最近删除（默认 hide）
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
-                                "-gesture.down", "moveToRecentlyDeleted"]
+                                "-gesture.down", "moveToRecentlyDeleted",
+                                "-uiTestingKeepChrome"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
@@ -120,7 +121,8 @@ final class PageRegressionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
-                                "-gesture.down", "moveToRecentlyDeleted"]
+                                "-gesture.down", "moveToRecentlyDeleted",
+                                "-uiTestingKeepChrome"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
@@ -155,7 +157,8 @@ final class PageRegressionUITests: XCTestCase {
         // mock 模式：BatchCommitCoordinator 对 mock writer 的批量提交次数 === 真实路径的 performChanges 次数
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
-                                "-gesture.down", "moveToRecentlyDeleted"]
+                                "-gesture.down", "moveToRecentlyDeleted",
+                                "-uiTestingKeepChrome"]
         launchToGrid(app)
 
         let viewer = app.otherElements["ViewerRoot"]
