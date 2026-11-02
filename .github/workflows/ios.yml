@@ -85,6 +85,14 @@ jobs:
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData build
 
+      # UI 测试播种（docs/09 Phase 8）：系统默认照片 <8 张，查看器定位/多选滚动/会话用例需要足够样本；
+      # 带 EXIF 日期（2020–2026 每月 2 张，≈166 张）供筛选/位置记忆测试
+      - name: Seed photos for UI tests
+        run: |
+          xcrun simctl boot CI-iPhone13 2>/dev/null || true
+          xcrun simctl bootstatus CI-iPhone13 -b
+          bash scripts/sim-photos-dated.sh 2
+
       - name: Test (simulator)
         run: |
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
