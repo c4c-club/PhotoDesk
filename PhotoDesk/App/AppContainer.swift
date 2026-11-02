@@ -131,11 +131,13 @@ final class AppContainer: ObservableObject {
         appLock = AppLockController(gate: BiometricGate())
         #if DEBUG
         // UI 测试钩子（docs/09 Phase 0）：-uiTestingSessionMock 用 mock writer + 临时目录 store，
-        // 避免测试真的删照片；普通启动（无参数）绝不走 mock
+        // 避免测试真的删照片；普通启动（无参数）绝不走 mock。
+        // mock store 每次启动清空：跨用例/跨重启的持久队列会让计数断言漂移（CI 实测 20+4=24）
         if UITestHooks.enabled("-uiTestingSessionMock") {
             let mock = MockPhotoWriter()
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PendingActions-UITest", isDirectory: true)
+            try? FileManager.default.removeItem(at: tmp)
             reviewSession = ReviewSessionController(store: PendingActionStore(directoryOverride: tmp),
                                                     writer: mock,
                                                     trashBin: nil,

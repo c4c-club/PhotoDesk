@@ -165,10 +165,11 @@ final class PageRegressionUITests: XCTestCase {
             swipeDown(in: viewer)
         }
 
-        // 打开整理回顾
+        // 打开整理回顾（UIBarButtonItem 的 AX scroll-to-visible 在 UIToolbar 上不可靠——
+        // FlowUITests 同款问题：用坐标点击绕开）
         let badge = anyElement(app, identifier: "SessionBadge")
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "待处理徽标未出现")
-        badge.tap()
+        badge.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let review = anyElement(app, identifier: "SessionReviewRoot")
         XCTAssertTrue(review.waitForExistence(timeout: 5), "整理回顾页未出现\n\(hierarchy(app))")
 
