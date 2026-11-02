@@ -71,7 +71,7 @@ final class ReviewSessionControllerTests: XCTestCase {
         XCTAssertEqual(writer.moveToRecentlyDeletedCallCount, 0, "恢复不自动提交、不自动弹系统框")
     }
 
-    func testCorruptStoreStartsEmptyNotCrash() throws {
+    func testCorruptStoreStartsEmptyNotCrash() async throws {
         // 先写一个合法文件再破坏它
         let session = makeController()
         session.enqueueDelete(id: "x", originIndex: 0)
