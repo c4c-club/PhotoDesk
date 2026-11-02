@@ -187,10 +187,14 @@ struct LibraryRootView: View {
             recoveryCount = undoCenter.recoverableCount()
             undoCenter.restoreLatestIfNeeded()
             showRecovery = recoveryCount > 0
+            #if DEBUG
             openHookViewerIfNeeded()
+            #endif
         }
         .onChange(of: viewModel.viewState) { _ in
+            #if DEBUG
             openHookViewerIfNeeded()
+            #endif
         }
         .onChange(of: sortAscending) { ascending in
             // 排序接线（docs/09 D10）：外观设置页开关 / 菜单 → 查询重载
