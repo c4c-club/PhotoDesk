@@ -3,6 +3,7 @@
 /// 设计：单次遍历 + Calendar 组件比较（按需惰性取件日期组件）；谓词不活跃时原样返回。
 
 import Foundation
+import PhotoDeskCore
 
 enum PhotoFilter {
     /// - Parameters:
@@ -51,7 +52,24 @@ enum PhotoFilter {
                 guard item.isFavorite else { return false }
             case .unorganized:
                 guard !item.isFavorite else { return false }
+            case .hidden:
+                guard item.isHidden else { return false }
             }
+        }
+
+        // 位置（docs/09 D10）：完全离线判定；nil 位置 = 无 GPS
+        switch predicate.location {
+        case .any:
+            break
+        case .withLocation:
+            guard item.location != nil else { return false }
+        case .withoutLocation:
+            guard item.location == nil else { return false }
+        case .near(let region):
+            guard let coordinate = item.location?.coordinate else { return false }
+            guard GeoFilter.region(latitude: coordinate.latitude,
+                                   longitude: coordinate.longitude,
+                                   containsIn: region) else { return false }
         }
         return true
     }

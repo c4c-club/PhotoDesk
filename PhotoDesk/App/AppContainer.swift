@@ -19,6 +19,14 @@ final class AppContainer: ObservableObject {
     let vaultService = VaultService()
     let fingerprintService: FingerprintService
     let scanCoordinator: ScanCoordinator
+    /// 会话整理（docs/09 D16）：滑动入队 → 结尾一次批量提交
+    let reviewSession: ReviewSessionController
+    /// 位置记忆（docs/09 D08）
+    let positionStore = LibraryPositionStore()
+    #if DEBUG
+    /// -uiTestingSessionMock：mock writer 调用计数（UI 测试断言「提交恰好 1 次」的信号源）
+    let mockPhotoWriter: MockPhotoWriter?
+    #endif
 
     lazy var libraryViewModel = LibraryViewModel(service: libraryService,
                                                  repository: assetRepository,
@@ -26,9 +34,20 @@ final class AppContainer: ObservableObject {
                                                  writer: photoWriter,
                                                  trashBin: trashBin,
                                                  undoCenter: undoCenter,
-                                                 settings: settings)
+                                                 settings: settings,
+                                                 reviewSession: reviewSession)
 
-    /// 浏览页每次打开新建（持有 items 快照与起始页）；写操作共享 photoWriter / undoCenter / trashBin
+    /// 浏览页每次打开新建：按 assetID 定位（docs/09 D01）
+    func makeViewerViewModel(context: ViewerContext) -> ViewerViewModel {
+        ViewerViewModel(context: context,
+                        settings: settings,
+                        writer: photoWriter,
+                        trashBin: trashBin,
+                        undoCenter: undoCenter,
+                        reviewSession: reviewSession)
+    }
+
+    /// 旧入口（扁平 index）——Phase 4 查看器重构后移除
     func makeViewerViewModel(startIndex: Int) -> ViewerViewModel {
         ViewerViewModel(items: libraryViewModel.itemsSnapshot,
                         startIndex: startIndex,
@@ -40,7 +59,8 @@ final class AppContainer: ObservableObject {
 
     /// 清理页每次打开新建（扫描结果在 coordinator 单例上，重进不丢）
     func makeCleanupViewModel() -> CleanupViewModel {
-        CleanupViewModel(coordinator: scanCoordinator, libraryViewModel: libraryViewModel)
+        CleanupViewModel(coordinator: scanCoordinator,
+                         reviewSession: reviewSession)
     }
 
     /// 导出页每次打开新建
@@ -70,5 +90,24 @@ final class AppContainer: ObservableObject {
                                           fingerprintService: fingerprintService,
                                           persistence: persistence,
                                           settings: settingsRef)
+        #if DEBUG
+        // UI 测试钩子（docs/09 Phase 0）：-uiTestingSessionMock 用 mock writer + 临时目录 store，
+        // 避免测试真的删照片；普通启动（无参数）绝不走 mock
+        if UITestHooks.enabled("-uiTestingSessionMock") {
+            let mock = MockPhotoWriter()
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("PendingActions-UITest", isDirectory: true)
+            reviewSession = ReviewSessionController(store: PendingActionStore(directoryOverride: tmp),
+                                                    writer: mock,
+                                                    trashBin: nil,
+                                                    settings: settingsRef)
+            mockPhotoWriter = mock
+        } else {
+            reviewSession = ReviewSessionController(writer: writerRef, trashBin: trashBin, settings: settingsRef)
+            mockPhotoWriter = nil
+        }
+        #else
+        reviewSession = ReviewSessionController(writer: writerRef, trashBin: trashBin, settings: settingsRef)
+        #endif
     }
 }

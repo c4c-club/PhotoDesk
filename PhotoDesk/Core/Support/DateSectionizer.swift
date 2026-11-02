@@ -19,10 +19,13 @@ struct MonthSection: Identifiable, Hashable {
 
 enum DateSectionizerAdapter {
     /// - Parameters:
-    ///   - items: (id, creationDate) 列表，约定已按时间倒序（fetch 排序保证）
+    ///   - items: (id, creationDate) 列表，约定已按时间倒序或正序（与 ascending 一致，fetch 排序保证）
+    ///   - ascending: true = 旧→新（grid.sortAsc 接线，docs/09 D10）
     /// - Returns: sections 与按组展开的 id 顺序（供快照逐组 appendItems）
-    static func monthSections(ids: [String], dates: [Date?]) -> (sections: [MonthSection], orderedIDs: [String]) {
-        let core = DateSectionizer.sections(ids: ids, dates: dates, granularity: .month)
+    static func monthSections(ids: [String],
+                              dates: [Date?],
+                              ascending: Bool = false) -> (sections: [MonthSection], orderedIDs: [String]) {
+        let core = DateSectionizer.sections(ids: ids, dates: dates, granularity: .month, ascending: ascending)
         let sections = core.map { MonthSection(id: $0.identifier, title: $0.title, count: $0.itemIDs.count) }
         let orderedIDs = core.flatMap(\.itemIDs)
         return (sections, orderedIDs)

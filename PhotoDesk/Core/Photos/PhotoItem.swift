@@ -41,4 +41,9 @@ struct PhotoItem: Identifiable, Hashable {
     let burstIdentifier: String?
     /// iCloud-only：原件未在本机（网格显示占位，删除前必须已下载——docs/03 §5.8）
     let isCloudOnly: Bool
+
+    /// 身份语义只按 id（docs/09 Phase 1）：收藏/隐藏标志变化不产生「删除+插入」diff，
+    /// 全选/位置恢复/查看器定位按 id 匹配才可靠。补单测 PhotoItemTests。
+    static func == (lhs: PhotoItem, rhs: PhotoItem) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }

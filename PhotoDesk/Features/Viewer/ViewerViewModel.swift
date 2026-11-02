@@ -33,6 +33,8 @@ final class ViewerViewModel: ObservableObject {
     private let writer: PhotoWriterProtocol
     private let trashBin: TrashBin
     private let undoCenter: UndoCenter
+    /// 会话整理（docs/09 D16）：删除/隐藏入队；旧 init（无会话）传 nil，Phase 4 移除
+    private let reviewSession: ReviewSessionController?
 
     init(items: [PhotoItem],
          startIndex: Int,
@@ -46,6 +48,25 @@ final class ViewerViewModel: ObservableObject {
         self.writer = writer
         self.trashBin = trashBin
         self.undoCenter = undoCenter
+        self.reviewSession = nil
+        isFavoriteCurrent = current?.isFavorite ?? false
+    }
+
+    /// docs/09 D01：按 assetID 定位的构造（网格点击直接传 ViewerContext）
+    init(context: ViewerContext,
+         settings: SettingsStore,
+         writer: PhotoWriterProtocol,
+         trashBin: TrashBin,
+         undoCenter: UndoCenter,
+         reviewSession: ReviewSessionController) {
+        let startIndex = context.items.firstIndex(where: { $0.id == context.startItemID }) ?? 0
+        self.items = context.items
+        self.currentIndex = startIndex
+        self.settings = settings
+        self.writer = writer
+        self.trashBin = trashBin
+        self.undoCenter = undoCenter
+        self.reviewSession = reviewSession
         isFavoriteCurrent = current?.isFavorite ?? false
     }
 

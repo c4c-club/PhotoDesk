@@ -308,16 +308,30 @@ final class LibraryViewController: UIViewController {
     @objc private func batchHideTapped() { runBatch(.setHidden(true)) }
 
     @objc private func batchDeleteTapped() {
-        // docs/04 §7 清理确认口径：移到「最近删除」≠ 永久删除
-        let alert = UIAlertController(
-            title: "移到「最近删除」？",
-            message: "将把 \(selectedIDs.count) 张照片移到「最近删除」。照片会在那里保留 30 天，期间随时可以在系统相册恢复，不是永久删除。",
-            preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "移到最近删除", style: .destructive) { [weak self] _ in
-            self?.runBatch(.moveToRecentlyDeleted)
-        })
-        present(alert, animated: true)
+        // docs/09 D03/D16：无 App 内确认——入队 → 一次批量提交（系统确认由批量提交触发 1 次）
+        let ids = Array(selectedIDs)
+        guard !ids.isEmpty else { return }
+        let session = AppContainer.shared.reviewSession
+        session.enqueueDeletes(ids: ids)
+        selectedIDs.removeAll()
+        reloadSelectionBadges()
+        Task { [weak self] in
+            let result = await session.commitDeletes()
+            guard let self else { return }
+            let text: String
+            if result.failed {
+                text = "系统未允许删除，\(ids.count) 张仍在待删除"
+            } else {
+                text = "已移到系统「最近删除」\(result.committed) 项"
+            }
+            self.batchToast.show(icon: "trash.fill",
+                                 text: text,
+                                 duration: 3.5,
+                                 allowUndo: false,
+                                 onUndo: nil,
+                                 onDismissFinished: nil)
+            self.exitSelectionMode()   // 已删除项随 observer 增量消失
+        }
     }
 
     @objc private func batchAddToAlbumTapped() {
@@ -353,9 +367,6 @@ final class LibraryViewController: UIViewController {
                 Task { await self?.viewModel.undoLatest() }
             },
                                  onDismissFinished: nil)
-            if case .moveToRecentlyDeleted = action {
-                self.exitSelectionMode()   // 已删除项随 observer 增量消失
-            }
         }
     }
 
@@ -486,11 +497,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // 接近底部 → 续页（每批 500）
-        let threshold = scrollView.contentSize.height - scrollView.bounds.height * 2
-        if scrollView.contentOffset.y > max(0, threshold) {
-            Task { await viewModel.loadNextPage() }
-        }
+        // docs/09 Phase 1：完整索引自后台补齐（500/批），不再由滚动触发续页
     }
 
     func collectionView(_ collectionView: UICollectionView,
@@ -510,13 +517,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     func collectionView(_ collectionView: UICollectionView,
                         willDisplay cell: UICollectionViewCell,
                         forItemAt indexPath: IndexPath) {
-        // 兜底分页（某些快速滚动场景 scrollViewDidScroll 阈值不可靠）
-        if indexPath.section >= currentSections.count - 1 {
-            let itemsInSection = currentItemsBySection[safe: indexPath.section]?.count ?? 0
-            if indexPath.item >= itemsInSection - 12 {
-                Task { await viewModel.loadNextPage() }
-            }
-        }
+        // docs/09 Phase 1：索引自后台补齐，此处无需兜底分页
     }
 
     func collectionView(_ collectionView: UICollectionView,

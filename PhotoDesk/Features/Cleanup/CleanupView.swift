@@ -10,7 +10,8 @@ struct CleanupView: View {
     @ObservedObject var viewModel: CleanupViewModel
     @ObservedObject var coordinator: ScanCoordinator
     @State private var showGroupSheet = false
-    @State private var showConfirm = false
+    /// 执行结果内联展示（docs/09 D03：移除 App 内删除确认）
+    @State private var resultMessage: String?
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -140,11 +141,14 @@ struct CleanupView: View {
                         .foregroundColor(Color(ds: DSColor.textSecondary))
                 }
 
-                // 待清理清单
+                // 待清理清单（docs/09 D03：直接执行，无 App 内二次确认；系统确认由批量提交时出现一次）
                 if !viewModel.pendingIDs.isEmpty {
                     Section("待清理清单 · \(viewModel.pendingIDs.count) 张") {
                         Button {
-                            showConfirm = true
+                            Task {
+                                let outcome = await viewModel.executePending()
+                                resultMessage = outcome.message
+                            }
                         } label: {
                             Text("移到最近删除（可在 30 天内恢复）")
                                 .frame(maxWidth: .infinity)
@@ -153,7 +157,21 @@ struct CleanupView: View {
                                 .background(Color(ds: DSColor.accentDelete))
                                 .cornerRadius(DSSpacing.buttonCornerRadius)
                         }
-                        .disabled(coordinator.isRunning)
+                        .disabled(coordinator.isRunning || viewModel.isExecuting)
+
+                        if viewModel.isExecuting {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("正在提交…")
+                                    .font(.caption)
+                                    .foregroundColor(Color(ds: DSColor.textSecondary))
+                            }
+                        }
+                        if let resultMessage {
+                            Text(resultMessage)
+                                .font(.caption)
+                                .foregroundColor(Color(ds: DSColor.textSecondary))
+                        }
                     }
                 }
             }
@@ -161,18 +179,6 @@ struct CleanupView: View {
         .refreshable { viewModel.startScan() }
         .sheet(isPresented: $showGroupSheet) {
             DuplicateGroupsSheet(viewModel: viewModel, groups: summary?.duplicateGroups ?? [])
-        }
-        .confirmationDialog(
-            "移到「最近删除」？",
-            isPresented: $showConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("移到最近删除", role: .destructive) {
-                Task { _ = await viewModel.executePending() }
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("将把 \(viewModel.pendingIDs.count) 张照片移到「最近删除」。照片会在那里保留 30 天，期间随时可以在系统相册恢复，不是永久删除。")
         }
     }
 

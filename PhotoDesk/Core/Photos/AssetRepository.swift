@@ -10,10 +10,14 @@ import Photos
 protocol AssetRepositoryProtocol: AnyObject {
     /// 建立查询并返回总数（后续 fetch 使用同一 fetchResult 切片）
     func prepare(scope: PhotoScope) async -> Int
+    /// 建立查询并返回总数（docs/09 Phase 1：sortAscending 下推到 PHFetchOptions，升/降序由 LibraryQuery 决定）
+    func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int
     /// 分批取窗口 [offset, offset + limit) 内的条目（映射 PhotoItem）
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem]
     /// 当前 scope 的底层结果（PhotoChangeObserver 监听用）
     var latestResult: PHFetchResult<PHAsset>? { get }
+    /// 指定 scope 的底层结果（query-driven 模式下监听非 .all 范围，docs/09 Phase 1）
+    func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>?
     /// 变更同步：用 fetchResultAfterChanges 替换当前结果（增量，不重建查询）
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope)
     /// PHAsset → PhotoItem（变更增量时 ViewModel 复用同一映射）
@@ -34,8 +38,16 @@ final class AssetRepository: AssetRepositoryProtocol {
         results[.all]
     }
 
+    func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>? {
+        results[scope]
+    }
+
     func prepare(scope: PhotoScope) async -> Int {
-        let result = await Self.makeResultInBackground(scope: scope)
+        await prepare(scope: scope, sortAscending: false)
+    }
+
+    func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int {
+        let result = await Self.makeResultInBackground(scope: scope, sortAscending: sortAscending)
         results[scope] = result
         return result.count
     }
@@ -45,7 +57,7 @@ final class AssetRepository: AssetRepositoryProtocol {
         if let cached = results[scope] {
             result = cached
         } else {
-            result = await Self.makeResultInBackground(scope: scope)
+            result = await Self.makeResultInBackground(scope: scope, sortAscending: false)
             results[scope] = result
         }
         let count = result.count
@@ -65,20 +77,23 @@ final class AssetRepository: AssetRepositoryProtocol {
 
     // MARK: - 后台重活（不触碰 results）
 
-    private nonisolated static func makeResultInBackground(scope: PhotoScope) async -> PHFetchResult<PHAsset> {
+    private nonisolated static func makeResultInBackground(scope: PhotoScope,
+                                                           sortAscending: Bool) async -> PHFetchResult<PHAsset> {
         await Task.detached(priority: .userInitiated) {
-            Self.makeFetchResult(scope: scope)
+            Self.makeFetchResult(scope: scope, sortAscending: sortAscending)
         }.value
     }
 
     // MARK: - 查询构造（后台线程调用）
 
-    nonisolated private static func makeFetchResult(scope: PhotoScope) -> PHFetchResult<PHAsset> {
+    nonisolated private static func makeFetchResult(scope: PhotoScope,
+                                                    sortAscending: Bool) -> PHFetchResult<PHAsset> {
         let options = PHFetchOptions()
         options.includeAllBurstAssets = false
         // 仅「已隐藏」scope 可见隐藏资源；主网格一律不含隐藏（AGENTS.md §4.2）
         options.includeHiddenAssets = (scope == .hidden)
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        // 排序下推（docs/09 Phase 1：LibraryQuery.sortAscending → PHFetchOptions）
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: sortAscending)]
 
         switch scope {
         case .all:

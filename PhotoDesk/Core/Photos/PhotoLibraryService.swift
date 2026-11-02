@@ -19,8 +19,9 @@ final class PhotoLibraryService: ObservableObject {
     /// 当前授权状态（主线程更新）
     @Published private(set) var access: LibraryAccess
 
-    init() {
-        access = Self.map(PHPhotoLibrary.authorizationStatus(for: .readWrite))
+    /// - Parameter initialAccess: 测试注入固定状态（nil = 读真实授权；生产路径不受影响）
+    init(initialAccess: LibraryAccess? = nil) {
+        access = initialAccess ?? Self.map(PHPhotoLibrary.authorizationStatus(for: .readWrite))
     }
 
     /// 触发系统授权弹窗（首次）或返回既有状态；结果发布到 access

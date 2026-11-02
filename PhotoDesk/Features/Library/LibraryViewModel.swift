@@ -1,7 +1,8 @@
-// MARK: - 职责说明：照片库 ViewModel（docs/05 M1 任务 1.4 / docs/03 §4.1 说明）——
-// 状态机（未授权/加载中/就绪/空/拒绝/受限）+ 分页加载（每批 500，AGENTS.md §4.7）+
-// 变更增量应用（PhotoChangeObserver → items 数组增删改 → 重新分组 → Diffable 快照推送，非整库 reload）。
-// @MainActor：@Published 全在主线程更新；VC 经 onSnapshotUpdate 回调拿到数据（不直接跨层读）。
+// MARK: - 职责说明：照片库 ViewModel（docs/09 Phase 1 重写：query-driven 完整索引）——
+// LibraryQuery（scope+filter+sort）→ 首屏 500 先 ready → 后台 500/批补齐全量索引 → PhotoFilter 应用
+// → filteredItems（单一事实来源：网格 / 全选 / 查看器 / 位置记忆 / 搜索共用）。
+// pending 过滤：ReviewSession 的待删除/待隐藏项在网格立即消失（仅 SessionReview 可恢复）。
+// 变更增量：PhotoChangeObserver → allItems 增删改 → 重新应用 filter + pending → Diffable 快照推送。
 
 import Foundation
 import Photos
@@ -22,10 +23,20 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - 输出
 
     @Published private(set) var viewState: ViewState = .notDetermined
+    @Published private(set) var query = LibraryQuery()
+    /// 完整索引（分批加载，含 pending 项）
+    @Published private(set) var allItems: [PhotoItem] = []
+    /// 可见项 = allItems − pendingDelete/pendingHide
+    @Published private(set) var visibleItems: [PhotoItem] = []
+    /// 当前筛选结果（基于 visibleItems；网格/全选/查看器共用）
+    @Published private(set) var filteredItems: [PhotoItem] = []
     @Published private(set) var sections: [MonthSection] = []
     @Published private(set) var itemsBySection: [[PhotoItem]] = []
-    @Published private(set) var isLoadingMore = false
+    /// 完整索引进度（后台补齐）
+    @Published private(set) var indexProgress: (loaded: Int, total: Int) = (0, 0)
+    @Published private(set) var isIndexing = false
     @Published private(set) var isLimitedAccess = false
+    @Published private(set) var isLoadingMore = false
 
     /// VC 注册：快照数据推送（主线程）。已在加载完成的 VC 接入时立即重放当前快照——
     /// 否则 VM 先于 VC 完成加载，回调错过唯一一次推送，网格永远空白（CI 实测的根因）。
@@ -47,14 +58,15 @@ final class LibraryViewModel: ObservableObject {
     private let trashBin: TrashBin
     private let undoCenter: UndoCenter
     private let settings: SettingsStore
+    private let reviewSession: ReviewSessionController
     private let batchSize = AssetRepository.batchSize
 
     // MARK: - 内部状态
 
-    private var items: [PhotoItem] = []          // 已加载条目（时间倒序，镜像 fetchResult 前缀）
     private var totalCount = 0
     private var changeObserver: PhotoChangeObserver?
     private var hasLoadedOnce = false
+    private var indexingTask: Task<Void, Never>?
 
     init(service: PhotoLibraryService,
          repository: AssetRepositoryProtocol,
@@ -62,7 +74,8 @@ final class LibraryViewModel: ObservableObject {
          writer: PhotoWriterProtocol,
          trashBin: TrashBin,
          undoCenter: UndoCenter,
-         settings: SettingsStore) {
+         settings: SettingsStore,
+         reviewSession: ReviewSessionController) {
         self.service = service
         self.repository = repository
         self.pipeline = pipeline
@@ -70,6 +83,10 @@ final class LibraryViewModel: ObservableObject {
         self.trashBin = trashBin
         self.undoCenter = undoCenter
         self.settings = settings
+        self.reviewSession = reviewSession
+        reviewSession.onSessionChanged = { [weak self] session in
+            self?.applyPendingChanges(session)
+        }
     }
 
     // MARK: - 生命周期
@@ -102,41 +119,71 @@ final class LibraryViewModel: ObservableObject {
 
     /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
     var debugSummary: String {
-        "state=\(viewState) items=\(items.count)/\(totalCount) sections=\(sections.count) loadingMore=\(isLoadingMore)"
+        "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
+            "sections=\(sections.count) indexing=\(isIndexing) " +
+            "del=\(reviewSession.pendingDeleteCount) hide=\(reviewSession.pendingHideCount)"
     }
 
-    /// 浏览页快照入口：当前已加载条目的扁平拷贝（浏览页内自管；关闭后库侧经 observer 增量同步）
-    var itemsSnapshot: [PhotoItem] { items }
+    /// 浏览页/搜索快照入口：当前筛选结果（docs/09 §2.1 单一事实来源）
+    var itemsSnapshot: [PhotoItem] { filteredItems }
+    var itemsSnapshotForViewer: [PhotoItem] { filteredItems }
 
     /// 库侧撤销（批量操作 Toast / 重启恢复横幅共用）：PhotoKit 反向写后经 observer 增量同步网格
     func undoLatest() async {
         _ = await undoCenter.undo()
     }
 
-    // MARK: - 批量操作（docs/05 M3 任务 5）
+    // MARK: - 查询更新（D10）
+
+    /// 顶部五段切换（全部/收藏/视频/截图/已隐藏走 Vault，不经此）
+    func setScope(_ scope: PhotoScope) async {
+        guard scope != query.scope else { return }
+        query.scope = scope
+        await reloadForQuery()
+    }
+
+    /// 筛选变化：内存全集上应用（不重查 PhotoKit，<500ms 预算内）
+    func setFilter(_ filter: SearchPredicate) {
+        guard filter != query.filter else { return }
+        query.filter = filter
+        rebuildDerived(animated: false)
+    }
+
+    /// 排序（docs/09 D10：sortAscending 下推 fetch + 分组顺序）
+    func setSort(ascending: Bool) async {
+        guard ascending != query.sortAscending else { return }
+        query.sortAscending = ascending
+        await reloadForQuery()
+    }
+
+    /// 下拉刷新（Phase 2）：保留筛选与排序，重查当前 scope
+    func reload() async {
+        await reloadForQuery()
+    }
+
+    /// 全选前确保完整索引就绪（docs/09 D11）
+    func ensureIndexComplete() async {
+        await indexingTask?.value
+    }
+
+    // MARK: - 批量操作（收藏 / 相簿；删除与隐藏已改走 ReviewSession，D16）
 
     enum BatchAction {
         case setFavorite(Bool)
         case setHidden(Bool)
-        case moveToRecentlyDeleted
         case addToAlbum(albumID: String)
     }
 
     struct BatchOutcome {
         let succeeded: Int
-        let needsDownload: Int
+        let failed: Int
         var message: String {
-            var text = "已完成 \(succeeded) 项"
-            if needsDownload > 0 {
-                text += "；\(needsDownload) 张在 iCloud，请先下载原件"
-            }
-            return text
+            failed > 0 ? "已完成 \(succeeded) 项；\(failed) 项失败" : "已完成 \(succeeded) 项"
         }
     }
 
-    /// 批量执行（移到最近删除前逐张落 TrashBin 副本；iCloud-only 计入 needsDownload 不执行）
     func performBatch(_ action: BatchAction, ids: [String]) async -> BatchOutcome {
-        guard !ids.isEmpty else { return BatchOutcome(succeeded: 0, needsDownload: 0) }
+        guard !ids.isEmpty else { return BatchOutcome(succeeded: 0, failed: 0) }
         do {
             switch action {
             case .setFavorite(let favorite):
@@ -145,7 +192,7 @@ final class LibraryViewModel: ObservableObject {
                                 assetIDs: ids,
                                 toastText: favorite ? "已收藏" : "已取消收藏",
                                 window: settings.undoWindow)
-                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
+                return BatchOutcome(succeeded: ids.count, failed: 0)
 
             case .setHidden(let hidden):
                 try await writer.setHidden(ids: ids, isHidden: hidden)
@@ -153,7 +200,7 @@ final class LibraryViewModel: ObservableObject {
                                 assetIDs: ids,
                                 toastText: hidden ? "已隐藏" : "已取消隐藏",
                                 window: settings.undoWindow)
-                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
+                return BatchOutcome(succeeded: ids.count, failed: 0)
 
             case .addToAlbum(let albumID):
                 try await writer.add(ids: ids, toAlbum: albumID)
@@ -162,70 +209,73 @@ final class LibraryViewModel: ObservableObject {
                                 albumID: albumID,
                                 toastText: "已加入相簿",
                                 window: settings.undoWindow)
-                return BatchOutcome(succeeded: ids.count, needsDownload: 0)
-
-            case .moveToRecentlyDeleted:
-                // 红线 1：逐张落撤销保险副本（iCloud-only 拒绝并计数）→ deleteAssets（唯一删除实现）
-                var records: [TrashRecord] = []
-                var needsDownload = 0
-                for id in ids {
-                    do {
-                        records.append(try await trashBin.storeCopy(forAssetID: id))
-                    } catch TrashError.needsDownload {
-                        needsDownload += 1
-                    }
-                }
-                let originIDs = records.map(\.originLocalID)
-                guard !originIDs.isEmpty else {
-                    return BatchOutcome(succeeded: 0, needsDownload: needsDownload)
-                }
-                try await writer.moveToRecentlyDeleted(ids: originIDs)
-                undoCenter.push(kind: .moveToRecentlyDeleted,
-                                assetIDs: originIDs,
-                                trashRecordIDs: records.map(\.id),
-                                toastText: "已移到最近删除",
-                                window: settings.undoWindow)
-                return BatchOutcome(succeeded: originIDs.count, needsDownload: needsDownload)
+                return BatchOutcome(succeeded: ids.count, failed: 0)
             }
         } catch {
-            return BatchOutcome(succeeded: 0, needsDownload: 0)
+            return BatchOutcome(succeeded: 0, failed: ids.count)
         }
     }
 
-    // MARK: - 加载与分页
+    // MARK: - 加载与完整索引
 
     private func loadIfNeeded() async {
         guard !hasLoadedOnce else {
-            viewState = items.isEmpty ? .empty : .ready
+            viewState = allItems.isEmpty ? .empty : .ready
             return
         }
         viewState = .loading
-        totalCount = await repository.prepare(scope: .all)
-        hasLoadedOnce = true
         isLimitedAccess = (service.access == .limited)
+        totalCount = await repository.prepare(scope: query.scope, sortAscending: query.sortAscending)
+        hasLoadedOnce = true
         // 空库也要监听变更：第一张照片加入时增量同步并切出空态
         startObservingChanges()
         guard totalCount > 0 else {
+            rebuildDerived(animated: false)
             viewState = .empty
             return
         }
-        items = await repository.fetch(scope: .all, offset: 0, limit: min(batchSize, totalCount))
-        rebuildSections(animated: false)
+        allItems = await repository.fetch(scope: query.scope,
+                                          offset: 0,
+                                          limit: min(batchSize, totalCount))
+        indexProgress = (allItems.count, totalCount)
+        rebuildDerived(animated: false)
         viewState = .ready
+        startIndexCompletion()
     }
 
-    /// 滚动接近底部时续页（VC scrollViewDidScroll 触发）
-    func loadNextPage() async {
-        guard hasLoadedOnce, !isLoadingMore, items.count < totalCount else { return }
-        isLoadingMore = true
-        let page = await repository.fetch(scope: .all, offset: items.count, limit: batchSize)
-        guard !page.isEmpty else {
-            isLoadingMore = false
-            return
+    /// 后台补齐全量索引（500/批；每 2,000 条合并一次重建，docs/09 §2.2）
+    private func startIndexCompletion() {
+        indexingTask?.cancel()
+        indexingTask = Task { [weak self] in
+            guard let self else { return }
+            await self.runIndexCompletion()
         }
-        items += page
-        rebuildSections(animated: true)
-        isLoadingMore = false
+    }
+
+    private func runIndexCompletion() async {
+        guard allItems.count < totalCount else { return }
+        isIndexing = true
+        var sinceRebuild = 0
+        defer {
+            isIndexing = false
+            indexProgress = (min(allItems.count, totalCount), totalCount)
+        }
+        while !Task.isCancelled, allItems.count < totalCount {
+            let page = await repository.fetch(scope: query.scope,
+                                              offset: allItems.count,
+                                              limit: batchSize)
+            guard !page.isEmpty, !Task.isCancelled else { break }
+            allItems += page
+            sinceRebuild += page.count
+            indexProgress = (allItems.count, totalCount)
+            if sinceRebuild >= 2_000 {
+                rebuildDerived(animated: false)
+                sinceRebuild = 0
+            }
+        }
+        if !Task.isCancelled {
+            rebuildDerived(animated: true)
+        }
     }
 
     /// 预取（VC prefetchRowsAt 触发）
@@ -236,7 +286,8 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - 变更增量（系统相册增删 / limited 选择 / 收藏隐藏同步）
 
     private func startObservingChanges() {
-        guard changeObserver == nil, let result = repository.latestResult else { return }
+        guard changeObserver == nil,
+              let result = repository.latestResult(for: query.scope) else { return }
         let observer = PhotoChangeObserver { [weak self] changeSet in
             self?.applyChange(changeSet)
         }
@@ -244,9 +295,14 @@ final class LibraryViewModel: ObservableObject {
         changeObserver = observer
     }
 
+    private func restartObserving() {
+        changeObserver = nil
+        startObservingChanges()
+    }
+
     private func applyChange(_ changeSet: PhotoChangeObserver.ChangeSet) {
-        // 1. 数据层增量：items 数组镜像 fetchResult（移除（旧索引，倒序）→ 变更（旧索引原位替换）→ 插入（新索引，升序））
-        var updated = items
+        // 1. 数据层增量：allItems 镜像 fetchResult（移除（旧索引，倒序）→ 变更（旧索引原位替换）→ 插入（新索引，升序））
+        var updated = allItems
 
         for index in changeSet.removedIndexes.sorted(by: >) where index < updated.count {
             updated.remove(at: index)
@@ -261,32 +317,72 @@ final class LibraryViewModel: ObservableObject {
             }
         }
 
-        items = updated
+        allItems = updated
         totalCount = changeSet.resultAfterChanges?.count ?? totalCount
-        rebuildSections(animated: true)
+        indexProgress = (min(allItems.count, totalCount), totalCount)
+        // docs/09 §2.2.5：变更后重新应用 filter + pending，再推快照（不允许混数组）
+        rebuildDerived(animated: true)
 
         // 库清空 / 从空到非空时同步视图状态
-        if viewState == .empty && !items.isEmpty { viewState = .ready }
-        if viewState == .ready && items.isEmpty && totalCount == 0 { viewState = .empty }
+        if viewState == .empty && !filteredItems.isEmpty { viewState = .ready }
+        if viewState == .ready && filteredItems.isEmpty && totalCount == 0 { viewState = .empty }
 
         // 2. 底层结果换新并续听（旧 result 不再推送）
         if let newResult = changeSet.resultAfterChanges {
-            repository.replaceResult(newResult, for: .all)
+            repository.replaceResult(newResult, for: query.scope)
             changeObserver?.startMonitoring(result: newResult)
         }
     }
 
-    // MARK: - 分组与快照
+    // MARK: - pending 过滤（D16）
+
+    /// ReviewSessionController.onSessionChanged 回调：pending 集合变化 → 立即重算可见集
+    func applyPendingChanges(_ session: ReviewSession) {
+        guard hasLoadedOnce else { return }
+        rebuildDerived(animated: false)
+    }
+
+    // MARK: - 派生计算（visible → filtered → sections）
+
+    private func rebuildDerived(animated: Bool) {
+        let pendingDeletes = Set(reviewSession.session.pendingDeleteIDs)
+        let pendingHides = Set(reviewSession.session.pendingHideIDs)
+        let pending = pendingDeletes.union(pendingHides)
+        visibleItems = pending.isEmpty ? allItems : allItems.filter { !pending.contains($0.id) }
+        filteredItems = PhotoFilter.apply(visibleItems, predicate: query.filter)
+        rebuildSections(animated: animated)
+    }
 
     private func rebuildSections(animated: Bool) {
         let (newSections, orderedIDs) = DateSectionizerAdapter.monthSections(
-            ids: items.map(\.id),
-            dates: items.map(\.creationDate)
+            ids: filteredItems.map(\.id),
+            dates: filteredItems.map(\.creationDate),
+            ascending: query.sortAscending
         )
-        let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let byID = Dictionary(filteredItems.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         sections = newSections
         itemsBySection = orderedIDs.groupedBy(sections: newSections, lookup: byID)
         onSnapshotUpdate?(newSections, itemsBySection, animated)
+    }
+
+    private func reloadForQuery() async {
+        guard hasLoadedOnce else { return }
+        indexingTask?.cancel()
+        totalCount = await repository.prepare(scope: query.scope, sortAscending: query.sortAscending)
+        restartObserving()
+        guard totalCount > 0 else {
+            allItems = []
+            rebuildDerived(animated: false)
+            viewState = .empty
+            return
+        }
+        allItems = await repository.fetch(scope: query.scope,
+                                          offset: 0,
+                                          limit: min(batchSize, totalCount))
+        indexProgress = (allItems.count, totalCount)
+        rebuildDerived(animated: false)
+        viewState = .ready
+        startIndexCompletion()
     }
 
     private var onSnapshotUpdate: ((_ sections: [MonthSection], _ itemsBySection: [[PhotoItem]], _ animated: Bool) -> Void)?
