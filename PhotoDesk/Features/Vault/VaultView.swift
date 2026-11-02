@@ -32,8 +32,9 @@ struct VaultView: View {
         .navigationTitle("已隐藏")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let onClose {
-                ToolbarItem(placement: .navigationBarLeading) {
+            // iOS 15：ToolbarContentBuilder 不支持条件（buildIf iOS 16+）——条件放 ToolbarItem 内部视图
+            ToolbarItem(placement: .navigationBarLeading) {
+                if let onClose {
                     Button("完成") {
                         viewModel.lock()
                         onClose()

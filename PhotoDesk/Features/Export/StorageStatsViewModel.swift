@@ -59,7 +59,7 @@ final class StorageStatsViewModel: ObservableObject {
         }
         computeTask = task
         // 软超时 watchdog（docs/09 D07：到点 cancel → compute 返回部分结果，不永久转圈）
-        Task { [weak self, weak task] in
+        Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64((self?.timeoutSeconds ?? 90) * 1_000_000_000))
             guard let task, !task.isCancelled else { return }
             self?.didTimeout = true

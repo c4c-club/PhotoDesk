@@ -39,7 +39,7 @@ final class LAContextEvaluator: BiometricEvaluating {
                 if success {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing error ?? LAError(.authenticationFailed))
+                    continuation.resume(throwing: error ?? LAError(.authenticationFailed))
                 }
             }
         }
@@ -58,7 +58,7 @@ final class LAContextEvaluator: BiometricEvaluating {
                 if success {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing error ?? LAError(.authenticationFailed))
+                    continuation.resume(throwing: error ?? LAError(.authenticationFailed))
                 }
             }
         }
