@@ -1,0 +1,533 @@
+================================================================================
+PhotoDesk（照片管家）· 页面功能补齐与缺陷修复 · 一次性执行提示词
+版本：v1.2.0 规划 · 生成日期：2026-11-03（含 2026-11-03 的 8 条补充：D16/D17）
+适用仓库：C:\Users\RuiZh\Desktop\photo_manager（GitHub: c4c-club/PhotoDesk）
+================================================================================
+
+【使用方式】
+把本文件从「=== 提示词正文开始 ===」到「=== 提示词正文结束 ===」之间的全部内容，一次性复制给编码 Agent。
+不要分批投喂，不要删减阶段。Agent 必须按 Phase 0 → Phase 8 连续执行，直到 CI 全绿或达到停止条件。
+
+=== 提示词正文开始 ===
+
+你是 PhotoDesk（照片管家）项目的 iOS 原生开发 Agent。请一次性完成本次「页面功能补齐 + 缺陷修复」的全部工作，不要中途停下来问“是否继续”，不要只做分析不给代码，不要只改一部分就交付。
+
+============================================================
+一、开始前必读（按顺序读完再动手）
+============================================================
+
+1. C:\Users\RuiZh\Desktop\photo_manager\AGENTS.md
+   —— 全局编码规则：iOS 15 API 黑名单、架构分层、PhotoKit 规则、两条红线、DoD。
+2. docs\09-页面功能补齐与缺陷修复规划.md
+   —— 本次的权威规划：15 条原反馈 + 8 条补充（D16/D17）的根因、目标架构、Phase 0–8 详细步骤、验收矩阵、平台限制。
+   **本提示词与 docs/09 冲突时，以 docs/09 为准；docs/09 没写到的细节，按本提示词和 AGENTS.md 执行。**
+3. docs\01-需求规格说明书.md（重点 FR-A3/A9、FR-B1~B15、FR-C2~C5、FR-D3/D4、FR-E1~E4、FR-J2）
+4. docs\03-技术设计文档.md（架构、目录、数据模型、线程模型）
+5. docs\04-UIUX设计文档.md（页面布局、交互规格、文案规范）
+6. docs\05-开发进程与里程碑.md（当前进度、变更日志格式）
+7. 现有代码：PhotoDesk/、PhotoDeskCore/、PhotoDeskTests/、PhotoDeskUITests/。
+   至少先读这些文件：
+   - PhotoDesk/Features/Viewer/ViewerViewController.swift
+   - PhotoDesk/Features/Viewer/ViewerViewModel.swift
+   - PhotoDesk/Features/Viewer/ZoomableImageCell.swift
+   - PhotoDesk/Features/Library/LibraryViewController.swift
+   - PhotoDesk/Features/Library/LibraryViewModel.swift
+   - PhotoDesk/Features/Library/LibraryContainer.swift
+   - PhotoDesk/Features/Library/PhotoGridCell.swift
+   - PhotoDesk/Features/Vault/VaultView.swift
+   - PhotoDesk/Features/Export/StorageStatsView.swift
+   - PhotoDesk/Features/Search/SearchView.swift + SearchViewModel.swift
+   - PhotoDesk/Core/Photos/PhotoWriter.swift / AssetRepository.swift / PhotoScope.swift
+   - PhotoDesk/Core/Support/PhotoFilter.swift / SettingsStore.swift / UndoCenter.swift
+   - PhotoDesk/Core/Vault/BiometricGate.swift
+   - PhotoDesk/App/AppContainer.swift / PhotoDeskApp.swift
+
+============================================================
+二、项目事实与环境（不要重复探测、不要建议替代方案）
+============================================================
+
+- 项目：PhotoDesk，iOS 原生照片管理 App；最低部署 iOS 15.0（硬性）；Swift 5.9+；SwiftUI 壳 + UIKit 核。
+- 第三方依赖：0 个；只用系统框架；完全离线，禁止 URLSession 外发、禁止分析/广告 SDK。
+- Bundle ID：com.example.PhotoDesk；DEVELOPMENT_TEAM 从环境变量注入。
+- 本机：Windows 10 原生，无 Xcode、无 iOS 模拟器。**本机不能编译 iOS，不要尝试 xcodebuild / simctl。**
+- 本地唯一可跑的测试：Docker 容器 swift:6.0-noble，入口：
+  powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+- iOS 编译/测试/出包：GitHub Actions（macos-14，Xcode 15.4，iOS 15.5 模拟器），workflow：.github/workflows/ios.yml。
+- 仓库已配置：origin = https://github.com/c4c-club/PhotoDesk.git；gh CLI 已安装并登录（gh 2.103+）。
+- 本机未安装 AltServer / idevice_id；**不要假装真机验证**。模拟器/CI 能验证的必须由你亲自验证；真机专属项输出清单。
+- 出包：CI 产出未签名 `PhotoDesk-unsigned-ipa`，用户在 Windows 用 AltStore/Sideloadly 自签安装；你只负责
+  产出 IPA + SHA256 + docs/12，不负责替用户签名，也不要把“未验证真机”写成已验证。
+- 删除平台事实：`PHAssetChangeRequest.deleteAssets` 每次调用都会触发系统确认，公共 API 不能关闭；
+  因此**禁止在逐张滑动路径调用**。正确做法是 D16 的会话暂存 + 结尾一次批量提交；系统确认从 N 次降到 1 次。
+- 隐藏平台事实：`isHidden` 是公开 API，通常无系统确认；真机若出现确认，也只允许批量一次，不能逐张调用。
+- `PhotoDeskCore` 纯逻辑除现有模块外，还要放 `ReviewSession` / `ReplacementPlanner` / `BatchCommitPlanner`，
+  并为它们写 XCTest。
+- 不要安装 Ubuntu、不要迁移 Linux、不要用 Hackintosh/macOS 虚拟机/Windows 原生 Swift 工具链。
+
+两条红线（违反即打回，任何情况下不得突破）：
+1. 永不永久删除：应用内所有“删除”只能走 `PHAssetChangeRequest.deleteAssets` → 系统「最近删除」（30 天）。
+   禁止永久擦除、禁止清空「最近删除」、禁止绕过系统回收站、禁止把删除实现成沙盒内删除。
+   UI 文案统一说「移到最近删除」，不得出现「彻底删除」「永久删除」（否定句说明除外）。
+2. `PhotoDeskCore/` 零 Apple 依赖：只能 import Foundation；禁止 import UIKit/SwiftUI/Photos/PhotosUI/
+   Vision/CoreImage/Accelerate。输入用基础类型；纯逻辑（手势判定/日期分组/哈希/去重/选择状态/位置距离/
+   统计聚合）必须放 PhotoDeskCore 并写 XCTest；App 侧只做类型适配。
+
+其他硬约束：
+- iOS 15 API 黑名单：NavigationStack / NavigationPath / PhotosPicker(SwiftUI) / ShareLink / Swift Charts /
+  @Observable / @Bindable / ContentUnavailableView / .scrollContentBackground / .scrollTargetBehavior /
+  .scrollPosition / ImageRenderer / .fontDesign() / .toolbarBackground / SwiftData —— 全部禁止直接使用。
+  需要新 API 时写 `if #available(iOS 16, *) { ... } else { ... }` 双实现。
+- 网格/全屏浏览器必须用 UIKit（UICollectionView + Compositional Layout + Diffable DataSource + Prefetching）；
+  不要改成 SwiftUI LazyVGrid（主库性能不达标）。
+- 所有 PhotoKit 写操作必须在 `PHPhotoLibrary.shared().performChanges` 内并处理 completion error。
+- 主网格 `includeHiddenAssets = false`；「已隐藏」scope 才为 true。
+- 图片加载必须走 ImagePipeline，禁止在 View 里直接 requestImage。
+- 新增文件必须加入 Xcode target membership（XcodeGen 下自动包含，注意 excludes）。
+- 不新增第三方依赖；不新增网络权限；不新增 Capability（免费签名会失败）。
+- 每个文件顶部写一行 `// MARK: - 职责说明`；颜色/字体/间距只用 DesignSystem token；禁止 try! / 强制解包
+  （IBOutlet 与已确保非空的 PHFetchResult.object(at:) 除外）。
+
+============================================================
+三、本次必须完成的 15 条 + 8 条补充（D16/D17，逐条验收，不许漏）
+============================================================
+
+D01 查看大图永远显示最新一张
+- 现象：点任意缩略图，查看器总停在第 1 张（最新）。
+- 根因：ViewerViewController 在 viewDidLoad 里对未布局的 collectionView 调 scrollToItem；初次布局后
+  scrollViewDidScroll 把 page=0 写回 currentIndex；跨层传的是扁平 index 而非 assetID。
+- 必须做到：查看器用 `ViewerContext(items:startItemID:)` 按 assetID 定位；首次 viewDidLayoutSubviews
+  设置 contentOffset；滚动回调只在 isTracking || isDecelerating 时更新 index；程序化滚动有标志位。
+- 验收：点第 8 张，DEBUG 横幅显示的 assetID 与第 8 张一致；左右滑动顺序正确。
+
+D02 图片显示错误导致删错图片
+- 根因：删除后只改 ViewerViewModel.items，不通知 UICollectionView；加载 token 按 index 不按 cell+assetID；
+  ZoomableImageCell 复用不清图；执行期间 currentIndex 会漂移。
+- 必须做到：
+  1) 删除/隐藏改为“会话暂存”（见 D16）：滑动只入队 + 本地移除，不 await PhotoKit；
+  2) VM 返回 ReplacementPlan（nextIndex/entryEdge），VC 用 performBatchUpdates 删除 cell，按 entryEdge 做 snapshot 补位；
+  3) cell 级加载 token，回填前校验 cell.itemID == item.id；
+  4) ZoomableImageCell.configure 设置新 item 时清空 imageView、resetZoom、取消旧任务；
+  5) 删除/隐藏保持当前 index（原位置变成下一张），不要 currentIndex+1 跳一张；最后一张回退一张；空列表关闭查看器；
+  6) 上滑→下一张从底部补位，下滑→下一张从顶部补位，末尾回退时从与飞出方向相同的一侧补位；
+  7) 预取后 3 张，补位不得显示上一张或白屏。
+- 验收：连续标记 3 张，逐张核对 assetID；删除后不跳图、不显示上一张；左右滑不串图；补位方向正确。
+
+D03 删除时“是否允许照片管家删除”提示
+- 平台事实（已核实）：`PHAssetChangeRequest.deleteAssets` 必然触发 iOS 系统确认弹窗，公共 API 无法关闭/
+  自定义/预授权。市面 App 也没有绕过：Swipewipe 是“标记→review→批量删除”，Slider 仍会出现
+  “Allow Slider to delete this photo?”。禁止私有 API、非 PhotoKit 删除、沙盒删除或永久删除。
+- 真正根因：当前每滑一张就调用一次 deleteAssets（ViewerViewModel.moveToRecentlyDeleted），所以每张弹一次；
+  这不是 App 二次确认的问题。
+- 必须做到（会话暂存 + 一次批量提交）：
+  1) 新增 PhotoDeskCore/ReviewSession.swift：pendingDelete/pendingHide 队列（assetID/kind/originIndex/时间）；
+  2) 新增 PendingActionStore（Application Support/PendingActions/session-v1.json，原子写、损坏备份、上限 10,000）；
+  3) 新增 ReviewSessionController：enqueueDelete/enqueueHide/unmark/commitDeletes/commitHides；
+  4) 滑动删除只 enqueue + 本地移除 + Toast「已标记待删除 · 撤销」，全程不调用 deleteAssets；
+  5) 用户点「完成整理」→ SessionReviewView → 「全部移到最近删除」→ 一次 `PHAssetChangeRequest.deleteAssets`
+     提交所有 id；系统确认恰好 1 次（单批上限内；超过上限按批，每批一次，不是每张）；
+  6) 系统确认取消：队列保留，提示「系统未允许删除，N 张仍在待删除」；不丢数据；
+  7) 移除 App 自己的删除二次确认（presentConfirmation 删除分支、batchDeleteTapped alert、CleanupView
+     confirmationDialog）；**不保留 confirmDestructive/confirmDeleteInApp 设置开关**；
+     SwipeGestureEngine.config 的 confirmRequired 固定 false 或删除该参数；
+  8) `deleteAssets` 全仓库只允许出现在 PhotoWriter.moveToRecentlyDeleted；其他位置出现即失败。
+- 验收：连续下滑 20 张 → 0 次系统弹窗、计数 20；提交 → 恰好 1 次系统确认；取消 → 20 张仍 pending；
+  杀 App 重启 → 队列恢复；多选 100 张删除 → 1 次确认。
+- 如果要求“连最后 1 次也没有”：公共 API + 真删除做不到。只能改成“仅隐藏、不释放空间”或接受批量 1 次；
+  不要用私有 API，不要假装能做到。
+
+D04 隐藏时“是否允许照片管家隐藏”提示
+- 从代码看是 App 自己的 UIAlertController（SwipeAction.isDestructive 把 .hide 也标成破坏性；
+  SettingsStore.confirmDestructive 默认 true）；先移除。`isHidden` 是公开 API，通常无系统确认；
+  真机若出现系统确认，按“批量一次”处理，不绕过。
+- 必须做到：
+  1) SwipeAction.isDestructive 只保留 .moveToRecentlyDeleted；隐藏/批量隐藏不弹任何 App 确认；
+  2) 隐藏走 ReviewSession.enqueueHide：滑动只入队 + 本地移除 + 补位，不等待 PhotoKit；
+  3) 在“完成整理/进入 Vault/App 进后台/队列到 500”时一次 `performChanges` 批量 isHidden=true；
+  4) VaultViewModel 合并 pendingHideIDs，进入 Vault 前 flushHidesIfNeeded，未提交也能查看；
+  5) 取消隐藏立即 setHidden(false)，失败恢复 item；
+  6) 文案「已隐藏到系统「已隐藏」相册 · 撤销」；隐藏不等于删除，不释放空间。
+- 验收：连续下滑隐藏 20 张 → 0 次 App 弹窗、画面连续补位；进入 Vault 能看到 20 张（含 pending）；
+  提交只发生一次批量 performChanges；系统「已隐藏」可见；若系统确认存在，只 1 次不是 20 次。
+
+D05 隐藏照片在 App 内无法查看
+- 根因：VaultView 只在点“解锁”按钮后 loadHidden；vaultLockEnabled=false 或宽限期内永远空；
+  VaultThumb 不可点击、无查看器；无 observer；隐藏后查看器仍保留该 item。
+- 必须做到：新增 VaultViewModel（locked/unlocking/unlocked/failed/unavailable 状态机）；
+  `.task` 自动加载/自动 Face ID；网格 cell 可点开 ViewerContainer；长按/上下文菜单支持取消隐藏、
+  移到最近删除、收藏；注册 PhotoChangeObserver 增量刷新；空态/失败态/受限态完整；
+  主查看器隐藏后从 items 移除。
+- 验收：隐藏 1 张 → 工具→已隐藏 → 看到 → 点开大图 → 取消隐藏 → 列表空、主库恢复。
+
+D06 使用 Face ID
+- 现状：BiometricGate 只在保险箱用，且模拟器静默放行；没有 App 启动锁；没有失败/不可用态；没有后台遮罩。
+- 必须做到：
+  1) 抽出 BiometricEvaluating 协议，BiometricGate 依赖注入；评估顺序 .deviceOwnerAuthenticationWithBiometrics
+     → 失败/不可用 → .deviceOwnerAuthentication 密码兜底 → 都不可用返回 unavailable；
+  2) VaultView 进入自动唤起 Face ID；取消/失败有明确提示与重试；
+  3) 新增 AppLockController + AppLockView：`app.lockEnabled` 默认 false（用 UserDefaults + @Published，
+     不要用 @AppStorage，避免 ObservableObject 不刷新），冷启动/后台超时重新锁；
+  4) 设置→隐私与锁定新增启动锁、保险箱锁、立即锁定、宽限时间；
+  5) scenePhase 非 active 时加隐私遮罩（防止 App Switcher 截屏）；
+  6) 测试钩子仅 DEBUG + 启动参数：-uiTestingFaceIDBypass / -uiTestingFaceIDFailure / -uiTestingAppLock；
+     Release 与普通启动绝不绕过。
+- 验收：单测覆盖成功/失败/取消/不可用/宽限；UI 测试用 bypass 跑通隐藏库；真机清单写清楚 Face ID 待验。
+
+D07 存储统计一直转圈
+- 根因：StorageStatsView 为每张照片建一个 TaskGroup 子任务，每个子任务单独 PHAsset.fetchAssets；
+  5,300 张 = 5,300 次查询；无进度/取消/超时；isLoading 异常时不复位。
+- 必须做到：新增 AssetSizeProviding 协议 + PhotoKitAssetSizeProvider（每 500 个 id 一次 fetch，
+  Task.detached(priority:.utility)，并发上限 4，逐批 progress，Task.checkCancellation）；
+  新增 StorageStatsService + StorageStatsViewModel；新增 AssetSizeCache（Application Support/AssetSizeCache.json，
+  按 assetID + modificationDate 缓存，不要给 Core Data 加实体——程序化模型未启用自动迁移，新增实体会让老库加载失败）；
+  UI 显示环形进度 + 已统计 N/M + 取消；
+  90 秒软超时显示部分结果 + “部分 iCloud 资源大小未知”；完成后图表；.refreshable 强制重算；
+  未知大小计数脚注。
+- 验收：mock 数据 5 秒内出结果；真实 5,300 张 <90 秒；取消立即停止；缓存命中 <1 秒；绝不永久转圈。
+
+D08 无法记住上次整理到的位置
+- 必须做到：新增 LibraryPositionStore（UserDefaults JSON，key = library.lastPosition.<queryKey>，
+  存 assetID/sectionID/offsetRatio/savedAt）；queryKey 必须跨进程稳定（scope + canonical JSON + sort
+  做 FNV-1a/SHA，禁止 Swift hashValue，否则每次启动随机化、重启后位置全丢）；LibraryViewController 滚动停止 0.5 秒 + viewWillDisappear
+  保存首个可见 assetID；applySnapshot 首次非空后按 assetID 恢复（找不到用 offsetRatio 回退）；
+  恢复时 isRestoringPosition 防写回；恢复成功 Toast「已回到上次整理的位置」；
+  查看器保存 library.viewer.lastAssetID.<queryKey>；
+  设置→外观与网格新增「记住上次整理位置」开关（默认开）+「清除位置记忆」。
+- 验收：滚到 2024 年 5 月 → 切 Tab → 回来仍在；杀 App 重启恢复；切换筛选各自记住；清除后回顶部。
+
+D09 隐藏、删除进入系统隐藏/最近删除空间
+- 现状：`isHidden = true` 与 `deleteAssets` 语义正确；缺陷在 UI 链路、批量逻辑与会话提交。
+- 必须做到：所有删除/隐藏先入 ReviewSession；只有 BatchCommitCoordinator 调用 PhotoWriter：
+  删除一次 deleteAssets（尊重 safetyCopyEnabled，关闭副本时 undoKind=nil）；隐藏一次 setHidden(true)；
+  VaultView 自动加载 + observer + 合并 pendingHide；查看器隐藏后移除 item；
+  Toast 文案统一「已隐藏到系统「已隐藏」相册 · 撤销」/「已移到系统「最近删除」· 撤销」；
+  RecentlyDeletedView 保持说明 + photos-redirect 跳转；deleteAssets 只出现在 PhotoWriter。
+- 验收：系统相册「已隐藏」「最近删除」可见；App 内隐藏列表可见（含 pending）；批量关闭副本时不产生副本；
+  滑动 20 张只提交 1 次；无永久删除入口。
+
+D10 相册无法筛选（年/月/位置/类型）
+- 根因：SearchView 是独立 sheet，数据源是已加载快照，结果 prefix(200)，不能点开、不能作用主网格；
+  主库没有筛选栏；SearchPredicate 没有位置；筛选只对已加载 500 张生效。
+- 必须做到：
+  1) 新增 LibraryQuery（scope + filter + sortAscending + key）；
+  2) LibraryViewModel 改为 query-driven，完整索引（首屏 500 先出，后台 500/批补齐）；
+  3) SearchPredicate 增加 location: LocationFilter（any/withLocation/withoutLocation/near(GeoRegion)）；
+  4) PhotoDeskCore 新增 GeoFilter.swift（GeoPoint/GeoRegion/球面距离/0.25°网格聚类）+ 测试；
+  5) 主库 LibraryFilterBar + LibraryFilterSheet + LocationFilterView（离线聚类列表，不请求定位、不联网、
+     不做反向地理编码）；
+  6) 筛选条件持久化 library.filter.<scope>；结果计数与分组头一致；无结果空态 + 清除筛选；
+  7) SearchView 结果可点开查看器，支持“应用筛选到主库”，去掉 200 上限。
+- 验收：选 2023 年 + 视频 → 只剩 2023 年视频；计数正确；位置聚类筛选正确；结果可点开；清除恢复全部。
+
+D11 全选不生效 / 全选不应作用于所有照片
+- 根因：PhotoGridCell.setSelectionVisible 没给 isSelectingVisible 赋值，setSelected 的 didSet 永远隐藏角标；
+  selectAllTapped 只选 currentItemsBySection（已加载）；selectionBar 11 个 item 在 iPhone 上溢出。
+- 必须做到：
+  1) 新增 PhotoDeskCore/SelectionPolicy.swift（SelectionState：begin/toggle/selectAll/deselectAll/invert/
+     allSelected + 测试）；
+  2) 全选 scope = 当前 filteredItems 的 id 集合，不是全库；筛选变化时 selected = selected ∩ newScope；
+  3) 修复 PhotoGridCell.setSelectionVisible（isSelectingVisible = visible）；
+  4) 重做 SelectionToolbar：取消 / 已选择 N 项 / 完成 + 操作按钮（溢出用 UIMenu）；
+  5) 全选前若索引未完成，await ensureIndexComplete() 并显示进度。
+- 验收：选 2023 年 → 全选 → 计数 = 2023 年照片数；角标全部可见；取消全选/反选正确；筛选变化自动收敛。
+
+D12 多选逻辑错误、不方便取消
+- 必须做到：顶部取消/完成 + 计数；点选即切换；已选 cell 2pt 主色边框 + 右上角勾选；
+  反选/取消全选放更多菜单；批量操作后保留多选但清空选择（删除类退出）；返回手势/取消按钮退出并清空；
+  滚动位置不变。
+- 验收：点 3 张计数 3，再点 1 张计数 2；取消退出无选中；批量收藏后计数清零、Toast 正确。
+
+D13 多选模式下无法滚动相册
+- 根因：selectionPan 无条件挂在 collectionView 上，与滚动 pan 竞争。
+- 必须做到：删除常驻 selectionPan；用 UILongPressGestureRecognizer(minimumPressDuration:0.28,
+  allowableMovement:10) 驱动框选；普通快速滑动不触发长按，正常滚动；长按后移动超过 10pt 才进入框选，
+  此时才 isScrollEnabled=false；边缘自动滚动（CADisplayLink 或 1/60 Timer，8–12pt/帧）；
+  松手恢复滚动；框选只加选不取消。
+- 验收：多选模式上滑/下滑能滚动；长按拖拽出现矩形并选中；拖到边缘自动滚；松手恢复。
+
+D14 缩小/放大手势改变相册视图
+- 必须做到：collectionView 加 UIPinchGestureRecognizer（允许与滚动同时识别）；
+  target = clamp(round(startColumns/scale), 2...5)；setColumns(target, animated:true)；
+  记录 anchorIndexPath 并在布局后 scrollToItem(.centeredVertically) 保持锚点；
+  每次列数变化 UISelectionFeedbackGenerator；松手持久化 settings.gridColumns；
+  scale 接近 1 回弹；首次提示「双指捏合可调整列数」；Reduce Motion 无动画。
+- 验收：3→5、3→2 列；持久化；锚点照片不跳；设置页 Stepper 与手势一致。
+
+D15 补齐未实现的功能
+按 docs/09 §4 的 P0/P1 清单执行，至少包括：
+- 照片库：顶部五段切换（全部/收藏/视频/截图/已隐藏）、筛选、排序接线、下拉刷新、月份头“选择”、
+  底部/导航工具栏（多选/清理/排序/列数）、记住位置、SessionBadge 待处理入口；
+- 查看器：加相簿/分享/信息/旋转全部接入（不得再返回“该动作将在后续里程碑开放”）、长按操作菜单、
+  视频点击暂停/继续、胶片条删除后刷新、双击缩放不触发 chrome 切换；
+- 相簿：AlbumDetailView 缩略图可点开 ViewerContainer、支持移出相簿；
+- 搜索：结果可点开、应用筛选到主库、去掉 200 上限；
+- 清理：截图/大文件/模糊卡片可加入待清理清单；移除 App 内删除确认；
+- 设置：安全页（App 锁/保险箱锁/立即锁定/宽限）、位置记忆开关/清除、排序接线；
+- P2 不做但要登记：OCR、图片分类、搜索历史/智能视图、地图浏览、Live Photo、RAW、批量导出到文件、
+  Vision 相似照片；在 `已知问题.md` 写清楚，不要留代码 TODO。
+
+D16 会话式无感整理（暂存删除/暂存隐藏/智能补位）——2026-11-03 补充，优先级最高
+- 目标：上下滑期间不做任何 PhotoKit 写操作；只做本地队列 + 乐观 UI + 预取补位。删除在会话结束
+  一次批量提交；隐藏按队列批量提交。连续滑 100 张不应出现 100 次系统弹窗，也不应每张等待写库。
+- PhotoDeskCore 新增（先写测试）：
+  1) ReviewSession.swift：PendingEntry(assetID/kind/originIndex/markedAt)、pendingDeleteIDs/pendingHideIDs、
+     markDelete/markHide/unmark/removeCommitted、上限 10,000、Codable；
+  2) ReplacementPlanner.swift：plan(currentIndex,countAfterRemoval,exitEdge,hasNext,hasPrevious) ->
+     ReplacementPlan(nextIndex,entryEdge,shouldClose)；
+  3) BatchCommitPlanner.swift：5,000 分批、缺失 id、取消、幂等。
+- App 层新增：
+  1) PendingActionStore：Application Support/PendingActions/session-v1.json，原子写、损坏备份、
+     0.2s debounce、启动恢复、不新增 Core Data 实体；
+  2) ReviewSessionController（@MainActor）：enqueueDelete/enqueueHide/undoPending/commitDeletes/
+     commitHides/flushHidesIfNeeded；pendingDeleteCount/pendingHideCount/isCommitting/commitProgress；
+  3) BatchCommitCoordinator：删除时一次 deleteAssets；隐藏时一次 setHidden；安全副本统一在提交前做；
+  4) SessionReviewView：待删除/待隐藏缩略图、逐张恢复、继续整理、全部移到最近删除、全部隐藏、关闭；
+  5) SessionBadgeView：照片库/查看器顶部「待删除 N / 待隐藏 M」。
+- 交互：
+  1) 上滑/下滑删除或隐藏 → 同步入队（<16ms）→ 从 items 移除 → ReplacementPlan → 飞出 + 下一张补位；
+  2) Toast「已标记待删除 · 撤销」/「已加入待隐藏 · 撤销」；顶部计数 +1；
+  3) 补位规则：上滑→底部、下滑→顶部、末尾回退→与飞出同侧、工具栏无方向→底部、空列表→关闭；
+  4) 滑完或点「完成整理」→ SessionReviewView；用户可恢复任意项；
+  5) 「全部移到最近删除」→ 一次系统确认；取消→队列保留；成功→Toast 并清空；
+  6) 杀 App 重启→恢复队列，不自动提交、不自动弹系统框；
+  7) 网格立即排除 pendingDelete/pendingHide；Vault 合并 pendingHide；全选/筛选不包含 pending；
+  8) 进入 Vault、离开会话、App 进后台时 flushHidesIfNeeded。
+- 性能硬指标：入队+动画 <16ms；连续 100 次 0 系统弹窗、0 主线程 >50ms、内存增长 <20MB；
+  补位首帧命中缓存 <100ms；5,000 张连续整理 10 分钟无泄漏；杀进程恢复 10,000 条 <200ms。
+- 测试：ReviewSessionTests/ReplacementPlannerTests/BatchCommitPlannerTests；
+  ReviewSessionControllerTests（20 次滑动 0 次 writer、提交 1 次、取消保留、重启恢复）；
+  SessionUITests（20 次滑动 0 alert、提交 1 alert、取消、重启、补位方向）；性能测试 100 次滑动。
+- 验收：连续下滑删除 20 张 → 0 弹窗、计数 20、每次立即补位；提交 → 1 次系统确认；
+  取消 → 队列保留；重启 → 恢复；隐藏 20 张 → Vault 可见；多选 100 张 → 1 次确认；全程不因弹窗/等待中断。
+
+D17 GitHub Actions 出包 + 用户自签名
+- 目标：CI 产出未签名 IPA，用户在 Windows 用 AltStore/Sideloadly 自签安装；Agent 不假装真机验证。
+- 必须做到：
+  1) 保持 `.github/workflows/ios.yml` 的 `PhotoDesk-unsigned-ipa` artifact；
+  2) 额外生成 `PhotoDesk-unsigned.ipa.sha256` 并上传；
+  3) 校验 `unzip -l` 含 Payload/PhotoDesk.app/PhotoDesk；`plutil` MinimumOSVersion=15.0；
+     `otool` minos=15.0；`codesign -dv` 确认未签名；
+  4) 可选创建 GitHub Release `v1.1.0-build2`，附 IPA + SHA256 + 安装说明；
+  5) 新建 docs/12-真机签名与验收.md：AltStore/Sideloadly 步骤、7 天免费签名、权限、真机验收清单；
+  6) 最终报告给出 artifact URL、SHA256、`gh run download` 命令；不要声称已做真机验证。
+- 验收：CI 全绿；IPA 可下载；SHA256 一致；用户能自签安装；Agent 报告真机项为“待用户验证”。
+
+============================================================
+四、执行顺序（必须按 Phase 0 → 8，不许跳）
+============================================================
+
+【Phase 0 · 基线与失败测试（0.5–1 天）】
+1. `git status` 确认干净；从 main 建分支：`git checkout -b fix/pages-overhaul-20261103`。
+2. 新建 `PhotoDeskUITests/PageRegressionUITests.swift`，先写会失败的测试：
+   - testViewerOpensTappedPhoto
+   - testDeleteKeepsDisplayedPhotoInSync
+   - testSessionSwipeDoesNotPrompt（20 次滑动 0 个系统 alert）
+   - testSessionCommitPromptsOnce（提交恰好 1 个系统 alert）
+   - testSelectionBadgesAppearAfterSelectAll
+   - testScrollWorksInSelectionMode
+   - testStorageStatsCompletes
+3. 加 DEBUG 测试钩子（仅 #if DEBUG + ProcessInfo.arguments）：
+   -uiTestingViewerStartIndex <n>、-uiTestingSelectMode（已有）、-uiTestingStorageMock、-uiTestingSessionMock、
+   -uiTestingFaceIDBypass、-uiTestingFaceIDFailure、-uiTestingAppLock、-uiTestingDatedPhotos。
+4. 给 PhotoGridCell / ViewerViewController 加 DEBUG accessibilityValue（item.id / idx），Release 不生效。
+5. 跑 `scripts/test-core.ps1` 基线；commit：`test(regression): 固化查看器定位/多选/统计回归用例`
+
+【Phase 1 · 数据层（2.5–3 天）】
+- PhotoDeskCore 新增 GeoFilter.swift / SelectionPolicy.swift / StorageMath.swift /
+  ReviewSession.swift / ReplacementPlanner.swift / BatchCommitPlanner.swift + 测试（先测后写）。
+- SearchPredicate 增加 location; PhotoFilter 增加位置匹配。
+- AssetRepository 增加 latestResult(for:)、排序参数、fetchAll/progress。
+- DateSectionizer 增加 ascending 参数（升/降序）并补测试；DateSectionizerAdapter 透传 LibraryQuery.sortAscending。
+- PhotoItem 的 Equatable/Hashable 改为只按 id（自定义 == 与 hash(into:)），避免收藏/隐藏变化导致
+  Diffable 删除+插入、全选/位置恢复按值匹配失效；补单测。
+- LibraryViewModel 重写为 query-driven：allItems/visibleItems/filteredItems/indexProgress/isIndexing；
+  首屏 500 先 ready；后台补齐；setScope/setFilter/setSort；ensureIndexComplete；observer 后重新 apply filter；
+  pendingDelete/pendingHide 过滤；applyPendingChanges。
+- 新增 LibraryQuery.swift。
+- 测试：LibraryViewModelTests、PhotoFilterTests、GeoFilterTests、SelectionPolicyTests、StorageMathTests、
+  ReviewSessionTests、ReplacementPlannerTests、BatchCommitPlannerTests。
+- commit：`feat(library): 引入 LibraryQuery/ReviewSession 与完整索引，筛选/全选/补位统一数据源`
+
+【Phase 2 · 照片库 UI（2.5–3 天）】
+- LibraryRootView：顶部 ScopePicker（全部/收藏/视频/截图/已隐藏；已隐藏 fullScreenCover 打开 VaultView）。
+- LibraryFilterBar + LibraryFilterSheet + LocationFilterView（离线聚类）。
+- 排序接线 grid.sortAsc；下拉刷新 UIRefreshControl；月份头“选择”；位置记忆保存/恢复；无结果空态；
+  SessionBadgeView（待删除/待隐藏计数）接入导航栏。
+- 测试：FilterUITests、位置记忆 UI 测试。
+- commit：`feat(library): 顶部视图切换、筛选栏、排序与位置记忆`
+
+【Phase 3 · 多选（2 天）】
+- 集成 SelectionState；修 PhotoGridCell 角标；重做 SelectionToolbar；删除 selectionPan，长按拖拽框选 + 自动滚。
+- 批量收藏/隐藏/删除/加相簿/分享；删除走 ReviewSession.enqueueDelete + SessionReviewView + 一次 commitDeletes；
+  隐藏走 enqueueHide + 批量 flush；删除/隐藏都不弹 App 确认。
+- 测试：MultiSelectUITests、SelectionPolicyTests、ReviewSessionTests；批量 100 张删除只 1 次系统确认。
+- commit：`feat(library): 重做多选为系统相册式选择（全选/反选/框选/滚动/批量入队）`
+
+【Phase 4 · 查看器 + 会话暂存 + 智能补位（3.5–4 天）】
+- ViewerContext + makeViewerViewModel(context:)；onOpenViewer 传 (items, startItemID)；注入 ReviewSessionController。
+- ViewerViewModel：init(items:startItemID:)、index(of:)、execute(_:forItemID:)、enqueueDelete/enqueueHide、
+  staged 结果 + ReplacementPlan；本地移除，不 await PhotoKit。
+- ViewerViewController：首次布局定位、isProgrammaticScroll、performBatchUpdates 删除、cell 级 token、
+  ZoomableImageCell 清图、snapshot 按 entryEdge 补位、prefetch 后 3 张、SessionBadgeView、
+  动作池接入、filmStrip 刷新、视频点击暂停、移除 App 确认。
+- 新增 PendingActionStore/ReviewSessionController/BatchCommitCoordinator/SessionReviewView；实现 0 弹窗滑动、
+  1 次批量提交、取消保留、重启恢复。
+- 测试：ViewerViewModelTests、ReviewSessionControllerTests + PageRegressionUITests + SessionUITests。
+- commit：`fix(viewer): 会话暂存 + assetID 定位 + 智能补位，修复错图/删错图/每张弹窗`
+
+【Phase 5 · 已隐藏 + Face ID（2.5–3 天）】
+- VaultViewModel 状态机 + load + observer + unhide/delete/favorite；合并 pendingHideIDs；
+  进入 Vault 前 flushHidesIfNeeded；VaultView 重做；VaultGridView 用 UIKit UICollectionView
+  （复用 PhotoGridCell），不要用 SwiftUI LazyVGrid。
+- BiometricGate 协议化 + 失败/不可用/宽限；AppLockController + AppLockView + 隐私遮罩；
+  SecuritySettingsView（启动锁/保险箱锁/立即锁定/宽限）。
+- 测试：BiometricGateTests、VaultUITests、AppLockUITests、ReviewSessionControllerTests（pending hide）。
+- commit：`feat(vault): 已隐藏相册可查看与取消隐藏，补齐 Face ID 启动锁`
+
+【Phase 6 · 存储统计（1.5 天）】
+- AssetSizeProvider + PhotoKitAssetSizeProvider（500/批、并发 4、progress、取消）。
+- StorageStatsService + StorageStatsViewModel + AssetSizeCache（JSON 磁盘缓存）。
+- StorageStatsView：进度环/取消/90s 软超时/未知大小/刷新；统计排除 pendingDelete/pendingHide。
+- 测试：StorageMathTests、StorageStatsServiceTests、StorageStatsUITests。
+- commit：`fix(storage): 批量统计 + 缓存 + 进度/取消，消除永久转圈`
+
+【Phase 7 · 捏合 + 会话性能 + 细节（1.5–2 天）】
+- UIPinchGestureRecognizer 2–5 列吸附、锚点、触觉、持久化、首次提示。
+- 双击缩放不触发 chrome；视频点击暂停；VoiceOver；深色模式；Reduce Motion。
+- 旋转/分屏时更新查看器 itemSize 与网格列宽，按当前 assetID 保持页/锚点。
+- Session 无感打磨：补位动画串行、预取后 3 张、连续 100 次滑动内存/掉帧测量、SessionReview 懒加载。
+- 测试：PinchUITests、双击/视频回归、testSession100SwipesSmooth。
+- commit：`feat(library): 双指捏合 + 会话性能，统一手势与无障碍细节`
+
+【Phase 8 · 全量验证 + 未签名 IPA 发布（2.5–3 天）】
+- 本机 `scripts/test-core.ps1` 全绿；新增 core 测试 ≥35 条，覆盖率 ≥85%。
+- push → CI → 修复直到全绿（最多 10 轮）。
+- 新增 `scripts/sim-photos-dated.sh`（带 EXIF 日期，2020–2026 各月）与 `scripts/capture-pages.sh`（截图）。
+- 更新 docs/05（M10 + 变更日志）、docs/03、docs/04、已知问题.md、发布说明.md（1.1.0 Build 2）、
+  新建 docs/11-页面补齐验收记录.md、docs/12-真机签名与验收.md。
+- IPA：确认 `PhotoDesk-unsigned-ipa` artifact；生成 `PhotoDesk-unsigned.ipa.sha256`；
+  `unzip -l` 检查 Payload；`plutil` MinimumOSVersion=15.0；`otool` minos=15.0；`codesign -dv` 未签名；
+  可选 GitHub Release `v1.1.0-build2` 附 IPA + SHA256。
+- 红线复查：grep 永久删除/彻底删除/清空最近删除（只允许否定句）；grep deleteAssets 只允许
+  PhotoWriter.moveToRecentlyDeleted；无 URLSession；无第三方；otool minos = 15.0；无新增 TODO/FIXME。
+- commit：`docs(m10): 页面补齐验收记录 + 未签名 IPA 发布说明`
+
+============================================================
+五、测试与命令（本机 + CI）
+============================================================
+
+本机（只跑 core）：
+  powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+  # 或（如果脚本不可用）：
+  docker run --rm -v "${PWD}/PhotoDeskCore:/package" -w /package swift:6.0-noble swift test
+
+Git：
+  git status
+  git add -A
+  git commit -m "feat(scope): 中文描述"
+  git push -u origin fix/pages-overhaul-20261103
+
+CI：
+  gh run list --branch fix/pages-overhaul-20261103 --limit 5
+  gh run watch <RUN_ID> --exit-status
+  gh run view <RUN_ID> --log-failed
+  gh run download <RUN_ID> -n PhotoDesk-unsigned-ipa -D artifacts/ipa
+  gh run download <RUN_ID> -n m1-screenshots -D artifacts/screenshots（如 workflow 产出）
+  gh run download <RUN_ID> -n ui-test-attachments -D artifacts/ui-tests
+  shasum -a 256 artifacts/ipa/PhotoDesk-unsigned.ipa（Windows 可用 certutil -hashfile）
+  # 可选：gh release create v1.1.0-build2 artifacts/ipa/PhotoDesk-unsigned.ipa \
+  #   artifacts/ipa/PhotoDesk-unsigned.ipa.sha256 -t "1.1.0 Build 2" -n "页面补齐与缺陷修复"
+
+注意：
+- 本机不能跑 xcodebuild / simctl；不要在 Windows 上尝试编译 iOS。
+- CI 失败时先看失败测试名与日志，不要靠猜；每轮只改一个根因，提交后重跑。
+- 最多 10 轮 CI 修复；超过 10 轮仍有失败，停止并输出：失败测试名、完整错误、已尝试的修复、下一步建议。
+- 不要为了“变绿”删除测试、跳过测试、降低断言、关闭覆盖率；不允许 `-skip-testing` 新测试（性能测试除外）。
+
+============================================================
+六、最终必须交付的内容
+============================================================
+
+1. 代码：D01–D17 全部实现；Phase 0–8 全部 commit；分支已 push。
+2. 测试：新增 core 测试、iOS 单测、UI 测试全部通过；CI 全绿（给出 run URL）。
+3. 文档：
+   - docs/05：M10 进度表 + 变更日志（变更 19 起）。
+   - docs/03 / docs/04：新架构与新交互规格（ReviewSession/批量提交/补位）。
+   - 已知问题.md：平台限制更新（系统删除每批一次、第三方无法零弹窗真删）。
+   - 发布说明.md：1.1.0（Build 2）。
+   - docs/11-页面补齐验收记录.md：CI run、测试数量、截图路径、D01–D17 逐项证据、真机待验项。
+   - docs/12-真机签名与验收.md：AltStore/Sideloadly 步骤 + 真机清单。
+4. 截图：m10-library / m10-filter / m10-selection / m10-viewer / m10-vault / m10-storage / m10-lock /
+   m10-pinch / m10-session-swipe / m10-session-review；你必须逐张打开查看，不能只看测试日志。
+5. 最终报告（直接写在回复里）：
+   - 表 A：D01–D17 状态（✅ 已修 / ⚠️ 平台限制 / 🟨 待真机）+ 证据（测试名/截图/run）。
+   - 表 B：新增/修改文件清单。
+   - 表 C：测试结果（core X/X、iOS 单测 X/X、UI X/X、覆盖率）。
+   - 表 D：CI run URL + artifact 路径 + `PhotoDesk-unsigned-ipa` 的 SHA256。
+   - 表 E：真机待验清单（Face ID、系统删除弹窗次数、系统隐藏/最近删除、iCloud、连续滑动 100 张、FPS），
+     标注“本机无法验证，需用户在 iPhone 上执行”，不要假装已验证。
+
+============================================================
+七、停止条件与禁止事项
+============================================================
+
+停止条件（满足任一即停止并报告）：
+1. CI 全绿 + 文档齐全 + 最终报告完成 → 正常完成。
+2. CI 连续 10 轮仍失败 → 输出失败详情与根因，不要继续盲目改。
+3. 遇到必须改变产品定义才能解决的问题（例如“连 iOS 系统删除弹窗也要去掉”）→ 记录为平台限制，
+   按本提示词口径实现“会话暂存 + 一次批量提交”，继续其余工作，不要卡住；不要尝试私有 API。
+   唯一零弹窗替代是“只隐藏不真删”，需用户改产品定义，不在本次代码范围。
+
+绝对禁止：
+- 不要修改 AGENTS.md 的红线；不要删除/弱化现有测试；不要引入第三方依赖。
+- 不要用私有 API（包括 KVC 读 `locallyAvailable` 之类；现有代码已踩过坑）。
+- 不要把删除实现成永久删除/沙盒删除/文件删除；不要清空系统「最近删除」。
+- 不要在逐张滑动路径调用 `deleteAssets` 或 `setHidden`；只允许在 BatchCommitCoordinator 的批量提交中调用
+  PhotoWriter 的封装方法。
+- 不要用 iOS 16+ API 裸写；不要用 NavigationStack/PhotosPicker/ShareLink/Charts/@Observable。
+- 不要伪造 CI 结果、截图、测试数量；没有跑过的验证不要写“已验证”。
+- 不要只改文档不改代码；也不要只改代码不更新文档。
+- 不要在未读完 docs/09 与相关源码前开始大改。
+
+============================================================
+八、建议的 commit 序列（可直接用）
+============================================================
+
+1. test(regression): 固化查看器定位/会话滑动/多选/统计回归用例
+2. feat(core): 新增 GeoFilter/SelectionPolicy/StorageMath/ReviewSession/ReplacementPlanner 纯逻辑与测试
+3. feat(library): 引入 LibraryQuery/ReviewSession 与完整索引，筛选/全选/补位统一数据源
+4. feat(library): 顶部视图切换、筛选栏、排序与位置记忆
+5. feat(library): 重做多选为系统相册式选择（全选/反选/框选/滚动/批量入队）
+6. fix(viewer): 会话暂存 + assetID 定位 + 智能补位，修复错图/删错图/每张弹窗
+7. feat(vault): 已隐藏相册可查看与取消隐藏，补齐 Face ID 启动锁
+8. fix(storage): 批量统计 + 缓存 + 进度/取消，消除永久转圈
+9. feat(library): 双指捏合 + 会话性能，统一手势与无障碍细节
+10. docs(m10): 页面补齐验收记录 + 未签名 IPA 发布说明
+
+现在开始执行。先读 docs/09 与相关源码，然后从 Phase 0 开始；不要问我“是否继续”，直接做完整个流程。
+
+=== 提示词正文结束 ===
+
+================================================================================
+附：执行者自查清单（不要复制给 Agent，仅供你验收）
+================================================================================
+[ ] Agent 是否先读了 docs/09 与相关源码，而不是直接改代码？
+[ ] 是否从 main 建了独立分支，并按 Phase 0–8 提交？
+[ ] D01/D02 是否有 UI 测试证明“点哪张显示哪张、删哪张”，且补位方向正确？
+[ ] D03 是否做到“滑动 20 张 0 弹窗、提交恰好 1 次系统确认”？是否明确系统确认无法降为 0？
+[ ] D04 是否去掉 App 隐藏确认，并让 Vault 合并 pending 隐藏项？
+[ ] D05/D06 是否用 mock/bypass 跑通，并列出真机 Face ID 待验？
+[ ] D07 是否 5,300 张 <90 秒、可取消、有缓存？
+[ ] D08 是否跨 Tab / 杀 App 都能恢复位置？
+[ ] D09 是否验证系统「已隐藏」「最近删除」都有照片？
+[ ] D10 是否能按年/月/位置/类型筛选，且结果可点开？
+[ ] D11/D12 全选是否只作用于当前筛选，角标是否可见，取消是否方便？
+[ ] D13 多选模式是否能正常滚动？
+[ ] D14 捏合是否能 2–5 列并持久化？
+[ ] D15 的 P0/P1 清单是否逐项完成，P2 是否登记？
+[ ] D16 是否连续滑 100 张无系统弹窗、0 等待、内存 <+20MB、杀进程能恢复队列？
+[ ] D17 是否产出未签名 IPA + SHA256 + docs/12，且没有假装真机验证？
+[ ] CI 是否真的全绿？run URL 是否能打开？
+[ ] 截图是否逐张看过？不是只看测试日志？
+[ ] 文档是否更新（05/03/04/已知问题/发布说明/11/12）？
+[ ] 是否全程没有改 AGENTS.md 红线、没有引入第三方依赖、没有永久删除路径？
+================================================================================
