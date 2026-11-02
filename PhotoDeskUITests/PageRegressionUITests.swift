@@ -170,12 +170,9 @@ final class PageRegressionUITests: XCTestCase {
         let badge = anyElement(app, identifier: "SessionBadge")
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "待处理徽标未出现")
         badge.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let review = anyElement(app, identifier: "SessionReviewRoot")
-        XCTAssertTrue(review.waitForExistence(timeout: 5), "整理回顾页未出现\n\(hierarchy(app))")
-
-        // 一次性批量提交
+        // 整理回顾页：直接等「全部移到最近删除」按钮（NavigationView 本身不暴露 AX 元素）
         let commit = anyElement(app, identifier: "SessionReview-CommitDelete")
-        XCTAssertTrue(commit.waitForExistence(timeout: 3), "缺「全部移到最近删除」按钮")
+        XCTAssertTrue(commit.waitForExistence(timeout: 8), "整理回顾页未出现\n\(hierarchy(app))")
         commit.tap()
 
         // mock writer 提交计数（通过回顾页/横幅回显；1 次批量 = 1 次 writer 调用）
