@@ -61,6 +61,9 @@ struct LibraryRootView: View {
     /// UI 测试钩子：网格就绪后自动打开筛选/月份面板（docs/13 M11——SwiftUI 导航栏按钮对
     /// XCUITest 合成点击不响应（CI 两轮实测），测试改走启动钩子；仅 DEBUG + 启动参数）
     @State private var hookSheetOpened = false
+    /// UI 测试钩子：就绪后应用 -uiTestingFilterYear（0 = 清空）；快照含目标月时执行 -uiTestingMonthJump
+    @State private var hookFilterApplied = false
+    @State private var hookMonthJumped = false
     #endif
 
     var body: some View {
@@ -231,14 +234,17 @@ struct LibraryRootView: View {
             undoCenter.restoreLatestIfNeeded()
             showRecovery = recoveryCount > 0
         #if DEBUG
-        openHookViewerIfNeeded()
-        openHookSheetIfNeeded()
+        runHooksIfNeeded()
         #endif
         }
         .onChange(of: viewModel.viewState) { _ in
             #if DEBUG
-            openHookViewerIfNeeded()
-            openHookSheetIfNeeded()
+            runHooksIfNeeded()
+            #endif
+        }
+        .onChange(of: viewModel.sections) { _ in
+            #if DEBUG
+            runHooksIfNeeded()   // 月份跳转钩子等快照包含目标月后重试
             #endif
         }
         .onChange(of: sortAscending) { ascending in
@@ -359,6 +365,14 @@ private extension LibraryRootView {
                                       queryKey: viewModel.query.key)
     }
 
+    /// UI 测试钩子集中入口（每次状态/快照变化时调用；各自内部有一次性守卫）
+    func runHooksIfNeeded() {
+        openHookViewerIfNeeded()
+        openHookSheetIfNeeded()
+        openHookFilterIfNeeded()
+        openHookMonthJumpIfNeeded()
+    }
+
     /// docs/13 M11：网格就绪后自动打开筛选/月份面板（每次 launch 只触发一次）
     func openHookSheetIfNeeded() {
         guard !hookSheetOpened, viewModel.viewState == .ready else { return }
@@ -368,6 +382,33 @@ private extension LibraryRootView {
         } else if UITestHooks.enabled("-uiTestingOpenMonthJump") {
             hookSheetOpened = true
             showMonthJump = true
+        }
+    }
+
+    /// docs/13 M11：就绪后应用 -uiTestingFilterYear（0 = 清空；等价用户在面板选年并应用，同一条 setFilter 路径）
+    func openHookFilterIfNeeded() {
+        guard !hookFilterApplied, viewModel.viewState == .ready,
+              let year = UITestHooks.intValue("-uiTestingFilterYear") else { return }
+        hookFilterApplied = true
+        if year == 0 {
+            viewModel.clearFilter()
+        } else {
+            var filter = viewModel.query.filter
+            filter.year = year
+            filter.month = nil
+            filter.day = nil
+            viewModel.setFilter(filter)
+        }
+    }
+
+    /// docs/13 M11：快照包含目标月后跳转（等价月份面板点卡片，同一条 scrollToSection 路径；
+    /// scrollToSection 失败（collectionView 未提交）时不置位，等下一次快照重试）
+    func openHookMonthJumpIfNeeded() {
+        guard !hookMonthJumped, viewModel.viewState == .ready,
+              let sectionID = UITestHooks.stringValue("-uiTestingMonthJump") else { return }
+        guard let index = viewModel.sections.firstIndex(where: { $0.id == sectionID }) else { return }
+        if selectionBridge.controller?.scrollToSection(index) == true {
+            hookMonthJumped = true
         }
     }
 }

@@ -929,11 +929,13 @@ final class LibraryViewController: UIViewController {
     }
 
     /// 月份/索引条跳转（docs/13 S09/S11）：校验 → 滚动 → 抵消粘性 header → 同步保存 → 顶部细横幅
-    func scrollToSection(_ index: Int) {
+    /// - Returns: 是否实际执行了滚动（false = 校验未通过/快照未提交，调用方可重试）
+    @discardableResult
+    func scrollToSection(_ index: Int) -> Bool {
         // S03 修复：校验 collectionView 实际 section/item 数（apply 未提交时 currentSections 已是新值）
         guard index < currentSections.count,
               index < collectionView.numberOfSections,
-              collectionView.numberOfItems(inSection: index) > 0 else { return }
+              collectionView.numberOfItems(inSection: index) > 0 else { return false }
         isRestoringPosition = true
         collectionView.layoutIfNeeded()
         collectionView.scrollToItem(at: IndexPath(item: 0, section: index),
@@ -957,6 +959,7 @@ final class LibraryViewController: UIViewController {
             ViewerTrace.log("position.save monthJump section=\(section.id)")
         }
         showJumpBanner(section: currentSections[index])
+        return true
     }
 
     /// 月份面板「回到顶部」（docs/13 S09）
