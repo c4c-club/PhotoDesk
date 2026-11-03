@@ -6,6 +6,7 @@
 // iCloud-only：未下载时显示占位 + 「下载」按钮 + 环形进度（docs/04 §4.13）。
 
 import UIKit
+import PhotoDeskCore
 
 final class ZoomableImageCell: UICollectionViewCell {
     static let reuseID = "ZoomableImageCell"
@@ -273,9 +274,10 @@ final class ZoomableImageCell: UICollectionViewCell {
             imageWidth: Double(zoomContentView.frame.width),
             imageHeight: Double(zoomContentView.frame.height)
         ) else { return }
-        scrollView.zoom(to: CGRect(x: rect.x, y: rect.y,
-                                   width: rect.width, height: rect.height),
-                        animated: animated)
+        // 显式 CGFloat 转换（避免 Double/CGFloat 混合表达式拖慢类型检查）
+        let targetRect = CGRect(x: CGFloat(rect.x), y: CGFloat(rect.y),
+                                width: CGFloat(rect.width), height: CGFloat(rect.height))
+        scrollView.zoom(to: targetRect, animated: animated)
     }
 }
 

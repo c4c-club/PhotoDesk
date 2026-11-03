@@ -417,10 +417,9 @@ final class StabilityUITests: XCTestCase {
         let monthButton = anyElement(app, identifier: "Library-MonthJump")
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
         monthButton.tap()
-        let sheet = anyElement(app, identifier: "MonthJump-Sheet")
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "月份面板未出现\n\(hierarchy(app))")
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        XCTAssertTrue(card.waitForExistence(timeout: 5), "缺 2024-05 月份卡片\n\(hierarchy(app))")
+        // NavigationView 本身不暴露 AX 元素：直接等月份卡片（面板出现即卡片存在）
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         snap(app, "s09-month-jump")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8),
@@ -437,7 +436,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
         monthButton.tap()
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        XCTAssertTrue(card.waitForExistence(timeout: 8), "缺 2024-05 月份卡片\n\(hierarchy(app))")
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8))
 
@@ -494,7 +493,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
         monthButton.tap()
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        XCTAssertTrue(card.waitForExistence(timeout: 8), "缺 2024-05 月份卡片\n\(hierarchy(app))")
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8))
         Thread.sleep(forTimeInterval: 1.5)   // 等同步保存完成
