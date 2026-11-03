@@ -14,8 +14,9 @@ struct MonthJumpSheet: View {
     }
 
     private struct YearBlock: Identifiable {
-        let id: Int             // 年份
+        let year: Int
         let rows: [Row]
+        var id: Int { year }
     }
 
     private let blocks: [YearBlock]
@@ -57,7 +58,7 @@ struct MonthJumpSheet: View {
             }
             buckets[descriptor.year, default: []].append(row)
         }
-        blocks = order.map { YearBlock(id: $0, rows: buckets[$0] ?? []) }
+        blocks = order.map { YearBlock(year: $0, rows: buckets[$0] ?? []) }
     }
 
     var body: some View {
