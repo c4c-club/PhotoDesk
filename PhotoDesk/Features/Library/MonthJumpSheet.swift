@@ -63,35 +63,8 @@ struct MonthJumpSheet: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Button {
-                        onScrollToTop()
-                        dismiss()
-                    } label: {
-                        Label("回到顶部", systemImage: "arrow.up.to.line")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color(ds: DSColor.bgSecondary))
-                            .foregroundColor(Color(ds: DSColor.tint))
-                            .cornerRadius(DSSpacing.buttonCornerRadius)
-                    }
-                    .accessibilityIdentifier("MonthJump-ScrollTop")
-
-                    ForEach(blocks) { block in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("\(String(block.year)) 年")
-                                .font(.headline)
-                                .foregroundColor(Color(ds: DSColor.textPrimary))
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-                                      spacing: 8) {
-                                ForEach(block.rows) { row in
-                                    monthCard(row)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(DSSpacing.screenPadding)
+                content
+                    .padding(DSSpacing.screenPadding)
             }
             .navigationTitle("按月份跳转")
             .navigationBarTitleDisplayMode(.inline)
@@ -105,45 +78,101 @@ struct MonthJumpSheet: View {
         .accessibilityIdentifier("MonthJump-Sheet")
     }
 
+    // 拆小表达式（SwiftUI 复杂 body 会触发类型检查超时）
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            backToTopButton
+            ForEach(blocks) { block in
+                yearSection(block)
+            }
+        }
+    }
+
+    private var backToTopButton: some View {
+        Button {
+            onScrollToTop()
+            dismiss()
+        } label: {
+            backToTopLabel
+        }
+        .accessibilityIdentifier("MonthJump-ScrollTop")
+    }
+
+    private var backToTopLabel: some View {
+        Label("回到顶部", systemImage: "arrow.up.to.line")
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color(ds: DSColor.bgSecondary))
+            .foregroundColor(Color(ds: DSColor.tint))
+            .cornerRadius(DSSpacing.buttonCornerRadius)
+    }
+
+    private func yearSection(_ block: YearBlock) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(String(block.year)) 年")
+                .font(.headline)
+                .foregroundColor(Color(ds: DSColor.textPrimary))
+            LazyVGrid(columns: Self.gridColumns, spacing: 8) {
+                ForEach(block.rows) { row in
+                    monthCard(row)
+                }
+            }
+        }
+    }
+
+    private static let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+
     // MARK: - 月份卡片
 
     private func monthCard(_ row: Row) -> some View {
         ZStack(alignment: .topTrailing) {
-            Button {
-                onSelect(row.sectionIndex)
-                dismiss()
-            } label: {
-                VStack(spacing: 2) {
-                    Text(row.title)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(Color(ds: DSColor.textPrimary))
-                    Text("\(row.count) 张")
-                        .font(.caption2)
-                        .foregroundColor(Color(ds: DSColor.textSecondary))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color(ds: DSColor.bgSecondary))
-                .cornerRadius(8)
-                .opacity(row.count == 0 ? 0.4 : 1)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("MonthJump-Month-\(row.id)")
-            .accessibilityLabel("\(row.title)，\(row.count) 张")
-            .disabled(row.count == 0)
-
-            Button {
-                onSelectAll(row.sectionIndex)
-                dismiss()
-            } label: {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color(ds: DSColor.tint))
-                    .padding(4)
-            }
-            .accessibilityIdentifier("MonthJump-SelectAll-\(row.id)")
-            .accessibilityLabel("全选\(row.title)")
-            .disabled(row.count == 0)
+            jumpButton(row)
+            selectAllButton(row)
         }
+    }
+
+    private func jumpButton(_ row: Row) -> some View {
+        Button {
+            onSelect(row.sectionIndex)
+            dismiss()
+        } label: {
+            cardLabel(row)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("MonthJump-Month-\(row.id)")
+        .accessibilityLabel("\(row.title)，\(row.count) 张")
+        .disabled(row.count == 0)
+    }
+
+    private func cardLabel(_ row: Row) -> some View {
+        VStack(spacing: 2) {
+            Text(row.title)
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(Color(ds: DSColor.textPrimary))
+            Text("\(row.count) 张")
+                .font(.caption2)
+                .foregroundColor(Color(ds: DSColor.textSecondary))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color(ds: DSColor.bgSecondary))
+        .cornerRadius(8)
+        .opacity(row.count == 0 ? 0.4 : 1)
+    }
+
+    private func selectAllButton(_ row: Row) -> some View {
+        Button {
+            onSelectAll(row.sectionIndex)
+            dismiss()
+        } label: {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(ds: DSColor.tint))
+                .padding(4)
+        }
+        .accessibilityIdentifier("MonthJump-SelectAll-\(row.id)")
+        .accessibilityLabel("全选\(row.title)")
+        .disabled(row.count == 0)
     }
 }
