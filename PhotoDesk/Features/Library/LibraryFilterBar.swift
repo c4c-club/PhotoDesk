@@ -66,6 +66,7 @@ struct LibraryFilterBar: View {
             }
         }
         .background(Color(ds: DSColor.bgPrimary))
+        .accessibilityIdentifier("Library-FilterBar")   // 稳定性 UI 测试锚点（S06 断言其不存在）
     }
 
     private var locationChipText: String {

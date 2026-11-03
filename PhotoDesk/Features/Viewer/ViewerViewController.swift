@@ -69,6 +69,7 @@ final class ViewerViewController: UIViewController {
         setupToast()
         setupPanGesture()
         scheduleChromeHide()
+        ViewerTrace.log("open items=\(viewModel.items.count) idx=\(viewModel.currentIndex)")
 
         undoCenter.onExpire = { [weak self] _ in
             self?.toast.dismiss()
@@ -206,6 +207,7 @@ final class ViewerViewController: UIViewController {
         let close = UIBarButtonItem(image: UIImage(systemName: "xmark"),
                                     style: .plain, target: self, action: #selector(closeTapped))
         close.accessibilityLabel = "关闭"
+        close.accessibilityIdentifier = "Viewer-Close"   // UI 测试锚点
         // SessionBadge（docs/09 D16）：查看器顶部待处理入口 → SessionReviewView
         let sessionBadge = UIBarButtonItem(title: "", style: .plain, target: self,
                                            action: #selector(sessionBadgeTapped))
@@ -416,6 +418,7 @@ final class ViewerViewController: UIViewController {
     private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?) {
         guard let item = viewModel.current else { return }
         guard let staged = viewModel.stage(action, forItemID: item.id, exitEdge: exitEdge) else { return }
+        ViewerTrace.log("stage \(action) idx=\(staged.removedIndex) count=\(viewModel.items.count)")
 
         flyOut(direction: exitEdge == .bottom ? .down : .up,
                index: staged.removedIndex) { [weak self] in
@@ -432,6 +435,7 @@ final class ViewerViewController: UIViewController {
 
     /// performBatchUpdates 删除 cell → 按计划滚到 nextIndex → entry 动画 → 刷新胶片条
     private func applyRemoval(staged: ViewerViewModel.StagedOutcome) {
+        ViewerTrace.log("commit idx=\(staged.removedIndex) next=\(staged.plan.nextIndex.map(String.init) ?? "nil") close=\(staged.plan.shouldClose)")
         let removedIndexPath = IndexPath(item: staged.removedIndex, section: 0)
         collectionView.performBatchUpdates {
             collectionView.deleteItems(at: [removedIndexPath])
@@ -690,6 +694,7 @@ final class ViewerViewController: UIViewController {
     // MARK: - 按钮
 
     @objc private func closeTapped() {
+        ViewerTrace.log("close idx=\(viewModel.currentIndex) count=\(viewModel.items.count)")
         undoCenter.dismissActive()
         onClose?()
         dismiss(animated: usesMotion)
@@ -835,6 +840,7 @@ final class ViewerViewController: UIViewController {
     private func loadImage(for item: PhotoItem, at index: Int, cell: ZoomableImageCell) {
         // cell 级 token（docs/09 D02：回填前校验 cell.itemID 与 item.id 一致且 token 未过期）
         let token = cell.beginLoad()
+        ViewerTrace.log("loadStart idx=\(index) id=\(item.id.prefix(8))")
         // iCloud-only 未下载：保持占位态，等用户点「下载」（docs/03 §5.8）
         guard !item.isCloudOnly else { return }
         Task { [weak self, weak cell] in
@@ -844,6 +850,7 @@ final class ViewerViewController: UIViewController {
                     cell?.updateDownloadProgress(fraction)
                 }
             }, allowNetwork: false)
+            ViewerTrace.log("loadEnd idx=\(index) ok=\(image != nil)")
             guard let cell, cell.itemID == item.id, cell.matches(token: token) else { return }
             if let image {
                 cell.applyDownloadedImage(image)
@@ -917,6 +924,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
         let page = Int(round(scrollView.contentOffset.x / max(1, scrollView.bounds.width)))
         let clamped = max(0, min(page, viewModel.items.count - 1))
         if clamped != viewModel.currentIndex {
+            ViewerTrace.log("page idx=\(clamped) count=\(viewModel.items.count)")
             viewModel.updateIndex(clamped)
             filmStrip.highlight(index: clamped, centerIfNeeded: true)
             refreshChrome()

@@ -38,6 +38,11 @@ for year in range(2020, 2027):
             exif[0x9003] = f"{year:04d}:{month:02d}:{day:02d} 12:00:00"
             im.save(f'/tmp/simphotos-dated/d{count:05d}.jpg', quality=85, exif=exif.tobytes())
             count += 1
+# 极端比例图（docs/13 Phase 0：S01 缩放 / S08 滑动覆盖——长图/宽图/超大全景）
+Image.new('RGB', (1200, 3600), (200, 60, 60)).save('/tmp/simphotos-dated/x-long.jpg', quality=85)
+Image.new('RGB', (3600, 1200), (60, 200, 60)).save('/tmp/simphotos-dated/x-wide.jpg', quality=85)
+Image.new('RGB', (12000, 1000), (60, 60, 200)).save('/tmp/simphotos-dated/x-pano.jpg', quality=85)
+count += 3
 print(f"generated {count}")
 PYEOF
 

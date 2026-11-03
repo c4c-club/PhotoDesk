@@ -1,7 +1,8 @@
 // MARK: - 职责说明：UI 测试钩子集中解析（docs/09 Phase 0）——
 // 仅 #if DEBUG 编译；由启动参数驱动（-uiTestingViewerStartIndex / -uiTestingSelectMode /
 // -uiTestingStorageMock / -uiTestingSessionMock / -uiTestingFaceIDBypass / -uiTestingFaceIDFailure /
-// -uiTestingAppLock / -uiTestingDatedPhotos）。Release 构建全部返回 false，绝不影响生产路径。
+// -uiTestingAppLock / -uiTestingDatedPhotos / -uiTestingDisableAnimations【docs/13 Phase 0：
+// 关闭全 App 动画，稳定坐标点击用，不是修复手段】）。Release 构建全部返回 false，绝不影响生产路径。
 
 import Foundation
 

@@ -1,0 +1,560 @@
+================================================================================
+PhotoDesk（照片管家）· 稳定性修复与页面交互重做 · 一次性执行提示词
+版本：v1.2.1 / M11 · 生成日期：2026-11-04
+适用仓库：C:\Users\RuiZh\Desktop\photo_manager（GitHub: c4c-club/PhotoDesk）
+基线：12a64fc（M10 最终提交）· 执行分支：fix/stability-20261104
+================================================================================
+
+【使用方式】
+把本文件从「=== 提示词正文开始 ===」到「=== 提示词正文结束 ===」之间的全部内容，一次性复制给编码 Agent。
+不要分批投喂，不要删减 Phase。Agent 必须按 Phase 0 → Phase 8 连续执行，直到 CI 全绿、文档齐全、IPA 产出，
+或达到「停止条件」。中途不要问“是否继续”，不要只给分析不给代码，不要只修一半就交付。
+
+=== 提示词正文开始 ===
+
+你是 PhotoDesk（照片管家）项目的 iOS 原生开发 Agent。本次任务是「稳定性修复 + 页面交互重做」，
+目标是把用户实测的 12 条必现/高频问题全部修到「有复现用例、有修复、有 CI 证据」，并把上一轮
+M10 引入的回归清理干净。**本轮不新增功能面，只做稳定性、正确性、交互可用性。**
+
+============================================================
+一、开始前必读（按顺序读完再动手，禁止跳读）
+============================================================
+
+1. C:\Users\RuiZh\Desktop\photo_manager\AGENTS.md
+   —— 全局编码规则：iOS 15 API 黑名单、架构分层、PhotoKit 规则、两条红线、DoD。
+2. docs\13-稳定性修复与页面交互重做规划.md
+   —— 本轮权威规划：12 条根因（S01–S12）、目标架构、Phase 0–8、验收矩阵。**与本文冲突时以 docs/13 为准。**
+3. docs\09-页面功能补齐与缺陷修复规划.md（只读 §2/§3 中与查看器、图库、位置记忆、多选相关的部分，
+   了解上一轮为什么这么设计；不要重复上一轮的错误方案）。
+4. docs\03-技术设计文档.md（架构、线程模型、ImagePipeline、查看器）。
+5. docs\04-UIUX设计文档.md（页面布局、交互规格、文案规范）。
+6. docs\05-开发进程与里程碑.md（M10 记录、变更日志格式）。
+7. 现有代码，至少逐行读完下面这些文件（不要只看文件名）：
+   - PhotoDesk/Features/Viewer/ViewerViewController.swift
+   - PhotoDesk/Features/Viewer/ViewerViewModel.swift
+   - PhotoDesk/Features/Viewer/ZoomableImageCell.swift
+   - PhotoDesk/Features/Viewer/FilmStripView.swift
+   - PhotoDesk/Features/Viewer/SwipeGestureEngine.swift
+   - PhotoDesk/Features/Library/LibraryViewController.swift
+   - PhotoDesk/Features/Library/LibraryViewModel.swift
+   - PhotoDesk/Features/Library/LibraryContainer.swift
+   - PhotoDesk/Features/Library/LibraryFilterBar.swift
+   - PhotoDesk/Features/Library/LibraryFilterSheet.swift
+   - PhotoDesk/Features/Library/MonthIndexBar.swift
+   - PhotoDesk/Features/Library/PhotoGridCell.swift
+   - PhotoDesk/Core/Imaging/ImagePipeline.swift
+   - PhotoDesk/Core/Support/LibraryPositionStore.swift
+   - PhotoDesk/Core/Support/LibraryQuery.swift
+   - PhotoDesk/Core/Support/DateSectionizer.swift
+   - PhotoDesk/Core/Support/ReviewSessionController.swift
+   - PhotoDesk/Core/Photos/AssetRepository.swift
+   - PhotoDesk/Core/Photos/BatchCommitCoordinator.swift
+   - PhotoDesk/UI/DesignSystem/DSToast.swift
+   - PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift
+   - PhotoDeskCore/Sources/PhotoDeskCore/ReplacementPlanner.swift
+   - PhotoDeskTests/ViewerViewModelTests.swift
+   - PhotoDeskUITests/PageRegressionUITests.swift
+8. 先输出一份「现状确认」：用 10–15 行列出你读到的 4 组根因、涉及文件、你准备先改哪 3 个文件。
+   输出后**立刻开始 Phase 0**，不要等待用户确认。
+
+============================================================
+二、项目事实与环境（已确认，不要重复探测、不要建议替代方案）
+============================================================
+
+- 项目：PhotoDesk，iOS 原生照片管理 App；最低部署 iOS 15.0（硬性）；Swift 5.9+；SwiftUI 壳 + UIKit 核。
+- 第三方依赖：0 个；只用系统框架；完全离线，禁止 URLSession 外发、禁止分析/广告 SDK。
+- Bundle ID：com.example.PhotoDesk；DEVELOPMENT_TEAM 从环境变量注入。
+- 本机：Windows 10 原生，无 Xcode、无 iOS 模拟器。**本机不能编译 iOS，不要尝试 xcodebuild / simctl。**
+- 本地唯一可跑的测试：Docker 容器 swift:6.0-noble，入口：
+  powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+- iOS 编译/测试/出包：GitHub Actions（macos-14，Xcode 15.4，iOS 15.5 模拟器），workflow：.github/workflows/ios.yml。
+- 仓库：origin = https://github.com/c4c-club/PhotoDesk.git；gh CLI 已安装并登录。
+- CI 前会执行 scripts/sim-photos-dated.sh 2（2020–2026 每月 2 张，约 166 张）；性能测试会导入 5,000 张。
+- 本机未安装 AltServer / idevice_id；**不要假装真机验证**。模拟器/CI 能验证的必须由你亲自验证；
+  真机专属项输出清单，标注「本机无法验证，需用户在 iPhone 上执行」。
+- 出包：CI 产出未签名 `PhotoDesk-unsigned-ipa` + `.sha256`；用户用 AltStore/Sideloadly 自签；
+  你只负责产出 IPA + SHA256 + docs/12，不负责替用户签名，也不要把“未验证真机”写成已验证。
+- 上一轮最终 CI：run 41535224761，core 126/126、iOS 单测 104/104、UI 12/12、性能 2/2（5,470 张 156s）。
+- 当前版本 1.1.0 (Build 2)；本轮目标版本 **1.1.1 (Build 3)**。
+
+两条红线（违反即打回，任何情况下不得突破）：
+1. **永不永久删除**：应用内所有“删除”只能走 `PHAssetChangeRequest.deleteAssets` → 系统「最近删除」（30 天）。
+   禁止永久擦除、禁止清空「最近删除」、禁止绕过系统回收站、禁止把删除实现成沙盒内删除。
+   UI 文案统一说「移到最近删除」，不得出现「彻底删除」「永久删除」（否定句说明除外）。
+2. **PhotoDeskCore 零 Apple 依赖**：只能 import Foundation；禁止 import UIKit / SwiftUI / Photos / PhotosUI /
+   Vision / CoreImage / Accelerate。输入用基础类型（Double、[UInt8]、Date、自定义 struct），
+   不传 CGSize / UIImage / PHAsset。纯逻辑（缩放几何 / 范围选择 / 月份导航 / 位置策略 / 手势判定）
+   必须放 PhotoDeskCore 并写 XCTest；App 侧只做类型适配。
+
+其他硬约束：
+- iOS 15 API 黑名单：NavigationStack / NavigationPath / PhotosPicker(SwiftUI) / ShareLink / Swift Charts /
+  @Observable / @Bindable / ContentUnavailableView / .scrollContentBackground / .scrollTargetBehavior /
+  .scrollPosition / ImageRenderer / .fontDesign() / .toolbarBackground / SwiftData —— 全部禁止直接使用。
+  需要新 API 时写 `if #available(iOS 16, *) { ... } else { ... }` 双实现。
+- 网格/全屏浏览器必须用 UIKit（UICollectionView + Compositional Layout + Diffable DataSource + Prefetching）；
+  不要改成 SwiftUI LazyVGrid。
+- 所有 PhotoKit 写操作必须在 `PHPhotoLibrary.shared().performChanges` 内并处理 completion error。
+- 主网格 `includeHiddenAssets = false`；“已隐藏”scope 才为 true。
+- 图片加载必须走 ImagePipeline，禁止在 View 里直接 requestImage。
+- 新增文件必须加入 Xcode target membership（XcodeGen 下自动包含，注意 excludes）。
+- 每个文件顶部写一行 `// MARK: - 职责说明`；颜色/字体/间距只用 DesignSystem token；
+  禁止 try! / 强制解包（IBOutlet 与已确保非空的 PHFetchResult.object(at:) 除外）。
+- 不新增第三方依赖；不新增网络权限；不新增 Capability（免费签名会失败）。
+- **本轮禁止用「关闭动画/延迟/吞异常」当修复**；禁止为了变绿删除/跳过/弱化测试。
+
+============================================================
+三、本轮 12 条问题（必须逐条修复，不许漏）
+============================================================
+
+> 下面每条都给出「现象 / 根因 / 必须做到 / 验收」。详细代码定位见 docs/13 §2。
+> 修复时必须先写一个修复前会失败的测试；测试名按下面给的命名，方便验收。
+
+S01 捏合缩放必卡死闪退
+- 现象：查看器双指放大/缩小几次就卡住闪退；双击也可能崩。
+- 根因：ZoomableImageCell 在 cell 未布局时把 imageView.frame 设为 zero；layoutSubviews / scrollViewDidZoom
+  在缩放过程中直接改被缩放视图的 frame；双击在 UIView.animate 内先 zoom(to:) 再 setZoomScale；
+  没有 NaN/零尺寸守卫。
+- 必须做到：
+  1) 新增 PhotoDeskCore/ZoomGeometry.swift（纯 Double）：aspectFitSize / centeredInset / clampedZoomRect /
+     sanitizedScale，全部对 0/负/NaN/∞ 返回安全值，≥12 条单测；
+  2) 重写 ZoomableImageCell：scrollView → zoomContentView → imageView；viewForZooming 返回 zoomContentView；
+     只有 bounds > 0 且 image != nil 时才允许缩放；缩放中绝不改 zoomContentView.frame；
+     scrollViewDidZoom 只更新 contentInset；双击只调用一次 scrollView.zoom(to:animated:)；
+  3) image == nil 时 scrollView.isUserInteractionEnabled = false；
+  4) prepareForReuse 取消加载、清图、resetZoom（先判 bounds）；
+  5) DEBUG 横幅显示 zoom=<有限数字>，UI 测试断言不含 nan/inf。
+- 验收：StabilityUITests.testPinchZoom20Times 全绿（20 次放大/缩小/双击，app 始终 runningForeground）；
+  ZoomGeometryTests ≥12 全绿。
+
+S02 快速滑动必卡死闪退
+- 现象：查看器快速左右连续滑十几张，卡住后闪退（常为 jetsam）。
+- 根因：ViewerViewController.prefetchAround 每次翻页以全屏像素 startCachingImages 且从不 stopCachingImages；
+  ImagePipeline.fullImage 用 PHImageManagerMaximumSize + .opportunistic + withCheckedContinuation，
+  无取消、无单次 resume 保护；FilmStripView.highlight 每次 reloadData。
+- 必须做到：
+  1) 新增 ResumeOnce<T>（NSLock + didResume），所有 continuation 必须经它 resume；
+  2) ImagePipeline 改为可注入 ImageRequesting（生产 PHCachingImageManager，测试 Fake）；
+     fullImage 用 .highQualityFormat（单次回调）+ .fast + targetSize = min(screenPixel*1.25, 2048)，
+     保存 PHImageRequestID，cancel 可取消；
+  3) prefetch 维护 prefetchedIDs，差量 stop/start，窗口 ≤ 7 张，尺寸 ≤ 2048；
+  4) 新增 fullImageCache（countLimit 6 / costLimit 60MB）与 cancelAll()；
+  5) FilmStripView.highlight 不再 reloadData，只刷新旧/新两个 cell 的 isCurrent；
+  6) ViewerViewController.prefetchAround 只在页码变化时调用，加 100ms 防抖，items 为空/越界直接 return；
+  7) viewDidDisappear 调 pipeline.cancelAll()。
+- 验收：ImagePipelineResumeTests 全绿（Fake 连续回调两次/取消后回调，不崩且只 resume 一次）；
+  StabilityUITests.testFastSwipe50Times 全绿；5,000 张 100 次滑动内存峰值 < 250MB。
+
+S03 选择年份后卡死闪退
+- 现象：筛选面板选年份并应用，或点右侧年份刻度，卡住后闪退；持久化筛选后重启也可能崩。
+- 根因：LibraryViewModel.setFilter 在主线程同步全量过滤/分组；LibraryViewController.applySnapshot 在
+  dataSource.apply 未完成时立刻 restorePositionIfNeeded()/syncIndexBar()，并按新 section index
+  scrollToItem；索引条 entries 先于快照更新；后台索引与用户筛选的 apply 交错；索引续拉可能产生重复 id。
+- 必须做到：
+  1) setFilter 改为后台 Task.detached + filterGeneration 代际令牌，主线程只赋值与推快照；
+  2) LibraryViewController 增加 isApplyingSnapshot + pendingSnapshot + drain()：同一时间只允许一个
+     dataSource.apply；新快照覆盖 pending；筛选/年份变化一律 animatingDifferences:false；
+  3) currentSections/currentItemsBySection、syncIndexBar、restorePositionIfNeeded 全部移到 apply completion；
+  4) scrollToSection / restore 前校验 collectionView.numberOfSections 与 numberOfItems(inSection:)，
+     用 dataSource.indexPath(for:) 拿有效 index path；
+  5) rebuildSections 前对 filteredItems 按 id 去重（保序）；runIndexCompletion 追加后去重；
+     DEBUG 下断言 id 唯一，Release 去重后继续；
+  6) LibraryFilterSheet.previewCount 改 @State + 200ms debounce，不在 body 里全量扫描；
+  7) isApplyingSnapshot 时 indexBar.isUserInteractionEnabled = false，完成后恢复。
+- 验收：StabilityUITests.testFilterYearsRepeatedly（2026→2024→2020 循环 5 次）全绿；
+  testFilterPersistedAfterRelaunch 全绿；5,470 张筛选 < 500ms，主线程无 >100ms 阻塞。
+
+S04 无法记住上次整理到的位置
+- 现象：滚到某月/某张，切 Tab 或杀进程重启，回到顶部或错误位置。
+- 根因：didRestorePosition 在 positionStore.load 之前就置 true；首快照只有 500 张，保存的 asset 找不到时
+  用部分 contentSize 算 ratio；保存只靠滚动停止 0.5s + viewWillDisappear；queryKey 读的是保存时的值；
+  sectionID 存了但恢复时完全没用；每次恢复都弹底部 Toast。
+- 必须做到：
+  1) LibraryPosition v2：assetID/sectionID/itemIndexInSection/offsetRatio/savedAt/schemaVersion；
+     LibraryPositionStore 用 library.lastPosition.v2.<queryKey>，兼容 v1 读取（失败不崩）；
+  2) LibraryViewController 捕获 currentSnapshotQueryKey，保存时用它，不用 viewModel.query.key；
+  3) 统一 savePositionNow(reason:)：scrollViewDidEndDecelerating、scrollViewDidEndDragging(willDecelerate:false)、
+     viewWillDisappear、UIApplication.willResignActiveNotification、scenePhase .background、
+     scrollToSection 完成后、0.3s 滚动停止兜底；
+  4) LibraryViewModel 增加 isIndexComplete；恢复策略：assetID → sectionID + itemIndexInSection → offsetRatio；
+     索引未完成且 assetID 找不到时保持 pending，等下一批；不要提前置 didRestorePosition；
+  5) 恢复成功不弹 Toast，只在 DEBUG 横幅显示 restore=ok section=<id>；
+  6) 设置页「清除位置记忆」保留并清空 v2。
+- 验收：LibraryPositionStoreTests 全绿；StabilityUITests.testPositionRestoredAfterRelaunch 全绿
+  （滚到 2024-05 → terminate → launch → header 含「2024年5月」）；testPositionSavedOnTabSwitch 全绿。
+
+S05 程序下半部分有一个气泡一直占位，挡住控件
+- 现象：照片库底部、Tab 栏上方有一条空玻璃胶囊，占位且拦截触摸。
+- 根因：DSToast 只给 effectView 设了 translatesAutoresizingMaskIntoConstraints=false，
+  iconView/messageLabel/undoButton 仍是 autoresizing → 内容塌陷成空胶囊；dismiss 只设 alpha=0，
+  不 isHidden、不关交互；batchToast 常驻底部；restorePositionIfNeeded 每次启动都 show。
+- 必须做到：
+  1) DSToast：三个子视图全部 translatesAutoresizingMaskIntoConstraints=false；messageLabel 单行截断；
+     init 即 isHidden=true；show 时 isHidden=false；dismiss 完成 isHidden=true；show 加 generation 令牌；
+  2) override hitTest：isHidden 或 alpha<=0.01 返回 nil；只允许 undoButton 命中，其余返回 nil；
+  3) LibraryViewController：batchToast 不再常驻；删除恢复 Toast；多选时 toast 上移到 selectionBar 之上
+     （bottom = -(84+12)），退出多选恢复 -12；
+  4) 首次捏合提示改为顶部提示/2 秒自动消失，不占底部；
+  5) Viewer/SessionReview 的 Toast 同样走新 DSToast。
+- 验收：StabilityUITests.testToastDoesNotBlockGrid 全绿（启动等 5s，点最后一个可见 cell 能打开查看器；
+  DSToast 不存在或 isHittable=false）；截图 s05-toast.png 底部无空胶囊。
+
+S06 顶部的筛选栏不要，筛选按钮放到全选左侧
+- 现象：ScopePicker 下还有一行筛选图标+chips+「共 N 项」，占约 50pt。
+- 必须做到：
+  1) LibraryRootView 删除 LibraryFilterBar 调用；VStack 只保留 scopePicker + ZStack；
+     删除 LibraryFilterBar.swift（或把 chips 迁到 LibraryFilterSheet 顶部「当前条件」section，不得留死代码）；
+  2) 导航栏 trailing 增加筛选按钮（active 用 .fill），accessibilityIdentifier="Library-Filter"，
+     位于搜索按钮左侧；不新增整行；
+  3) LibraryViewController 多选 actionStack 顺序：filterButton, selectAllButton, favorite, hide, delete, album, more；
+     filterButton 的 accessibilityIdentifier="Batch-Filter"，点击回调 onOpenFilter；
+  4) LibraryContainer 增加 onOpenFilter 闭包并赋给 controller；LibraryRootView 传入 { showFilterSheet = true }；
+  5) LibraryFilterSheet 顶部「当前条件」显示 chips + 清除全部；
+  6) 主页面不再常驻「共 N 项」。
+- 验收：StabilityUITests.testFilterBarRemovedAndFilterButtonPlacement 全绿：
+  Library-FilterBar 不存在；Batch-Filter.frame.maxX <= Batch-SelectAll.frame.minX；点 Batch-Filter 能开 sheet；
+  截图 s06-filter-entry.png 顶部只有 ScopePicker。
+
+S07 多选时不能滑动选择
+- 现象：多选模式只能逐格点，按住拖动变成滚动或不触发。
+- 根因：长按 minimumPressDuration=0.28、allowableMovement=10 太苛刻；没有范围选择纯逻辑；
+  框选只加选、跨 section 不连续；长按失败时 collectionView 的 pan 接管。
+- 必须做到：
+  1) PhotoDeskCore 新增 SelectionRange.ids(in:from:to:)（双向、缺失返回空、去重），≥10 条单测；
+  2) SelectionState 增加 select(_ ids:)、replaceSelection(_ ids:)、selectRange(in:from:to:)；
+  3) LibraryViewController 长按参数改 0.15s / allowableMovement=.greatestFiniteMagnitude /
+     delaysTouchesBegan=false；.began 记录 anchorID + baseSelected；.changed 用
+     SelectionRange + replaceSelection(base ∪ range) 连续选中，边缘 CADisplayLink 自动滚；
+     .ended 清理并恢复滚动；快速滑动（未按 0.15s）仍滚动；
+  4) 多选工具栏加提示「按住滑动可连续选择」；
+  5) 角标刷新用 dataSource.itemIdentifier(for:)，不用数组下标。
+- 验收：SelectionRangeTests ≥10 全绿；StabilityUITests.testSlideToSelect 全绿（长按第 1 格拖到第 6 格，
+  计数 ≥6，前 6 格 selected）；既有 testScrollWorksInSelectionMode 仍绿。
+
+S08 滑动照片闪退
+- 现象：查看器左右滑几张闪退，像 S02 但更像「滑到某张特定的图」。
+- 根因：loadImage 的 Task 没保存到 cell；didEndDisplaying 只处理 VideoCell；ZoomableImageCell.prepareForReuse
+  不取消在途任务；fullImage 用 MaximumSize；cellForItemAt 无边界检查。
+- 必须做到：
+  1) ZoomableImageCell 增加 loadTask + cancelLoad；prepareForReuse 调 cancelLoad；
+  2) ViewerViewController.loadImage 把 Task 存到 cell；didEndDisplaying 对 ZoomableImageCell 调 cancelLoad；
+  3) fullImage 按 S02 的目标尺寸/单次 resume/requestID；
+  4) cellForItemAt / willDisplay / prefetchItemsAt 全部 guard indexPath.item < items.count；
+     numberOfItemsInSection 返回 max(0, items.count)；
+  5) DEBUG 横幅显示 load=<在途数>，滑动后不得持续增长（≤3）。
+- 验收：StabilityUITests.testViewerSwipeThroughAllPhotos 全绿（第 1 张滑到第 30 张，每张停 0.3s，
+  app 始终 runningForeground）；5,000 张滑 50 张内存 <250MB。
+
+S09 要求能够按月份进行跳转
+- 现象：右侧只有很细的刻度条，点/拖不精确；没有月份面板；月份头不能跳。
+- 必须做到：
+  1) PhotoDeskCore 新增 MonthNavigator（MonthDescriptor/YearGroup/descriptors/yearGroups/nearestIndex/
+     monthID），纯 Foundation，≥10 条单测（闰年/未知/空/排序/跨年）；
+  2) 新增 PhotoDesk/Features/Library/MonthJumpSheet.swift：按年份分组 + 3 列月份卡片（月份名 + N 张），
+     点击跳转；卡片右上角「全选」；顶部「回到顶部」；accessibilityIdentifier：
+     MonthJump-Sheet / MonthJump-Month-2024-05 / MonthJump-SelectAll-2024-05；
+  3) LibraryRootView 导航栏加「月份」按钮（calendar 图标，Library-MonthJump），sheet 呈现 MonthJumpSheet；
+  4) MonthIndexBar 保留但增大命中区域 + 拖动浮层显示「2024年5月」+ accessibilityIdentifier="MonthIndexBar"；
+  5) scrollToSection：校验 numberOfSections/numberOfItems，isProgrammaticScroll 包裹，
+     scrollToItem(.top) 后 contentOffset.y -= 48 抵消 sticky header，完成后 savePositionNow("monthJump")；
+  6) MonthHeaderView 标题点击弹菜单：「跳到本月」「选择本月全部」「取消」。
+- 验收：MonthNavigatorTests 全绿；StabilityUITests.testMonthJump 全绿（选 2024-05 → header 含 2024年5月）。
+
+S10 要求能够对单月的内容进行全选
+- 现象：月份头「选择」只进入多选，不全选；还要再点全选；范围不明确。
+- 必须做到：
+  1) SelectionState 增加 scopeID（如 "month:2024-05"）；begin(scope:initial:scopeID:)；
+  2) LibraryViewController.enterSelectionMode(section:selectAll:)：scope=该月 ids，
+     selectAll=true 时立即 selectionState.selectAll()；计数文案「已选择 N 项 · 本月」；
+  3) MonthHeaderView 右侧按钮改 ellipsis.circle（MonthHeader-Menu-<sectionID>），UIMenu：
+     「选择本月全部」「跳到本月」；标题 accessibilityValue="id=<sectionID> count=<n>"；
+  4) selectAllTapped：scopeID 是 month 时只在该月 scope 内 selectAll/deselectAll，
+     不得 intersectScope 到全库；只有普通多选（scopeID nil）才扩到当前筛选全集；
+  5) MonthJumpSheet 的月份卡片「全选」调用同一入口并关闭 sheet。
+- 验收：StabilityUITests.testSelectWholeMonth 全绿（计数 == header count，且含「本月」；
+  再点全选归零）；testSelectAllDoesNotLeakToOtherMonths 全绿。
+
+S11 通过时间刻度跳转后，重启应用无法记住位置
+- 现象：拖右侧刻度跳到某月，马上杀进程重启，回到顶部/旧位置。
+- 必须做到：
+  1) scrollToSection 完成后同步保存 LibraryPosition（assetID=目标 section item 0，sectionID，itemIndex=0），
+     不依赖滚动回调/0.5s Timer；
+  2) restorePositionIfNeeded 增加 sectionID 优先（见 S04）；
+  3) LibraryRootView 在 scenePhase .background/.inactive 调 controller.savePositionNow；
+  4) 跳转后显示 1.5s 顶部细横幅「已跳到 2024年5月」，不挡网格。
+- 验收：StabilityUITests.testMonthJumpPersistsAfterRelaunch 全绿（跳 2024-05 → terminate → launch →
+  header 2024年5月）。
+
+S12 删除、隐藏图片必闪退（先跳第一张，再闪退）
+- 现象：查看器下滑删除/隐藏任意一张，画面先跳到第一张后闪退；多选批量删除也可能崩。
+- 根因：ViewerViewModel.stage 先 items.remove，再等 0.35s flyOut 完成才 performBatchUpdates deleteItems；
+  期间 collectionView 仍按旧 index 取新数组；performBatchUpdates 在布局已更新后再删 → 数量不一致；
+  currentIndex=plan.nextIndex ?? 0 可能跳 0；无串行化；cellForItemAt 无边界检查。
+- 必须做到：
+  1) ViewerViewModel 拆分 planRemoval（只入队+算 plan，不改 items/currentIndex）/
+     commitRemoval（在 batch block 内改 items + 返回 nextIndex/shouldClose）/ rollbackRemoval；
+  2) ViewerViewController：isRemovalInFlight 串行；取 cell snapshotView 加到 view 上做飞出动画；
+     **立即**在同一 runloop 执行 performBatchUpdates { commitRemoval + deleteItems }；
+     completion 里 scrollTo(next)/dismiss/刷新 filmstrip/prefetch；不要等 0.35s；
+  3) 删除 flyOut 真实 cell 的逻辑；snapshot 动画不阻塞数据源；
+  4) cellForItemAt/willDisplay/prefetchItemsAt 全部 guard 边界；numberOfItemsInSection 返回 max(0, count)；
+  5) prefetchAround 用 items[index..<min(index+4, count)]，空数组/越界 return；
+  6) 多选批量删除仍走 ReviewSession + SessionReviewView，不直接操作网格；网格通过 diffable 快照移除；
+  7) 新增 ViewerRemovalPlannerTests ≥8 条（首/中/末/唯一/连续两次/plan 不改数组/commit 后 index/回滚）。
+- 验收：StabilityUITests.testDeleteFirstMiddleLastNoCrash、testHideFirstMiddleLastNoCrash、
+  testDelete20InARowNoCrash 全绿；每次 app 始终 runningForeground；横幅 id 为预期邻居；计数正确。
+
+============================================================
+四、本轮架构要求（不要偏离）
+============================================================
+
+1. **查看器单一事实来源**：任意时刻 `viewModel.items.count == collectionView.numberOfItems(inSection:0)`，
+   除了 performBatchUpdates block 内部；currentIndex 永远在 0..<count；空列表关闭查看器。
+2. **删除事务**：plan（不改数组）→ snapshot 飞出（可选）→ 同一 runloop `performBatchUpdates { commitRemoval + deleteItems }`
+   → completion 定位/关闭 → 刷新。isRemovalInFlight 串行化。
+3. **ImagePipeline v2**：ResumeOnce + ImageRequesting 协议 + requestID 取消 + 目标尺寸上限 2048 +
+   预取差量 stop/start + fullImageCache 60MB + cancelAll + 内存警告清理。
+4. **ZoomableImageCell v2**：scrollView → zoomContentView → imageView；缩放中不改 frame；
+   scrollViewDidZoom 只改 contentInset；双击只调用一次 zoom(to:)；零尺寸/NaN 守卫。
+5. **Library 快照协调器**：isApplyingSnapshot + pendingSnapshot + drain；apply completion 后再
+   syncIndexBar/restore/更新数组；筛选/年份变化 animatingDifferences:false；去重。
+6. **位置记忆 v2**：currentSnapshotQueryKey + sectionID/itemIndexInSection + isIndexComplete +
+   多生命周期保存；恢复按 assetID → sectionID → ratio。
+7. **月份导航**：MonthNavigator core + MonthJumpSheet + MonthIndexBar 增强 + MonthHeader 菜单。
+8. **多选范围**：SelectionRange core + 0.15s 长按 + 无移动限制 + CADisplayLink 边缘滚动；快速滑动仍滚动。
+9. **Toast**：内容约束完整、默认隐藏、dismiss 后 isHidden、hitTest 只放行 undoButton、不常驻底部。
+10. **崩溃取证**：ViewerTrace 环形缓冲 + AppCrashLogger（NSSetUncaughtExceptionHandler）+
+    DiagnosticsView 查看/导出；DEBUG 横幅 items/idx/id/zoom/load/restore。
+
+============================================================
+五、执行顺序（必须按 Phase 0 → 8，不许跳）
+============================================================
+
+【Phase 0 · 基线与崩溃复现（0.5–1 天）】
+1. git status 确认干净；建分支：
+   git checkout fix/pages-overhaul-20261103
+   git checkout -b fix/stability-20261104
+2. 新增 PhotoDeskUITests/StabilityUITests.swift，先写 12 个用例（可全红）：
+   testPinchZoom20Times / testFastSwipe50Times / testFilterYearsRepeatedly /
+   testPositionRestoredAfterRelaunch / testToastDoesNotBlockGrid /
+   testFilterBarRemovedAndFilterButtonPlacement / testSlideToSelect /
+   testViewerSwipeThroughAllPhotos / testMonthJump / testSelectWholeMonth /
+   testMonthJumpPersistsAfterRelaunch / testDeleteFirstMiddleLastNoCrash
+   另加 testHideFirstMiddleLastNoCrash / testDelete20InARowNoCrash / testAllPagesSmoke。
+   公共 helper：launchToGrid / openViewer(at:) / swipeDown / swipeUp / swipeLeft / assertAlive /
+   sectionHeaderTitle / selectionCount。所有断言必须带 hierarchy(app) 失败取证。
+3. 新增 PhotoDesk/Core/Support/ViewerTrace.swift + AppCrashLogger.swift；在 PhotoDeskApp.init 或
+   @UIApplicationDelegateAdaptor 安装 AppCrashLogger；ViewerViewController 关键节点打 trace：
+   open/page/zoomBegin/zoomEnd/loadStart/loadEnd/loadCancel/stage/plan/commit/remove/close。
+4. UITestHooks 增加 -uiTestingDisableAnimations（仅 DEBUG，稳定坐标点击用，不是修复手段）；
+   保留已有 -uiTestingViewerStartIndex / -uiTestingSelectMode / -uiTestingSessionMock /
+   -uiTestingKeepChrome / -uiTestingStorageMock / -uiTestingFaceIDBypass。
+5. scripts/sim-photos-dated.sh 增加 1:3 长图、3:1 宽图、12000×1000 全景各 1 张。
+6. 跑 baseline：
+   powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+   git add -A && git commit -m "test(stability): 固化 12 条崩溃/交互回归用例 + 崩溃取证骨架"
+   git push -u origin fix/stability-20261104
+   gh run list --branch fix/stability-20261104 --limit 5
+   gh run watch <RUN_ID> --exit-status
+   记录失败用例名与崩溃签名；不要在这一步修业务代码。
+7. Phase 0 验收：至少 6 条用例能复现失败/崩溃；Application Support/Logs/ 有 trace。
+
+【Phase 1 · 核心纯逻辑 + 单测（1 天）】
+1. PhotoDeskCore/ZoomGeometry.swift、SelectionRange.swift、MonthNavigator.swift；
+   SelectionPolicy 扩展 scopeID/select/replaceSelection/selectRange。
+2. 新增 PhotoDeskTests/ZoomGeometryTests.swift、SelectionRangeTests.swift、MonthNavigatorTests.swift；
+   补 SelectionPolicyTests。
+3. 本机跑 scripts/test-core.ps1，全绿，覆盖率 ≥85%。
+4. commit：feat(core): ZoomGeometry/SelectionRange/MonthNavigator + 单测
+
+【Phase 2 · ImagePipeline v2 + 单测（1.5 天）】
+1. 新增 PhotoDesk/Core/Imaging/ResumeOnce.swift、ImageRequesting.swift。
+2. 重写 ImagePipeline：ResumeOnce、requestID 取消、.highQualityFormat、targetSize 上限、
+   prefetch 差量 stop/start、fullImageCache、cancelAll、内存警告清理。
+3. 新增 PhotoDeskTests/ImagePipelineResumeTests.swift（Fake 连续回调两次/取消后回调/预取 stop/尺寸上限）。
+4. ZoomableImageCell 先加 loadTask/cancelLoad（完整重写在 Phase 3）。
+5. commit：fix(imaging): ImagePipeline 单次 resume + 可取消 + 预取有界
+
+【Phase 3 · 查看器重写（2 天）】
+1. 重写 ZoomableImageCell（按 S01/§四.4）。
+2. ViewerViewModel 拆 planRemoval/commitRemoval/rollbackRemoval。
+3. ViewerViewController：snapshot 飞出 + 立即 performBatchUpdates；isRemovalInFlight；
+   边界保护；prefetch 防抖；FilmStrip 只刷新两格；viewDidDisappear cancelAll；DEBUG 横幅。
+4. 新增 ViewerRemovalPlannerTests（≥8）。
+5. UI：testPinchZoom20Times / testFastSwipe50Times / testViewerSwipeThroughAllPhotos /
+   testDeleteFirstMiddleLastNoCrash / testHideFirstMiddleLastNoCrash / testDelete20InARowNoCrash。
+6. commit：fix(viewer): 删除事务 + 缩放几何 + 请求取消，修复捏合/快滑/删除闪退
+
+【Phase 4 · 图库快照/筛选稳定性（1.5 天）】
+1. LibraryViewModel 后台过滤 + filterGeneration + isIndexComplete + 去重。
+2. LibraryViewController isApplyingSnapshot + pendingSnapshot + drain；apply completion 后再
+   syncIndexBar/restore/更新数组；indexBar 在 apply 中禁用；reloadSelectionBadges 用 dataSource。
+3. LibraryFilterSheet previewCount 改 @State + debounce。
+4. UI：testFilterYearsRepeatedly / testFilterPersistedAfterRelaunch；既有全选用例仍绿。
+5. commit：fix(library): 快照串行化 + 后台筛选 + 去重，修复选年份崩溃
+
+【Phase 5 · 位置记忆 v2 + 月份导航 + 单月全选（1.5 天）】
+1. LibraryPositionStore v2 + LibraryPositionStoreTests。
+2. LibraryViewController savePositionNow + restoreIfNeeded 重写 + currentSnapshotQueryKey。
+3. LibraryViewModel.isIndexComplete 接入。
+4. MonthNavigator + MonthJumpSheet + MonthIndexBar 增强 + MonthHeaderView 菜单。
+5. SelectionState scopeID + enterSelectionMode(section:selectAll:) + selectAllTapped 分支。
+6. LibraryRootView 导航栏月份按钮 + scenePhase 保存。
+7. UI：testPositionRestoredAfterRelaunch / testMonthJump / testSelectWholeMonth /
+   testMonthJumpPersistsAfterRelaunch。
+8. commit：feat(library): 位置记忆 v2 + 月份跳转/单月全选
+
+【Phase 6 · 多选滑动 + 筛选栏移除 + Toast（1 天）】
+1. LibraryViewController 长按 0.15s + SelectionRange + 边缘滚动 + 提示。
+2. 删除 LibraryFilterBar；LibraryRootView 只剩 ScopePicker + 网格；导航栏筛选按钮；
+   actionStack 加 Batch-Filter 在 Batch-SelectAll 左侧；LibraryContainer 传 onOpenFilter。
+3. DSToast 重写布局/命中测试/隐藏；batchToast 位置随 selectionBar 上移；删除恢复 Toast。
+4. UI：testSlideToSelect / testFastSwipeStillScrollsInSelectionMode / testToastDoesNotBlockGrid /
+   testFilterBarRemovedAndFilterButtonPlacement。
+5. 截图 s05-toast.png / s06-filter-entry.png / s07-slide-select.png。
+6. commit：fix(ui): 移除顶部筛选栏 + 多选滑动选择 + Toast 不再挡控件
+
+【Phase 7 · 全页面回归 + 压力/性能（1.5 天）】
+1. testAllPagesSmoke：照片库→查看器→工具→智能清理→已隐藏（FaceID bypass）→相簿→最近删除→
+   存储统计（mock）→手势教学→设置→返回；每步 app.state == .runningForeground。
+2. PerformanceUITests：testViewerMemoryUnderFastSwipe（5,000 张 100 次滑动，XCTMemoryMetric）、
+   testFilterPerformance（5,470 张年份切换 5 次，XCTClockMetric）。
+3. 压力循环：50 次快滑 / 20 次捏合 / 20 次删除（首中末）/ 20 次隐藏 / 20 次年份切换 / 10 次月份跳转 /
+   3 次杀进程重启；全部 0 崩溃。
+4. 检查 ViewerTrace/last-exception.log 为空；修复所有回归；更新既有 UI 断言（Library-Result-Count 已移除）。
+5. commit：test(stability): 全页面烟测 + 压力/性能回归
+
+【Phase 8 · CI 全绿、截图、文档、IPA（1 天）】
+1. git push → CI；最多 12 轮，每轮只修一个根因；gh run view <ID> --log-failed 看失败。
+2. 截图 12 张：s01-zoom / s02-fast-swipe / s03-year-filter / s04-restore / s05-toast /
+   s06-filter-entry / s07-slide-select / s08-viewer / s09-month-jump / s10-month-select /
+   s11-relaunch / s12-delete；逐张打开确认。
+3. 文档：docs/05（M11 + 变更 20）、docs/03（ImagePipeline/Zoom/删除事务/快照协调器）、
+   docs/04（筛选栏移除/月份面板/滑动选择/Toast）、docs/15-稳定性修复验收记录.md、
+   已知问题.md、发布说明.md（1.1.1 Build 3）、docs/12（真机复测清单）。
+4. IPA：确认 PhotoDesk-unsigned-ipa + .sha256；unzip -l / plutil MinimumOSVersion=15.0 /
+   otool minos=15.0 / codesign 未签名；记录 SHA256。
+5. 红线 grep：
+   grep -rn "deleteAssets" PhotoDesk --include=*.swift   # 仅 PhotoWriter.moveToRecentlyDeleted
+   grep -rn "永久删除\|彻底删除\|清空.*最近删除" .       # 仅否定句说明
+   grep -rn "URLSession\|import Alamofire\|import SDWebImage" PhotoDesk PhotoDeskCore
+   grep -rn "import UIKit\|import SwiftUI\|import Photos" PhotoDeskCore/Sources
+6. commit：docs(m11): 稳定性修复验收记录 + 1.1.1 IPA 说明
+
+============================================================
+六、测试与命令（本机 + CI）
+============================================================
+
+本机（只跑 core）：
+  powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+  # 或（脚本不可用时）：
+  docker run --rm -v "${PWD}/PhotoDeskCore:/package" -w /package swift:6.0-noble swift test
+
+Git：
+  git status
+  git add -A
+  git commit -m "fix(viewer): 中文描述"
+  git push -u origin fix/stability-20261104
+
+CI：
+  gh run list --branch fix/stability-20261104 --limit 5
+  gh run watch <RUN_ID> --exit-status
+  gh run view <RUN_ID> --log-failed
+  gh run download <RUN_ID> -n PhotoDesk-unsigned-ipa -D artifacts/ipa
+  gh run download <RUN_ID> -n m1-screenshots -D artifacts/screenshots
+  gh run download <RUN_ID> -n ui-test-attachments -D artifacts/ui-tests
+  shasum -a 256 artifacts/ipa/PhotoDesk-unsigned.ipa   # Windows 用 certutil -hashfile
+
+要求：
+- iOS 编译必须用 iOS 15.5 模拟器（workflow 已配置）；不得为过编译抬高 deployment target。
+- 新增 core 测试 ≥40 条；iOS 单测 ≥120；UI ≥24（新增 12+）；既有 12 条 UI 不得回归。
+- 覆盖率 ≥85%（core）。
+- 性能：5,470 张筛选 <500ms；月份跳转 <100ms；删除事务 <100ms；查看器 100 次滑动内存 <250MB。
+- 不允许 -skip-testing 新测试（性能测试除外）；不允许删除断言、降低覆盖率门槛。
+- CI 失败先看失败测试名与日志，不要靠猜；每轮只改一个根因。
+
+============================================================
+七、最终必须交付的内容
+============================================================
+
+1. 代码：S01–S12 全部实现；Phase 0–8 全部 commit；分支已 push。
+2. 测试：core 全绿且覆盖率 ≥85%；iOS 单测/UI 全绿；新增 StabilityUITests 全绿；给出 CI run URL。
+3. 文档：
+   - docs/05：M11 进度表 + 变更 20。
+   - docs/03 / docs/04：新架构/新交互（ImagePipeline v2、Zoom v2、删除事务、快照协调器、月份面板、滑动选择、Toast）。
+   - docs/15-稳定性修复验收记录.md：S01–S12 逐项证据、CI run、测试数量、截图路径、真机待验项。
+   - 已知问题.md：平台限制/取舍更新。
+   - 发布说明.md：1.1.1（Build 3）。
+   - docs/12：真机复测清单（捏合/快滑/删/隐/月份/位置）。
+4. 截图：12 张（s01–s12），逐张打开确认，不能只看日志。
+5. IPA：PhotoDesk-unsigned-ipa + SHA256；artifact 路径 + 下载命令。
+6. 最终报告（直接写在回复里，表 A–E）：
+   - 表 A：S01–S12 状态（✅ 已修 / 🟨 模拟器通过真机待验 / ⚠️ 平台限制）+ 证据（测试名/截图/run）。
+   - 表 B：新增/修改文件清单。
+   - 表 C：测试结果（core X/X、iOS 单测 X/X、UI X/X、覆盖率）。
+   - 表 D：CI run URL + artifact 路径 + SHA256。
+   - 表 E：真机待验清单（捏合 30 次、快滑 100 张、删首/中/末、隐藏、月份跳转、杀进程重启、内存/FPS），
+     标注“本机无法验证，需用户在 iPhone 上执行”，不要假装已验证。
+
+============================================================
+八、停止条件与禁止事项
+============================================================
+
+停止条件（满足任一即停止并报告）：
+1. CI 全绿 + 文档齐全 + 最终报告完成 → 正常完成。
+2. CI 连续 12 轮仍失败 → 输出失败测试名、完整错误、已尝试修复、下一步建议，不要继续盲目改。
+3. 遇到必须改变产品定义才能解决的问题（例如要求“系统删除弹窗也完全没有”）→ 记录为平台限制，
+   按「会话暂存 + 每批一次」继续，不要卡住；不要用私有 API。
+4. 真机专属项（Face ID、系统弹窗次数、系统相册联动、FPS）无法在本机验证 → 列入表 E，继续其余工作。
+
+绝对禁止：
+- 不要修改 AGENTS.md 的红线；不要删除/弱化现有测试；不要引入第三方依赖。
+- 不要用私有 API（包括 KVC 读 locallyAvailable 之类）。
+- 不要把删除实现成永久删除/沙盒删除/文件删除；不要清空系统「最近删除」。
+- 不要在逐张滑动路径调用 deleteAssets 或 setHidden；只允许 BatchCommitCoordinator 的批量提交。
+- 不要用 iOS 16+ API 裸写；不要用 NavigationStack/PhotosPicker/ShareLink/Charts/@Observable。
+- 不要用「关闭动画/延迟/吞异常/try? 全包」掩盖崩溃；不要用 reloadData 当万能药。
+- 不要先改数组再延迟删 cell；不要在没有 apply completion 的情况下 scrollToItem。
+- 不要伪造 CI 结果、截图、测试数量；没有跑过的验证不要写“已验证”。
+- 不要只改文档不改代码；也不要只改代码不更新文档。
+- 不要在未读完 docs/13 与相关源码前开始大改。
+- 不要问“是否继续”；按 Phase 连续执行，直到完成或触发停止条件。
+
+============================================================
+九、建议的 commit 序列（可直接用）
+============================================================
+
+1. test(stability): 固化 12 条崩溃/交互回归用例 + 崩溃取证骨架
+2. feat(core): ZoomGeometry/SelectionRange/MonthNavigator + 单测
+3. fix(imaging): ImagePipeline 单次 resume + 可取消 + 预取有界
+4. fix(viewer): 删除事务 + 缩放几何 + 请求取消，修复捏合/快滑/删除闪退
+5. fix(library): 快照串行化 + 后台筛选 + 去重，修复选年份崩溃
+6. feat(library): 位置记忆 v2 + 月份跳转/单月全选
+7. fix(ui): 移除顶部筛选栏 + 多选滑动选择 + Toast 不再挡控件
+8. test(stability): 全页面烟测 + 压力/性能回归
+9. docs(m11): 稳定性修复验收记录 + 1.1.1 IPA 说明
+
+现在开始执行。先读 docs/13 与相关源码，输出 10–15 行现状确认，然后从 Phase 0 开始；
+不要问我“是否继续”，直接做完整个流程。
+
+=== 提示词正文结束 ===
+
+================================================================================
+附：执行者自查清单（不要复制给 Agent，仅供用户验收）
+================================================================================
+[ ] Agent 是否先读了 docs/13 与相关源码，并输出了 10–15 行现状确认？
+[ ] 是否从 fix/pages-overhaul-20261103 建了 fix/stability-20261104，并按 Phase 0–8 提交？
+[ ] S01 是否用 ZoomGeometry 重写缩放，而不是在旧 cell 上打补丁？
+[ ] S02/S08 是否做到「单次 resume + requestID 取消 + 预取窗口 ≤7 + 全尺寸 ≤2048」？
+[ ] S03 是否把 apply completion 作为唯一更新 indexBar/restore 的时机？
+[ ] S04/S11 是否做到「杀进程重启回到 2024-05」？
+[ ] S05 是否删除了常驻 Toast，且 hitTest 只放行撤销按钮？
+[ ] S06 是否删除了顶部筛选栏，Batch-Filter 是否在 Batch-SelectAll 左侧？
+[ ] S07 是否 0.15s 长按可拖选 6 格，同时快速滑动仍能滚动？
+[ ] S09/S10 是否有月份面板、单月全选计数正确？
+[ ] S12 是否在同一 runloop 内 commitRemoval + deleteItems，删首/中/末都不崩？
+[ ] 是否跑了 50 次快滑 / 20 次捏合 / 20 次删除 / 20 次年份切换的压力循环？
+[ ] 是否逐张打开 12 张截图确认？
+[ ] 是否更新了 docs/05、03、04、15、已知问题、发布说明、docs/12？
+[ ] 是否给出 CI run URL、测试数量、覆盖率、IPA SHA256？
+[ ] 是否把真机项标注为「待用户验证」，没有假装已验证？
+================================================================================

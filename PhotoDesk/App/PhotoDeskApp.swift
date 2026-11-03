@@ -10,6 +10,17 @@ struct PhotoDeskApp: App {
     @StateObject private var container = AppContainer.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // 崩溃取证（docs/13 §3.9）：未捕获异常 → last-exception.log（只取证，不拦截）
+        AppCrashLogger.install()
+        #if DEBUG
+        // UI 测试钩子：坐标点击稳定性（不是修复手段，docs/13 Phase 0）
+        if UITestHooks.enabled("-uiTestingDisableAnimations") {
+            UIView.setAnimationsEnabled(false)
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {

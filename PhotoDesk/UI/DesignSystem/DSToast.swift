@@ -46,6 +46,7 @@ final class DSToast: UIView {
     }
 
     private func setup() {
+        accessibilityIdentifier = "DSToast"   // 稳定性 UI 测试锚点（S05：断言不可命中）
         // 减弱透明度：材质降级为实色（docs/04 §6）
         if UIAccessibility.isReduceTransparencyEnabled {
             effectView.effect = nil
