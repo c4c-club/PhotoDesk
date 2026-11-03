@@ -195,7 +195,7 @@ final class LibraryViewModelTests: XCTestCase {
         await vm.ensureIndexComplete()
 
         var filter = SearchPredicate.default
-        filter.media = [.image]
+        filter.media = [.photo]
         vm.setFilter(filter)
         XCTAssertEqual(vm.filteredItems.count, 300, "setFilter 立即返回（未阻塞主线程），结果尚未应用")
         await vm.waitForFilterComputation()
@@ -221,7 +221,7 @@ final class LibraryViewModelTests: XCTestCase {
         var videoFilter = SearchPredicate.default
         videoFilter.media = [.video]
         var imageFilter = SearchPredicate.default
-        imageFilter.media = [.image]
+        imageFilter.media = [.photo]
         vm.setFilter(videoFilter)   // 旧任务：预期 1
         vm.setFilter(imageFilter)   // 新任务：预期 99（覆盖旧任务的 generation）
         await vm.waitForFilterComputation()
@@ -233,12 +233,16 @@ final class LibraryViewModelTests: XCTestCase {
         var items = (0..<10).map { makeItem($0) }
         items.append(items[3])   // 重复 id
         let vm = makeViewModel(FakeAssetRepository(items))
+        var snapshotIDs: [[String]] = []
+        vm.attachSnapshotHandler { snapshot in
+            snapshotIDs.append(snapshot.itemsBySection.flatMap { $0.map(\.id) })
+        }
         await vm.start()
         await vm.ensureIndexComplete()
         XCTAssertEqual(vm.filteredItems.count, 10, "重复 id 去重")
         let allIDs = vm.itemsBySection.flatMap { $0.map(\.id) }
         XCTAssertEqual(Set(allIDs).count, allIDs.count, "快照内 id 唯一")
-        XCTAssertEqual(vm.snapshots.last?.items.flatMap { $0.map(\.id) }.count, 10)
+        XCTAssertEqual(snapshotIDs.last?.count, 10, "推送的快照同样去重")
     }
 
     func testIndexCompleteFlagTurnsTrueAfterFullIndex() async {
