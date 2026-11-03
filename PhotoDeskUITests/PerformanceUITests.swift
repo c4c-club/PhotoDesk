@@ -119,12 +119,12 @@ final class PerformanceUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground, "年份切换后 App 必须存活")
     }
 
-    /// 打开筛选面板选年份 → 完成（与 StabilityUITests 同款流程）
+    /// 打开筛选面板选年份 → 完成（与 StabilityUITests 同款流程；导航栏按钮用坐标点击）
     @discardableResult
     private func applyYearFilter(_ app: XCUIApplication, year: String) -> Bool {
         let filterButton = app.descendants(matching: .any)["Library-Filter"].firstMatch
         guard filterButton.waitForExistence(timeout: 5) else { return false }
-        filterButton.tap()
+        filterButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         guard dateMenu.waitForExistence(timeout: 8) else { return false }
         dateMenu.tap()

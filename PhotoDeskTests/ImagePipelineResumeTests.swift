@@ -169,11 +169,12 @@ final class ImagePipelineResumeTests: XCTestCase {
         pipeline.prefetch(ids: first, size: size)
         pipeline.prefetch(ids: second, size: size)
 
+        // 第二次调用（差量）的语义
+        let lastStart = fake.startCalls.last?.ids ?? []
         let stopped = fake.stopCalls.flatMap(\.ids)
         XCTAssertTrue(stopped.contains("id-0"), "滑出窗口的 id 应收到 stop：\(fake.stopCalls)")
-        let started = fake.startCalls.flatMap(\.ids)
-        XCTAssertTrue(started.contains("id-7"), "新进入窗口的 id 应收到 start")
-        XCTAssertFalse(started.contains("id-0"), "已在窗口内的 id 不应重复 start")
+        XCTAssertTrue(lastStart.contains("id-7"), "新进入窗口的 id 应收到 start")
+        XCTAssertFalse(lastStart.contains("id-0"), "已在窗口内的 id 不应重复 start（第二次调用只 start id-7）")
     }
 
     func testPrefetchWindowCappedAt7() {

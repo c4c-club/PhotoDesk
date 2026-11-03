@@ -386,6 +386,7 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - 派生计算（visible → filtered → sections）
 
     private func rebuildDerived(animated: Bool) {
+        derivedRevision += 1
         let pendingDeletes = Set(reviewSession.session.pendingDeleteIDs)
         let pendingHides = Set(reviewSession.session.pendingHideIDs)
         let pending = pendingDeletes.union(pendingHides)
@@ -395,10 +396,13 @@ final class LibraryViewModel: ObservableObject {
     }
 
     /// 后台筛选 + 代际令牌（docs/13 S03 修复 1/4：主线程不再同步重算全库；
-    /// 用户连续切年份时旧结果按 generation 丢弃，apply 不会交错）
+    /// 用户连续切年份时旧结果按 generation 丢弃，apply 不会交错）。
+    /// derivedRevision 兜底：计算期间若 allItems/pending 变化（索引推进/会话变更），
+    /// 过期结果直接丢弃并用当前数据同步重算一次（罕见路径，保证结果永远基于最新数据）。
     private func rebuildDerivedInBackground(animated: Bool) {
         filterGeneration += 1
         let generation = filterGeneration
+        let revision = derivedRevision
         let allItems = self.allItems
         let pendingDeletes = Set(reviewSession.session.pendingDeleteIDs)
         let pendingHides = Set(reviewSession.session.pendingHideIDs)
@@ -417,7 +421,13 @@ final class LibraryViewModel: ObservableObject {
             )
             guard !Task.isCancelled else { return }
             await MainActor.run { [weak self] in
-                guard let self, generation == self.filterGeneration else { return }   // 代际令牌
+                guard let self else { return }
+                guard generation == self.filterGeneration else { return }   // 代际令牌：丢弃过期结果
+                guard revision == self.derivedRevision else {
+                    // 计算期间数据已变（索引推进/会话变更）：基于当前数据同步重算一次
+                    self.rebuildDerived(animated: animated)
+                    return
+                }
                 self.visibleItems = visible
                 self.filteredItems = filtered
                 self.pushSections(newSections, orderedIDs: orderedIDs, animated: animated)
@@ -426,6 +436,8 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private var filterGeneration = 0
+    /// 派生数据版本号：rebuildDerived（数据源/会话变化触发的重算）时自增
+    private var derivedRevision = 0
     private var filterTask: Task<Void, Never>?
 
     /// sections 入库 + 推快照（主线程；去重后的 items 才允许进 Diffable）

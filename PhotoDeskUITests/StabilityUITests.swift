@@ -137,7 +137,8 @@ final class StabilityUITests: XCTestCase {
     private func openFilterSheet(_ app: XCUIApplication) {
         let filterButton = anyElement(app, identifier: "Library-Filter")
         XCTAssertTrue(filterButton.waitForExistence(timeout: 5), "筛选入口不存在\n\(hierarchy(app))")
-        filterButton.tap()
+        // SwiftUI 导航栏按钮 element.tap() 不可靠（同 SessionBadge 先例）：用坐标点击
+        filterButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 8), "筛选面板未出现\n\(hierarchy(app))")
     }
@@ -344,7 +345,8 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(selectAll.waitForExistence(timeout: 3), "多选操作行缺全选\n\(hierarchy(app))")
         XCTAssertLessThanOrEqual(filter.frame.maxX, selectAll.frame.minX + 1,
                                  "筛选按钮应位于全选左侧（filter.maxX=\(filter.frame.maxX)，selectAll.minX=\(selectAll.frame.minX)）")
-        filter.tap()
+        // UIKit 按钮 tap 可靠（Batch-Filter 为 UIButton）；保底坐标点击
+        filter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 8), "点 Batch-Filter 未打开筛选面板\n\(hierarchy(app))")
         snap(app, "s06-filter-entry")
@@ -416,7 +418,8 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let monthButton = anyElement(app, identifier: "Library-MonthJump")
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        monthButton.tap()
+        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
+        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
         // NavigationView 本身不暴露 AX 元素：直接等月份卡片（面板出现即卡片存在）
         XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
@@ -434,7 +437,8 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let monthButton = anyElement(app, identifier: "Library-MonthJump")
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        monthButton.tap()
+        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
+        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
         XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
@@ -491,7 +495,8 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let monthButton = anyElement(app, identifier: "Library-MonthJump")
         XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        monthButton.tap()
+        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
+        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
         XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
