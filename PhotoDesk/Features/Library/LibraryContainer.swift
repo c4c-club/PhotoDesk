@@ -58,6 +58,9 @@ struct LibraryRootView: View {
     #if DEBUG
     /// UI 测试钩子：-uiTestingViewerStartIndex 启动即打开第 n 张查看器（只触发一次）
     @State private var hookViewerOpened = false
+    /// UI 测试钩子：网格就绪后自动打开筛选/月份面板（docs/13 M11——SwiftUI 导航栏按钮对
+    /// XCUITest 合成点击不响应（CI 两轮实测），测试改走启动钩子；仅 DEBUG + 启动参数）
+    @State private var hookSheetOpened = false
     #endif
 
     var body: some View {
@@ -227,13 +230,15 @@ struct LibraryRootView: View {
             recoveryCount = undoCenter.recoverableCount()
             undoCenter.restoreLatestIfNeeded()
             showRecovery = recoveryCount > 0
-            #if DEBUG
-            openHookViewerIfNeeded()
-            #endif
+        #if DEBUG
+        openHookViewerIfNeeded()
+        openHookSheetIfNeeded()
+        #endif
         }
         .onChange(of: viewModel.viewState) { _ in
             #if DEBUG
             openHookViewerIfNeeded()
+            openHookSheetIfNeeded()
             #endif
         }
         .onChange(of: sortAscending) { ascending in
@@ -259,7 +264,7 @@ struct LibraryRootView: View {
             hadActiveEntry = has
         }
         #if DEBUG
-        // CI 截图自诊断：网格异常时可直接读出 VM 状态（Release 不编译）
+        // CI 截图自诊断：网格异常时可直接读出 VM 状态（Release 不编译；不拦截触摸）
         .overlay(alignment: .top) {
             Text(viewModel.debugSummary)
                 .font(.system(size: 10, design: .monospaced))
@@ -269,6 +274,7 @@ struct LibraryRootView: View {
                 .background(Color(ds: DSColor.accentFavorite))
                 .cornerRadius(4)
                 .padding(.top, 2)
+                .allowsHitTesting(false)
         }
         #endif
     }
@@ -351,6 +357,18 @@ private extension LibraryRootView {
         viewerContext = ViewerContext(items: viewModel.filteredItems,
                                       startItemID: viewModel.filteredItems[index].id,
                                       queryKey: viewModel.query.key)
+    }
+
+    /// docs/13 M11：网格就绪后自动打开筛选/月份面板（每次 launch 只触发一次）
+    func openHookSheetIfNeeded() {
+        guard !hookSheetOpened, viewModel.viewState == .ready else { return }
+        if UITestHooks.enabled("-uiTestingOpenFilterSheet") {
+            hookSheetOpened = true
+            showFilterSheet = true
+        } else if UITestHooks.enabled("-uiTestingOpenMonthJump") {
+            hookSheetOpened = true
+            showMonthJump = true
+        }
     }
 }
 #endif

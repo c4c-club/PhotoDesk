@@ -2,7 +2,9 @@
 // 仅 #if DEBUG 编译；由启动参数驱动（-uiTestingViewerStartIndex / -uiTestingSelectMode /
 // -uiTestingStorageMock / -uiTestingSessionMock / -uiTestingFaceIDBypass / -uiTestingFaceIDFailure /
 // -uiTestingAppLock / -uiTestingDatedPhotos / -uiTestingDisableAnimations【docs/13 Phase 0：
-// 关闭全 App 动画，稳定坐标点击用，不是修复手段】）。Release 构建全部返回 false，绝不影响生产路径。
+// 关闭全 App 动画，稳定坐标点击用，不是修复手段】/ -uiTestingOpenFilterSheet /
+// -uiTestingOpenMonthJump【docs/13 M11：网格就绪后自动打开筛选/月份面板——SwiftUI 导航栏按钮
+// 对 XCUITest 合成点击不响应（CI 轮 9/10 实证）】）。Release 构建全部返回 false，绝不影响生产路径。
 
 import Foundation
 

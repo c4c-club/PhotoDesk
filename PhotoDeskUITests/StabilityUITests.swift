@@ -134,38 +134,58 @@ final class StabilityUITests: XCTestCase {
         return false
     }
 
-    private func openFilterSheet(_ app: XCUIApplication) {
-        let filterButton = anyElement(app, identifier: "Library-Filter")
-        XCTAssertTrue(filterButton.waitForExistence(timeout: 5), "筛选入口不存在\n\(hierarchy(app))")
-        // SwiftUI 导航栏按钮 element.tap() 不可靠（同 SessionBadge 先例）：用坐标点击
-        filterButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    // MARK: 筛选面板驱动（docs/13 M11：SwiftUI 导航栏按钮对 XCUITest 合成点击不响应（CI 轮 9/10 实证），
+    // 面板改由 -uiTestingOpenFilterSheet 启动钩子打开；面板内交互全部走 Form 行/上下文菜单——UIKit 宿主可靠）
+
+    /// 以「自动打开筛选面板」模式启动（每次 launch 只打开一次；年份循环经重新 launch 续开）
+    private func launchWithFilterSheetOpen(_ app: XCUIApplication) {
+        app.launchArguments += ["-uiTestingOpenFilterSheet"]
+        _ = launchToGrid(app)
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
-        XCTAssertTrue(dateMenu.waitForExistence(timeout: 8), "筛选面板未出现\n\(hierarchy(app))")
+        XCTAssertTrue(dateMenu.waitForExistence(timeout: 10), "筛选面板未自动打开\n\(hierarchy(app))")
     }
 
-    /// 打开筛选面板并选一个年份 → 完成
-    private func applyYearFilter(_ app: XCUIApplication, year: String) {
-        openFilterSheet(app)
+    private func waitForSheetClosed(_ app: XCUIApplication, timeout: TimeInterval = 5) {
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
+        let gone = NSPredicate { _, _ in !dateMenu.exists }
+        let expectation = XCTNSPredicateExpectation(predicate: gone, object: nil)
+        XCTWaiter.wait(for: [expectation], timeout: timeout)
+    }
+
+    /// 在面板内选一个年份 → 「应用筛选」行按钮（Form 行，UIKit 宿主）
+    private func applyYearInSheet(_ app: XCUIApplication, year: String) {
+        let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
+        XCTAssertTrue(dateMenu.waitForExistence(timeout: 5), "日期菜单不存在\n\(hierarchy(app))")
         dateMenu.tap()
         let option = app.buttons[year]
         XCTAssertTrue(option.waitForExistence(timeout: 5), "年份选项 \(year) 未出现\n\(hierarchy(app))")
         option.tap()
-        let done = app.buttons["完成"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5), "筛选面板缺「完成」\n\(hierarchy(app))")
-        done.tap()
+        tapApplyInSheet(app)
     }
 
-    /// 清空筛选（跨用例的 UserDefaults 持久化隔离）
-    private func resetFilter(_ app: XCUIApplication) {
-        openFilterSheet(app)
-        let reset = app.buttons["重置"]
-        if reset.waitForExistence(timeout: 3) {
-            reset.tap()
+    /// 「应用筛选」行按钮（无需选年份 = 应用当前 draft，用于清空筛选）
+    private func tapApplyInSheet(_ app: XCUIApplication) {
+        let apply = app.buttons["Filter-Sheet-Apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5), "「应用筛选」按钮不存在\n\(hierarchy(app))")
+        apply.tap()
+        waitForSheetClosed(app)
+    }
+
+    /// 清空筛选并应用（「清除全部条件」Form 行 + 应用；跨用例的 UserDefaults 持久化隔离）
+    private func clearFilterInSheet(_ app: XCUIApplication) {
+        let clear = app.buttons["Filter-Sheet-Clear"]
+        if clear.waitForExistence(timeout: 2) {
+            clear.tap()
         }
-        let done = app.buttons["完成"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
-        done.tap()
+        tapApplyInSheet(app)
+    }
+
+    /// 以「自动打开月份面板」模式启动
+    private func launchWithMonthSheetOpen(_ app: XCUIApplication) {
+        app.launchArguments += ["-uiTestingOpenMonthJump"]
+        _ = launchToGrid(app)
+        let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未自动打开或缺 2024-05 卡片\n\(hierarchy(app))")
     }
 
     private func selectionCountLabel(_ app: XCUIApplication) -> XCUIElement {
@@ -255,12 +275,12 @@ final class StabilityUITests: XCTestCase {
 
     func testFilterYearsRepeatedly() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        resetFilter(app)
         let years = ["2026", "2024", "2020"]
         for round in 1...5 {
             for year in years {
-                applyYearFilter(app, year: year)
+                // 每轮重新 launch（面板自动打开 + 上一轮持久化筛选生效——覆盖 S03 重启崩溃路径）
+                launchWithFilterSheetOpen(app)
+                applyYearInSheet(app, year: year)
                 assertAlive(app, "应用 \(year) 年筛选后（第 \(round) 轮）")
                 XCTAssertTrue(waitTopHeaderContains(app, "\(year)年", timeout: 5),
                               "选 \(year) 年后顶部月份头为「\(topHeaderText(app))」\n\(hierarchy(app))")
@@ -273,9 +293,10 @@ final class StabilityUITests: XCTestCase {
 
     func testFilterPersistedAfterRelaunch() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        resetFilter(app)
-        applyYearFilter(app, year: "2024")
+        launchWithFilterSheetOpen(app)
+        clearFilterInSheet(app)   // 隔离跨用例持久化
+        launchWithFilterSheetOpen(app)
+        applyYearInSheet(app, year: "2024")
         XCTAssertTrue(waitTopHeaderContains(app, "2024年", timeout: 5),
                       "选 2024 年后顶部月份头为「\(topHeaderText(app))」")
         app.terminate()
@@ -290,8 +311,8 @@ final class StabilityUITests: XCTestCase {
 
     func testPositionRestoredAfterRelaunch() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        resetFilter(app)
+        launchWithFilterSheetOpen(app)
+        clearFilterInSheet(app)   // 隔离跨用例持久化筛选
         var reached = waitTopHeaderContains(app, "2024年5月", timeout: 2)
         var swipes = 0
         while !reached, swipes < 60 {
@@ -415,14 +436,8 @@ final class StabilityUITests: XCTestCase {
 
     func testMonthJump() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        let monthButton = anyElement(app, identifier: "Library-MonthJump")
-        XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
-        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        launchWithMonthSheetOpen(app)
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        // NavigationView 本身不暴露 AX 元素：直接等月份卡片（面板出现即卡片存在）
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         snap(app, "s09-month-jump")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8),
@@ -434,13 +449,8 @@ final class StabilityUITests: XCTestCase {
 
     func testSelectWholeMonth() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        let monthButton = anyElement(app, identifier: "Library-MonthJump")
-        XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
-        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        launchWithMonthSheetOpen(app)
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8))
 
@@ -492,13 +502,8 @@ final class StabilityUITests: XCTestCase {
 
     func testMonthJumpPersistsAfterRelaunch() throws {
         let app = XCUIApplication()
-        _ = launchToGrid(app)
-        let monthButton = anyElement(app, identifier: "Library-MonthJump")
-        XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "导航栏缺「月份」按钮\n\(hierarchy(app))")
-        // SwiftUI 导航栏按钮 element.tap() 不可靠：坐标点击（同 SessionBadge 先例）
-        monthButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        launchWithMonthSheetOpen(app)
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未出现或缺 2024-05 卡片\n\(hierarchy(app))")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8))
         Thread.sleep(forTimeInterval: 1.5)   // 等同步保存完成

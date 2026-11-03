@@ -97,6 +97,7 @@ struct LibraryFilterSheet: View {
                 draft = .default
             }
             .foregroundColor(Color(ds: DSColor.tint))
+            .accessibilityIdentifier("Filter-Sheet-Clear")
         }
     }
 
@@ -274,6 +275,7 @@ struct LibraryFilterSheet: View {
                     .cornerRadius(DSSpacing.buttonCornerRadius)
             }
             .listRowInsets(EdgeInsets())
+            .accessibilityIdentifier("Filter-Sheet-Apply")
         }
     }
 

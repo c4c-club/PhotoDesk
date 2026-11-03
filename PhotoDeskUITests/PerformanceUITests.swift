@@ -98,7 +98,9 @@ final class PerformanceUITests: XCTestCase {
     // MARK: - docs/13 Phase 7：年份筛选性能（5,470 张切换 < 500ms/次）
 
     func testFilterPerformance() throws {
+        // 面板由 -uiTestingOpenFilterSheet 钩子打开（SwiftUI 导航栏按钮对合成点击不响应，docs/13 M11）
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingOpenFilterSheet"]
         installPermissionMonitor(for: app)
         app.launch()
         let introButton = app.buttons["允许访问照片"]
@@ -109,31 +111,34 @@ final class PerformanceUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格没有任何 cell")
+        let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
+        XCTAssertTrue(dateMenu.waitForExistence(timeout: 30), "筛选面板未自动打开")
 
         let options = XCTMeasureOptions()
         options.iterationCount = 1
         measure(metrics: [XCTClockMetric()], options: options) {
-            applyYearFilter(app, year: "2024")
-            applyYearFilter(app, year: "2026")
+            // 一次完整年份切换：菜单选年（面板内 draft）→「应用筛选」行 → setFilter 后台重算 + 快照提交
+            dateMenu.tap()
+            let option = app.buttons["2024"]
+            guard option.waitForExistence(timeout: 5) else { return }
+            option.tap()
+            let apply = app.buttons["Filter-Sheet-Apply"]
+            guard apply.waitForExistence(timeout: 5) else { return }
+            apply.tap()
+            let headers = collection.staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+            _ = headers.firstMatch.waitForExistence(timeout: 10)
         }
+        XCTAssertTrue(waitHeaderContains(collection, "2024年"), "应用 2024 年后网格应只含该年")
         XCTAssertEqual(app.state, .runningForeground, "年份切换后 App 必须存活")
     }
 
-    /// 打开筛选面板选年份 → 完成（与 StabilityUITests 同款流程；导航栏按钮用坐标点击）
-    @discardableResult
-    private func applyYearFilter(_ app: XCUIApplication, year: String) -> Bool {
-        let filterButton = app.descendants(matching: .any)["Library-Filter"].firstMatch
-        guard filterButton.waitForExistence(timeout: 5) else { return false }
-        filterButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
-        guard dateMenu.waitForExistence(timeout: 8) else { return false }
-        dateMenu.tap()
-        let option = app.buttons[year]
-        guard option.waitForExistence(timeout: 5) else { return false }
-        option.tap()
-        let done = app.buttons["完成"]
-        guard done.waitForExistence(timeout: 5) else { return false }
-        done.tap()
-        return true
+    private func waitHeaderContains(_ collection: XCUIElement, _ text: String) -> Bool {
+        let headers = collection.staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if headers.firstMatch.label.contains(text) { return true }
+            usleep(300_000)
+        }
+        return false
     }
 }
