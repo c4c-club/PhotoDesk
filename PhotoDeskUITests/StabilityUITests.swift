@@ -146,16 +146,17 @@ final class StabilityUITests: XCTestCase {
     // 的合成点击不可靠（CI 轮 9–12 实证，与已知问题 #12 同类）——筛选与月份跳转改走启动参数钩子，
     // 与用户操作共用同一条 setFilter / scrollToSection 代码路径；面板只做存在性断言 + 截图）
 
-    /// 清空筛选启动（-uiTestingFilterYear 0 = 就绪后 clearFilter，跨用例持久化隔离）
+    /// 清空筛选启动（-uiTestingFilterYear 0 = 就绪后 clearFilter，跨用例持久化隔离）。
+    /// 注意必须整体赋值：+= 会累积多个同名参数，intValue 取第一个导致钩子失效（CI 轮 14 实测）
     @discardableResult
     private func launchWithFilterCleared(_ app: XCUIApplication) -> XCUIElement {
-        app.launchArguments += ["-uiTestingFilterYear", "0"]
+        app.launchArguments = ["-uiTestingFilterYear", "0"]
         return launchToGrid(app)
     }
 
     /// 年份筛选启动（就绪后应用年份筛选）
     private func launchWithYearFilter(_ app: XCUIApplication, year: Int) {
-        app.launchArguments += ["-uiTestingFilterYear", "\(year)"]
+        app.launchArguments = ["-uiTestingFilterYear", "\(year)"]
         _ = launchToGrid(app)
     }
 
@@ -298,20 +299,26 @@ final class StabilityUITests: XCTestCase {
     func testPositionRestoredAfterRelaunch() throws {
         let app = XCUIApplication()
         launchWithFilterCleared(app)   // 隔离跨用例持久化筛选
-        var reached = waitTopHeaderContains(app, "2024年5月", timeout: 2)
+        // 先按年滚动（单次快滑约跳 6-9 个月，逐月目标会被采样跳过——CI 轮 14 实测滑到 2018）
+        var reached = waitTopHeaderContains(app, "2024年", timeout: 2)
         var swipes = 0
         while !reached, swipes < 60 {
             app.swipeUp()
             swipes += 1
-            reached = waitTopHeaderContains(app, "2024年5月", timeout: 1)
+            reached = waitTopHeaderContains(app, "2024年", timeout: 1)
         }
-        XCTAssertTrue(reached, "\(swipes) 次滑动内未到达 2024年5月（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        XCTAssertTrue(reached, "\(swipes) 次滑动内未到达 2024 年（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        Thread.sleep(forTimeInterval: 0.5)   // 等减速完成
+        // 以实际停住的月份为恢复断言目标（保存/恢复都按首个可见 asset，二者自洽）
+        let savedMonth = topHeaderText(app).components(separatedBy: " ").first ?? ""
+        XCTAssertTrue(savedMonth.contains("2024年"), "停在非 2024 年月份：\(savedMonth)")
         Thread.sleep(forTimeInterval: 1.5)   // 等位置保存兜底 Timer
         app.terminate()
         _ = launchToGrid(app)
-        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "重启后未回到 2024年5月（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        XCTAssertTrue(waitTopHeaderContains(app, savedMonth, timeout: 10),
+                      "重启后未回到 \(savedMonth)（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
         assertAlive(app, "位置恢复重启后")
+        snap(app, "s04-restore")
     }
 
     // MARK: - S05 底部无空胶囊、不挡网格

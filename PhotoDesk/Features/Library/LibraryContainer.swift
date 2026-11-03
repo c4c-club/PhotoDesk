@@ -64,6 +64,7 @@ struct LibraryRootView: View {
     /// UI 测试钩子：就绪后应用 -uiTestingFilterYear（0 = 清空）；快照含目标月时执行 -uiTestingMonthJump
     @State private var hookFilterApplied = false
     @State private var hookMonthJumped = false
+    @State private var hookMonthJumpRetrying = false
     #endif
 
     var body: some View {
@@ -401,15 +402,31 @@ private extension LibraryRootView {
         }
     }
 
-    /// docs/13 M11：快照包含目标月后跳转（等价月份面板点卡片，同一条 scrollToSection 路径；
-    /// scrollToSection 失败（collectionView 未提交）时不置位，等下一次快照重试）
+    /// docs/13 M11：快照包含目标月后跳转（等价月份面板点卡片，同一条 scrollToSection 路径）。
+    /// 首次触发时快照 apply 可能尚未提交（numberOfSections == 0）→ 短重试；
+    /// sections 内容不变时 onChange 不再触发，不能只依赖 onChange 重试（CI 轮 14 实测跳转丢失）
     func openHookMonthJumpIfNeeded() {
         guard !hookMonthJumped, viewModel.viewState == .ready,
               let sectionID = UITestHooks.stringValue("-uiTestingMonthJump") else { return }
         guard let index = viewModel.sections.firstIndex(where: { $0.id == sectionID }) else { return }
         if selectionBridge.controller?.scrollToSection(index) == true {
             hookMonthJumped = true
+            return
         }
+        guard !hookMonthJumpRetrying else { return }
+        hookMonthJumpRetrying = true
+        var attempts = 0
+        func retry() {
+            guard !hookMonthJumped, attempts < 20 else { return }
+            attempts += 1
+            if let index2 = viewModel.sections.firstIndex(where: { $0.id == sectionID }),
+               selectionBridge.controller?.scrollToSection(index2) == true {
+                hookMonthJumped = true
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { retry() }
+        }
+        retry()
     }
 }
 #endif
