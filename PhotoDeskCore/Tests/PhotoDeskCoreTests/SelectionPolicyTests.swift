@@ -95,4 +95,88 @@ final class SelectionPolicyTests: XCTestCase {
         XCTAssertEqual(state.selected, ["d"])
         XCTAssertEqual(state.scope, ["b", "c", "d"])
     }
+
+    // MARK: - docs/13 S07/S10 扩展：scopeID / 批量加选 / 范围替换 / 范围选择
+
+    func testBeginStoresScopeID() {
+        var state = SelectionState()
+        state.begin(scope: scope, scopeID: "month:2024-05")
+        XCTAssertEqual(state.scopeID, "month:2024-05")
+        XCTAssertTrue(state.isMonthScope)
+    }
+
+    func testDefaultScopeIDIsNil() {
+        var state = SelectionState()
+        state.begin(scope: scope)
+        XCTAssertNil(state.scopeID)
+        XCTAssertFalse(state.isMonthScope)
+    }
+
+    func testRebeginResetsScopeID() {
+        var state = SelectionState()
+        state.begin(scope: scope, scopeID: "month:2024-05")
+        state.begin(scope: scope)
+        XCTAssertNil(state.scopeID)
+    }
+
+    func testBatchSelectPreservesOrderAndSkipsOutsideScope() {
+        var state = SelectionState()
+        state.begin(scope: scope)
+        state.select(["d", "zzz", "a", "a", "b"])
+        XCTAssertEqual(state.selected, ["d", "a", "b"])
+    }
+
+    func testReplaceSelectionFiltersAndDedupes() {
+        var state = SelectionState()
+        state.begin(scope: scope)
+        state.replaceSelection(["c", "zzz", "a", "c"])
+        XCTAssertEqual(state.selected, ["c", "a"])
+    }
+
+    func testReplaceSelectionWithEmptyListClears() {
+        var state = SelectionState()
+        state.begin(scope: scope, initial: "a")
+        state.replaceSelection([])
+        XCTAssertTrue(state.isEmpty)
+    }
+
+    func testSelectRangeForward() {
+        var state = SelectionState()
+        let ordered = ["a", "b", "c", "d", "e"]
+        state.begin(scope: Set(ordered))
+        state.selectRange(in: ordered, from: "b", to: "d")
+        XCTAssertEqual(state.selected, ["b", "c", "d"])
+    }
+
+    func testSelectRangeReverseKeepsListOrder() {
+        var state = SelectionState()
+        let ordered = ["a", "b", "c", "d", "e"]
+        state.begin(scope: Set(ordered))
+        state.selectRange(in: ordered, from: "d", to: "b")
+        XCTAssertEqual(state.selected, ["b", "c", "d"])
+    }
+
+    func testSelectRangeIgnoresOutOfScopeIds() {
+        var state = SelectionState()
+        let ordered = ["a", "b", "c", "d", "e"]
+        state.begin(scope: ["b", "c", "d"])   // scope 不含 a/e
+        state.selectRange(in: ordered, from: "a", to: "e")
+        XCTAssertEqual(state.selected, ["b", "c", "d"])
+    }
+
+    func testSelectRangeMissingAnchorIsNoOp() {
+        var state = SelectionState()
+        let ordered = ["a", "b", "c"]
+        state.begin(scope: Set(ordered), initial: "a")
+        state.selectRange(in: ordered, from: "zzz", to: "c")
+        XCTAssertEqual(state.selected, ["a"])
+    }
+
+    func testSelectRangeMergesWithExistingSelection() {
+        var state = SelectionState()
+        let ordered = ["a", "b", "c", "d", "e"]
+        state.begin(scope: Set(ordered), initial: "e")
+        state.selectRange(in: ordered, from: "b", to: "d")
+        XCTAssertEqual(state.selected, ["e", "b", "c", "d"])
+    }
 }

@@ -9,20 +9,27 @@ public struct SelectionState: Equatable {
     public private(set) var selected: [String]
     /// 多选作用域 = 进入多选时（或筛选变化后）的「当前筛选结果」id 全集
     public private(set) var scope: Set<String>
+    /// 作用域标识（docs/13 S10）："month:2024-05" = 单月多选；nil = 普通多选（当前筛选全集）
+    public private(set) var scopeID: String?
 
     public var selectedSet: Set<String> { Set(selected) }
     /// 全选态：scope 非空且 selected 覆盖 scope
     public var allSelected: Bool { !scope.isEmpty && selectedSet == scope }
     public var isEmpty: Bool { selected.isEmpty }
+    /// 作用域是否为单月（scopeID 以 "month:" 开头）
+    public var isMonthScope: Bool { scopeID?.hasPrefix("month:") ?? false }
 
     public init() {
         selected = []
         scope = []
+        scopeID = nil
     }
 
-    /// 进入多选：scope = 当前筛选结果全集；initial = 长按进入时初始选中的 id
-    public mutating func begin(scope: Set<String>, initial: String? = nil) {
+    /// 进入多选：scope = 当前筛选结果全集；initial = 长按进入时初始选中的 id；
+    /// scopeID = 作用域标识（单月多选传 "month:<sectionID>"，docs/13 S10）
+    public mutating func begin(scope: Set<String>, initial: String? = nil, scopeID: String? = nil) {
         self.scope = scope
+        self.scopeID = scopeID
         selected = []
         if let initial, scope.contains(initial) {
             selected.append(initial)
@@ -43,6 +50,36 @@ public struct SelectionState: Equatable {
     public mutating func select(_ id: String) {
         guard scope.contains(id), !selectedSet.contains(id) else { return }
         selected.append(id)
+    }
+
+    /// 批量加选（docs/13 S07）：顺序保持、去重、scope 外 id 忽略
+    public mutating func select(_ ids: [String]) {
+        for id in ids {
+            select(id)
+        }
+    }
+
+    /// 范围替换（docs/13 S07 长按拖选）：选中集整体替换为给定 id 列表
+    ///（调用方传入 base ∪ range），过滤 scope 外 id、去重保序。
+    public mutating func replaceSelection(_ ids: [String]) {
+        var seen = Set<String>()
+        var result: [String] = []
+        for id in ids where scope.contains(id) && seen.insert(id).inserted {
+            result.append(id)
+        }
+        selected = result
+    }
+
+    /// 范围选择（docs/13 S07）：orderedIDs 内 anchor→target 连续范围与当前选中取并集；
+    /// 任一端缺失时无操作（保持现状）。
+    public mutating func selectRange(in orderedIDs: [String], from anchor: String, to target: String) {
+        let range = SelectionRange.ids(in: orderedIDs, from: anchor, to: target)
+        guard !range.isEmpty else { return }
+        var merged = selected
+        for id in range where !selectedSet.contains(id) {
+            merged.append(id)
+        }
+        replaceSelection(merged)
     }
 
     public mutating func selectAll() {
