@@ -56,7 +56,7 @@ final class FilmStripView: UIView {
         guard index != currentIndex || centerIfNeeded else { return }
         let oldIndex = currentIndex
         currentIndex = index
-        if oldIndex != index, collectionView.numberOfSections() > 0 {
+        if oldIndex != index, collectionView.numberOfSections > 0 {
             let total = collectionView.numberOfItems(inSection: 0)
             for changed in [oldIndex, index] where changed >= 0 && changed < total {
                 let path = IndexPath(item: changed, section: 0)

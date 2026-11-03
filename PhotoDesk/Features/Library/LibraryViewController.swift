@@ -932,7 +932,7 @@ final class LibraryViewController: UIViewController {
     func scrollToSection(_ index: Int) {
         // S03 修复：校验 collectionView 实际 section/item 数（apply 未提交时 currentSections 已是新值）
         guard index < currentSections.count,
-              index < collectionView.numberOfSections(),
+              index < collectionView.numberOfSections,
               collectionView.numberOfItems(inSection: index) > 0 else { return }
         isRestoringPosition = true
         collectionView.layoutIfNeeded()
@@ -961,7 +961,7 @@ final class LibraryViewController: UIViewController {
 
     /// 月份面板「回到顶部」（docs/13 S09）
     func scrollToTop() {
-        guard collectionView.numberOfSections() > 0 else { return }
+        guard collectionView.numberOfSections > 0 else { return }
         isRestoringPosition = true
         collectionView.setContentOffset(.zero, animated: false)
         isRestoringPosition = false
