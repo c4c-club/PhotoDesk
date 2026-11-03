@@ -117,10 +117,11 @@ final class PerformanceUITests: XCTestCase {
     }
 
     private func waitHeaderContains(_ collection: XCUIElement, _ text: String) -> Bool {
-        let headers = collection.staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+        // 月头被 AX 暴露为 Button（标题带点击手势）——用 .any 后代查询
+        let headers = collection.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS '月 ·'"))
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline {
-            // sheet/筛选动画期间 count 可能为 0——count 守卫防 firstMatch 硬失败
             if headers.count > 0, headers.firstMatch.label.contains(text) { return true }
             usleep(300_000)
         }

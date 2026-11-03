@@ -115,19 +115,25 @@ final class StabilityUITests: XCTestCase {
 
     // MARK: 网格 / 筛选 / 多选查询
 
+    /// 月份头元素查询（docs/13 M11：MonthHeaderView 标题带点击手势后被 AX 暴露为 Button 而非
+    /// StaticText（CI 轮 9–13 实证）——用 .any 后代 + label 谓词，兼容两种暴露形态）
+    private func headerElements(_ app: XCUIApplication) -> XCUIElementQuery {
+        app.collectionViews.firstMatch
+            .descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+    }
+
     /// 顶部（粘性）月份头文本，形如「2024年5月 · 2 张」
     private func topHeaderText(_ app: XCUIApplication) -> String {
-        let headers = app.collectionViews.firstMatch
-            .staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
-        // sheet 收起动画期间 firstMatch 可能解析到面板的 List（无月头文本）——count 守卫防硬失败
+        let headers = headerElements(app)
+        // sheet/筛选动画期间可能解析到面板 List（无月头）——count 守卫防 firstMatch 硬失败
         guard headers.count > 0 else { return "" }
         return headers.firstMatch.label
     }
 
     private func waitTopHeaderContains(_ app: XCUIApplication, _ text: String,
                                        timeout: TimeInterval = 5) -> Bool {
-        let headers = app.collectionViews.firstMatch
-            .staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+        let headers = headerElements(app)
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if headers.count > 0, headers.firstMatch.label.contains(text) { return true }
@@ -374,13 +380,15 @@ final class StabilityUITests: XCTestCase {
             usleep(300_000)
         }
         XCTAssertGreaterThanOrEqual(n, 6, "长按拖选后计数不足 6：\(count.label)\n\(hierarchy(app))")
-        // 前 6 格应带 selected 标记
-        for index in 0..<6 {
+        // 可见格选中核验（≥6；boundBy 顺序不保证网格序，不做逐格位次断言——计数标签是权威信号）
+        var selectedVisible = 0
+        for index in 0..<12 {
             let cell = collection.cells.element(boundBy: index)
             guard cell.exists else { continue }
-            let value = cell.value as? String ?? ""
-            XCTAssertTrue(value.contains("selected"), "第 \(index + 1) 格未选中：\(value)\n\(hierarchy(app))")
+            if (cell.value as? String ?? "").contains("selected") { selectedVisible += 1 }
         }
+        XCTAssertGreaterThanOrEqual(selectedVisible, 6,
+                                    "可见选中格不足 6（\(selectedVisible)/12）\n\(hierarchy(app))")
         snap(app, "s07-slide-select")
     }
 
