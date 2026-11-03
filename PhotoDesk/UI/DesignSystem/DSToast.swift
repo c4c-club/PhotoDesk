@@ -1,6 +1,8 @@
-// MARK: - 职责说明：Toast（docs/04 §3.2 规格）——
-// 距底部 16pt 黑玻璃胶囊（UIBlurEffect 系统材质），左图标 + 文案，右「撤销」按钮 + 环形倒计时；
-// 窗口结束自动收起；尊重「减弱动态效果」（docs/04 §6）与「减弱透明度」（材质降级实色）。
+// MARK: - 职责说明：Toast v2（docs/04 §3.2 规格 + docs/13 S05 重写）——
+// 距底部 16pt 黑玻璃胶囊（UIBlurEffect 系统材质），左图标 + 文案，右「撤销」按钮 + 环形倒计时。
+// v2 修复：① 全部子视图 translatesAutoresizingMaskIntoConstraints=false（旧版缺失 → 内容塌陷成空胶囊）；
+// ② init 即 isHidden，dismiss 完成后 isHidden（不再常驻底部占位）；③ hitTest 只放行撤销按钮
+//（Toast 本体不拦截网格/工具栏触摸）；④ generation 令牌：旧 dismiss 不得隐藏新 toast。
 
 import UIKit
 
@@ -11,6 +13,9 @@ final class DSToast: UIView {
         let label = UILabel()
         label.font = DSTypography.font(.toast)   // 15pt Semibold（docs/04 §5.2）
         label.textColor = DSColor.textPrimary
+        label.numberOfLines = 1
+        label.lineBreakMode = .byTruncatingTail
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return label
     }()
     private let undoButton: UIButton = {
@@ -29,6 +34,8 @@ final class DSToast: UIView {
 
     private var onUndo: (() -> Void)?
     private var onDismissFinished: (() -> Void)?
+    /// 展示代际：新的 show 使旧 dismiss 的完成回调失效（docs/13 S05）
+    private var generation = 0
 
     private var usesMotion: Bool {
         !(UIAccessibility.isReduceMotionEnabled && AppContainer.shared.settings.respectReduceMotion)
@@ -59,6 +66,11 @@ final class DSToast: UIView {
         effectView.contentView.addSubview(messageLabel)
         effectView.contentView.addSubview(undoButton)
         addSubview(effectView)
+
+        // docs/13 S05 根因 1：三个内容子视图必须关闭 autoresizing（旧版缺失 → 塌陷成空玻璃胶囊）
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        undoButton.translatesAutoresizingMaskIntoConstraints = false
 
         layer.shadowOpacity = 0.25
         layer.shadowRadius = 16
@@ -101,6 +113,9 @@ final class DSToast: UIView {
             undoButton.widthAnchor.constraint(equalToConstant: 44),
             undoButton.heightAnchor.constraint(equalToConstant: 44),
         ])
+
+        // docs/13 S05 根因 3：init 即隐藏——不占位、不参与命中测试
+        isHidden = true
     }
 
     override func layoutSubviews() {
@@ -115,9 +130,19 @@ final class DSToast: UIView {
                                       clockwise: true).cgPath
     }
 
+    // MARK: - 命中测试隔离（docs/13 S05 根因 4：只放行撤销按钮，其余区域不拦截）
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard !isHidden, alpha > 0.01, !undoButton.isHidden else { return nil }
+        let undoPoint = convert(point, to: undoButton)
+        guard undoButton.bounds.contains(undoPoint) else { return nil }
+        return undoButton
+    }
+
     /// 展示：autoAdvance 场景由 VC 调用；duration 与 UndoCenter 窗口一致
     func show(icon: String, text: String, duration: TimeInterval, allowUndo: Bool,
               onUndo: (() -> Void)?, onDismissFinished: (() -> Void)?) {
+        generation += 1
         self.onUndo = onUndo
         self.onDismissFinished = onDismissFinished
         iconView.image = UIImage(systemName: icon)
@@ -125,6 +150,7 @@ final class DSToast: UIView {
         undoButton.isHidden = !allowUndo
         ringLayer.isHidden = !allowUndo
 
+        isHidden = false
         ringDuration = duration
         ringStart = Date()
         if allowUndo {
@@ -147,8 +173,11 @@ final class DSToast: UIView {
 
     func dismiss() {
         stopRingTimer()
-        let finish = {
+        let currentGeneration = generation
+        let finish = { [weak self] in
+            guard let self, currentGeneration == self.generation else { return }
             self.alpha = 0
+            self.isHidden = true   // docs/13 S05：dismiss 完成必须隐藏（旧版只 alpha=0 仍拦截触摸）
             self.onDismissFinished?()
         }
         guard usesMotion else {

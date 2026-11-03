@@ -8,6 +8,15 @@ import Foundation
 import Photos
 import PhotoDeskCore
 
+/// 网格快照（docs/13 §3.4）：sections + itemsBySection + 动画标记 + 查询键。
+/// queryKey 随快照走（位置记忆 v2 用「快照时的 key」而非「保存时的 key」）。
+struct LibrarySnapshot {
+    let sections: [MonthSection]
+    let itemsBySection: [[PhotoItem]]
+    let animated: Bool
+    let queryKey: String
+}
+
 @MainActor
 final class LibraryViewModel: ObservableObject {
     /// 网格视图状态（驱动 DSEmptyState / 引导页 / 网格）
@@ -35,15 +44,18 @@ final class LibraryViewModel: ObservableObject {
     /// 完整索引进度（后台补齐）
     @Published private(set) var indexProgress: (loaded: Int, total: Int) = (0, 0)
     @Published private(set) var isIndexing = false
+    /// 完整索引是否就绪（docs/13 S04/S10：位置恢复等待 + 单月全选范围判定）
+    @Published private(set) var isIndexComplete = false
     @Published private(set) var isLimitedAccess = false
     @Published private(set) var isLoadingMore = false
 
     /// VC 注册：快照数据推送（主线程）。已在加载完成的 VC 接入时立即重放当前快照——
     /// 否则 VM 先于 VC 完成加载，回调错过唯一一次推送，网格永远空白（CI 实测的根因）。
-    func attachSnapshotHandler(_ handler: @escaping ([MonthSection], [[PhotoItem]], Bool) -> Void) {
+    func attachSnapshotHandler(_ handler: @escaping (LibrarySnapshot) -> Void) {
         onSnapshotUpdate = handler
         if viewState == .ready {
-            handler(sections, itemsBySection, false)
+            handler(LibrarySnapshot(sections: sections, itemsBySection: itemsBySection,
+                                    animated: false, queryKey: query.key))
         }
     }
     /// VC 注册：调起系统 limited 选择器（需要 VC 锚点）
@@ -122,10 +134,13 @@ final class LibraryViewModel: ObservableObject {
     }
 
     /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
+    /// debugRestoreNote：位置恢复状态（restore=ok/pending/ratio，docs/13 S04；VC 写入）
+    var debugRestoreNote = ""
     var debugSummary: String {
         "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
-            "sections=\(sections.count) indexing=\(isIndexing) " +
-            "del=\(reviewSession.pendingDeleteCount) hide=\(reviewSession.pendingHideCount)"
+            "sections=\(sections.count) indexing=\(isIndexing) done=\(isIndexComplete) " +
+            "del=\(reviewSession.pendingDeleteCount) hide=\(reviewSession.pendingHideCount)" +
+            (debugRestoreNote.isEmpty ? "" : " \(debugRestoreNote)")
     }
 
     /// 浏览页/搜索快照入口：当前筛选结果（docs/09 §2.1 单一事实来源）
@@ -148,12 +163,12 @@ final class LibraryViewModel: ObservableObject {
         await reloadForQuery()
     }
 
-    /// 筛选变化：内存全集上应用（不重查 PhotoKit，<500ms 预算内）+ 持久化
+    /// 筛选变化：后台全集过滤（docs/13 S03 修复 1：主线程只赋值与推快照）+ 持久化
     func setFilter(_ filter: SearchPredicate) {
         guard filter != query.filter else { return }
         query.filter = filter
         Self.persistFilter(filter, for: query.scope)
-        rebuildDerived(animated: false)
+        rebuildDerivedInBackground(animated: false)
     }
 
     /// 清除筛选（空态「清除筛选」按钮）
@@ -176,6 +191,11 @@ final class LibraryViewModel: ObservableObject {
     /// 全选前确保完整索引就绪（docs/09 D11）
     func ensureIndexComplete() async {
         await indexingTask?.value
+    }
+
+    /// 等待后台筛选计算完成（测试用：setFilter 已异步化，docs/13 S03）
+    func waitForFilterComputation() async {
+        await filterTask?.value
     }
 
     // MARK: - 批量操作（收藏 / 相簿；删除与隐藏已改走 ReviewSession，D16）
@@ -250,6 +270,7 @@ final class LibraryViewModel: ObservableObject {
                                           offset: 0,
                                           limit: min(batchSize, totalCount))
         indexProgress = (allItems.count, totalCount)
+        isIndexComplete = allItems.count >= totalCount
         rebuildDerived(animated: false)
         viewState = .ready
         startIndexCompletion()
@@ -265,7 +286,10 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private func runIndexCompletion() async {
-        guard allItems.count < totalCount else { return }
+        guard allItems.count < totalCount else {
+            isIndexComplete = true
+            return
+        }
         isIndexing = true
         var sinceRebuild = 0
         defer {
@@ -277,8 +301,12 @@ final class LibraryViewModel: ObservableObject {
                                               offset: allItems.count,
                                               limit: batchSize)
             guard !page.isEmpty, !Task.isCancelled else { break }
-            allItems += page
-            sinceRebuild += page.count
+            // docs/13 S03 修复 5：追加去重（索引期间库变更可能造成 offset 偏移 → 重复 id → Diffable fatal）
+            var seen = Set(allItems.map(\.id))
+            let fresh = page.filter { seen.insert($0.id).inserted }
+            guard !fresh.isEmpty else { break }   // 本批全部重复：索引无法推进，避免死循环
+            allItems += fresh
+            sinceRebuild += fresh.count
             indexProgress = (allItems.count, totalCount)
             if sinceRebuild >= 2_000 {
                 rebuildDerived(animated: false)
@@ -286,6 +314,7 @@ final class LibraryViewModel: ObservableObject {
             }
         }
         if !Task.isCancelled {
+            isIndexComplete = allItems.count >= totalCount
             rebuildDerived(animated: true)
         }
     }
@@ -365,21 +394,78 @@ final class LibraryViewModel: ObservableObject {
         rebuildSections(animated: animated)
     }
 
+    /// 后台筛选 + 代际令牌（docs/13 S03 修复 1/4：主线程不再同步重算全库；
+    /// 用户连续切年份时旧结果按 generation 丢弃，apply 不会交错）
+    private func rebuildDerivedInBackground(animated: Bool) {
+        filterGeneration += 1
+        let generation = filterGeneration
+        let allItems = self.allItems
+        let pendingDeletes = Set(reviewSession.session.pendingDeleteIDs)
+        let pendingHides = Set(reviewSession.session.pendingHideIDs)
+        let predicate = query.filter
+        let ascending = query.sortAscending
+        filterTask?.cancel()
+        filterTask = Task.detached(priority: .userInitiated) {
+            // 后台重活：pending 过滤 + PhotoFilter + 分组（全部纯函数，无可变共享状态）
+            let pending = pendingDeletes.union(pendingHides)
+            let visible = pending.isEmpty ? allItems : allItems.filter { !pending.contains($0.id) }
+            let filtered = PhotoFilter.apply(visible, predicate: predicate)
+            let (newSections, orderedIDs) = DateSectionizerAdapter.monthSections(
+                ids: filtered.map(\.id),
+                dates: filtered.map(\.creationDate),
+                ascending: ascending
+            )
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, generation == self.filterGeneration else { return }   // 代际令牌
+                self.visibleItems = visible
+                self.filteredItems = filtered
+                self.pushSections(newSections, orderedIDs: orderedIDs, animated: animated)
+            }
+        }
+    }
+
+    private var filterGeneration = 0
+    private var filterTask: Task<Void, Never>?
+
+    /// sections 入库 + 推快照（主线程；去重后的 items 才允许进 Diffable）
     private func rebuildSections(animated: Bool) {
+        // docs/13 S03 修复 5：重复 id 会让 Diffable 快照 fatal——按 id 去重（保序）
+        let uniqueItems = Self.uniqueByID(filteredItems)
+        if uniqueItems.count != filteredItems.count {
+            filteredItems = uniqueItems
+        }
         let (newSections, orderedIDs) = DateSectionizerAdapter.monthSections(
-            ids: filteredItems.map(\.id),
-            dates: filteredItems.map(\.creationDate),
+            ids: uniqueItems.map(\.id),
+            dates: uniqueItems.map(\.creationDate),
             ascending: query.sortAscending
         )
+        pushSections(newSections, orderedIDs: orderedIDs, animated: animated)
+    }
+
+    private func pushSections(_ newSections: [MonthSection], orderedIDs: [String], animated: Bool) {
         let byID = Dictionary(filteredItems.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         sections = newSections
         itemsBySection = orderedIDs.groupedBy(sections: newSections, lookup: byID)
-        onSnapshotUpdate?(newSections, itemsBySection, animated)
+        onSnapshotUpdate?(LibrarySnapshot(sections: newSections,
+                                          itemsBySection: itemsBySection,
+                                          animated: animated,
+                                          queryKey: query.key))
+    }
+
+    /// 按 id 去重（保序）；DEBUG 下断言唯一（重复说明上游有 bug，Release 静默修复）
+    private static func uniqueByID(_ items: [PhotoItem]) -> [PhotoItem] {
+        var seen = Set<String>()
+        seen.reserveCapacity(items.count)
+        let result = items.filter { seen.insert($0.id).inserted }
+        assert(result.count == items.count, "PhotoItem id 重复：Diffable 快照会 fatal，已去重")
+        return result
     }
 
     private func reloadForQuery() async {
         guard hasLoadedOnce else { return }
         indexingTask?.cancel()
+        isIndexComplete = false   // 换查询：完整索引重新补齐（位置恢复会等待，docs/13 S04）
         totalCount = await repository.prepare(scope: query.scope, sortAscending: query.sortAscending)
         restartObserving()
         guard totalCount > 0 else {
@@ -392,12 +478,13 @@ final class LibraryViewModel: ObservableObject {
                                           offset: 0,
                                           limit: min(batchSize, totalCount))
         indexProgress = (allItems.count, totalCount)
+        isIndexComplete = allItems.count >= totalCount
         rebuildDerived(animated: false)
         viewState = .ready
         startIndexCompletion()
     }
 
-    private var onSnapshotUpdate: ((_ sections: [MonthSection], _ itemsBySection: [[PhotoItem]], _ animated: Bool) -> Void)?
+    private var onSnapshotUpdate: ((LibrarySnapshot) -> Void)?
 
     // MARK: - 筛选持久化（library.filter.<scope>；docs/09 D10）
 

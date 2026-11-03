@@ -6,10 +6,13 @@
 import Foundation
 import os.log
 
+private enum ResumeOnceLog {
+    static let logger = Logger(subsystem: "com.example.PhotoDesk", category: "imaging")
+}
+
 final class ResumeOnce<T> {
     private let lock = NSLock()
     private var didResume = false
-    private static let logger = Logger(subsystem: "com.example.PhotoDesk", category: "imaging")
 
     /// 第一次调用恢复 continuation，之后全部忽略（线程安全）
     func resume(_ value: T, _ continuation: CheckedContinuation<T, Never>) {
@@ -20,7 +23,7 @@ final class ResumeOnce<T> {
         if isFirst {
             continuation.resume(returning: value)
         } else {
-            Self.logger.warning("duplicate resume suppressed (continuation already resumed)")
+            ResumeOnceLog.logger.warning("duplicate resume suppressed (continuation already resumed)")
         }
     }
 

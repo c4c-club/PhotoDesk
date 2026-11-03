@@ -43,6 +43,7 @@ struct LibraryRootView: View {
     @State private var viewerContext: ViewerContext?
     @State private var showSearch = false
     @State private var showFilterSheet = false
+    @State private var showMonthJump = false
     @State private var showVault = false
     @State private var showSessionReview = false
     /// 排序接线（docs/09 D10）：外观设置页 @AppStorage("grid.sortAsc") 变化 → 查询重载
@@ -53,6 +54,7 @@ struct LibraryRootView: View {
     @State private var recoveryCount = 0
     @State private var showRecovery = false
     @State private var hadActiveEntry = false
+    @Environment(\.scenePhase) private var scenePhase
     #if DEBUG
     /// UI 测试钩子：-uiTestingViewerStartIndex 启动即打开第 n 张查看器（只触发一次）
     @State private var hookViewerOpened = false
@@ -77,11 +79,9 @@ struct LibraryRootView: View {
                 case .empty:
                     DSEmptyState(kind: .empty)
                 case .ready:
+                    // docs/13 S06：VStack 只保留 ScopePicker + 网格（顶部筛选栏已移除，入口在导航栏）
                     VStack(spacing: 0) {
                         scopePicker
-                        LibraryFilterBar(viewModel: viewModel) {
-                            showFilterSheet = true
-                        }
                         ZStack {
                             LibraryContainer(viewModel: viewModel,
                                              onOpenViewer: { item in
@@ -90,7 +90,10 @@ struct LibraryRootView: View {
                                                      startItemID: item.id,
                                                      queryKey: viewModel.query.key)
                                              },
-                                             selectionBridge: selectionBridge)
+                                             selectionBridge: selectionBridge,
+                                             onOpenFilter: {
+                                                 showFilterSheet = true
+                                             })
                             if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
                                 filterEmptyState
                             }
@@ -105,6 +108,30 @@ struct LibraryRootView: View {
                     SessionBadgeView(session: AppContainer.shared.reviewSession) {
                         showSessionReview = true
                     }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // docs/13 S09：「月份」跳转面板
+                    Button {
+                        showMonthJump = true
+                    } label: {
+                        Image(systemName: "calendar")
+                    }
+                    .accessibilityIdentifier("Library-MonthJump")
+                    .accessibilityLabel("按月份跳转")
+                    .disabled(viewModel.viewState != .ready)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // docs/13 S06：筛选入口（导航栏按钮，active 时实心图标），位于搜索左侧
+                    Button {
+                        showFilterSheet = true
+                    } label: {
+                        Image(systemName: viewModel.query.filter.isActive
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityIdentifier("Library-Filter")
+                    .accessibilityLabel("筛选")
+                    .disabled(viewModel.viewState != .ready)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -137,6 +164,19 @@ struct LibraryRootView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             LibraryFilterSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showMonthJump) {
+            // docs/13 S09/S10：月份面板（跳转 / 单月全选 / 回到顶部）
+            MonthJumpSheet(sections: viewModel.sections,
+                           onSelect: { sectionIndex in
+                               selectionBridge.controller?.scrollToSection(sectionIndex)
+                           },
+                           onSelectAll: { sectionIndex in
+                               selectionBridge.controller?.enterMonthSelection(sectionIndex: sectionIndex)
+                           },
+                           onScrollToTop: {
+                               selectionBridge.controller?.scrollToTop()
+                           })
         }
         .sheet(isPresented: $showSessionReview) {
             SessionReviewView(session: AppContainer.shared.reviewSession,
@@ -199,6 +239,12 @@ struct LibraryRootView: View {
         .onChange(of: sortAscending) { ascending in
             // 排序接线（docs/09 D10）：外观设置页开关 / 菜单 → 查询重载
             Task { await viewModel.setSort(ascending: ascending) }
+        }
+        .onChange(of: scenePhase) { phase in
+            // docs/13 S04/S11：进后台/失活立即保存位置（杀进程前最后一道保存）
+            if phase != .active {
+                selectionBridge.controller?.savePositionNow(reason: "scenePhase")
+            }
         }
         .onReceive(service.$access) { _ in
             Task { await viewModel.start() }
@@ -320,6 +366,8 @@ struct LibraryContainer: UIViewControllerRepresentable {
     let onOpenViewer: (PhotoItem) -> Void
     /// 工具栏「多选」按钮与 UIKit 控制器的桥
     let selectionBridge: SelectionModeBridge
+    /// 多选操作行「筛选」按钮 → 打开筛选面板（docs/13 S06）
+    let onOpenFilter: () -> Void
     @AppStorage("grid.columns") private var gridColumns = 3
     @AppStorage("grid.sortAsc") private var sortAscending = false
 
@@ -330,12 +378,14 @@ struct LibraryContainer: UIViewControllerRepresentable {
                                                positionStore: AppContainer.shared.positionStore)
         controller.setColumns(gridColumns)
         controller.onOpenViewer = onOpenViewer
+        controller.onOpenFilter = onOpenFilter
         selectionBridge.controller = controller
         return controller
     }
 
     func updateUIViewController(_ controller: LibraryViewController, context: Context) {
         controller.setColumns(gridColumns)
+        controller.onOpenFilter = onOpenFilter
         selectionBridge.controller = controller
     }
 }

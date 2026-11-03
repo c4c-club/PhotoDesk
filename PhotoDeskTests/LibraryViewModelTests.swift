@@ -54,6 +54,7 @@ private final class FakeImagePipeline: ImagePipelineProtocol {
     func thumbnail(for id: String, size: CGSize, scale: CGFloat) async -> UIImage? { nil }
     func prefetch(ids: [String], size: CGSize) {}
     func cancel(id: String) {}
+    func cancelAll() {}
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? { nil }
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)? { nil }
     var diskCacheBytes: Int64 { 0 }
@@ -115,8 +116,8 @@ final class LibraryViewModelTests: XCTestCase {
                                                          persistence: persistence),
                                   settings: settings,
                                   reviewSession: session)
-        vm.attachSnapshotHandler { [weak self] sections, items, _ in
-            self?.snapshots.append((sections, items))
+        vm.attachSnapshotHandler { [weak self] snapshot in
+            self?.snapshots.append((snapshot.sections, snapshot.itemsBySection))
         }
         return vm
     }
@@ -152,11 +153,13 @@ final class LibraryViewModelTests: XCTestCase {
         var filter = SearchPredicate.default
         filter.year = Calendar.current.component(.year, from: items[0].creationDate!)
         vm.setFilter(filter)
+        await vm.waitForFilterComputation()
         XCTAssertEqual(vm.filteredItems.count, 10, "全部 10 张同年")
         XCTAssertEqual(vm.sections.first?.count, 10, "分组头计数与筛选结果一致")
 
         filter.month = Calendar.current.component(.month, from: items[0].creationDate!) + 7  // 不存在的月
         vm.setFilter(filter)
+        await vm.waitForFilterComputation()
         XCTAssertTrue(vm.filteredItems.isEmpty, "无结果筛选 → 空集（网格显示「清除筛选」空态）")
         XCTAssertEqual(vm.viewState, .ready, "筛选无结果不是库空态")
     }
@@ -178,7 +181,73 @@ final class LibraryViewModelTests: XCTestCase {
         filter.media = [.video]
         vm.setFilter(filter)
         await vm.ensureIndexComplete()
+        await vm.waitForFilterComputation()
         XCTAssertEqual(vm.filteredItems.count, 1, "筛选作用于完整索引而非首屏 500")
+    }
+
+    // MARK: - 后台筛选 / 代际令牌 / 去重（docs/13 S03 验收）
+
+    func testSetFilterIsAsynchronousWithSameResult() async {
+        // 后台过滤结果与同步口径一致（docs/13 S03 修复 1）
+        let items = (0..<300).map { makeItem($0) }
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        await vm.ensureIndexComplete()
+
+        var filter = SearchPredicate.default
+        filter.media = [.image]
+        vm.setFilter(filter)
+        XCTAssertEqual(vm.filteredItems.count, 300, "setFilter 立即返回（未阻塞主线程），结果尚未应用")
+        await vm.waitForFilterComputation()
+        XCTAssertEqual(vm.filteredItems.count, 300, "后台计算完成后与同步口径一致")
+        XCTAssertEqual(vm.sections.count, vm.itemsBySection.count)
+    }
+
+    func testStaleFilterResultIsDiscardedByGeneration() async {
+        // 连续两次 setFilter：旧计算的过期结果不得覆盖新结果（代际令牌，docs/13 S03 修复 4）
+        var items = (0..<100).map { makeItem($0) }
+        items[0] = PhotoItem(id: "id-0",
+                             mediaType: .video,
+                             mediaSubtypes: [],
+                             creationDate: items[0].creationDate,
+                             modificationDate: nil,
+                             pixelWidth: 10, pixelHeight: 10, duration: 2,
+                             isFavorite: false, isHidden: false,
+                             location: nil, burstIdentifier: nil, isCloudOnly: false)
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        await vm.ensureIndexComplete()
+
+        var videoFilter = SearchPredicate.default
+        videoFilter.media = [.video]
+        var imageFilter = SearchPredicate.default
+        imageFilter.media = [.image]
+        vm.setFilter(videoFilter)   // 旧任务：预期 1
+        vm.setFilter(imageFilter)   // 新任务：预期 99（覆盖旧任务的 generation）
+        await vm.waitForFilterComputation()
+        XCTAssertEqual(vm.filteredItems.count, 99, "过期结果应被代际令牌丢弃")
+    }
+
+    func testDuplicateItemIDsAreDedupedBeforeSnapshot() async {
+        // 仓库返回重复 id（索引期间库变更模拟）：快照不得 fatal，且去重保序（docs/13 S03 修复 5）
+        var items = (0..<10).map { makeItem($0) }
+        items.append(items[3])   // 重复 id
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        await vm.ensureIndexComplete()
+        XCTAssertEqual(vm.filteredItems.count, 10, "重复 id 去重")
+        let allIDs = vm.itemsBySection.flatMap { $0.map(\.id) }
+        XCTAssertEqual(Set(allIDs).count, allIDs.count, "快照内 id 唯一")
+        XCTAssertEqual(vm.snapshots.last?.items.flatMap { $0.map(\.id) }.count, 10)
+    }
+
+    func testIndexCompleteFlagTurnsTrueAfterFullIndex() async {
+        let items = (0..<1_100).map { makeItem($0) }
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        XCTAssertEqual(vm.isIndexComplete, false, "首屏 500 时索引未完成")
+        await vm.ensureIndexComplete()
+        XCTAssertEqual(vm.isIndexComplete, true, "补齐后置位（位置恢复/单月全选依赖）")
     }
 
     // MARK: - pending 过滤（D16）
