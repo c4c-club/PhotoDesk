@@ -66,4 +66,74 @@ final class PerformanceUITests: XCTestCase {
             }
         }
     }
+
+    // MARK: - docs/13 Phase 7：查看器连滑内存（5,000 张 100 次滑动峰值 < 250MB）
+
+    func testViewerMemoryUnderFastSwipe() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingViewerStartIndex", "0"]
+        installPermissionMonitor(for: app)
+        app.launch()
+        let introButton = app.buttons["允许访问照片"]
+        if introButton.waitForExistence(timeout: 10) {
+            introButton.tap()
+            app.tap()
+        }
+        let viewer = app.otherElements["ViewerRoot"]
+        XCTAssertTrue(viewer.waitForExistence(timeout: 30), "查看器未打开")
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 1
+        measure(metrics: [XCTMemoryMetric()], options: options) {
+            for _ in 0..<50 {
+                viewer.swipeLeft(velocity: .fast)
+            }
+            for _ in 0..<50 {
+                viewer.swipeRight(velocity: .fast)
+            }
+        }
+        XCTAssertEqual(app.state, .runningForeground, "100 次连滑后 App 必须存活")
+    }
+
+    // MARK: - docs/13 Phase 7：年份筛选性能（5,470 张切换 < 500ms/次）
+
+    func testFilterPerformance() throws {
+        let app = XCUIApplication()
+        installPermissionMonitor(for: app)
+        app.launch()
+        let introButton = app.buttons["允许访问照片"]
+        if introButton.waitForExistence(timeout: 10) {
+            introButton.tap()
+            app.tap()
+        }
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现")
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格没有任何 cell")
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 1
+        measure(metrics: [XCTClockMetric()], options: options) {
+            applyYearFilter(app, year: "2024")
+            applyYearFilter(app, year: "2026")
+        }
+        XCTAssertEqual(app.state, .runningForeground, "年份切换后 App 必须存活")
+    }
+
+    /// 打开筛选面板选年份 → 完成（与 StabilityUITests 同款流程）
+    @discardableResult
+    private func applyYearFilter(_ app: XCUIApplication, year: String) -> Bool {
+        let filterButton = app.descendants(matching: .any)["Library-Filter"].firstMatch
+        guard filterButton.waitForExistence(timeout: 5) else { return false }
+        filterButton.tap()
+        let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
+        guard dateMenu.waitForExistence(timeout: 8) else { return false }
+        dateMenu.tap()
+        let option = app.buttons[year]
+        guard option.waitForExistence(timeout: 5) else { return false }
+        option.tap()
+        let done = app.buttons["完成"]
+        guard done.waitForExistence(timeout: 5) else { return false }
+        done.tap()
+        return true
+    }
 }

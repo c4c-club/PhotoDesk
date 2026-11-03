@@ -173,6 +173,14 @@ final class StabilityUITests: XCTestCase {
 
     // MARK: 文本解析
 
+    /// 截图取证（docs/13 Phase 8：s01–s12 随 ui-test-attachments artifact 导出，逐张确认）
+    private func snap(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// 「已选择 N 项 · 本月」→ N
     private static func parseCount(_ label: String) -> Int {
         guard let regex = try? NSRegularExpression(pattern: "[0-9]+"),
@@ -218,6 +226,7 @@ final class StabilityUITests: XCTestCase {
         let label = banner.label.lowercased()
         XCTAssertFalse(label.contains("nan"), "横幅出现 NaN：\(banner.label)")
         XCTAssertFalse(label.contains("inf"), "横幅出现 inf：\(banner.label)")
+        snap(app, "s01-zoom")
     }
 
     // MARK: - S02 快滑 50 + 回滑 50 不卡死不闪退
@@ -238,6 +247,7 @@ final class StabilityUITests: XCTestCase {
             }
         }
         assertAlive(app, "100 次快滑结束后")
+        snap(app, "s02-fast-swipe")
     }
 
     // MARK: - S03 年份筛选反复切换不崩
@@ -255,6 +265,7 @@ final class StabilityUITests: XCTestCase {
                               "选 \(year) 年后顶部月份头为「\(topHeaderText(app))」\n\(hierarchy(app))")
             }
         }
+        snap(app, "s03-year-filter")
     }
 
     // MARK: - S03b 持久化筛选重启不崩
@@ -271,6 +282,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(waitTopHeaderContains(app, "2024年", timeout: 10),
                       "重启后筛选未保持（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
         assertAlive(app, "持久化筛选重启后")
+        snap(app, "s04-restore")
     }
 
     // MARK: - S04 滚到 2024-05 杀进程重启回到原位置
@@ -315,6 +327,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(viewerRoot(app).waitForExistence(timeout: 5),
                       "点底部照片未打开查看器（可能被底部气泡挡住）\n\(hierarchy(app))")
         assertAlive(app, "底部点击后")
+        snap(app, "s05-toast")
     }
 
     // MARK: - S06 顶部筛选栏移除 + 多选筛选按钮在全选左侧
@@ -334,6 +347,7 @@ final class StabilityUITests: XCTestCase {
         filter.tap()
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 8), "点 Batch-Filter 未打开筛选面板\n\(hierarchy(app))")
+        snap(app, "s06-filter-entry")
     }
 
     // MARK: - S07 多选长按拖选连续选中
@@ -365,6 +379,7 @@ final class StabilityUITests: XCTestCase {
             let value = cell.value as? String ?? ""
             XCTAssertTrue(value.contains("selected"), "第 \(index + 1) 格未选中：\(value)\n\(hierarchy(app))")
         }
+        snap(app, "s07-slide-select")
     }
 
     // MARK: - S08 查看器连滑 30 张不闪退
@@ -391,6 +406,7 @@ final class StabilityUITests: XCTestCase {
             }
         }
         assertAlive(app, "连滑 30 张结束后")
+        snap(app, "s08-viewer")
     }
 
     // MARK: - S09 月份面板跳转
@@ -405,6 +421,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(sheet.waitForExistence(timeout: 5), "月份面板未出现\n\(hierarchy(app))")
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
         XCTAssertTrue(card.waitForExistence(timeout: 5), "缺 2024-05 月份卡片\n\(hierarchy(app))")
+        snap(app, "s09-month-jump")
         card.tap()
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 8),
                       "跳转后顶部不是 2024年5月（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
@@ -445,6 +462,7 @@ final class StabilityUITests: XCTestCase {
         let headerCount = Self.parseHeaderCount(header)
         XCTAssertEqual(Self.parseCount(label), headerCount,
                        "单月全选计数应等于该月张数（计数=\(label)，header=\(header)）")
+        snap(app, "s10-month-select")
         // 相邻月份不应被选中：滚一屏后抽查首格
         app.swipeUp()
         Thread.sleep(forTimeInterval: 0.5)
@@ -485,6 +503,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
                       "跳转后重启未回到 2024年5月（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
         assertAlive(app, "月份跳转重启后")
+        snap(app, "s11-relaunch")
     }
 
     // MARK: - S12 删除首/中/末不闪退（会话 mock 隔离 PhotoKit）
@@ -534,6 +553,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "待处理徽标未出现\n\(hierarchy(app))")
         XCTAssertTrue(badge.label.contains("20"), "待删除计数应 20，实际「\(badge.label)」")
         assertAlive(app, "连续 20 次删除结束后")
+        snap(app, "s12-delete")
     }
 
     // MARK: - Phase 7 全页面烟测（照片库→查看器→工具各页→返回）

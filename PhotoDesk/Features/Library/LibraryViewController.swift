@@ -971,7 +971,7 @@ final class LibraryViewController: UIViewController {
     /// 跳转/提示共用顶部细横幅（不挡网格；generation 令牌防旧动画隐藏新横幅）
     private let jumpBanner: UILabel = {
         let label = UILabel()
-        label.font = DSTypography.font(.caption)
+        label.font = DSTypography.font(.badge)
         label.textColor = DSColor.textPrimary
         label.backgroundColor = DSColor.bgSecondary
         label.textAlignment = .center
