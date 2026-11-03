@@ -119,6 +119,8 @@ final class StabilityUITests: XCTestCase {
     private func topHeaderText(_ app: XCUIApplication) -> String {
         let headers = app.collectionViews.firstMatch
             .staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+        // sheet 收起动画期间 firstMatch 可能解析到面板的 List（无月头文本）——count 守卫防硬失败
+        guard headers.count > 0 else { return "" }
         return headers.firstMatch.label
     }
 
@@ -128,7 +130,7 @@ final class StabilityUITests: XCTestCase {
             .staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if headers.firstMatch.label.contains(text) { return true }
+            if headers.count > 0, headers.firstMatch.label.contains(text) { return true }
             usleep(300_000)
         }
         return false
@@ -143,6 +145,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 10), "筛选面板未自动打开\n\(hierarchy(app))")
+        Thread.sleep(forTimeInterval: 0.8)   // 等 sheet 滑入动画完成（动画中点击会丢失）
     }
 
     private func waitForSheetClosed(_ app: XCUIApplication, timeout: TimeInterval = 5) {
@@ -150,15 +153,19 @@ final class StabilityUITests: XCTestCase {
         let gone = NSPredicate { _, _ in !dateMenu.exists }
         let expectation = XCTNSPredicateExpectation(predicate: gone, object: nil)
         XCTWaiter.wait(for: [expectation], timeout: timeout)
+        Thread.sleep(forTimeInterval: 0.5)   // 等收起动画完全结束（期间 AX 树含面板 List）
     }
 
     /// 在面板内选一个年份 → 「应用筛选」行按钮（Form 行，UIKit 宿主）
     private func applyYearInSheet(_ app: XCUIApplication, year: String) {
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 5), "日期菜单不存在\n\(hierarchy(app))")
-        dateMenu.tap()
         let option = app.buttons[year]
-        XCTAssertTrue(option.waitForExistence(timeout: 5), "年份选项 \(year) 未出现\n\(hierarchy(app))")
+        // 上下文菜单动画偶发较慢/首次点击丢失：等选项 → 没出现则再点一次菜单
+        for _ in 0..<2 where !option.waitForExistence(timeout: 6) {
+            dateMenu.tap()
+        }
+        XCTAssertTrue(option.waitForExistence(timeout: 6), "年份选项 \(year) 未出现\n\(hierarchy(app))")
         option.tap()
         tapApplyInSheet(app)
     }
@@ -180,12 +187,18 @@ final class StabilityUITests: XCTestCase {
         tapApplyInSheet(app)
     }
 
-    /// 以「自动打开月份面板」模式启动
+    /// 以「自动打开月份面板」模式启动（前序用例可能留下年份持久化筛选 → 面板无 2024-05 卡片：
+    /// 先用筛选钩子清空筛选，再用月份钩子打开面板）
     private func launchWithMonthSheetOpen(_ app: XCUIApplication) {
-        app.launchArguments += ["-uiTestingOpenMonthJump"]
+        app.launchArguments = ["-uiTestingOpenFilterSheet"]
+        _ = launchToGrid(app)
+        clearFilterInSheet(app)
+        app.terminate()
+        app.launchArguments = ["-uiTestingOpenMonthJump"]
         _ = launchToGrid(app)
         let card = anyElement(app, identifier: "MonthJump-Month-2024-05")
         XCTAssertTrue(card.waitForExistence(timeout: 10), "月份面板未自动打开或缺 2024-05 卡片\n\(hierarchy(app))")
+        Thread.sleep(forTimeInterval: 0.8)   // 等 sheet 滑入动画完成
     }
 
     private func selectionCountLabel(_ app: XCUIApplication) -> XCUIElement {

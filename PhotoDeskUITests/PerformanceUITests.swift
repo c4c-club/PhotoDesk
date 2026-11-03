@@ -113,6 +113,7 @@ final class PerformanceUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格没有任何 cell")
         let dateMenu = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '日期筛选'")).firstMatch
         XCTAssertTrue(dateMenu.waitForExistence(timeout: 30), "筛选面板未自动打开")
+        Thread.sleep(forTimeInterval: 0.8)   // 等 sheet 滑入动画完成
 
         let options = XCTMeasureOptions()
         options.iterationCount = 1
@@ -120,13 +121,15 @@ final class PerformanceUITests: XCTestCase {
             // 一次完整年份切换：菜单选年（面板内 draft）→「应用筛选」行 → setFilter 后台重算 + 快照提交
             dateMenu.tap()
             let option = app.buttons["2024"]
+            for _ in 0..<2 where !option.waitForExistence(timeout: 6) {
+                dateMenu.tap()   // 上下文菜单动画偶发较慢：重试一次
+            }
             guard option.waitForExistence(timeout: 5) else { return }
             option.tap()
             let apply = app.buttons["Filter-Sheet-Apply"]
             guard apply.waitForExistence(timeout: 5) else { return }
             apply.tap()
-            let headers = collection.staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
-            _ = headers.firstMatch.waitForExistence(timeout: 10)
+            _ = waitHeaderContains(collection, "2024年")
         }
         XCTAssertTrue(waitHeaderContains(collection, "2024年"), "应用 2024 年后网格应只含该年")
         XCTAssertEqual(app.state, .runningForeground, "年份切换后 App 必须存活")
@@ -136,7 +139,8 @@ final class PerformanceUITests: XCTestCase {
         let headers = collection.staticTexts.matching(NSPredicate(format: "label CONTAINS '月 ·'"))
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
-            if headers.firstMatch.label.contains(text) { return true }
+            // sheet 收起动画期间 count 可能为 0（面板 List 短暂留在 AX 树）——count 守卫防硬失败
+            if headers.count > 0, headers.firstMatch.label.contains(text) { return true }
             usleep(300_000)
         }
         return false

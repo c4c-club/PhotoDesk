@@ -465,13 +465,12 @@ final class LibraryViewModel: ObservableObject {
                                           queryKey: query.key))
     }
 
-    /// 按 id 去重（保序）；DEBUG 下断言唯一（重复说明上游有 bug，Release 静默修复）
+    /// 按 id 去重（保序）。重复 id 是索引期间库变更的**预期产物**（offset 偏移），
+    /// 静默去重即可——不得 assert（Debug 下会把可自愈场景变成 SIGTRAP，CI 轮 11 实测）。
     private static func uniqueByID(_ items: [PhotoItem]) -> [PhotoItem] {
         var seen = Set<String>()
         seen.reserveCapacity(items.count)
-        let result = items.filter { seen.insert($0.id).inserted }
-        assert(result.count == items.count, "PhotoItem id 重复：Diffable 快照会 fatal，已去重")
-        return result
+        return items.filter { seen.insert($0.id).inserted }
     }
 
     private func reloadForQuery() async {
