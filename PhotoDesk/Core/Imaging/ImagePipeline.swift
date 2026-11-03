@@ -1,7 +1,8 @@
-// MARK: - 职责说明：图片加载管线（docs/03 §5.2）——唯一合法取图入口（AGENTS.md §3.6 禁止 View 直接 requestImage）。
-// 三级：内存 NSCache 60MB → 磁盘 LRU 200MB → PHCachingImageManager（allowsCachingHighQualityImages = false）。
-// 同 id+size 在途请求合并（TaskBox）；解码并发上限 4（AGENTS.md §3.5，AsyncSemaphore）；
-// iCloud-only 未下载时返回 nil（isNetworkAccessAllowed 由设置控制，docs/03 §5.8）。
+// MARK: - 职责说明：图片加载管线 v2（docs/03 §5.2 + docs/13 §3.2）——唯一合法取图入口。
+// v2 修复 S02/S08：全部 continuation 经 ResumeOnce 单次恢复；大图 .highQualityFormat 单回调 +
+// 目标尺寸 ≤2048 + requestID 可取消；预取经 PrefetchWindowTracker 差量 stop/start（窗口 ≤7）；
+// fullImageCache（6 张 / 60MB）滑动回看命中；cancelAll + 内存警告清理。
+// 三级：内存 NSCache 60MB → 磁盘 LRU 200MB → PHCachingImageManager；解码并发 4、大图并发 2。
 
 import AVFoundation
 import Photos
@@ -10,11 +11,13 @@ import UIKit
 protocol ImagePipelineProtocol: AnyObject {
     /// 缩略图（网格/胶片条）：三级缓存 + 在途合并
     func thumbnail(for id: String, size: CGSize, scale: CGFloat) async -> UIImage?
-    /// 预取（可视区 ± N）：经 PHCachingImageManager.startCachingImages
+    /// 预取（可视区 ± N）：差量 start/stopCachingImages，窗口 ≤7
     func prefetch(ids: [String], size: CGSize)
     /// 取消某 id 的在途请求与预取（cell 离屏）
     func cancel(id: String)
-    /// 大图（浏览页）：opportunistic 先低清后高清，progress 上报下载进度。
+    /// 取消全部在途请求与预取（查看器关闭 / 内存警告，docs/13 S02）
+    func cancelAll()
+    /// 大图（浏览页）：.highQualityFormat 单回调 + 目标尺寸 ≤2048，progress 上报下载进度。
     /// allowNetwork：iCloud 手动下载时由「下载」按钮置 true，否则跟随设置（docs/03 §5.8）
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage?
     /// 视频播放资产（浏览页视频 cell；用 iOS 8+ 的 requestAVAsset，兼容 iOS 15）
@@ -61,22 +64,54 @@ actor AsyncSemaphore {
 final class ImagePipeline: ImagePipelineProtocol {
     /// 解码/请求并发上限（AGENTS.md §3.5）
     static let maxConcurrentDecodes = 4
+    /// 大图并发上限（docs/13 §3.2：48MP 全尺寸解码限 2 路）
+    static let maxConcurrentFullImages = 2
+    /// 大图目标尺寸硬上限（docs/13 S02：屏幕像素×1.25，封顶 2048）
+    static let maxFullImagePixel: CGFloat = 2048
+    /// 预取窗口上限（docs/13 S02）
+    static let maxPrefetchWindow = 7
     static let thumbnailJPEGQuality: CGFloat = 0.85
 
+    private let requester: ImageRequesting
     private let memory = MemoryCache()
     private let disk: DiskCache
-    private let cachingManager = PHCachingImageManager()
     private let gate = AsyncSemaphore(limit: ImagePipeline.maxConcurrentDecodes)
+    private let fullImageGate = AsyncSemaphore(limit: ImagePipeline.maxConcurrentFullImages)
     private var inflight: [String: TaskBox] = [:]
-    /// 最近一次预取的像素尺寸（网格缩略图统一尺寸；cancel 用它匹配 stopCachingImages）
-    private var prefetchPixelSize: CGSize?
+    private let inflightLock = NSLock()
+    /// 大图在途请求 id（cancel(id:)/cancelAll 用）
+    private var fullImageRequestIDs: [String: PHImageRequestID] = [:]
+    private let requestIDLock = NSLock()
+    /// 大图回看缓存（countLimit 6 / costLimit 60MB，docs/13 S02）
+    private let fullImageCache = NSCache<NSString, UIImage>()
+    /// 预取窗口差量
+    private let prefetchTracker = PrefetchWindowTracker(windowLimit: ImagePipeline.maxPrefetchWindow)
     private let allowsNetworkAccess: () -> Bool
+    private var memoryWarningObserver: NSObjectProtocol?
 
-    /// - Parameter allowsNetworkAccess: iCloud 原件是否允许联网下载（设置 icloud.autoDownloadOriginal，docs/03 §4.3）
-    init(disk: DiskCache = DiskCache(), allowsNetworkAccess: @escaping () -> Bool = { false }) {
+    /// - Parameters:
+    ///   - requester: PhotoKit 请求层（生产默认 PHCachingImageManager；测试注入 Fake）
+    ///   - allowsNetworkAccess: iCloud 原件是否允许联网下载（设置 icloud.autoDownloadOriginal，docs/03 §4.3）
+    init(requester: ImageRequesting = PhotoKitImageRequester(),
+         disk: DiskCache = DiskCache(),
+         allowsNetworkAccess: @escaping () -> Bool = { false }) {
+        self.requester = requester
         self.disk = disk
         self.allowsNetworkAccess = allowsNetworkAccess
-        cachingManager.allowsCachingHighQualityImages = false
+        fullImageCache.countLimit = 6
+        fullImageCache.totalCostLimit = 60 * 1024 * 1024
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil, queue: nil
+        ) { [weak self] _ in
+            self?.handleMemoryWarning()
+        }
+    }
+
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - ImagePipelineProtocol
@@ -96,7 +131,7 @@ final class ImagePipeline: ImagePipelineProtocol {
         }
 
         // 3. 在途合并
-        if let box = inflight[key] {
+        if let box = self.inflightBox(forKey: key) {
             return await box.task.value
         }
 
@@ -107,83 +142,115 @@ final class ImagePipeline: ImagePipelineProtocol {
             if Task.isCancelled { return nil }
             return await self.requestThumbnail(request)
         })
-        inflight[key] = box
+        self.setInflightBox(box, forKey: key)
         let result = await box.task.value
-        if inflight[key] === box {
-            inflight.removeValue(forKey: key)
-        }
+        self.removeInflightBox(forKey: key, expected: box)
         return result
     }
 
-    /// 预取（可视区 ± N）：经 PHCachingImageManager.startCachingImages。
+    /// 预取：差量 stop/start（docs/13 S02——旧实现只 start 从不 stop，快滑必涨内存）
     /// - Parameter size: **像素尺寸**（与 thumbnail 的缓存键格式一致：同 id 同尺寸共用三级缓存）
     func prefetch(ids: [String], size: CGSize) {
-        guard !ids.isEmpty else { return }
-        let pixelSize = size
-        let options = Self.thumbnailOptions(allowsNetwork: allowsNetworkAccess())
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-        let targets = assets.objects(at: IndexSet(integersIn: 0..<assets.count))
-        guard !targets.isEmpty else { return }
-        prefetchPixelSize = pixelSize
-        cachingManager.startCachingImages(for: targets,
-                                          targetSize: pixelSize,
-                                          contentMode: .aspectFill,
-                                          options: options)
+        let delta = prefetchTracker.update(ids: ids, size: size)
+        execute(delta)
     }
 
     func cancel(id: String) {
+        // 1. 在途缩略图任务
         let prefix = id + "|"
-        for (key, box) in inflight where key.hasPrefix(prefix) {
-            box.task.cancel()
-            inflight.removeValue(forKey: key)
-        }
-        // 停掉该资源对应尺寸的 PhotoKit 预取（网格缩略图尺寸统一，记录于 prefetchPixelSize）
-        guard let pixelSize = prefetchPixelSize else { return }
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        if let asset = assets.firstObject {
-            cachingManager.stopCachingImages(for: [asset],
-                                             targetSize: pixelSize,
-                                             contentMode: .aspectFill,
-                                             options: nil)
-        }
+        inflightLock.lock()
+        let matching = inflight.filter { $0.key.hasPrefix(prefix) }
+        matching.forEach { inflight.removeValue(forKey: $0.key) }
+        inflightLock.unlock()
+        matching.values.forEach { $0.task.cancel() }
+        // 2. 在途大图请求
+        cancelFullImageRequest(id)
+        // 3. 该 id 的 PhotoKit 预取
+        executeStopOnly(prefetchTracker.remove(id))
+    }
+
+    func cancelAll() {
+        inflightLock.lock()
+        let boxes = Array(inflight.values)
+        inflight.removeAll()
+        inflightLock.unlock()
+        boxes.forEach { $0.task.cancel() }
+
+        requestIDLock.lock()
+        let ids = fullImageRequestIDs
+        fullImageRequestIDs.removeAll()
+        requestIDLock.unlock()
+        ids.values.forEach { requester.cancelImageRequest($0) }
+
+        let delta = prefetchTracker.reset()
+        executeStopOnly(delta)
     }
 
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        guard let asset = assets.firstObject else { return nil }
+        // 回看命中（docs/13 S02：滑动回看不再重新解码）
+        if let cached = fullImageCache.object(forKey: id as NSString) {
+            progress(1)
+            return cached
+        }
+
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic           // 先低清后高清（docs/02 §3.2）
+        options.deliveryMode = .highQualityFormat   // 单次回调（docs/13 S02：.opportunistic 双回调是 resume 隐患）
         options.isNetworkAccessAllowed = allowsNetworkAccess() || allowNetwork
-        options.resizeMode = .none
+        options.resizeMode = .fast                  // 快速重采样：直接给目标尺寸
+        options.isSynchronous = false
         options.progressHandler = { fraction, _, _, _ in
             progress(fraction)
         }
-        return await withCheckedContinuation { continuation in
-            let requestID = cachingManager.requestImage(
-                for: asset,
-                targetSize: PHImageManagerMaximumSize,
-                contentMode: .aspectFit,
-                options: options
-            ) { image, info in
-                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
-                guard !isDegraded else { return }        // 只在最终结果恢复 continuation
-                // iCloud-only 且未允许联网：image 为 nil + PHImageResultIsInCloudKey（「下载」按钮与环形进度）
-                continuation.resume(returning: image)
+
+        await fullImageGate.acquire()
+        defer { Task { await fullImageGate.release() } }
+        if Task.isCancelled { return nil }
+
+        let resumeOnce = ResumeOnce<UIImage?>()
+        let requester = self.requester
+        let targetSize = Self.fullImageTargetSize()
+
+        let image: UIImage? = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let requestID = requester.requestImage(
+                    id: id,
+                    targetSize: targetSize,
+                    contentMode: .aspectFit,
+                    options: options
+                ) { image, info in
+                    let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                    guard !isDegraded else { return }   // .highQualityFormat 不会再有 degraded，防御保留
+                    // iCloud-only 且未允许联网：image 为 nil + PHImageResultIsInCloudKey（「下载」按钮）
+                    resumeOnce.resume(image, continuation)
+                }
+                self.registerFullImageRequestID(requestID, for: id)
             }
-            _ = requestID   // 浏览页切页取消：M3 随批量取消一并完善
+        } onCancel: {
+            // 立即取消 PhotoKit 解码（requestID 可能尚未注册：register 前的窗口期由 ResumeOnce 兜底）
+            let registered = self.storedFullImageRequestID(for: id)
+            if let registered, registered != PHInvalidImageRequestID {
+                requester.cancelImageRequest(registered)
+            }
         }
+        unregisterFullImageRequestID(id)
+        if let image {
+            let cost = Int(image.size.width * image.scale * image.size.height * image.scale * 4)
+            fullImageCache.setObject(image, forKey: id as NSString, cost: max(1, cost))
+        }
+        return image
     }
 
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)? {
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        guard let asset = assets.firstObject, asset.mediaType == .video else { return nil }
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
+              asset.mediaType == .video else { return nil }
+        let resumeOnce = ResumeOnce<(asset: AVAsset, audioMix: AVAudioMix?)?>()
         return await withCheckedContinuation { continuation in
             PHImageManager.default().requestAVAsset(forVideo: asset, options: nil) { avAsset, audioMix, _ in
                 guard let avAsset else {
-                    continuation.resume(returning: nil)
+                    resumeOnce.resume(nil, continuation)
                     return
                 }
-                continuation.resume(returning: (avAsset, audioMix))
+                resumeOnce.resume((avAsset, audioMix), continuation)
             }
         }
     }
@@ -195,26 +262,35 @@ final class ImagePipeline: ImagePipelineProtocol {
     func clearCaches() {
         memory.clear()
         disk.clear()
+        fullImageCache.removeAllObjects()
     }
 
-    // MARK: - PhotoKit 请求
+    // MARK: - 大图目标尺寸（docs/13 S02：屏幕像素 ×1.25，封顶 2048）
+
+    static func fullImageTargetSize(scale: CGFloat = UIScreen.main.scale,
+                                    screenBounds: CGSize = UIScreen.main.bounds.size) -> CGSize {
+        let width = min(screenBounds.width * scale * 1.25, maxFullImagePixel)
+        let height = min(screenBounds.height * scale * 1.25, maxFullImagePixel)
+        return CGSize(width: max(1, width), height: max(1, height))
+    }
+
+    // MARK: - PhotoKit 请求（缩略图）
 
     private func requestThumbnail(_ request: ThumbnailRequest) async -> UIImage? {
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [request.id], options: nil)
-        guard let asset = assets.firstObject else { return nil }
         let options = Self.thumbnailOptions(allowsNetwork: allowsNetworkAccess())
+        let resumeOnce = ResumeOnce<UIImage?>()
+        let requester = self.requester
 
-        // requestID 在回调闭包内才产生：用 box 递给 onCancel 取消 PhotoKit 解码
+        /// requestID 在回调闭包内才产生：用 box 递给 onCancel 取消 PhotoKit 解码
         final class RequestIDBox: @unchecked Sendable {
             var id: PHImageRequestID = PHInvalidImageRequestID
         }
         let box = RequestIDBox()
-        let cachingManager = self.cachingManager
 
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                box.id = cachingManager.requestImage(
-                    for: asset,
+                box.id = requester.requestImage(
+                    id: request.id,
                     targetSize: request.pixelSize,
                     contentMode: .aspectFill,
                     options: options
@@ -222,20 +298,17 @@ final class ImagePipeline: ImagePipelineProtocol {
                     let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                     guard !isDegraded else { return }
                     guard let image else {
-                        continuation.resume(returning: nil)
+                        resumeOnce.resume(nil, continuation)
                         return
                     }
                     self?.cacheAside(image, request: request)
-                    continuation.resume(returning: image)
-                }
-                if box.id == PHInvalidImageRequestID {
-                    continuation.resume(returning: nil)
+                    resumeOnce.resume(image, continuation)
                 }
             }
         } onCancel: {
             let id = box.id
             if id != PHInvalidImageRequestID {
-                cachingManager.cancelImageRequest(id)
+                requester.cancelImageRequest(id)
             }
         }
     }
@@ -264,5 +337,82 @@ final class ImagePipeline: ImagePipelineProtocol {
         await Task.detached(priority: .userInitiated) {
             UIImage(data: data)
         }.value
+    }
+
+    // MARK: - 预取执行
+
+    private func execute(_ delta: PrefetchDelta) {
+        executeStopOnly(delta)
+        guard !delta.startIDs.isEmpty, let startSize = delta.startSize else { return }
+        requester.startCachingImages(ids: delta.startIDs,
+                                     targetSize: startSize,
+                                     contentMode: .aspectFill,
+                                     options: Self.thumbnailOptions(allowsNetwork: allowsNetworkAccess()))
+    }
+
+    private func executeStopOnly(_ delta: PrefetchDelta) {
+        guard !delta.stopIDs.isEmpty, let stopSize = delta.stopSize else { return }
+        requester.stopCachingImages(ids: delta.stopIDs,
+                                    targetSize: stopSize,
+                                    contentMode: .aspectFill,
+                                    options: nil)
+    }
+
+    // MARK: - 在途表（锁保护：回调线程 ≠ 调用线程）
+
+    private func inflightBox(forKey key: String) -> TaskBox? {
+        inflightLock.lock()
+        defer { inflightLock.unlock() }
+        return inflight[key]
+    }
+
+    private func setInflightBox(_ box: TaskBox, forKey key: String) {
+        inflightLock.lock()
+        inflight[key] = box
+        inflightLock.unlock()
+    }
+
+    private func removeInflightBox(forKey key: String, expected: TaskBox) {
+        inflightLock.lock()
+        if inflight[key] === expected {
+            inflight.removeValue(forKey: key)
+        }
+        inflightLock.unlock()
+    }
+
+    private func registerFullImageRequestID(_ id: PHImageRequestID, for assetID: String) {
+        requestIDLock.lock()
+        fullImageRequestIDs[assetID] = id
+        requestIDLock.unlock()
+    }
+
+    private func storedFullImageRequestID(for assetID: String) -> PHImageRequestID? {
+        requestIDLock.lock()
+        defer { requestIDLock.unlock() }
+        return fullImageRequestIDs[assetID]
+    }
+
+    private func unregisterFullImageRequestID(_ assetID: String) {
+        requestIDLock.lock()
+        fullImageRequestIDs.removeValue(forKey: assetID)
+        requestIDLock.unlock()
+    }
+
+    private func cancelFullImageRequest(_ assetID: String) {
+        requestIDLock.lock()
+        let id = fullImageRequestIDs.removeValue(forKey: assetID)
+        requestIDLock.unlock()
+        if let id, id != PHInvalidImageRequestID {
+            requester.cancelImageRequest(id)
+        }
+    }
+
+    // MARK: - 内存警告（docs/13 §3.2）
+
+    private func handleMemoryWarning() {
+        memory.clear()
+        fullImageCache.removeAllObjects()
+        let delta = prefetchTracker.reset()
+        executeStopOnly(delta)
     }
 }

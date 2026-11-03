@@ -40,6 +40,14 @@ final class ViewerViewController: UIViewController {
     private var isProgrammaticScroll = false
     /// 首次布局定位（D01：viewDidLoad 时 bounds 未定，scrollToItem 无效——布局后按 assetID 定位）
     private var needsInitialPositioning = true
+    /// 删除事务进行中（docs/13 S12：同一时间只允许一个 plan→commit→settle 事务）
+    private var isRemovalInFlight = false
+    /// commitRemoval 结果（batch block 内赋值，completion 消费）
+    private var pendingRemovalResult: ViewerViewModel.RemovalResult?
+    /// 在途大图加载数（DEBUG 横幅 load= 字段；S08 验收 ≤3）
+    private var inflightLoadCount = 0
+    /// 预取防抖任务（docs/13 S02：100ms 内多次翻页只预取最后一次）
+    private var prefetchDebounceTask: Task<Void, Never>?
 
     var onClose: (() -> Void)?
 
@@ -105,6 +113,13 @@ final class ViewerViewController: UIViewController {
         }
     }
 
+    /// 离开查看器：取消全部在途请求与预取（docs/13 S02 验收项 7）
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        prefetchDebounceTask?.cancel()
+        pipeline.cancelAll()
+    }
+
     /// 旋转 / 分屏（docs/09 Phase 7）：更新 itemSize，按当前 assetID 保持页码不跳回第 1 张
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
@@ -151,9 +166,7 @@ final class ViewerViewController: UIViewController {
         filmStrip.highlight(index: index, centerIfNeeded: true)
         refreshChrome()
         prefetchAround(index: index)
-        #if DEBUG
-        updateDebugBanner(page: index)
-        #endif
+        refreshDebugBanner()
     }
 
     private func setupOverlays() {
@@ -181,7 +194,7 @@ final class ViewerViewController: UIViewController {
         label.layer.cornerRadius = 4
         label.clipsToBounds = true
         label.text = "viewer:ready"
-        // UI 测试（docs/09 D01）：横幅可查询，label 内含 "id=<assetID> idx=<n>"
+        // UI 测试（docs/09 D01 + docs/13 S01/S08）：横幅含 items/idx/id/zoom/load 字段
         label.accessibilityIdentifier = "Viewer-Debug"
         return label
     }()
@@ -190,11 +203,19 @@ final class ViewerViewController: UIViewController {
         debugLabel.text = text
     }
 
-    /// 带定位信息的横幅文本（id / idx 供 UI 测试断言 assetID 一致性）
-    private func updateDebugBanner(page index: Int) {
-        guard let item = viewModel.items[safe: index] else { return }
-        updateDebugLabel("id=\(item.id) idx=\(index)")
+    /// 当前 zoom 字段（cell 缩放回调写入；NaN 时 %.2f 会渲染成 "nan" 被 UI 测试捕获）
+    private var debugZoomScale: Double = 1
+
+    /// 带全部状态字段的横幅（items/idx/id/zoom/load，docs/13 §3.9）
+    private func refreshDebugBanner() {
+        guard isViewLoaded else { return }
+        let index = viewModel.currentIndex
+        let idPart = viewModel.items[safe: index].map { "id=\($0.id)" } ?? "id=-"
+        updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
+                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount)")
     }
+    #else
+    private func refreshDebugBanner() {}
     #endif
 
     private func setupTopBar() {
@@ -414,48 +435,67 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// 会话暂存路径（docs/09 D16）：同步入队 → 飞出 → 批量更新删除 cell → 按补位计划进入
+    /// 删除事务（docs/13 S12）：plan → snapshot 飞出（并行）→ 同一 runloop 内
+    /// performBatchUpdates { commitRemoval + deleteItems } → completion 定位/关闭。
+    /// isRemovalInFlight 串行化：事务期间忽略新动作（最多丢一次滑动，好过崩溃）。
     private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?) {
-        guard let item = viewModel.current else { return }
-        guard let staged = viewModel.stage(action, forItemID: item.id, exitEdge: exitEdge) else { return }
+        guard !isRemovalInFlight, let item = viewModel.current,
+              let staged = viewModel.planRemoval(action: action, forItemID: item.id, exitEdge: exitEdge) else { return }
+        isRemovalInFlight = true
         ViewerTrace.log("stage \(action) idx=\(staged.removedIndex) count=\(viewModel.items.count)")
 
-        flyOut(direction: exitEdge == .bottom ? .down : .up,
-               index: staged.removedIndex) { [weak self] in
-            guard let self else { return }
-            self.applyRemoval(staged: staged)
+        // snapshot 飞出：真实 cell 不再参与动画（docs/13 S12 根因 1/2——cell 冻结与 batch 更新错位）
+        let removedIndexPath = IndexPath(item: staged.removedIndex, section: 0)
+        if usesMotion, let cell = collectionView.cellForItem(at: removedIndexPath),
+           let snapshot = cell.snapshotView(afterScreenUpdates: false) {
+            snapshot.frame = collectionView.convert(cell.frame, to: view)
+            view.addSubview(snapshot)
+            let flyDistance = exitEdge == .top ? -view.bounds.height : view.bounds.height
+            UIView.animate(withDuration: DSMotion.flyOutDuration,
+                           delay: 0,
+                           usingSpringWithDamping: DSMotion.springDamping,
+                           initialSpringVelocity: DSMotion.springVelocity,
+                           options: [.beginFromCurrentState],
+                           animations: {
+                snapshot.transform = CGAffineTransform(translationX: 0, y: flyDistance)
+                snapshot.alpha = 0
+            }, completion: { _ in
+                snapshot.removeFromSuperview()
+            })
         }
+
         showToast(text: staged.toastText,
                   icon: ActionOverlayView.symbol(for: action),
                   allowUndo: true)
-        #if DEBUG
-        updateDebugLabel("staged:\(action) n=\(staged.removedIndex)")
-        #endif
-    }
 
-    /// performBatchUpdates 删除 cell → 按计划滚到 nextIndex → entry 动画 → 刷新胶片条
-    private func applyRemoval(staged: ViewerViewModel.StagedOutcome) {
-        ViewerTrace.log("commit idx=\(staged.removedIndex) next=\(staged.plan.nextIndex.map(String.init) ?? "nil") close=\(staged.plan.shouldClose)")
-        let removedIndexPath = IndexPath(item: staged.removedIndex, section: 0)
+        // 同一 runloop：数据源变更与 cell 删除在同一事务（不变量 I1：block 外 items.count == numberOfItems）
         collectionView.performBatchUpdates {
+            let result = viewModel.commitRemoval(staged)
             collectionView.deleteItems(at: [removedIndexPath])
+            pendingRemovalResult = result
         } completion: { [weak self] _ in
             guard let self else { return }
-            if staged.plan.shouldClose {
+            self.isRemovalInFlight = false
+            guard let result = self.pendingRemovalResult else { return }
+            self.pendingRemovalResult = nil
+            ViewerTrace.log("settle next=\(result.nextIndex.map(String.init) ?? "nil") close=\(result.shouldClose)")
+            if result.shouldClose {
                 self.closeTapped()   // 列表删空：关闭查看器（docs/09 D02）
                 return
             }
-            guard let next = staged.plan.nextIndex else { return }
+            guard let next = result.nextIndex, next < self.viewModel.items.count else { return }
             self.viewModel.updateIndex(next)
+            self.collectionView.layoutIfNeeded()
             self.scrollTo(index: next, animated: false)
             self.applyEntryAnimation(edge: staged.plan.entryEdge, index: next)
             self.refreshFilmStrip(current: next)
             self.refreshChrome()   // 顶部待处理计数 +1（docs/09 D16）
             self.prefetchAround(index: next)
-            #if DEBUG
-            self.updateDebugBanner(page: next)
-            #endif
+            self.refreshDebugBanner()
         }
+        #if DEBUG
+        updateDebugLabel("staged:\(action) idx=\(staged.removedIndex)")
+        #endif
     }
 
     /// 补位进入动画：下一张从 entryEdge 以 0.96→1.0 缩放 / 16pt 位移进入（Reduce Motion 降级）
@@ -478,9 +518,7 @@ final class ViewerViewController: UIViewController {
         scrollTo(index: index, animated: false)
         refreshFilmStrip(current: index)
         refreshChrome()
-        #if DEBUG
-        updateDebugBanner(page: index)
-        #endif
+        refreshDebugBanner()
     }
 
     private func perform(action: SwipeAction, direction: SwipeDirection) {
@@ -512,29 +550,7 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// 飞出动画（目标 cell 在移除生效前冻结，docs/09 D02；index = 被移除条目原 index）
-    private func flyOut(direction: SwipeDirection, index: Int, completion: @escaping () -> Void) {
-        let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0))
-        let flyDistance = direction == .up ? -view.bounds.height : view.bounds.height
-
-        guard usesMotion, let cell else {
-            completion()
-            return
-        }
-        UIView.animate(withDuration: DSMotion.flyOutDuration,
-                       delay: 0,
-                       usingSpringWithDamping: DSMotion.springDamping,
-                       initialSpringVelocity: DSMotion.springVelocity,
-                       options: [.beginFromCurrentState],
-                       animations: {
-            cell.transform = CGAffineTransform(translationX: 0, y: flyDistance)
-            cell.alpha = 0
-        }, completion: { _ in
-            cell.transform = .identity
-            cell.alpha = 1
-            completion()
-        })
-    }
+    /// 飞出动画已由 performStaged 的 snapshot 覆盖（docs/13 S12：真实 cell 不参与飞出）
 
     private var usesMotion: Bool {
         !(UIAccessibility.isReduceMotionEnabled && settings.respectReduceMotion)
@@ -813,15 +829,25 @@ final class ViewerViewController: UIViewController {
         isProgrammaticScroll = false
         filmStrip.highlight(index: index, centerIfNeeded: true)
         refreshChrome()
-        #if DEBUG
-        updateDebugBanner(page: index)
-        #endif
+        refreshDebugBanner()
     }
 
-    /// 预取当前 index 后 3 张 + 前 1 张（docs/09 D02：补位不白屏）
+    /// 预取当前 index 后 3 张 + 前 1 张（docs/09 D02：补位不白屏；docs/13 S02：100ms 防抖 + 边界保护）
     private func prefetchAround(index: Int) {
-        let ids = viewModel.items[index...].prefix(4).dropFirst().prefix(3).map(\.id)
-            + viewModel.items[..<index].suffix(1).map(\.id)
+        prefetchDebounceTask?.cancel()
+        prefetchDebounceTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self?.prefetchNow(index: index) }
+        }
+    }
+
+    private func prefetchNow(index: Int) {
+        let items = viewModel.items
+        guard !items.isEmpty, items.indices.contains(index) else { return }
+        let forward = items[(index + 1)..<min(index + 4, items.count)].map(\.id)
+        let backward = index > 0 ? [items[index - 1].id] : []
+        let ids = forward + backward
         guard !ids.isEmpty else { return }
         let size = collectionView.bounds.size
         let pixel = CGSize(width: size.width * UIScreen.main.scale,
@@ -837,21 +863,24 @@ final class ViewerViewController: UIViewController {
         }
     }
 
+    /// 大图加载：Task 挂到 cell（离屏/复用即取消，docs/13 S08）；在途计数供 DEBUG 横幅
     private func loadImage(for item: PhotoItem, at index: Int, cell: ZoomableImageCell) {
         // cell 级 token（docs/09 D02：回填前校验 cell.itemID 与 item.id 一致且 token 未过期）
         let token = cell.beginLoad()
-        ViewerTrace.log("loadStart idx=\(index) id=\(item.id.prefix(8))")
         // iCloud-only 未下载：保持占位态，等用户点「下载」（docs/03 §5.8）
         guard !item.isCloudOnly else { return }
-        Task { [weak self, weak cell] in
+        ViewerTrace.log("loadStart idx=\(index) id=\(item.id.prefix(8))")
+        inflightLoadCount += 1
+        cell.loadTask = Task { [weak self, weak cell] in
             guard let self else { return }
+            defer { self.inflightLoadCount = max(0, self.inflightLoadCount - 1) }
             let image = await self.pipeline.fullImage(for: item.id, progress: { fraction in
                 Task { @MainActor in
                     cell?.updateDownloadProgress(fraction)
                 }
             }, allowNetwork: false)
             ViewerTrace.log("loadEnd idx=\(index) ok=\(image != nil)")
-            guard let cell, cell.itemID == item.id, cell.matches(token: token) else { return }
+            guard !Task.isCancelled, let cell, cell.itemID == item.id, cell.matches(token: token) else { return }
             if let image {
                 cell.applyDownloadedImage(image)
             }
@@ -863,11 +892,16 @@ final class ViewerViewController: UIViewController {
 
 extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        viewModel.items.count
+        max(0, viewModel.items.count)
     }
 
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        // 边界保护（docs/13 S08/S12：删除事务窗口内可能收到旧 index 的请求）
+        guard indexPath.item < viewModel.items.count else {
+            return collectionView.dequeueReusableCell(withReuseIdentifier: ZoomableImageCell.reuseID,
+                                                      for: indexPath)
+        }
         let item = viewModel.items[indexPath.item]
         if item.mediaType == .video {
             // 视频资产在 willDisplay 拉取并起播（离屏停止）
@@ -883,17 +917,28 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
             guard let self, let imageCell else { return }
             self.downloadFromCloud(id: id, cell: imageCell)
         }
+        #if DEBUG
+        // 缩放回调 → 横幅 zoom 字段（UI 测试断言有限数字，docs/13 S01）
+        imageCell.setZoomCallback { [weak self] scale in
+            guard let self, scale.isFinite else { return }
+            self.debugZoomScale = Double(scale)
+            self.refreshDebugBanner()
+        }
+        #endif
         loadImage(for: item, at: indexPath.item, cell: imageCell)
         return imageCell
     }
 
     private func downloadFromCloud(id: String, cell: ZoomableImageCell) {
         let token = cell.beginLoad()
-        Task { [weak cell] in
+        inflightLoadCount += 1
+        cell.loadTask = Task { [weak self, weak cell] in
+            guard let self else { return }
+            defer { self.inflightLoadCount = max(0, self.inflightLoadCount - 1) }
             let image = await self.pipeline.fullImage(for: id, progress: { fraction in
                 Task { @MainActor in cell?.updateDownloadProgress(fraction) }
             }, allowNetwork: true)
-            guard let cell, cell.itemID == id, cell.matches(token: token) else { return }
+            guard !Task.isCancelled, let cell, cell.itemID == id, cell.matches(token: token) else { return }
             if let image {
                 cell.applyDownloadedImage(image)
             }
@@ -902,7 +947,8 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell,
                         forItemAt indexPath: IndexPath) {
-        guard let videoCell = cell as? VideoCell,
+        guard indexPath.item < viewModel.items.count,
+              let videoCell = cell as? VideoCell,
               let item = viewModel.items[safe: indexPath.item],
               item.mediaType == .video else { return }
         videoCell.loadVideo(item: item) { [weak self] in
@@ -914,6 +960,8 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell,
                         forItemAt indexPath: IndexPath) {
         (cell as? VideoCell)?.stopPlayback()
+        // 图片 cell 离屏取消在途加载（docs/13 S08：旧实现只处理 VideoCell）
+        (cell as? ZoomableImageCell)?.cancelLoad()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -929,9 +977,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
             filmStrip.highlight(index: clamped, centerIfNeeded: true)
             refreshChrome()
             prefetchAround(index: clamped)
-            #if DEBUG
-            updateDebugBanner(page: clamped)
-            #endif
+            refreshDebugBanner()
         }
     }
 }

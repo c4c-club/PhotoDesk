@@ -16,15 +16,23 @@ final class ViewerViewModel: ObservableObject {
         case rejected(String)
     }
 
-    /// 会话暂存结果（docs/09 D02/D16：删除/隐藏滑动路径，同步返回补位计划）
-    struct StagedOutcome {
-        let plan: ReplacementPlan
+    /// 会话暂存结果（docs/13 S12 删除事务：plan 阶段产物，不改 items/currentIndex）
+    struct StagedPlan: Equatable {
+        let action: SwipeAction
         /// 被移除条目在移除前的 index（VC 用 performBatchUpdates 删除 cell）
         let removedIndex: Int
-        let toastText: String
-        let kind: PendingKind
         /// 撤销用：被移除的 item 快照
         let removedItem: PhotoItem
+        /// 补位计划（ReplacementPlanner 纯函数）
+        let plan: ReplacementPlan
+        let kind: PendingKind
+        let toastText: String
+    }
+
+    /// commitRemoval 的结果（completion 定位/关闭用）
+    struct RemovalResult: Equatable {
+        let nextIndex: Int?
+        let shouldClose: Bool
     }
 
     @Published private(set) var items: [PhotoItem]
@@ -50,7 +58,7 @@ final class ViewerViewModel: ObservableObject {
     private let undoCenter: UndoCenter
     private let reviewSession: ReviewSessionController
     /// 最近一次 staged 条目（Toast「撤销」用；窗口与 Toast 生命周期一致）
-    private var lastStaged: StagedOutcome?
+    private var lastStaged: StagedPlan?
 
     init(context: ViewerContext,
          settings: SettingsStore,
@@ -78,10 +86,11 @@ final class ViewerViewModel: ObservableObject {
         }
     }
 
-    // MARK: - 会话暂存（docs/09 D16：滑动删除/隐藏 → 同步入队，不 await PhotoKit）
+    // MARK: - 删除事务（docs/13 S12：plan 不改数组 → commit 在 batch block 内 → rollback 兜底）
 
+    /// 阶段 1 · plan：入队会话 + 计算补位计划。**不改 items、不改 currentIndex**（单一事实来源不变量 I1/I2）。
     /// - Parameter exitEdge: 飞出边（上滑 = .top，下滑 = .bottom；工具栏动作 = nil → 默认底部前进）
-    func stage(_ action: SwipeAction, forItemID id: String, exitEdge: VerticalEdge?) -> StagedOutcome? {
+    func planRemoval(action: SwipeAction, forItemID id: String, exitEdge: VerticalEdge?) -> StagedPlan? {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return nil }
         let item = items[index]
         let kind: PendingKind
@@ -101,36 +110,58 @@ final class ViewerViewModel: ObservableObject {
             : reviewSession.enqueueHide(id: id, originIndex: index)
         guard enqueued else { return nil }
 
-        // 本地移除 + 补位计划（纯函数）
-        items.remove(at: index)
-        let countAfter = items.count
         let plan = ReplacementPlanner.plan(currentIndex: index,
-                                           countAfterRemoval: countAfter,
+                                           countAfterRemoval: items.count - 1,
                                            exitEdge: exitEdge,
-                                           hasNext: index < countAfter,
+                                           hasNext: index + 1 < items.count,
                                            hasPrevious: index > 0)
-        currentIndex = plan.nextIndex ?? 0
-        isFavoriteCurrent = current?.isFavorite ?? false
+        let staged = StagedPlan(action: action,
+                                removedIndex: index,
+                                removedItem: item,
+                                plan: plan,
+                                kind: kind,
+                                toastText: toast)
+        lastStaged = staged
+        return staged
+    }
 
-        let outcome = StagedOutcome(plan: plan,
-                                    removedIndex: index,
-                                    toastText: toast,
-                                    kind: kind,
-                                    removedItem: item)
-        lastStaged = outcome
-        return outcome
+    /// 阶段 2 · commit：**只在 performBatchUpdates block 内调用一次**；移除 item 并按计划推进 currentIndex。
+    func commitRemoval(_ staged: StagedPlan) -> RemovalResult {
+        guard items.indices.contains(staged.removedIndex),
+              items[staged.removedIndex].id == staged.removedItem.id else {
+            // 数组与 plan 失配（回滚后重复 commit 等防御路径）：按当前长度钳制，不让 index 越界
+            let clamped = min(staged.plan.nextIndex ?? 0, max(0, items.count - 1))
+            currentIndex = max(0, clamped)
+            isFavoriteCurrent = current?.isFavorite ?? false
+            return RemovalResult(nextIndex: items.isEmpty ? nil : currentIndex,
+                                 shouldClose: items.isEmpty)
+        }
+        items.remove(at: staged.removedIndex)
+        if staged.plan.shouldClose || items.isEmpty {
+            currentIndex = 0
+        } else {
+            currentIndex = min(staged.plan.nextIndex ?? 0, items.count - 1)
+        }
+        isFavoriteCurrent = current?.isFavorite ?? false
+        return RemovalResult(nextIndex: staged.plan.nextIndex,
+                             shouldClose: staged.plan.shouldClose || items.isEmpty)
+    }
+
+    /// 阶段 3 · rollback：入队失败/取消时恢复 item 原位（零 PhotoKit 写）
+    func rollbackRemoval(_ staged: StagedPlan) {
+        reviewSession.undoPending(id: staged.removedItem.id, kind: staged.kind)
+        guard !items.contains(where: { $0.id == staged.removedItem.id }) else { return }
+        let insertIndex = min(staged.removedIndex, items.count)
+        items.insert(staged.removedItem, at: insertIndex)
+        currentIndex = insertIndex
+        isFavoriteCurrent = current?.isFavorite ?? false
     }
 
     /// staged 撤销（Toast「撤销」）：从队列移除 + 本地还原（零 PhotoKit 写）
     func undoStaged() {
         guard let staged = lastStaged else { return }
         lastStaged = nil
-        reviewSession.undoPending(id: staged.removedItem.id, kind: staged.kind)
-        // 还原到原 index（夹紧到当前长度）
-        let insertIndex = min(staged.removedIndex, items.count)
-        items.insert(staged.removedItem, at: insertIndex)
-        currentIndex = insertIndex
-        isFavoriteCurrent = current?.isFavorite ?? false
+        rollbackRemoval(staged)
         onItemRestored?()
     }
 

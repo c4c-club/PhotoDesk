@@ -1,5 +1,6 @@
-// MARK: - 职责说明：ViewerViewModel 单元测试（docs/09 Phase 4）——assetID 定位、会话暂存补位
-//（上滑→底补/下滑→顶补/末尾回卷/空列表关闭）、滑动 0 次 PhotoKit 写、staged 撤销恢复、收藏即时写。
+// MARK: - 职责说明：ViewerViewModel 单元测试（docs/09 Phase 4；docs/13 S12 删除事务适配）——
+// assetID 定位；删除事务 plan（不改数组）→ commit（在 batch block 内调用）→ rollback；
+// 上滑→底补/下滑→顶补/末尾回卷/空列表关闭；滑动 0 次 PhotoKit 写、staged 撤销恢复、收藏即时写。
 
 import XCTest
 import PhotoDeskCore
@@ -42,6 +43,15 @@ final class ViewerViewModelTests: XCTestCase {
                         reviewSession: session)
     }
 
+    /// plan + commit 的便捷封装（模拟 VC 事务路径）
+    @discardableResult
+    private func planAndCommit(_ vm: ViewerViewModel, _ action: SwipeAction, id: String,
+                               exitEdge: VerticalEdge?) -> ViewerViewModel.StagedPlan? {
+        guard let staged = vm.planRemoval(action: action, forItemID: id, exitEdge: exitEdge) else { return nil }
+        _ = vm.commitRemoval(staged)
+        return staged
+    }
+
     // MARK: - D01 定位
 
     func testInitialPositionByAssetID() {
@@ -57,52 +67,59 @@ final class ViewerViewModelTests: XCTestCase {
         XCTAssertEqual(vm.currentIndex, 0)
     }
 
-    // MARK: - D02/D16 会话暂存补位
+    // MARK: - S12 删除事务：上滑→底补 / 下滑→顶补
 
-    func testStagedSwipeUpEntryFromBottom() {
+    func testPlanCommitSwipeUpEntryFromBottom() {
         let items = (0..<10).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-3")
-        let staged = vm.stage(.moveToRecentlyDeleted, forItemID: "id-3", exitEdge: .top)
+        let staged = vm.planRemoval(action: .moveToRecentlyDeleted, forItemID: "id-3", exitEdge: .top)
         XCTAssertNotNil(staged)
         XCTAssertEqual(staged?.plan.nextIndex, 3, "保持 index（原 i+1 顶上来），不跳张")
         XCTAssertEqual(staged?.plan.entryEdge, .bottom, "上滑 → 底部补位")
         XCTAssertEqual(staged?.removedItem.id, "id-3")
+        XCTAssertEqual(vm.items.count, 10, "plan 不改 items（S12 不变量：数组只在 commit 中变）")
+        XCTAssertEqual(vm.currentIndex, 3, "plan 不改 currentIndex")
+        _ = vm.commitRemoval(staged!)
         XCTAssertEqual(vm.items.count, 9)
         XCTAssertEqual(vm.current?.id, "id-4")
         XCTAssertEqual(writer.moveToRecentlyDeletedCallCount, 0, "滑动路径 0 次 PhotoKit 写")
         XCTAssertEqual(session.pendingDeleteCount, 1)
     }
 
-    func testStagedSwipeDownEntryFromTop() {
+    func testPlanCommitSwipeDownEntryFromTop() {
         let items = (0..<10).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-3")
-        let staged = vm.stage(.hide, forItemID: "id-3", exitEdge: .bottom)
+        let staged = vm.planRemoval(action: .hide, forItemID: "id-3", exitEdge: .bottom)
         XCTAssertEqual(staged?.plan.entryEdge, .top, "下滑 → 顶部补位")
+        _ = vm.commitRemoval(staged!)
         XCTAssertEqual(session.pendingHideCount, 1)
     }
 
-    func testStagedAtEndRollsBack() {
+    func testPlanCommitAtEndRollsBack() {
         let items = (0..<5).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-4")
-        let staged = vm.stage(.moveToRecentlyDeleted, forItemID: "id-4", exitEdge: .top)
+        let staged = planAndCommit(vm, .moveToRecentlyDeleted, id: "id-4", exitEdge: .top)
         XCTAssertEqual(staged?.plan.nextIndex, 3, "末尾回退上一张")
         XCTAssertEqual(staged?.plan.entryEdge, .top, "回卷：与飞出边相同")
         XCTAssertFalse(staged!.plan.shouldClose)
+        XCTAssertEqual(vm.current?.id, "id-3")
     }
 
-    func testStagedEmptyListShouldClose() {
+    func testPlanCommitEmptyListShouldClose() {
         let items = [makeItem(0)]
         let vm = makeViewModel(items: items, startItemID: "id-0")
-        let staged = vm.stage(.moveToRecentlyDeleted, forItemID: "id-0", exitEdge: .bottom)
+        let staged = planAndCommit(vm, .moveToRecentlyDeleted, id: "id-0", exitEdge: .bottom)
         XCTAssertEqual(staged?.plan.shouldClose, true, "列表删空 → 关闭查看器")
         XCTAssertTrue(vm.items.isEmpty)
+        XCTAssertEqual(vm.currentIndex, 0, "空列表 index 归 0（不变量 I2）")
     }
 
-    func testStagedToolbarDeleteDefaultsToBottom() {
+    func testPlanToolbarDeleteDefaultsToBottom() {
         let items = (0..<5).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-2")
-        let staged = vm.stage(.moveToRecentlyDeleted, forItemID: "id-2", exitEdge: nil)
+        let staged = vm.planRemoval(action: .moveToRecentlyDeleted, forItemID: "id-2", exitEdge: nil)
         XCTAssertEqual(staged?.plan.entryEdge, .bottom, "工具栏无手势 → 默认底部前进")
+        XCTAssertEqual(vm.items.count, 5, "plan 不改 items")
     }
 
     // MARK: - D16：连续滑动 0 次 writer、提交 1 次
@@ -111,7 +128,7 @@ final class ViewerViewModelTests: XCTestCase {
         let items = (0..<25).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-0")
         for item in items.prefix(20) {
-            XCTAssertNotNil(vm.stage(.moveToRecentlyDeleted, forItemID: item.id, exitEdge: .top))
+            XCTAssertNotNil(planAndCommit(vm, .moveToRecentlyDeleted, id: item.id, exitEdge: .top))
         }
         XCTAssertEqual(writer.moveToRecentlyDeletedCallCount, 0)
         XCTAssertEqual(session.pendingDeleteCount, 20)
@@ -128,7 +145,7 @@ final class ViewerViewModelTests: XCTestCase {
     func testUndoStagedRestoresItem() {
         let items = (0..<5).map { makeItem($0) }
         let vm = makeViewModel(items: items, startItemID: "id-2")
-        _ = vm.stage(.moveToRecentlyDeleted, forItemID: "id-2", exitEdge: .top)
+        _ = planAndCommit(vm, .moveToRecentlyDeleted, id: "id-2", exitEdge: .top)
         XCTAssertEqual(vm.items.count, 4)
 
         vm.undoStaged()

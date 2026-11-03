@@ -50,10 +50,19 @@ final class FilmStripView: UIView {
         highlight(index: currentIndex, centerIfNeeded: true)
     }
 
+    /// 高亮翻页：只刷新旧/新两个 cell 的 isCurrent（docs/13 S02：消除每次翻页的 reloadData 风暴）；
+    /// 离屏 cell 拿不到引用没关系——重新上屏时 cellForItemAt 会按 currentIndex 配置。
     func highlight(index: Int, centerIfNeeded: Bool) {
         guard index != currentIndex || centerIfNeeded else { return }
+        let oldIndex = currentIndex
         currentIndex = index
-        collectionView.reloadData()   // 条目小（44pt cell），重载刷新描边最简单；M3 可改 snapshot
+        if oldIndex != index {
+            let total = collectionView.numberOfItems(inSection: 0)
+            for changed in [oldIndex, index] where changed >= 0 && changed < total {
+                let path = IndexPath(item: changed, section: 0)
+                (collectionView.cellForItem(at: path) as? FilmCell)?.isCurrent = (changed == index)
+            }
+        }
         guard centerIfNeeded, index < ids.count else { return }
         collectionView.scrollToItem(at: IndexPath(item: index, section: 0),
                                     at: .centeredHorizontally,

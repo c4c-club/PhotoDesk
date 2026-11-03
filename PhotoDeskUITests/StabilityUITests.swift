@@ -307,9 +307,11 @@ final class StabilityUITests: XCTestCase {
         }
         // 点底部最后一行照片 → 应打开查看器
         let bottomCell = collection.cells.element(boundBy: 11)
-        let target: XCUIElement = bottomCell.exists ? bottomCell
-            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.86))
-        target.tap()
+        if bottomCell.exists {
+            bottomCell.tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.86)).tap()
+        }
         XCTAssertTrue(viewerRoot(app).waitForExistence(timeout: 5),
                       "点底部照片未打开查看器（可能被底部气泡挡住）\n\(hierarchy(app))")
         assertAlive(app, "底部点击后")
