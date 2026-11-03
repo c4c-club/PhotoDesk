@@ -294,25 +294,20 @@ final class StabilityUITests: XCTestCase {
         snap(app, "s04-restore")
     }
 
-    // MARK: - S04 滚到 2024-05 杀进程重启回到原位置
+    // MARK: - S04 深处月份位置保存 + 杀进程重启回到原位置
 
     func testPositionRestoredAfterRelaunch() throws {
         let app = XCUIApplication()
-        launchWithFilterCleared(app)   // 隔离跨用例持久化筛选
-        // 先按年滚动（单次快滑约跳 6-9 个月，逐月目标会被采样跳过——CI 轮 14 实测滑到 2018）
-        var reached = waitTopHeaderContains(app, "2024年", timeout: 2)
-        var swipes = 0
-        while !reached, swipes < 60 {
-            app.swipeUp()
-            swipes += 1
-            reached = waitTopHeaderContains(app, "2024年", timeout: 1)
-        }
-        XCTAssertTrue(reached, "\(swipes) 次滑动内未到达 2024 年（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
-        Thread.sleep(forTimeInterval: 0.5)   // 等减速完成
-        // 以实际停住的月份为恢复断言目标（保存/恢复都按首个可见 asset，二者自洽）
+        // 深处月份定位（跳转即同步保存，docs/13 S11）；滚动采样在 iOS 15 模拟器 AX 下不可靠（轮 14/15 实测），
+        // 改为「跳转 + 小幅滚动离开锚点」双路径：覆盖 scrollToSection 保存与滚动停止 0.3s 兜底保存
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+        let dragEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.70))
+        dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)   // 手指向下 = 看更新的月份（小幅滚动）
+        Thread.sleep(forTimeInterval: 1.5)   // 滚动停止 0.3s 兜底保存 + 余量
         let savedMonth = topHeaderText(app).components(separatedBy: " ").first ?? ""
-        XCTAssertTrue(savedMonth.contains("2024年"), "停在非 2024 年月份：\(savedMonth)")
-        Thread.sleep(forTimeInterval: 1.5)   // 等位置保存兜底 Timer
+        XCTAssertTrue(savedMonth.contains("2024年"),
+                      "滚动后停在非 2024 年月份：\(savedMonth)\n\(hierarchy(app))")
         app.terminate()
         _ = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, savedMonth, timeout: 10),

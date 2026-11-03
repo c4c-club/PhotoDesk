@@ -123,6 +123,12 @@ final class LibraryViewController: UIViewController {
         if ProcessInfo.processInfo.arguments.contains("-uiTestingSelectMode") {
             enterSelectionMode(selecting: nil)
         }
+        #if DEBUG
+        // UI 测试钩子：-uiTestingFilterYear（docs/13 M11）——viewDidLoad 先行设置 query.filter
+        //（单一事实来源），首屏/补齐的所有 rebuildDerived 都会尊重它；与用户面板应用同一条 setFilter 路径。
+        // 放 UIKit 侧（-uiTestingSelectMode 同款位置）：SwiftUI onChange 钩子在 CI 实测不可靠（轮 13–15）
+        applyDebugFilterHookIfNeeded()
+        #endif
 
         viewModel.onManageLimitedPhotos = { [weak self] in
             guard let self else { return }
@@ -832,8 +838,42 @@ final class LibraryViewController: UIViewController {
                 self.updateSelectionCount()
             }
             self.drainPendingSnapshot()   // apply 期间又来了新快照 → 排空
+            #if DEBUG
+            self.attemptDebugMonthJumpIfNeeded()   // 快照已提交：此时跳转校验必然可过
+            #endif
         }
     }
+
+    #if DEBUG
+    /// docs/13 M11：viewDidLoad 应用 -uiTestingFilterYear（0 = 清空）。
+    /// 等价用户在面板选年并应用（同一条 setFilter 路径）；每次 launch 只执行一次（viewDidLoad 语义）
+    private func applyDebugFilterHookIfNeeded() {
+        guard let year = UITestHooks.intValue("-uiTestingFilterYear") else { return }
+        ViewerTrace.log("hook filterYear=\(year)")
+        if year == 0 {
+            viewModel.clearFilter()
+        } else {
+            var filter = viewModel.query.filter
+            filter.year = year
+            filter.month = nil
+            filter.day = nil
+            viewModel.setFilter(filter)
+        }
+    }
+
+    /// docs/13 M11：每次 apply completion 尝试 -uiTestingMonthJump（等价月份面板点卡片，
+    /// 同一条 scrollToSection 路径；成功即置位，快照未含目标月时随下一次 apply 重试）
+    private func attemptDebugMonthJumpIfNeeded() {
+        guard !debugMonthJumpDone,
+              let sectionID = UITestHooks.stringValue("-uiTestingMonthJump"),
+              let index = currentSections.firstIndex(where: { $0.id == sectionID }) else { return }
+        if scrollToSection(index) {
+            debugMonthJumpDone = true
+        }
+    }
+
+    private var debugMonthJumpDone = false
+    #endif
 
     // MARK: - 位置记忆 v2（docs/13 §3.5 S04/S11）
 
