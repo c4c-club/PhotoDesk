@@ -260,9 +260,7 @@ final class ZoomableImageCell: UICollectionViewCell {
     // MARK: - 双击缩放（docs/04 §4.4：点击点为中心，1×↔2.5×；只调用一次 zoom(to:)）
 
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        guard imageView.image != nil,    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard imageView.image != nil,
-
               scrollView.bounds.width > 0, scrollView.bounds.height > 0,
               scrollView.zoomScale.isFinite else { return }
         let reduceMotion = UIAccessibility.isReduceMotionEnabled && AppContainer.shared.settings.respectReduceMotion
