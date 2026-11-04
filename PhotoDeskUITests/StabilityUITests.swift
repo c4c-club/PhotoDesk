@@ -40,8 +40,7 @@ final class StabilityUITests: XCTestCase {
             app.tap()
         }
         let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现
-\(hierarchy(app))")
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
         let cellReady = collection.cells.firstMatch.waitForExistence(timeout: 15)
         if !cellReady {
             snap(app, "fail-grid-no-cells")   // 取证：下一轮 CI 直接读 App 现场
