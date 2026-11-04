@@ -2,6 +2,8 @@
 // 灵敏度越高（阈值越小）越易触发；与设置项 gesture.sensitivity 一一对应。
 // 设置联动已于 M7 落地：App 侧 SwipeGestureEngine.config(for:) 每次判定时实时读取 gesture.sensitivity。
 
+import Foundation
+
 public enum Sensitivity: String, CaseIterable {
     /// 舒适：轻滑即触发
     case comfortable
