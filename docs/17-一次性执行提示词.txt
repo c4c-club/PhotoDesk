@@ -1,0 +1,737 @@
+================================================================================
+PhotoDesk（照片管家）· 后续功能补充与缺陷修复（v1.2.2 / M12）
+一次性执行提示词 · 8 条真机反馈完整修复
+================================================================================
+适用仓库：C:\Users\RuiZh\Desktop\photo_manager（GitHub: c4c-club/PhotoDesk）
+执行分支：fix/stability-20261104
+基线 HEAD：0b24396fb80895f5f3ab1d035d94465c66f3c640（工作树干净）
+权威规划：docs\16-后续功能补充与缺陷修复规划.md
+本文件定位：整份文件就是提示词正文，全选复制、一次投喂，不需要截取、不需要分批。
+生成日期：2026-11-05
+================================================================================
+
+你是 PhotoDesk（照片管家）项目的 iOS 原生开发 Agent。本次任务是【真正修改代码并修完用户实测的 8 条反馈】，
+不是再写一份规划。规划文档 docs/16 与提示词 docs/17 已经由上一轮 Agent 写好并入库，它们是只读依据，
+你不要改写、不要删除、不要重新生成 docs/16 和 docs/17。
+
+【最高优先级铁律 · 必须逐条遵守】
+1. 本提示词一次性投喂，你必须从「一、开始前必读」连续执行到「十、停止条件」，中途不要问
+   「是否继续」「要不要先做一部分」「要不要先给分析」，不要只输出分析不给代码，不要只修 3–4 条就交付。
+2. 输出完 10–15 行「现状确认」后立刻开始 Phase 0，不等任何确认。
+3. 先红后绿：每条反馈至少有一个在基线代码上会失败/会崩溃的自动化用例，先在基线上确认它是红的，
+   再改实现让它变绿。禁止先改实现再补测试。
+4. 一个 commit 只对应一条根因；禁止顺手重构把多个根因混在一起。
+5. 不掩盖症状：禁止用「关闭动画」「延迟 0.5 秒」「try? 吞掉」「collectionView.reloadData 当万能药」
+   「删断言 / 跳测」「只断言 app.state」让 CI 变绿。
+6. 所有结论必须亲自验证：本机亲自跑 scripts/test-core.ps1；亲自 git push；亲自核对 CI run；
+   逐张打开 CI 上传的截图确认；「没跑过 / 没真机验证」一律写「未验证」，绝不写成 ✅。
+7. 全程用中文输出与写注释；commit 信息用 type(scope): 中文简述。
+8. 如需委派子智能体做只读审计，最多 4 个且禁止嵌套；主路径的修改与验证必须你自己做。
+9. 与 AGENTS.md 冲突时以 AGENTS.md 为准；与 docs/16 冲突时以 docs/16 为准；docs/16 与 AGENTS.md
+   冲突时以 AGENTS.md 为准。
+
+--------------------------------------------------------------------------------
+一、开始前必读（按顺序读完再动手，禁止跳读）
+--------------------------------------------------------------------------------
+
+1. C:\Users\RuiZh\Desktop\photo_manager\AGENTS.md
+   —— 全局红线：iOS 15 API 黑名单、架构分层、PhotoKit 规则、两条红线、DoD、常见陷阱。
+2. docs\16-后续功能补充与缺陷修复规划.md
+   —— 本轮权威规划：4 组根因、R01–R08 逐项代码证据与修复方案、Phase 0–9、测试清单、
+      文件→改动→验收总表、文档同步清单。逐节读完，不要只读摘要。
+3. docs\13-稳定性修复与页面交互重做规划.md、docs\14-一次性执行提示词.txt、
+   docs\15-稳定性修复验收记录.md —— 上一轮 M11 的规划/提示词/验收；重点看懂 §0.2「为什么
+   M11 的 ✅ 不成立」和 docs/15 §3.2 的 6 条 🟨。
+4. docs\03-技术设计文档.md（架构、ImagePipeline、查看器、B.1/B.2/B.9）、
+   docs\04-UIUX设计文档.md（§2 信息架构、§3.1 顶部栏、§7 文案、附录 A.2/B.1）、
+   docs\05-开发进程与里程碑.md（M11 记录与变更日志格式）、docs\12-真机签名与验收.md（清单）、
+   docs\01-需求规格说明书.md（FR-A9）。
+5. 现有代码，至少逐行读完下面这些文件（不要只看文件名，行号基于基线 HEAD，仅用于定位；
+   执行时以「文件名 + 函数/符号名」为准，因为你会改动它们）：
+   - PhotoDesk\App\PhotoDeskApp.swift
+   - PhotoDesk\App\ToolsView.swift
+   - PhotoDesk\App\UITestHooks.swift
+   - PhotoDesk\Features\Library\LibraryContainer.swift
+   - PhotoDesk\Features\Library\LibraryViewController.swift
+   - PhotoDesk\Features\Library\LibraryViewModel.swift
+   - PhotoDesk\Features\Library\LibraryFilterSheet.swift
+   - PhotoDesk\Features\Library\PhotoGridCell.swift
+   - PhotoDesk\Features\Library\MonthIndexBar.swift
+   - PhotoDesk\Features\Library\MonthJumpSheet.swift
+   - PhotoDesk\Features\Viewer\ViewerViewController.swift
+   - PhotoDesk\Features\Viewer\ViewerViewModel.swift
+   - PhotoDesk\Features\Viewer\ViewerContainer.swift
+   - PhotoDesk\Features\Viewer\ViewerContext.swift
+   - PhotoDesk\Features\Viewer\ZoomableImageCell.swift
+   - PhotoDesk\Features\Viewer\FilmStripView.swift
+   - PhotoDesk\Core\Imaging\ImagePipeline.swift
+   - PhotoDesk\Core\Imaging\ImageRequesting.swift
+   - PhotoDesk\Core\Imaging\ResumeOnce.swift
+   - PhotoDesk\Core\Photos\AssetRepository.swift
+   - PhotoDesk\Core\Support\LibraryPositionStore.swift
+   - PhotoDesk\Core\Support\LibraryQuery.swift
+   - PhotoDesk\Core\Support\UndoCenter.swift
+   - PhotoDesk\Core\Support\ViewerTrace.swift
+   - PhotoDesk\Core\Support\AppCrashLogger.swift
+   - PhotoDesk\UI\DesignSystem\DSToast.swift
+   - PhotoDesk\UI\DesignSystem\Colors.swift / Spacing.swift / Motion.swift / Typography.swift
+   - PhotoDesk\Features\Settings\DiagnosticsView.swift（「设置→诊断」导出页，按当前实际路径读）
+   - PhotoDeskCore\Sources\PhotoDeskCore\ZoomGeometry.swift
+   - PhotoDeskCore\Sources\PhotoDeskCore\SelectionRange.swift
+   - PhotoDeskCore\Sources\PhotoDeskCore\SelectionPolicy.swift
+   - PhotoDeskTests\ 全部与 ZoomGeometry / SelectionPolicy / LibraryPosition 相关的测试
+   - PhotoDeskUITests\StabilityUITests.swift、LaunchUITests.swift、PageRegressionUITests.swift、
+     FlowUITests.swift
+   - project.yml、.github\workflows\ios.yml、scripts\test-core.ps1
+6. 必读确认项（写进「现状确认」）：
+   - LibraryFilterBar.swift 在当前仓库【不存在】，不要去找它、不要创建它。
+   - Info.plist 的 CFBundleDisplayName 是系统桌面 App 名，禁止删除；PermissionIntroView 的
+     授权引导文案禁止删除。要去掉的只是导航栏里的「照片管家」标题。
+   - 「顶部筛选按钮」（Library-Filter / Batch-Filter → LibraryFilterSheet）与「五段分类控件」
+     （Library-ScopePicker）是两个独立东西，禁止把分类合并进筛选面板。
+7. 完成后先输出「现状确认」10–15 行：4 组根因、涉及文件、准备先改哪 3 个文件、确认上面 3 条必读项、
+   基线 CI 数字（core 188/188、iOS 单测 139/139、UI 22/28）与 IPA SHA256
+   （0edbdbd4d9d9812f5d0bd511adb4bd3a8216dc48330412521e3d5adfe18f75be）。
+   输出后立刻开始 Phase 0。
+
+--------------------------------------------------------------------------------
+二、项目事实与环境（已确认，禁止重复探测、禁止建议替代方案）
+--------------------------------------------------------------------------------
+
+- 项目：PhotoDesk，iOS 原生照片管理 App；最低部署 iOS 15.0（硬性）；Swift 5.9+；SwiftUI 壳 + UIKit 核。
+- 第三方依赖 0 个；只用系统框架；完全离线，禁止 URLSession 外发、禁止分析/广告 SDK。
+- Bundle ID：com.example.PhotoDesk；DEVELOPMENT_TEAM 从环境变量注入，禁止硬编码。
+- 本机：Windows 10 原生，无 Xcode、无 iOS 模拟器。本机永远不能编译/签名/运行 iOS App。
+  禁止尝试 xcodebuild / simctl / 装 WSL2 Ubuntu / 装 macOS 虚拟机 / Windows 原生 Swift 工具链 /
+  Linux 交叉编译 iOS / ZCode iOS 模拟器插件。
+- 本机唯一可跑的测试：Docker 容器 swift:6.0-noble，入口
+  powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+  （.ps1 必须 UTF-8 带 BOM，否则 Windows PowerShell 5.1 按 GBK 解码中文注释会报错）。
+- iOS 编译/单测/UI 测试/出包：GitHub Actions macos-14（Xcode 15.4，iOS 15.5 模拟器），
+  workflow .github/workflows/ios.yml；xcodegen 后 objectVersion=63；
+  scripts/sim-photos-dated.sh 2 播种带日期照片；主测试命令带
+  -skip-testing:PhotoDeskUITests/PerformanceUITests；失败仍打包并上传 simulator .app 与未签名 ipa。
+- 真机通道：Windows AltServer + iPhone AltStore，免费账号 7 天续签；真机验证由用户完成，你负责
+  产出未签名 ipa、记录 SHA256、回填清单、列出取证回传要求。
+- 两条红线：① 删除只能 PHAssetChangeRequest.deleteAssets 进系统「最近删除」，UI 只说「移到最近删除」，
+  TrashBin 只是 5s 撤销保险副本（上限 2GB、可关闭），禁止永久删除/清空最近删除入口；
+  ② PhotoDeskCore 只 import Foundation、Package.swift platforms 留空、Linux 可 swift build && swift test，
+  禁止传 CGRect/CGSize/UIImage/PHAsset 等 Apple 类型进 Core。
+- iOS 16+ API 黑名单（禁止直接使用）：NavigationStack/NavigationPath、PhotosPicker(SwiftUI)、ShareLink、
+  Swift Charts、@Observable/@Bindable、ContentUnavailableView、.scrollContentBackground、
+  .scrollTargetBehavior、.scrollPosition、ImageRenderer、.fontDesign、.toolbarBackground、SwiftData。
+  确需新 API 必须 if #available(iOS 16, *) 双实现（本轮不应需要）。
+- 架构：网格与查看器必须 UICollectionView + Compositional Layout + Diffable DataSource +
+  DataSourcePrefetching；Feature 层不得直接引用 PHAsset，统一用 PhotoItem；Service protocol 化；
+  async/await 不用 Combine；UI @MainActor；ImagePipeline 是唯一取图入口；
+  新增文件必须进 target（XcodeGen 自动包含，检查 excludes）；每文件顶部 // MARK: - 职责说明；
+  颜色/字体/间距/魔法数只用 UI/DesignSystem token；禁止 try! / 强制解包；不新增 Xcode 警告。
+
+--------------------------------------------------------------------------------
+三、8 条反馈 → 根因 → 修复 → 不变量 → 先写失败测试（速查；权威细节见 docs/16 §2）
+--------------------------------------------------------------------------------
+
+【R01 · 无法查看大图（P0）】
+现象：网格缩略图正常，点开全屏黑屏/空白；present 信息/编辑/分享或切 Tab 返回后白屏；iCloud 图
+纯黑且无下载按钮。
+代码证据（4 个独立根因）：
+  A1 决定性：ZoomableImageCell.swift 的 imageView 只在 init 里 addSubview；约束表里没有 imageView /
+     zoomContentView 约束；layoutImageContent 只设 zoomContentView.frame 与 scrollView.contentSize；
+     configure / applyDownloadedImage / layoutSubviews 都不设 imageView.frame。UIImageView() 默认
+     frame=.zero、autoresizingMask=.none → 恒零尺寸，赋 image 也不可见。对照 PhotoGridCell、
+     FilmStripView 都有四边约束，精确解释「缩略图可见、全屏看不到」。
+  A2：AssetRepository.isCloudOnly 恒 false；ImagePipeline.fullImage 只查 PHImageResultIsDegradedKey，
+     不查 PHImageResultIsInCloudKey；禁网时返回 nil → applyDownloadedImage 不调用；
+     ZoomableImageCell.configure 的 cloudBox 因 isCloudOnly=false 恒隐藏 → 无占位无自救。
+  A3：ViewerViewController.viewDidDisappear 无条件 pipeline.cancelAll()（单例），且全类无
+     viewWillAppear/viewDidAppear；任一 present 或切 Tab 取消在途加载且返回后不重挂。
+  A4：setupCollectionView 在 viewDidLoad 设 layout.itemSize = view.bounds.size；
+     viewDidLayoutSubviews 从不刷新 itemSize（仅旋转时改）；fullScreenCover 首布局 bounds 为
+     .zero/占位值 → 全部 cell 零尺寸、positionAtCurrentIndex 与 itemSize 失配 → 整页空白。
+  附带：ImagePipeline.registerFullImageRequestID 在 requestImage 返回之后，而 ImageRequesting 对
+     缺失资产同步回调 nil → unregister 先跑、陈旧 requestID 残留、cancelAll 取消错对象；
+     ResumeOnce 取消路径没有强制 resume(nil)，PhotoKit 不再回调时 checked continuation 悬挂
+     （SWIFT TASK CONTINUATION MISUSE）；ViewerContainer.updateUIViewController 空实现、onClose
+     全项目无赋值 → fullScreenCover(item:) 再次打开复用旧 ViewerViewModel；越界 cellForItemAt
+     返回未 configure 的空 cell。
+修复：
+  1) imageView 加四边约束到 zoomContentView（translatesAutoresizingMaskIntoConstraints=false），
+     或在 layoutImageContent 设完 zoomContentView.frame 后同步 imageView.frame = zoomContentView.bounds。
+  2) viewDidLayoutSubviews 检测 layout.itemSize != view.bounds.size 时赋值 + invalidateLayout()，
+     用 isProgrammaticScroll 包住 positionAtCurrentIndex 重定位。
+  3) fullImage 回传 inCloud 状态（App 层新 FullImageResult 或独立 cloud 回调，Core 不参与），
+     VC 收到后 cell.showCloudPlaceholder()：占位 + 下载按钮 + 进度 + 回填。
+  4) viewDidDisappear 仅在 isBeingDismissed || isMovingFromParent 时 cancelAll()；新增
+     viewWillAppear 对 currentIndex 对应 cell 重挂 loadImage。
+  5) ViewerContainer.updateUIViewController 在 context 变化时重建/更新 ViewModel，onClose 复位
+     viewerContext；ResumeOnce 取消强制 resume(nil)；requestID 注册移到 requestImage 之前并用
+     generation 令牌防陈旧注销；越界分支返回已 configure 的空态 cell。
+不变量：
+  I5′：imageView.frame.size == zoomContentView.frame.size > 0 且 scrollView.contentSize 与之相等；
+  isUserInteractionEnabled == (image != nil && bounds > 0 && contentSize > 0)；
+  itemSize == collectionView.bounds.size；image == nil 必有可见占位 + 下载入口；
+  每次 appear 时当前 cell 必有 image 或有在途 Task。
+先写失败测试：testImageViewFrameMatchesZoomContentViewAfterImageApplied、
+  testViewerShowsNonBlankImage（截图中心像素 ≠ DSColor.bgViewer）、testFirstLayoutItemSizeEqualsBounds、
+  testZeroBoundsThenLayoutRecovers、testCloudOnlyAssetShowsDownloadButton、
+  testFullImageReportsInCloud、testPresentInfoThenDismissRestoresImage、testViewerShowsImageOnOpen。
+
+【R02 · 捏合缩小放大必崩溃（P0）】
+代码证据：
+  B1 最可疑必崩链：ViewerViewController 的 pan.maximumNumberOfTouches = 1 使
+     gestureRecognizerShouldBegin 里 pan.numberOfTouches > 1 成死代码；cell.isZoomed 只在
+     shouldBegin 起始判一次、此刻 zoomScale == 1 → 放行；shouldRecognizeSimultaneouslyWith
+     无条件 true → 捏合两指中单指移动触发 onPan 垂直锁 → collectionView.isScrollEnabled=false →
+     triggerAction → performStaged → performBatchUpdates { commitRemoval + deleteItems }
+     在 UIScrollView 缩放事务中执行；shouldBegin 还用 viewModel.currentIndex 取 cell，翻页时与
+     可见 cell 不一致。AGENTS.md §7「缩放时检查 zoomScale <= 1.01」形同虚设。
+  B2：ZoomableImageCell.applyDownloadedImage 先 isUserInteractionEnabled = true，再 resetZoom()
+     / layoutImageContent()（零 bounds 都直接 return）；叠加 A4 → viewForZooming 返回
+     frame/contentSize 都 .zero 的 view 却允许捏合 → 内部除零 → CALayer position contains NaN。
+  B3：updateCenteringInset 读 zoomContentView.frame.width/height（缩放中 frame 是 transform 后
+     包围盒）再乘 zoomScale → 双倍缩放 inset；scrollViewDidZoom 内改 contentInset 与内部 offset 竞态。
+  B4：ZoomGeometry.clampedZoomRect 要求 focusX/focusY > 0，点 x=0 / y=0 双击静默失败。
+  假绿：ViewerViewController.setZoomCallback 先 guard scale.isFinite 才写 debugZoomScale，
+     StabilityUITests「横幅不含 nan/inf」恒真；testPinchZoom20Times 只验 app.state，XCUITest
+     合成 pinch 打在 ViewerRoot 未命中 cell 内 UIScrollView；Viewer-Debug 横幅全在 #if DEBUG，
+     Release IPA 不编译；全项目零「图像可见」断言。
+修复：
+  1) 手势互斥：shouldRecognizeSimultaneouslyWith 对 UIPinchGestureRecognizer /
+     numberOfTouches >= 2 返回 false；gestureRecognizerShouldBegin 增加
+     cell.isZooming || zoomScale > 1.01 判定并在 .changed 持续复查；引入
+     idle → pinchActive → idle 状态机，pinchActive 期间 executeAction / performStaged /
+     triggerAction / performBatchUpdates 一律 guard 早退。
+  2) 交互护栏：isUserInteractionEnabled 只在 image != nil && bounds > 0 && contentSize > 0 时由
+     layoutImageContent 成功后置 true；resetZoom 用 ZoomGeometry.sanitizedScale 兜底；
+     viewForZooming 在零 contentSize 时返回 nil。
+  3) updateCenteringInset 改用 zoomContentView.bounds.size，且只在 !zoomBouncing 时更新 inset；
+     入参先做有限值/正数钳制。
+  4) ZoomGeometry.clampedZoomRect 把 focusX/focusY > 0 放宽为 [0, size] 钳制（0 边界合法），
+     保留 NaN/∞/负值守卫并补单测。
+  5) 可观测：去掉 setZoomCallback 的 scale.isFinite 过滤（NaN 原样写横幅）；Release 也把
+     zoom=... / img=ok|nil 写进 ViewerTrace；testPinchZoom20Times 增
+     XCTAssertTrue(banner.label.contains("img=ok"))、XCTAttachment 像素比对、pendingDeleteCount == 0；
+     新增真捏合命中 cell 内 UIScrollView 的用例，不得再以 app.state 单独作为证据。
+  6) 取证链：ViewerTrace 改异步串行队列写盘，补 scrollViewDidZoom / applyDownloadedImage /
+     viewWillAppear 面包屑；DiagnosticsView.export() 把 last-exception.log + viewer-trace.log
+     加入 activityItems；AppCrashLogger 补信号级/Swift fatal 兜底并写清能力边界（不宣称能抓 jetsam）。
+不变量：缩放事务与删除事务互斥；捏合全过程 pendingDeleteCount 不变、零删除事务、
+  collectionView.isScrollEnabled 不被误关；zoomScale ∈ [1,5] 恒有限；无图时捏合无响应。
+先写失败测试：testPinchDoesNotTriggerRemoval、testPinchKeepsCollectionViewScrollEnabled、
+  testPanDisabledWhileCellZoomed、testZeroBoundsDisablesPinch、
+  testPinchOnZeroContentSizeDoesNotCrash、testCenteringInsetUsesUntransformedBounds、
+  testPinchZoom20Times（加强）、testViewerShowsImageOnOpen、testDiagnosticsExportIncludesViewerTrace。
+
+【R03 · 上次位置记不准、冷启动需要等待跳转（P0）】
+代码证据：LibraryPositionStore 的 LibraryPosition v2 已含 assetID / sectionID /
+  itemIndexInSection / offsetRatio / savedAt / schemaVersion，键 library.lastPosition.v2.<queryKey>
+  —— 数据结构够用，问题不在「存」。LibraryViewModel 首屏只推 500 张，其余 500/批后台补齐；
+  reloadForQuery 重置 isIndexComplete=false；LibraryViewController.applySnapshot 等
+  dataSource.apply completion 才更新 currentSnapshotQueryKey 再 restorePositionIfNeeded；
+  restorePositionIfNeeded 在 isIndexComplete == false 时挂 pending → 两阶段可见跳转；
+  scrollViewDidScroll 的 0.3s Timer / didEndDragging / didEndDecelerating 在恢复期间会把中间位置
+  当成「上次位置」回写，覆盖锚点。iOS 15 SwiftUI TabView 切页不保证内嵌 VC 的
+  viewWillDisappear 触发，另靠 scenePhase / willResignActive 保存。
+修复（锚点优先 + 首帧遮罩；允许等效实现，但不变量不可让步）：
+  1) 启动读 LibraryPositionStore.load(queryKey:) 得锚点；LibraryViewModel.prepare 首屏不再固定
+     「最新 500」：用锚点 assetID 的 creationDate / 在完整 PHFetchResult 中的全局 index 求「锚点
+     窗口」（以锚点为中心前后各半批，仍遵守每批 <=500、分批 fetch），把锚点所在批次作为第一批推给数据源。
+  2) dataSource.apply completion 且 currentSnapshotQueryKey 更新后，用锚点 assetID 精确
+     indexPathForItem + offsetRatio 调 scrollToItem(animated:false)；从首帧到定位完成期间复用现有
+     加载骨架/遮罩盖住网格，isRestoringPosition = true，用户看不到中间位置；定位完成才移除遮罩。
+  3) 后台继续 500/批补齐其余月份（保留 startIndexCompletion）；用 Diffable 增量 append；若在锚点
+     之前插入 section，按插入高度同步补偿 contentOffset。
+  4) isRestoringPosition 期间禁用 savePositionNow 的 Timer / didEndDragging / didEndDecelerating
+     回写，恢复完成后再启用。
+  5) 锚点 asset 已删除/隐藏/不在当前 query 时回退 sectionID + itemIndexInSection + offsetRatio
+     的最近可用项；仍失败则落最新月份并写一次新锚点。任何回退都不得触发动画或 showJumpBanner
+     （那是用户主动月份跳转才用的）。
+  6) 每个 scope/filter 的 LibraryQuery.key 保持独立位置键（沿用 library.filter.<scope> 各自筛选
+     保持逻辑），切类不清空别类位置；setFilter / PhotoFilter.apply / LibraryQuery.scopeKey 语义不改。
+  7) viewWillDisappear / scenePhase / willResignActive 三条保存路径统一调 savePositionNow(reason:)；
+     与 R07 去 TabView 协同核对。
+不变量：恢复期间零位置回写；任何快照变更不得让首可见 assetID 漂移 > 1 行；
+  遮罩移除时首可见 assetID 即锚点；无可见跳转、无跳转 banner、无动画。
+先写失败测试：testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump、
+  testRestoreDoesNotOverwriteAnchorWithIntermediatePosition、testPerScopePositionKeysAreIndependent、
+  testDeletedAnchorFallsBackToNearestSection、testRotationKeepsAnchorWithinOneRow；
+  testPositionRestoredAfterRelaunch 保留并改为真冷启动（不再只靠 -uiTestingMonthJump + 小幅拖动）。
+
+【R04 · 底部撤销条倒计时 UI 错位】
+代码证据：DSToast 的 ringLayer 直接加到 undoButton.layer，并在【toast 的】layoutSubviews 里用
+  undoButton.bounds.midX/midY + r=17 画环 → 环叠在「撤销」文字上，动态字体变化后不同步；
+  undoButton 宽/高硬约束 44×44、effectView 高度硬约束 44，「撤销」在放大字体下被压缩；
+  DSToast 内部 30fps Timer 自算 remaining 到 0 自行 dismiss，UndoCenter 另有 0.25s Timer
+  到期 onExpire，ViewerViewController 的 staged 撤销还不走 UndoCenter → 两套/三套时钟；
+  ViewerViewController 的 toast 贴 filmStrip.top、LibraryViewController 的贴 safeArea.bottom，
+  多选时手动改成 -(84+12) 魔法数。hitTest 只放行 undoButton、init 即隐藏、generation 令牌
+  都是正确的，必须保留。
+修复：
+  1) 环独立：新建 countdownRingView（独立 UIView + 自身 CAShapeLayer），从 undoButton.layer 移出；
+     用 Auto Layout 放在「撤销」按钮外侧，不再与文字重叠；环路径在该视图自己的 layoutSubviews
+     用 bounds 计算（center = bounds.mid，radius = min(w,h)/2 - lineWidth/2）；环尺寸进
+     DesignSystem token（如 DSComponent.toastRingSize）。
+  2) 单一时钟：定义 App 层 UndoCountdownDriver（Core/Support，settings.undoWindow 为唯一时长来源），
+     UndoCenter（即时写）与 ViewerViewModel staged 撤销都通过它；DSToast 只暴露 show(...) /
+     updateRing(remaining:duration:) / dismiss()，删除内部自算到期与自行 dismiss 分支；
+     strokeEnd = clamp(remaining/duration, 0...1) 且先做有限值守卫；到 0 由驱动统一 onExpire
+     （执行提交 + dismiss）。
+  3) 位置统一：两处 toast 都用 safeAreaLayoutGuide 约束；多选行 / 胶片条出现时切换约束引用
+     （保存 toastBottomConstraint，activate/deactivate 到 selectionBar.topAnchor / filmStrip.topAnchor），
+     删除 -(84+12) 等魔法数，全部进 DSSpacing / SwipeConfig。
+  4) 动态字体：effectView.heightAnchor >= 44（去掉 equal 44）；undoButton 用 intrinsicContentSize
+     + contentEdgeInsets + titleLabel.adjustsFontForContentSizeCategory，最小命中区用
+     greaterThanOrEqualToConstant: 44；allowUndo == false 时环与按钮都隐藏且不注册驱动。
+  5) 保留 hitTest / generation / init 隐藏。
+不变量：环归零 / 「撤销」按钮失效 / 实际撤销截止三者同一时刻，误差 <= 0.1s；
+  Toast 本体不拦截网格触摸。
+先写失败测试：testCountdownRingDoesNotOverlapUndoLabel、testCountdownAndUndoExpireTogether、
+  testToastPositionUsesSafeAreaAndSelectionBarConstraint、testDynamicTypeXXXLToastNotClipped、
+  testAllowUndoFalseHasNoRing；testToastDoesNotBlockGrid 保留并加强两宿主场景。
+
+【R05 · 去掉顶部「照片管家」软件名称】
+代码证据：LibraryContainer.swift 的 LibraryRootView.body 上 .navigationTitle("照片管家") +
+  .navigationBarTitleDisplayMode(.inline) 修饰 switch 外的 Group → 授权/加载/空态/ready 四态全显示。
+修复：统一顶部栏改造时设 navigationItem.title = nil / largeTitleDisplayMode = .never（或彻底移除
+  SwiftUI .navigationTitle）。Info.plist 的 CFBundleDisplayName 与 PermissionIntroView 授权文案禁止删。
+测试：testTopChromeHasNoTitleAndNoTabBar 断言 navigationBars.staticTexts["照片管家"] 不存在。
+
+【R06 · 五段控件整合成一个按钮，放到筛选按钮旁边】
+代码证据：LibraryScopeOption（all/favorites/videos/screenshots/hidden，hidden.scope=nil）、
+  @State scopeOption、ready 分支 VStack 里 scopePicker 占一整行、Picker(.segmented) 带 AX
+  Library-ScopePicker、handleScopeChange 调 viewModel.setScope、hidden 弹 VaultView 后回弹
+  scopeBeforeHidden。注意：这不是 M11 删掉的旧 LibraryFilterBar（该文件不存在），是另一条一直
+  保留的五段 Picker。
+修复：
+  1) 从 body 的 VStack 移除整行 scopePicker，顶部栏新增「分类」按钮 Library-Category，
+     紧邻 Library-Filter；筛选按钮保持独立，仍打开 LibraryFilterSheet，绝不并入分类。
+  2) 用 iOS 15 可用的 UIButton(showsMenuAsPrimaryAction: true) + UIMenu / UIAction；
+     5 项「全部 / 收藏 / 视频 / 截图 / 已隐藏」全保留；UIAction.state 由 viewModel.query.scope
+     派生勾选（删掉漂移的独立 @State scopeOption）；标题带计数（当前项用 filteredItems.count，
+     其他项新增不切换 results 的异步 count(scope:)，只基于授权可见资产、主库不含隐藏，
+     hidden 解锁前不泄露数量）。
+  3) 前四项调 LibraryViewModel.setScope，继续按 library.filter.<scope> 保留各自筛选与
+     LibraryQuery.key 稳定位置键（与 R03 协同）；hidden 不 setScope，直接 fullScreenCover
+     VaultView（VaultViewModel.onAppear/unlock、VaultService 自动 Face ID、limitedNotice 全保留）。
+  4) .limited 授权保留 PhotoLibraryService + requestManageLimitedPhotos +
+     presentLimitedLibraryPicker，并在分类菜单补「管理可见照片」入口（接上当前未被使用的
+     DSEmptyState.limited）；SearchPredicate / PhotoFilter.apply / LibraryQuery.scopeKey 语义不改。
+  5) Batch-Filter 仍打开同一 LibraryFilterSheet（chips / 200ms 预览计数 / 应用 / 清除全保留）。
+先写失败测试：testFilterBarRemovedAndFilterButtonPlacement（保留全部原断言，加
+  Library-ScopePicker 不存在、Library-Category 与 Library-Filter 相邻）、
+  testCategoryMenuPreservesAllScopesAndHiddenVault、testLimitedLibraryManagementEntryIsReachable。
+
+【R07 · 去掉底部「图片库、工具」分页，工具做成软件左上角小按钮】
+代码证据：PhotoDeskApp.body 的 TabView 两个 tab（Label("照片库") / Label("工具")）；
+  ToolsView 自带 NavigationView + List + navigationTitle("工具") + .navigationViewStyle(.stack)；
+  AppContainer.shared.libraryViewModel 常驻，工具页每次 makeCleanupViewModel/makeVaultViewModel，
+  VaultView.onDisappear 立即锁，scanCoordinator 单例；PrivacyShield / AppLockView 在 ZStack
+  内 zIndex 1/2。
+修复：
+  1) PhotoDeskApp.body 去掉 TabView，直接放 LibraryRootView；PrivacyShield / AppLockView /
+     scenePhase 处理全部保留且 zIndex 不变。
+  2) 左上角新增小按钮 Library-Tools（wrench 图标，label「工具」）；点击用 iOS 15
+     .sheet(isPresented: $showTools) 打开 ToolsView；ToolsView 保留自身 NavigationView(.stack)
+     以支撑 NavigationLink 子页推入，补 UIKit 关闭按钮 Tools-Close（或外层
+     UIBarButtonItem.done）+ @Environment(\.dismiss)。返回路径：完成/下拉关闭 → 回库；
+     子页 back → 工具列表。fullScreenCover 不作首选（无下拉、必须显式关闭）；若采用 push
+     方案必须重构 NavigationLink/pop 并去掉内层 NavigationView 避免双层导航，风险更高，不推荐。
+  3) 状态隔离逐条保持现状：libraryViewModel 常驻不丢；工具页每次重建 cleanup/vault VM；
+     VaultView.onDisappear 立即锁；scanCoordinator 单例保留清理结果。
+  4) 去 TabView 减少生命周期歧义（TabView 切页不保证内嵌 VC viewWillDisappear 触发），与 R03 协同。
+  5) 动态字体/安全区：bar items 交给 UINavigationBar / safeArea；图标用
+     UIImage.SymbolConfiguration(textStyle: .body) + adjustsImageSizeForAccessibilityContentSizeCategory；
+     自定义文字用 DSTypography.font（UIFontMetrics）；44pt 命中区；颜色/间距/动效只取
+     Colors.swift / Spacing.swift / Motion.swift / Typography.swift；减弱动态效果用交叉溶解；
+     禁用 iOS 16 .toolbarBackground。
+先写失败测试：testToolsButtonOpensToolsSheetAndReturns、testTopChromeHasNoTitleAndNoTabBar
+  （无 tabBars）、testAllPagesSmoke（改写后保留 7 个 Tools-* 入口 smoke）、
+  testDynamicTypeTopBarDoesNotClip。
+
+【R08 · 向下滑动多选做成 iOS 原生相册一样】
+代码证据：LibraryViewController 的 selectionOverlay（DSColor.tint 15% 底 + 1pt 边框）直接加到
+  view；onBoxLongPress .changed 用 gesture.location(in: collectionView)（content 坐标）构造
+  selectionOverlay.frame（overlay 挂在 view = 屏幕坐标）→ contentOffset 后框选框必然错位；
+  targetPath = indexPathForItem(at: location) 命中错误；nearestIndexPath(to:) 把 y 当 content
+  坐标且未转换；orderedIDs 走 SelectionRange.ids 只做一维连续区间；
+  selectionState.replaceSelection(boxBaseSelected + range) 永远只加不减（往回拖不会取消）；
+  boxAutoScrollTick 用 lastBoxPoint.y - collectionView.contentOffset.y 混用坐标，setContentOffset
+  后仍用旧 start/lastBoxPoint 重算。PhotoDeskCore 的 SelectionRange 是双向一维区间，
+  SelectionPolicy 只过滤 scope / 去重，无二维矩形/反选语义。PhotoGridCell.configure 把
+  accessibilityValue 重置成 item.id，cell 复用后选中态后缀可能丢失。
+iOS 原生相册语义（目标）：长按锚点后拖动，按拖曳矩形与每个 cell 实际可见 frame 的二维相交实时
+  增减选中；拖过未选中的加入、往回拖自动移除；手指到上下边缘自动滚动且命中集合随 contentOffset
+  重算；松手框选框消失、滚动恢复、选中态稳定；绝不出现「框选框与手指错位」「选中只增不减」。
+修复：
+  1) 单一坐标系：手势点统一取 gesture.location(in: view) 作为「手指/屏幕」坐标；
+     boxStartPoint / lastBoxPoint 全存该坐标；selectionOverlay（挂在 view）直接用该坐标画 rect。
+     命中换算改用 view.convert(point, to: collectionView) 得 content 坐标，或（推荐）把
+     collectionView.indexPathsForVisibleItems 的 layoutAttributesForItem(at:)?.frame 逐个 convert
+     到 view 坐标后与 rect 相交 —— 后者彻底避开 contentOffset 混淆。
+  2) 二维相交下沉 Core：在 PhotoDeskCore 新增纯逻辑（只 import Foundation，用自定义
+     struct Rect/Point 的 Double 字段，不传 CGRect/CGSize/UIImage/PHAsset），例如
+     GridHitRegion.hitIDs(cells: [GridCellRect], rect: Rect, threshold: Double) -> Set<String>；
+     处理 0/负/NaN/∞、边界相交阈值（进 DesignSystem/SwipeConfig）、乱序与跨 section。
+     App 层只做 CGRect → Rect 适配。SelectionPolicy 复用 replaceSelection，不再累加 range。
+  3) 基线重算语义：.began 记录 boxBaseSelected（进入多选前的选中集）与 boxAnchorID；
+     每帧 selectionState.replaceSelection(boxBaseSelected ∪ hitIDs)（若锚点初态已选则按锚点初态
+     做反选，二选一必须在代码注释与测试中写死）；每帧从基线重算，往回拖自然移除。
+     禁止 base ∪ SelectionRange 的一维累加。
+  4) 自动滚动：手指坐标固定在 view 坐标；每帧若手指进入上/下边缘区（60pt，SwipeConfig），
+     按 10pt/帧 setContentOffset（clamp 到 max(0, contentSize.height - bounds.height)）；
+     滚动后用「同一手指 view 坐标 + 当前 contentOffset」重新换算命中并重算 rect；
+     CADisplayLink 加 .common mode，松手 invalidate。
+  5) 交互与状态：长按 0.15s 起、位移 4pt 阈值（全部进 SwipeConfig）；进入多选时若未选中则
+     选中锚点 cell；拖曳期间 collectionView.isScrollEnabled=false 但由自动滚动接管；松手恢复
+     滚动、隐藏 overlay、清空临时状态；overlay 颜色/边框只用 DSColor.tint token。
+  6) 徽标与可访问性：PhotoGridCell.configure 重置 accessibilityValue 后必须按当前
+     isSelectedCell 同步追加 selected/none；reloadSelectionBadges / updateSelectionCount 每帧
+     调用但做差量更新（避免全量 reload 掉帧）；每个 cell 的 AX value 保持
+     「<assetID> selected/none」契约（docs/09 D11）。
+  7) testSlideToSelect 的计数/可见选中 >=6 断言保留并加强，不删。
+先写失败测试：testRectSelectionUses2DIntersectionNot1DRange（Core 单测：空白/全包/回拖/
+  乱序/NaN/跨 section/动态列数）、testDragSelectionRectMatchesFingerInViewCoordinates、
+  testDragBackRemovesPreviouslySelected、testAutoScrollRecomputesHitsWithCurrentContentOffset、
+  testSelectionBadgesStayInSyncAfterConfigure、testSlideToSelect（保留加强）。
+
+--------------------------------------------------------------------------------
+四、跨项改造：唯一顶部栏（R05 + R06 + R07 必须合并实施）
+--------------------------------------------------------------------------------
+
+目标布局（唯一一行顶部栏，无标题、无分段行、无 TabBar）：
+  [🔧工具]                    [分类▾][筛选][月][搜][选][Session]
+  ────────────────────────────────────────────────────────────
+              UICollectionView 网格（全高）
+      ⭕ 撤销 · 5s（独立环，不叠文字；约束定位）
+  ────────────────────────────────────────────────────────────
+  「工具」点开 sheet；「分类」与「筛选」必须相邻。
+
+为什么用 UIKit UINavigationItem（不要再让 SwiftUI .toolbar 承载可点按钮）：
+  已知问题.md 与 docs/15 已实证 iOS 15.5 + Xcode 15.4 下 SwiftUI Toolbar / Form / Menu 按钮的
+  XCUITest 合成点击与坐标点击均不可靠（这正是 docs/15 §3.2 6 条 🟨 的成因）。改为
+  UINavigationItem.leftBarButtonItem / rightBarButtonItems + UIBarButtonItem（经
+  UIViewControllerRepresentable 桥到现有 NavigationView 的 UINavigationController，或一层薄
+  UINavigationController host）。rightBarButtonItems 按 UIKit 反序装配；title = nil、
+  largeTitleDisplayMode = .never；SessionBadge 改 UIBarButtonItem(customView:) 或移到右侧，
+  计数入口不丢。
+
+分类菜单语义表：
+  全部        → setScope(.all)        → 勾选来源 viewModel.query.scope → 带计数
+  收藏        → setScope(.favorites)  → 同上 → 带计数、保留本类筛选
+  视频        → setScope(.videos)     → 同上 → 带计数、保留本类筛选
+  截图        → setScope(.screenshots)→ 同上 → 带计数、保留本类筛选
+  已隐藏      → 不 setScope，fullScreenCover VaultView → 不勾选 → Face ID / 受限提示保留、
+                解锁前不泄露数量
+  管理可见照片（仅 .limited）→ requestManageLimitedPhotos / presentLimitedLibraryPicker → 接上
+                DSEmptyState.limited
+筛选按钮完全独立：仍打开 LibraryFilterSheet；Batch-Filter 仍打开同一面板；LibraryQuery.key 稳定
+  （R03 依赖）。
+
+AX 兼容表（既有 ID 一个不删）：
+  左上    Library-Tools（新增）                 label「工具」，wrench
+  右上    Library-Category（新增）              label「分类」，与 Library-Filter 相邻
+  右上    Library-Filter / Library-MonthJump / Library-Select（保留）；
+          搜索（补 Library-Search）；SessionBadge（保留计数入口）
+  多选行  Batch-Filter / Batch-SelectAll（保留）
+  工具页  Tools-Close（新增）、Tools-Cleanup / Tools-Vault / Tools-Settings /
+          Tools-StorageStats（保留），补 Tools-Root
+  Toast   DSToast / Toast-Undo（保留）
+  不存在断言：tabBars、navigationBars.staticTexts["照片管家"]、Library-ScopePicker、FilterBar、
+          LibraryFilterBar.swift
+
+动态字体与安全区：UIBarButtonItem 交给 UINavigationBar / safeArea；图标用
+  UIImage.SymbolConfiguration(textStyle: .body) + adjustsImageSizeForAccessibilityContentSizeCategory；
+  文字用 DSTypography.font（UIFontMetrics）；最小 44pt 命中区；颜色/间距/动效只取
+  DesignSystem token；减弱动态效果用交叉溶解；禁用 iOS 16 .toolbarBackground。
+
+--------------------------------------------------------------------------------
+五、执行步骤（Phase 0 → Phase 9，一步一步做完，不得跳 Phase）
+--------------------------------------------------------------------------------
+
+【Phase 0 · 现状确认与基线（不写实现）】
+  输入：第一节全部文档与源码、git status、docs/16。
+  动作：① 输出 10–15 行「现状确认」（4 组根因、涉及文件、先改哪 3 个文件、确认
+        LibraryFilterBar.swift 不存在 / Info.plist App 名不动 / 分类与筛选不合并）；
+        ② 确认工作树干净，沿用 fix/stability-20261104 或新建等价分支；
+        ③ 新建 docs\18-后续修复验收记录.md 骨架：8 行逐条表，状态全写「待验证」，
+        并写入基线 CI 数字与 IPA SHA256。
+  产出：现状确认文本 + docs/18 骨架。
+  门禁：git status 干净；docs/16 与 docs/17 未被修改。
+
+【Phase 1 · 观测与取证链（先让崩溃可见，再修崩溃）】
+  动作：① ViewerTrace 改异步串行队列写盘，补 zoom / img / appear 面包屑，Release 也生效；
+        ② 去掉 ViewerViewController.setZoomCallback 的 scale.isFinite 过滤；
+        ③ DiagnosticsView.export() 加入 last-exception.log + viewer-trace.log；
+        ④ AppCrashLogger 补信号级/Swift fatal 兜底并在注释写清能力边界（不宣称能抓 jetsam）；
+        ⑤ 落地 testDiagnosticsExportIncludesViewerTrace，在基线上确认红；
+        ⑥ 截图链路接 XCTAttachment。
+  门禁：scripts/test-core.ps1 通过；新用例在基线上红。
+  commit：fix(diagnostics): 补齐查看器可观测与崩溃日志导出
+
+【Phase 2 · R01 + R02 查看器（P0，最先修这两个）】
+  动作：① 先落地 R01 与 R02 的全部失败测试并逐条确认在基线代码上是红的（含
+        testViewerShowsNonBlankImage 的截图像素断言）；
+        ② A1/A4：imageView 四边约束或同步 frame；viewDidLayoutSubviews 刷新 itemSize；
+        ③ B2：交互护栏（image/bounds/contentSize 三条件）；viewForZooming 零尺寸返回 nil；
+        ④ B3：updateCenteringInset 用 bounds.size + !zoomBouncing；
+        ⑤ B4：ZoomGeometry.clampedZoomRect 支持 0 边界 + Core 单测；
+        ⑥ A2/A3：inCloud 回传 + 云占位下载 + 进度 + 回填；viewDidDisappear 条件取消；
+           新增 viewWillAppear 重挂；
+        ⑦ 附带：ImagePipeline requestID 注册竞态、ResumeOnce 取消强制 resume(nil)、
+           ViewerContainer.updateUIViewController + onClose 复位、越界 cell 空态；
+        ⑧ B1：手势互斥状态机（idle → pinchActive → idle），pinchActive 期间 guard
+           executeAction / performStaged / triggerAction / performBatchUpdates；
+           shouldRecognizeSimultaneouslyWith 对 pinch / numberOfTouches>=2 返回 false；
+           shouldBegin 与 .changed 持续复查 zoomScale > 1.01 / isZooming；
+        ⑨ 加强 testPinchZoom20Times（img=ok、像素、pendingDeleteCount==0）与真捏合命中用例。
+  门禁：scripts/test-core.ps1 全绿；CI iOS 15.5 单测全绿、UI 测试无新增失败（docs/15 §3.2 既有 6 条 🟨 保持如实登记，不得删断言凑绿）；截图逐张打开确认大图非背景色；
+        每个失败用例「基线红 → 修复绿」证据留存。
+  commit：按根因拆分 fix(viewer): imageView 尺寸与首布局 itemSize /
+        fix(viewer): 交互护栏与居中 inset / fix(viewer): 云图占位与生命周期重挂 /
+        fix(viewer): 捏合与删除事务互斥 / fix(imaging): 请求注册与取消竞态
+
+【Phase 3 · R03 位置记忆（P0）】
+  动作：① 落地 5 个失败测试并确认红；② 锚点优先首屏（第一批推锚点窗口）；
+        ③ 恢复遮罩 + isRestoringPosition；④ 恢复期间禁回写；⑤ 前插 section 补偿 contentOffset；
+        ⑥ 回退策略（删除/隐藏/不在当前 query → 最近可用项 → 最新月份，且不弹 banner/动画）；
+        ⑦ 三条保存路径统一；⑧ 与 R07 去 TabView 协同核对。
+  门禁：真冷启动在「深月份 / >=5000 张 / 筛选态」三种场景断言首可见 assetID 误差 <= 1 行、
+        无 banner、无动画、恢复期间零回写。
+  commit：fix(library): 冷启动锚点优先恢复，消除可见跳转
+
+【Phase 4 · R04 撤销条】
+  动作：① 落地 5 个失败测试；② countdownRingView 独立；③ UndoCountdownDriver 单一时钟
+        （UndoCenter 即时写 + ViewerViewModel staged 共用 settings.undoWindow）；
+        ④ DSToast 删除自算到期/自行 dismiss，只留 show / updateRing / dismiss；
+        ⑤ 两宿主 toast 改约束引用、去 -(84+12) 魔法数、token 化；
+        ⑥ effectView.height >= 44、按钮动态字体 + 44pt 命中区；allowUndo=false 不注册驱动；
+        ⑦ 保留 hitTest / generation / init 隐藏。
+  门禁：testToastDoesNotBlockGrid 仍绿 + 5 个新用例全绿；环与文字不重叠截图确认。
+  commit：fix(ui): 撤销条倒计时环与统一时钟
+
+【Phase 5 · R05 + R06 + R07 顶部栏 / 工具页统一】
+  动作：① 落地 5 个失败测试；② PhotoDeskApp 去 TabView（保留锁/遮罩/scenePhase/zIndex）；
+        ③ LibraryContainer 去 navigationTitle / .toolbar / 整行 scopePicker；
+        ④ UIKit UINavigationItem 桥：左上 Library-Tools，右上 Library-Category 紧邻
+           Library-Filter，其余 AX 全保留，SessionBadge 不丢；
+        ⑤ UIMenu 5 项 + .limited「管理可见照片」入口；勾选由 query.scope 派生；
+           count(scope:) 只读异步、不切换 results；hidden 不 setScope、直接 VaultView；
+        ⑥ ToolsView sheet + Tools-Close + @Environment(\.dismiss)，保留 NavigationView(.stack)
+           与 7 个入口；状态隔离保持现状；
+        ⑦ 动态字体/安全区/44pt/token 化；
+        ⑧ 新增 3 个 DEBUG 启动钩子并接在 UIKit VC 侧（见第六节 6.3）；
+        ⑨ 改写 4 个既有 UI 测试的 Tab 依赖，保留全部 smoke 断言。
+  门禁：4 个既有 UI 测试改写后仍绿、7 个 Tools-* smoke 仍绿、截图确认唯一顶部栏、
+        app.tabBars.count == 0、无「照片管家」标题、Library-ScopePicker 不存在。
+  commit：feat(library): 顶部栏整合与工具页改左上入口（可拆 2–3 个提交：
+        去标题 / 分类菜单 / 去 TabView 与工具 sheet）
+
+【Phase 6 · R08 原生相册式多选】
+  动作：① 先在 PhotoDeskCore 写 GridHitRegion + 8 类 XCTest（空白 / 全包 / 回拖 / 乱序 /
+        NaN / 重叠 / 跨 section / 动态列数），确认红→绿，跑 scripts/test-core.ps1；
+        ② LibraryViewController 统一 view 坐标系、二维相交命中、基线每帧重算、
+           自动滚动重算、松手恢复；
+        ③ PhotoGridCell.configure 同步选中态与 accessibilityValue；差量刷新徽标；
+        ④ 长按 0.15s / 4pt / 60pt / 10pt 全部进 SwipeConfig。
+  门禁：testSlideToSelect 保留加强 + 5 个新用例全绿；滚动 >= 55 FPS。
+  commit：fix(library): 拖动多选改为二维矩形相交与基线重算
+
+【Phase 7 · 测试改造与红绿证据归档】
+  动作：① 汇总所有新增用例的「基线红 / 修复绿」证据（日志或 CI run 链接）写入 docs/18；
+        ② 逐条核对 docs/15 §3.2 的 6 条 🟨 未被删断言、未被跳测；
+        ③ 逐条核对 AX 兼容表里所有既有 ID 未丢；
+        ④ 核对 app.state 不再单独作为「捏合成功」证据。
+  门禁：scripts/test-core.ps1 全绿；iOS 单测全绿；UI 测试无新增失败，docs/15 §3.2 既有 6 条 🟨 保持如实登记（不删断言 / 不跳测）。
+  commit：test: 补齐 8 条反馈的红绿回归
+
+【Phase 8 · CI / 出包 / 文档同步 / 红线检查】
+  动作：① git push origin <分支> 触发 Actions；② 逐张打开上传的截图确认；
+        ③ 核对 simulator .app / 未签名 ipa / Core 结果三个产物齐全，记录 IPA SHA256；
+        ④ 按第七节同步文档；docs/05 加 M12 行与变更日志；docs/18 逐条回填
+           （未真机验证的写「未验证」）；
+        ⑤ 逐条执行第八节红线 grep 检查；
+        ⑥ 检查零新增警告、otool -l | grep LC_BUILD_VERSION 的 minos = 15.0。
+  门禁：core 全绿；CI iOS 15.5 单测全绿、UI 测试无新增失败（docs/15 §3.2 既有 6 条 🟨 如实登记）；红线全过；中文文案按 docs/04 §7 校对。
+  commit：docs: 同步 M12 规划与验收记录
+
+【Phase 9 · 真机清单与最终交付报告】
+  动作：① 回填 docs/12 的 M12 #1–#8（尤其大图、捏合、位置、顶部栏、多选）与取证回传清单；
+        ② 输出最终报告（格式见第十节）。
+  门禁：报告里「未真机验证」项如实标注，绝不写成 ✅。
+
+--------------------------------------------------------------------------------
+六、测试清单（必须全部落地，先红后绿；禁止删断言 / 跳测）
+--------------------------------------------------------------------------------
+
+6.1 新增失败测试（按 R 分组，名单一个不少）
+  R01：testImageViewFrameMatchesZoomContentViewAfterImageApplied、testViewerShowsNonBlankImage、
+       testFirstLayoutItemSizeEqualsBounds、testZeroBoundsThenLayoutRecovers、
+       testCloudOnlyAssetShowsDownloadButton、testFullImageReportsInCloud、
+       testPresentInfoThenDismissRestoresImage、testViewerShowsImageOnOpen
+  R02：testPinchDoesNotTriggerRemoval、testPinchKeepsCollectionViewScrollEnabled、
+       testPanDisabledWhileCellZoomed、testZeroBoundsDisablesPinch、
+       testPinchOnZeroContentSizeDoesNotCrash、testCenteringInsetUsesUntransformedBounds、
+       testPinchZoom20Times（加强）、testDiagnosticsExportIncludesViewerTrace
+  R03：testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump、
+       testRestoreDoesNotOverwriteAnchorWithIntermediatePosition、
+       testPerScopePositionKeysAreIndependent、testDeletedAnchorFallsBackToNearestSection、
+       testRotationKeepsAnchorWithinOneRow
+  R04：testCountdownRingDoesNotOverlapUndoLabel、testCountdownAndUndoExpireTogether、
+       testToastPositionUsesSafeAreaAndSelectionBarConstraint、
+       testDynamicTypeXXXLToastNotClipped、testAllowUndoFalseHasNoRing
+  R05/06/07：testTopChromeHasNoTitleAndNoTabBar、
+       testCategoryMenuPreservesAllScopesAndHiddenVault、
+       testToolsButtonOpensToolsSheetAndReturns、
+       testLimitedLibraryManagementEntryIsReachable、testDynamicTypeTopBarDoesNotClip
+  R08 Core：GridHitRegionTests（空白矩形 / 全包 / 回拖 / 乱序 / NaN / 重叠 / 跨 section /
+       动态列数）+ SelectionPolicy 基线重算语义
+  R08 UI：testRectSelectionUses2DIntersectionNot1DRange、
+       testDragSelectionRectMatchesFingerInViewCoordinates、
+       testDragBackRemovesPreviouslySelected、
+       testAutoScrollRecomputesHitsWithCurrentContentOffset、
+       testSelectionBadgesStayInSyncAfterConfigure
+
+6.2 既有 UI 测试的必要改写（改写，不是删除）
+  LaunchUITests.testAppLaunchesWithTwoTabs → 断言无 tabBars、无「照片管家」标题、
+      Library-Tools 存在且网格可达（可改名）。
+  StabilityUITests.testAllPagesSmoke → 把 tab tap 改为 Library-Tools → Tools-Close；
+      保留 7 个 Tools-* 入口 smoke 与 navigationBars back 断言。
+  PageRegressionUITests.testStorageStatsCompletes → tab tap 改 Library-Tools；
+      保留 StorageStats-Total 断言。
+  FlowUITests.testCleanupScanStartAndCancel → tab tap 改 Library-Tools；
+      保留 -CleanupAutoStart 与状态断言。
+  StabilityUITests.testFilterBarRemovedAndFilterButtonPlacement → 保留 FilterBar 不存在、
+      Batch-Filter 在 Batch-SelectAll 左侧、点开面板；加 Library-ScopePicker 不存在、
+      Library-Category 与 Library-Filter 相邻、菜单 5 项 / 勾选 / 计数 / 已隐藏 Face ID。
+  StabilityUITests.testSlideToSelect → 保留计数与可见选中 >=6 断言，补坐标 / 回拖断言。
+  StabilityUITests.testPositionRestoredAfterRelaunch → 改真冷启动 + 锚点断言。
+  StabilityUITests.testToastDoesNotBlockGrid → 保留，补两宿主与动态字体场景。
+  StabilityUITests.testPinchZoom20Times / testViewerSwipeThroughAllPhotos → 补图像可见、
+      像素、pendingDeleteCount 断言。
+  docs/15 §3.2 的 6 条 🟨（testFilterYearsRepeatedly、testFilterPersistedAfterRelaunch、
+      testMonthJump、testMonthJumpPersistsAfterRelaunch、testPositionRestoredAfterRelaunch、
+      testSelectWholeMonth）保持如实登记，不删断言、不跳测、不粉饰成绿。
+
+6.3 启动钩子（集中在 App/UITestHooks.swift，#if DEBUG，Release 全返回 false）
+  新增 -uiTestingOpenTools、-uiTestingOpenCategoryMenu、-uiTestingSelectScope <rawValue>；
+  解析放 UITestHooks，接线放 UIKit VC 侧（同 -uiTestingFilterYear / -uiTestingMonthJump 的
+  接线处），走同一 setScope / showVault 路径。-uiTestingDisableAnimations 只作坐标稳定手段，
+  不是修复手段。
+
+6.4 门禁命令
+  本机：powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+  CI：git push → .github/workflows/ios.yml（macos-14 / Xcode 15.4 / iOS 15.5）
+  project.yml 锁 iOS 15 且自动纳入新源文件/测试；workflow 不新增全局 launchArguments，
+  只追加测试文件 / XCTAttachment 截图。
+  性能：5000 张滚动内存峰值 < 250MB、>= 55 FPS。
+
+--------------------------------------------------------------------------------
+七、文档同步清单 + 红线 grep
+--------------------------------------------------------------------------------
+
+文档同步（docs/16 与 docs/17 只读，不要改）：
+  docs/01 → FR-A9 五段改分类菜单；补「无 app 标题 / 无底部分页 / 工具左上入口」。
+  docs/03 → B.2 补 imageView 四边约束与 I5′；B.1 补交互护栏；B.9 补真实 zoom 面包屑与
+            Release 可观测；补锚点优先恢复、统一倒计时、二维命中架构。
+  docs/04 → §2 信息架构、§3.1 顶部栏、附录 A.2 / B.1（删「只剩五段 ScopePicker + 网格」）、
+            撤销条环规格、多选交互规格。
+  docs/05 → 进度表新增 M12 行；变更日志新增本轮条目（8 条反馈、文件清单、CI run）。
+  docs/12 → R10/R11/R13 与 M11 #1/#2/#8/#9/#10/#13 对齐；新增 M12 #1–#8 与取证回传清单。
+  docs/13 → S06 加注「M12 进一步把五段 Picker 收为菜单按钮」。
+  docs/15 → S06 / §3.2 / §5 / §7 加「M12 复核：✅ 不可采信」注记；6 条 🟨 保持原状。
+  docs/18（新建）→ 8 条逐条表、红绿证据、CI run、IPA SHA256、截图清单、真机待验项。
+
+红线 grep（Phase 8 逐条执行并写进报告）：
+  1. PhotoDeskCore/ 只允许 import Foundation；Package.swift platforms 留空；Linux swift build/test 通过。
+  2. 删除只走 PHAssetChangeRequest.deleteAssets；UI 只说「移到最近删除」；无「永久删除 /
+     彻底删除 / 清空最近删除」入口；TrashBin 仅 5s 撤销保险。
+  3. 无 iOS 16+ API（黑名单见第二节）；无 NavigationStack / PhotosPicker / ShareLink /
+     .toolbarBackground / @Observable 等。
+  4. 零第三方依赖、零 URLSession 外发；ImagePipeline 唯一取图入口；网格/查看器仍 UICollectionView。
+  5. .limited 授权、presentLimitedLibraryPicker、PHPhotoLibraryChangeObserver 增量更新、
+     分批 500、写操作 performChanges 全部保留。
+  6. 新增文件进 target（检查 excludes）；颜色/字体/间距/魔法数只用 DesignSystem token；
+     每文件顶部 // MARK: - 职责说明；无 try! / 强制解包；无新增警告；中文文案校对。
+  7. commit 格式 feat(scope): / fix(scope): / test: / docs:；minos = 15.0。
+
+--------------------------------------------------------------------------------
+八、崩溃取证与真机验收清单（回填 docs/12 / docs/18）
+--------------------------------------------------------------------------------
+
+取证回传要求（写进最终报告，请用户回传）：
+  ① Application Support/Logs/last-exception.log + viewer-trace.log 全文；
+  ② 系统「设置→隐私→分析与改进→分析数据」中 PhotoDesk 的 .ips（查
+     CALayer position contains NaN / SWIFT TASK CONTINUATION MISUSE）；
+  ③ 打开查看器后 / 捏合前 / 崩溃后各一张截图（含顶栏与胶片条，用于区分「全黑」与
+     「有 chrome 无图」）；
+  ④ 该图是否 iCloud-only、是否 HEIF/全景、此前是否 present 过信息/编辑/分享或切 Tab；
+  ⑤ 设备型号 / iOS 版本 / build 号 / IPA SHA256。
+
+真机验收 12 条：
+  1 点任意缩略图 → 1s 内显示与网格一致大图，截图像素非背景色。
+  2 present 信息/编辑/分享后返回 → 仍显示大图，不白屏。
+  3 连续 20 次开关查看器 → 无复用旧 VM / 无空白。
+  4 Release 捏合放大/缩小 30 次 + 双击 10 次 + 旋转后再捏合 → 0 崩溃、0 卡死、
+    zoomScale 恒有限、零删除事务。
+  5 iCloud-only / HEIF / 全景 → 占位 + 下载按钮 + 进度 + 回填；非云图正常。
+  6 杀进程冷启动（深月份 / 5000 张 / 筛选态）→ 首帧遮罩移除即锚点、误差 <= 1 行、无可见跳转。
+  7 撤销条（查看器 / 图库 / 多选 / XXXL 字体）→ 环不叠字、同刻归零、不遮挡、不拦截网格。
+  8 顶部栏 → 无标题、无 TabBar、无五段分段控件；分类与筛选相邻；工具左上可开可关；
+    7 个工具入口可达。
+  9 分类菜单 → 5 项齐全、勾选正确、计数正确、已隐藏 Face ID、.limited 管理入口可达。
+  10 拖动多选（滚动后 / 回拖 / 边缘自动滚动 / cell 复用）→ 框选框与手指一致、可取消选中、
+     命中正确、徽标同步、>= 55 FPS。
+  11 设置→诊断导出 → 含 last-exception.log 与含 zoom 的 viewer-trace.log。
+  12 性能与红线 → 内存 < 250MB、>= 55 FPS、minos 15.0、红线 grep 全过。
+
+--------------------------------------------------------------------------------
+九、绝对禁止事项（违反任一条即视为本轮失败）
+--------------------------------------------------------------------------------
+
+1. 禁止只输出分析/规划而不改代码；禁止只修一部分就交付；禁止中途询问是否继续。
+2. 禁止删除或弱化既有断言来让 CI 变绿；禁止 skip / xfail 掩盖失败；
+   禁止把 docs/15 §3.2 的 6 条 🟨 粉饰成 ✅。
+3. 禁止以 app.state 单独作为「捏合成功」或「大图可见」的证据；必须验 image != nil、
+   imageView.frame > 0、截图像素非背景色、pendingDeleteCount。
+4. 禁止把分类菜单合并进 LibraryFilterSheet；禁止删除 Library-Filter / Batch-Filter /
+   Library-MonthJump / Library-Select / Batch-SelectAll / Tools-* / StorageStats-* / Toast-Undo
+   任一 AX 或功能；禁止丢失 7 个工具入口、筛选面板、月份跳转、搜索、Vault、清理、存储统计。
+5. 禁止删除 Info.plist 的 CFBundleDisplayName 或 PermissionIntroView 的授权文案；
+   禁止创建或寻找 LibraryFilterBar.swift（它不存在）。
+6. 禁止用关闭动画、延迟、try?、reloadData 万能药掩盖症状；禁止在缩放事务里执行删除事务；
+   禁止在恢复位置期间回写中间位置。
+7. 禁止引入 iOS 16+ API、第三方依赖、网络请求、永久删除入口；
+   禁止把 CGRect/CGSize/UIImage/PHAsset 传进 PhotoDeskCore；禁止 Core 里 import UIKit/SwiftUI/Photos。
+8. 禁止在本机尝试 xcodebuild / simctl / 装 WSL2 Ubuntu / macOS 虚拟机 / Windows Swift 工具链；
+   禁止绕过 Windows → Git push → GitHub Actions → 真机这条已锁定链路。
+9. 禁止把「没跑过」「没真机验证」「CI 未产出截图」写成「已验证」；禁止修改 docs/16 与 docs/17。
+10. 禁止散落魔法数、硬编码颜色/字体、新增 Xcode 警告、try! / 强制解包、英文 UI 文案。
+
+--------------------------------------------------------------------------------
+十、停止条件与最终报告格式
+--------------------------------------------------------------------------------
+
+停止条件（满足其一即停止并如实报告，不得假装完成）：
+  ① 正常完成：scripts/test-core.ps1 全绿 + CI iOS 15.5 单测全绿、UI 测试无新增失败（docs/15 §3.2 既有 6 条 🟨 保持如实登记） + 8 条逐条红→绿证据 +
+     docs/18 与 docs/12 回填 + docs/01/03/04/05/13/15 同步 + 未签名 ipa 与截图产出 +
+     红线 grep 全过；
+  ② 硬阻塞：遇到必须真机才能复现、或需要用户凭据/设备、且无法继续推进的阻塞 → 输出阻塞报告
+     （已做到哪一步、缺什么、下一步最小动作），绝不假装完成。
+
+最终报告必须包含（用中文，逐条列全，不得省略）：
+  1. 8 条反馈逐条结论（R01–R08：根因、改了哪些文件、哪个测试从红变绿、验收结果）。
+  2. 新增测试清单与「基线红 / 修复绿」证据位置。
+  3. 既有 4 个 UI 测试的改写说明（证明没删断言，7 个 Tools-* smoke 仍绿）。
+  4. CI run 链接与三个产物（core 结果 / simulator .app / 未签名 ipa）。
+  5. IPA SHA256、build 号、最低系统 minos = 15.0 校验结果。
+  6. 内存峰值与 FPS 实测值（没测到就写「未验证」）。
+  7. 截图清单（逐张打开确认的结果，特别是大图非背景色、唯一顶部栏、撤销环不叠字、
+     框选框对齐）。
+  8. 红线 grep 结果、零新增警告、中文文案校对结果。
+  9. docs/18 与 docs/12 回填状态；明确列出「未真机验证」项与需要用户回传的 5 项取证材料。
+  10. 已知遗留问题（含 docs/15 §3.2 的 6 条 🟨 原状说明）。
+
+================================================================================
+最后一句：本提示词一次性投喂，你必须一口气做完 Phase 0 → Phase 9。不要停下来问「是否继续」，
+不要分批交付，不要只给分析。现在开始执行第一节「开始前必读」。
+================================================================================
