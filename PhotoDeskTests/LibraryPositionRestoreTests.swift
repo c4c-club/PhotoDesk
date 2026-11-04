@@ -28,6 +28,8 @@ private final class FakeAnchorRepository: AssetRepositoryProtocol {
         items.firstIndex(where: { $0.id == assetID })
     }
 
+    func count(scope: PhotoScope) async -> Int { items.count }
+
     func fetch(ids: [String]) async -> [PhotoItem] { [] }
 
     var latestResult: PHFetchResult<PHAsset>? { nil }

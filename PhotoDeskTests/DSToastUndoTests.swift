@@ -5,10 +5,13 @@
 
 import XCTest
 import UIKit
+import Photos
+import AVFoundation
+import PhotoDeskCore
 @testable import PhotoDesk
 
 /// 可注入时钟（PhotoDeskCore.Clock）
-private final class MockClock: Clock {
+private final class MockClock: PhotoDeskCore.Clock {
     var now: Date
 
     init(now: Date = Date(timeIntervalSince1970: 100_000)) {
@@ -224,6 +227,7 @@ private final class FakeToastRepo: AssetRepositoryProtocol {
     func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int { 0 }
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem] { [] }
     func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? { nil }
+    func count(scope: PhotoScope) async -> Int { 0 }
     func fetch(ids: [String]) async -> [PhotoItem] { [] }
     var latestResult: PHFetchResult<PHAsset>? { nil }
     func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>? { nil }

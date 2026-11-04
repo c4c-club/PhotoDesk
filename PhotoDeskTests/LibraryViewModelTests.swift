@@ -36,6 +36,12 @@ private final class FakeAssetRepository: AssetRepositoryProtocol {
         return store.filter { set.contains($0.id) }
     }
 
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? {
+        store.firstIndex(where: { $0.id == assetID })
+    }
+
+    func count(scope: PhotoScope) async -> Int { store.count }
+
     var latestResult: PHFetchResult<PHAsset>? { nil }
     func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>? { nil }
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {}
