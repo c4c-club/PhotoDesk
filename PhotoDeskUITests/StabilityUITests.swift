@@ -203,17 +203,19 @@ final class StabilityUITests: XCTestCase {
         let y0 = Int(Double(height) * 0.20)
         let y1 = Int(Double(height) * 0.72)
         guard x1 > x0, y1 > y0 else { return 0 }
-        let region = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+        let regionWidth = x1 - x0
+        let regionHeight = y1 - y0
+        let region = CGRect(x: x0, y: y0, width: regionWidth, height: regionHeight)
         guard let context = CGContext(data: nil,
-                                      width: region.width,
-                                      height: region.height,
+                                      width: regionWidth,
+                                      height: regionHeight,
                                       bitsPerComponent: 8,
-                                      bytesPerRow: region.width * 4,
+                                      bytesPerRow: regionWidth * 4,
                                       space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let data = context.data else { return 0 }
         context.draw(cg, in: CGRect(origin: .zero, size: region.size))
-        let total = region.width * region.height
+        let total = regionWidth * regionHeight
         let buffer = data.bindMemory(to: UInt8.self, capacity: total * 4)
         var nonBlack = 0
         for index in 0..<total {
