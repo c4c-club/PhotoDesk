@@ -4,6 +4,8 @@
 
 import XCTest
 import UIKit
+import Photos
+import AVFoundation
 @testable import PhotoDesk
 
 @MainActor
