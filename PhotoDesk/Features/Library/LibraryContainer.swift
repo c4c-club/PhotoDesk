@@ -222,20 +222,7 @@ struct LibraryRootView: View {
             }
         }
         .fullScreenCover(item: $viewerContext) { context in
-            // 拆小表达式（docs/13 轮 6：复杂泛型链会拖垮类型检查）
-            let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
-            let handleClose: () -> Void = {
-                // M12 R01：复位 viewerContext（旧版不复位 → 复开复用旧 VM）
-                viewerContext = nil
-            }
-            ViewerContainer(viewModel: viewerViewModel, onClose: handleClose)
-        }
-        .fullScreenCover(item: $viewerContext) { context in
-            ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context),
-                            onClose: {
-                                // M12 R01：复位 viewerContext（旧版不复位 → 复开复用旧 VM）
-                                viewerContext = nil
-                            })
+            ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))
         }
         .onAppear {
             Task { await viewModel.start() }
