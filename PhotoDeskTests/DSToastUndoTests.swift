@@ -162,7 +162,7 @@ final class DSToastUndoTests: XCTestCase {
     // MARK: - Toast 位置约束引用切换（R04 ④：去 -(84+12) 魔法数）
 
     func testToastPositionUsesSafeAreaAndSelectionBarConstraint() {
-        let store = LibraryPositionStore(defaults: UserDefaults(suiteName: "M12ToastPos-\(UUID())"))
+        let store = LibraryPositionStore(defaults: (UserDefaults(suiteName: "M12ToastPos-\(UUID())") ?? .standard))
         let viewModel = LibraryViewModel(service: PhotoLibraryService(initialAccess: .authorized),
                                          repository: FakeToastRepo(),
                                          pipeline: FakeToastPipeline(),
