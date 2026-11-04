@@ -404,9 +404,13 @@ final class LibraryViewController: UIViewController {
 
         // 右上（UIKit 反序装配：数组首元素显示在最右）：
         // [SessionBadge] [多选] [搜索] [月份] [筛选] [分类]
-        let session = UIBarButtonItem(title: "", style: .plain, target: self,
+        // 常驻图标：0 待处理时也可点开整理回顾（空标题 UIBarButtonItem 零宽，
+        // XCUITest 坐标点击会落空——验证轮 9 实测）
+        let session = UIBarButtonItem(image: UIImage(systemName: "tray"),
+                                      style: .plain, target: self,
                                       action: #selector(sessionBadgeTapped))
         session.accessibilityIdentifier = "SessionBadge"
+        session.accessibilityLabel = "整理回顾"
         let select = UIBarButtonItem(image: UIImage(systemName: "checkmark.circle",
                                                     withConfiguration: iconConfig),
                                      style: .plain, target: self, action: #selector(selectTapped))
@@ -1127,6 +1131,11 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
+            // M12 级联取证：滚动状态进 DEBUG 横幅（CI 失败时 AX 可读）
+            #if DEBUG
+            self.viewModel.debugScrollNote =
+                "off=\(Int(self.collectionView.contentOffset.y))/\(Int(max(0, self.collectionView.contentSize.height - self.collectionView.bounds.height))) sec=\(self.collectionView.numberOfSections) cells=\(self.collectionView.numberOfItems(inSection: 0))"
+            #endif
             // R03：前插补偿（头部回填月份时首可见 assetID 不漂移）
             if let item = compensationItem, let before = compensationMinYBefore,
                let newPath = self.dataSource.indexPath(for: item),

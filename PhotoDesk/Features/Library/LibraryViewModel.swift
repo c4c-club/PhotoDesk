@@ -142,11 +142,13 @@ final class LibraryViewModel: ObservableObject {
     /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
     /// debugRestoreNote：位置恢复状态（restore=ok/pending/ratio，docs/13 S04；VC 写入）
     var debugRestoreNote = ""
+    /// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）
+    var debugScrollNote = ""
     var debugSummary: String {
         "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
             "sections=\(sections.count) indexing=\(isIndexing) done=\(isIndexComplete) " +
             "del=\(reviewSession.pendingDeleteCount) hide=\(reviewSession.pendingHideCount)" +
-            (debugRestoreNote.isEmpty ? "" : " \(debugRestoreNote)")
+            (debugRestoreNote.isEmpty ? "" : " \(debugRestoreNote)") + " \(debugScrollNote)"
     }
 
     /// 浏览页/搜索快照入口：当前筛选结果（docs/09 §2.1 单一事实来源）
