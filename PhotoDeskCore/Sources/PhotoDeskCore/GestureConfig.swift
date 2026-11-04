@@ -28,3 +28,17 @@ public enum Sensitivity: String, CaseIterable {
         }
     }
 }
+
+/// 拖动框选阈值（docs/16 M12 R08：全部魔法数收口，App 侧只引用不散落）
+public enum BoxSelectConfig {
+    /// 长按起手时长（s）
+    public static let minPressDuration: TimeInterval = 0.15
+    /// 进入框选的位移阈值（pt）
+    public static let moveThreshold: Double = 4
+    /// 上/下边缘自动滚动触发区高度（pt）
+    public static let autoScrollEdge: Double = 60
+    /// 自动滚动步长（pt/帧）
+    public static let autoScrollStep: Double = 10
+    /// 二维相交命中阈值（相交面积 / cell 面积；原生相册手感：扫过约 1/5 格即命中）
+    public static let hitThreshold: Double = 0.2
+}

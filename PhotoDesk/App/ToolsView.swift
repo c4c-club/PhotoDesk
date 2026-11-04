@@ -1,10 +1,14 @@
-// MARK: - 职责说明：工具 Tab（docs/04 §2）——
-// 入口页：已隐藏（Face ID 门禁）/ 相簿 / 最近删除（说明+跳转）/ 手势教学。
-// 智能清理与存储统计随 M4/M5 接入。导航壳用 NavigationView + .stack（iOS 15，AGENTS.md §2 黑名单）。
+// MARK: - 职责说明：工具页（docs/04 §2；docs/16 M12 R07：由照片库左上「工具」按钮 sheet 呈现）——
+// 入口页：智能清理 / 已隐藏（Face ID 门禁）/ 相簿 / 最近删除 / 存储统计 / 手势教学 / 设置。
+// 保留自身 NavigationView(.stack) 以支撑 NavigationLink 子页推入；新增 Tools-Close 关闭按钮
+//（@Environment(\.dismiss)；下拉关闭同样回库）。状态隔离保持现状：libraryViewModel 常驻，
+// 每次呈现重建 cleanup/vault VM，VaultView.onDisappear 立即锁，scanCoordinator 单例保留清理结果。
 
 import SwiftUI
 
 struct ToolsView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         NavigationView {
             List {
@@ -29,12 +33,14 @@ struct ToolsView: View {
                     } label: {
                         Label("相簿", systemImage: "rectangle.stack")
                     }
+                    .accessibilityIdentifier("Tools-Albums")
 
                     NavigationLink {
                         RecentlyDeletedView()
                     } label: {
                         Label("最近删除", systemImage: "trash.circle")
                     }
+                    .accessibilityIdentifier("Tools-RecentlyDeleted")
                 }
                 Section {
                     NavigationLink {
@@ -42,6 +48,7 @@ struct ToolsView: View {
                     } label: {
                         Label("存储统计", systemImage: "chart.pie")
                     }
+                    .accessibilityIdentifier("Tools-StorageStats")
                 }
                 Section {
                     NavigationLink {
@@ -49,6 +56,7 @@ struct ToolsView: View {
                     } label: {
                         Label("手势教学", systemImage: "hand.draw")
                     }
+                    .accessibilityIdentifier("Tools-GestureTutorial")
                 }
                 Section {
                     NavigationLink {
@@ -59,6 +67,15 @@ struct ToolsView: View {
                     .accessibilityIdentifier("Tools-Settings")
                 }
                 Section {
+                    Button {
+                        dismiss()   // R07：完成 → 回照片库
+                    } label: {
+                        Label("完成", systemImage: "checkmark")
+                            .foregroundColor(Color(ds: DSColor.tint))
+                    }
+                    .accessibilityIdentifier("Tools-Close")
+                }
+                Section {
                     Text("搜索历史与智能视图已列入后续版本规划")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
@@ -67,6 +84,17 @@ struct ToolsView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("工具")
             .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .accessibilityIdentifier("Tools-Close-Bar")
+                    .accessibilityLabel("关闭工具")
+                }
+            }
         }
     }
 }

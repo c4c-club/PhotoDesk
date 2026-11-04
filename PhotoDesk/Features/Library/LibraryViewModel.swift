@@ -158,6 +158,15 @@ final class LibraryViewModel: ObservableObject {
         _ = await undoCenter.undo()
     }
 
+    /// 分类菜单异步计数（docs/16 M12 R06）：只读、不切换 results；
+    /// 仅基于授权可见资产、主库不含隐藏（PhotoFetchOptions.includeHiddenAssets = false）；
+    /// hidden 不计数（解锁前不泄露数量，调用方已挡）。
+    func count(scope: PhotoScope) async -> Int? {
+        guard scope != .hidden else { return nil }
+        if scope == query.scope { return filteredItems.count }
+        return await repository.count(scope: scope)
+    }
+
     // MARK: - 查询更新（D10）
 
     /// 顶部五段切换（全部/收藏/视频/截图/已隐藏走 Vault，不经此）

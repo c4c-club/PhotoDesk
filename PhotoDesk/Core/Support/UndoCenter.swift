@@ -53,12 +53,13 @@ final class UndoCenter: ObservableObject {
          trashBin: TrashBin? = nil,
          persistence: PersistenceController = .shared,
          clock: Clock = SystemClock(),
-         countdownDriver: UndoCountdownDriver = UndoCountdownDriver()) {
+         countdownDriver: UndoCountdownDriver? = nil) {
         self.writer = writer
         self.trashBin = trashBin
         self.persistence = persistence
         self.clock = clock
-        self.countdownDriver = countdownDriver
+        // 默认驱动就地创建（默认参数会在非隔离上下文求值，不能写进参数默认值）
+        self.countdownDriver = countdownDriver ?? UndoCountdownDriver()
     }
 
     // MARK: - 入栈（执行成功后调用）

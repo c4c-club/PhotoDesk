@@ -250,7 +250,7 @@ final class PageRegressionUITests: XCTestCase {
             app.tap()
         }
 
-        app.tabBars.buttons["工具"].tap()
+        app.descendants(matching: .any)["Library-Tools"].firstMatch.tap()
         let entry = app.buttons["存储统计"]
         XCTAssertTrue(entry.waitForExistence(timeout: 5), "工具页缺存储统计入口")
         entry.tap()

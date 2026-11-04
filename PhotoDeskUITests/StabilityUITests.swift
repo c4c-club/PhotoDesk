@@ -406,6 +406,181 @@ final class StabilityUITests: XCTestCase {
         assertAlive(app, "捏合 + 翻页后")
     }
 
+    // MARK: - M12 R05/R06/R07：唯一顶部栏（无标题/无 TabBar/无五段行；分类紧邻筛选；工具左上）
+
+    func testTopChromeHasNoTitleAndNoTabBar() throws {
+        let app = XCUIApplication()
+        _ = launchToGrid(app)
+        XCTAssertFalse(app.tabBars.firstMatch.exists, "R07：不得再有底部分页 TabBar")
+        XCTAssertFalse(app.navigationBars.staticTexts["照片管家"].exists, "R05：顶部不得有 App 标题")
+        let scopePicker = anyElement(app, identifier: "Library-ScopePicker")
+        XCTAssertFalse(scopePicker.exists, "R06：不得再有五段分段控件（整行）")
+        let category = anyElement(app, identifier: "Library-Category")
+        XCTAssertTrue(category.waitForExistence(timeout: 5), "R06：缺分类菜单按钮\n\(hierarchy(app))")
+        let filter = anyElement(app, identifier: "Library-Filter")
+        XCTAssertTrue(filter.waitForExistence(timeout: 3), "缺筛选按钮\n\(hierarchy(app))")
+        if category.exists && filter.exists {
+            XCTAssertLessThanOrEqual(category.frame.maxX, filter.frame.minX + 1,
+                                     "分类按钮应紧邻筛选按钮左侧（category.maxX=\(category.frame.maxX)，filter.minX=\(filter.frame.minX)）")
+        }
+        let tools = anyElement(app, identifier: "Library-Tools")
+        XCTAssertTrue(tools.waitForExistence(timeout: 3), "R07：缺左上工具按钮\n\(hierarchy(app))")
+        snap(app, "m12-top-chrome")
+    }
+
+    func testCategoryMenuPreservesAllScopesAndHiddenVault() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingFaceIDBypass"]
+        _ = launchToGrid(app)
+        let category = anyElement(app, identifier: "Library-Category")
+        XCTAssertTrue(category.waitForExistence(timeout: 5), "缺分类按钮\n\(hierarchy(app))")
+        category.tap()
+        for title in ["全部", "收藏", "视频", "截图", "已隐藏"] {
+            XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 3),
+                          "分类菜单缺「\(title)」\n\(hierarchy(app))")
+        }
+        snap(app, "m12-category-menu")
+        // 切到收藏（走同一条 setScope 路径；各 scope 保留自己的筛选与位置键）
+        app.buttons["收藏"].tap()
+        Thread.sleep(forTimeInterval: 1.2)
+        assertAlive(app, "切到收藏后")
+        // 已隐藏 → Vault（不 setScope；Face ID bypass 直解锁）
+        category.tap()
+        let hidden = app.buttons["已隐藏"]
+        if hidden.waitForExistence(timeout: 3) {
+            hidden.tap()
+            let vaultReady = app.collectionViews.firstMatch.waitForExistence(timeout: 8)
+                || app.navigationBars.firstMatch.waitForExistence(timeout: 3)
+            XCTAssertTrue(vaultReady, "已隐藏 → Vault 未打开\n\(hierarchy(app))")
+            assertAlive(app, "进入 Vault 后")
+            snap(app, "m12-category-vault")
+        }
+    }
+
+    func testToolsButtonOpensToolsSheetAndReturns() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingFaceIDBypass"]
+        _ = launchToGrid(app)
+        let tools = anyElement(app, identifier: "Library-Tools")
+        XCTAssertTrue(tools.waitForExistence(timeout: 5), "缺左上工具按钮\n\(hierarchy(app))")
+        tools.tap()
+        XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
+                      "工具 sheet 未打开\n\(hierarchy(app))")
+        assertAlive(app, "打开工具 sheet 后")
+        // 子页推入 → 返回工具列表
+        anyElement(app, identifier: "Tools-Cleanup").tap()
+        assertAlive(app, "进入智能清理后")
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "智能清理页缺返回按钮\n\(hierarchy(app))")
+        back.tap()
+        assertAlive(app, "返回工具列表后")
+        // 关闭 sheet → 回库
+        let close = anyElement(app, identifier: "Tools-Close")
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "工具 sheet 缺关闭按钮\n\(hierarchy(app))")
+        close.tap()
+        XCTAssertTrue(app.collectionViews.firstMatch.waitForExistence(timeout: 5),
+                      "关闭工具 sheet 后未回网格\n\(hierarchy(app))")
+        assertAlive(app, "关闭工具 sheet 后")
+        snap(app, "m12-tools-sheet")
+    }
+
+    func testLimitedLibraryManagementEntryIsReachable() throws {
+        // CI 模拟器授权 = full，无法注入 .limited：断言 full 授权下菜单不出现管理入口（Builder 语义）；
+        // .limited 语义由 LibraryCategoryMenuBuilderTests 覆盖，真机 .limited 场景回填 docs/12
+        let app = XCUIApplication()
+        _ = launchToGrid(app)
+        let category = anyElement(app, identifier: "Library-Category")
+        XCTAssertTrue(category.waitForExistence(timeout: 5))
+        category.tap()
+        Thread.sleep(forTimeInterval: 0.8)
+        XCTAssertFalse(app.buttons["管理可见照片"].exists,
+                       "非 .limited 授权不得出现「管理可见照片」入口\n\(hierarchy(app))")
+        snap(app, "m12-category-limited")
+    }
+
+    func testDynamicTypeTopBarDoesNotClip() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName",
+                                "UICTContentSizeCategoryAccessibilityXXXL"]
+        _ = launchToGrid(app)
+        for id in ["Library-Tools", "Library-Category", "Library-Filter",
+                   "Library-MonthJump", "Library-Select"] {
+            let element = anyElement(app, identifier: id)
+            XCTAssertTrue(element.waitForExistence(timeout: 5), "XXXL 字体下顶部缺 \(id)\n\(hierarchy(app))")
+            if element.exists {
+                XCTAssertTrue(element.isHittable, "XXXL 字体下 \(id) 不可点（可能被裁切）")
+            }
+        }
+        snap(app, "m12-top-chrome-xxxl")
+    }
+
+    // MARK: - M12 R08：原生相册式拖选（回拖取消 / 边缘自动滚动命中重算）
+
+    /// 拖过再拖回：选中数必须下降（旧版 base ∪ 一维区间只加不减 → 断言红）
+    func testDragBackRemovesPreviouslySelected() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSelectMode"]
+        let collection = launchToGrid(app)
+        let firstCell = collection.cells.firstMatch
+        XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
+        // 第一段：长按第 1 格（未选 → 加选路径）拖到右侧 → 计数 ≥6
+        let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let target = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        start.press(forDuration: 0.2, thenDragTo: target)
+        let count = selectionCountLabel(app)
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
+        let deadline = Date().addingTimeInterval(5)
+        var n = 0
+        while Date() < deadline {
+            n = Self.parseCount(count.label)
+            if n >= 6 { break }
+            usleep(300_000)
+        }
+        XCTAssertGreaterThanOrEqual(n, 6, "加选路径计数不足 6：\(count.label)\n\(hierarchy(app))")
+
+        // 第二段：长按已选的第 1 格（反选路径）小幅拖到相邻格 → 计数必须下降
+        let selectedCell = collection.cells.firstMatch
+        let dragTarget = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
+        selectedCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.25, thenDragTo: dragTarget)
+        let backDeadline = Date().addingTimeInterval(5)
+        var after = n
+        while Date() < backDeadline {
+            after = Self.parseCount(count.label)
+            if after < n { break }
+            usleep(300_000)
+        }
+        XCTAssertLessThan(after, n,
+                          "R08：反选路径（长按已选格拖动）必须能取消选中（before=\(n) after=\(after)）")
+        snap(app, "m12-drag-back-removes")
+    }
+
+    /// 长按拖到下边缘并保持：自动滚动持续加选（命中随 contentOffset 重算）
+    func testBoxAutoScrollSelectsWhileScrolling() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSelectMode"]
+        let collection = launchToGrid(app)
+        let firstCell = collection.cells.firstMatch
+        XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
+        let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.96))
+        // 慢速拖到底边缘后保持 3s：自动滚动接管，命中随滚动重算
+        start.press(forDuration: 0.2, thenDragTo: bottomEdge,
+                    withVelocity: .slow, thenHoldForDuration: 3.0)
+        let count = selectionCountLabel(app)
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
+        let deadline = Date().addingTimeInterval(5)
+        var n = 0
+        while Date() < deadline {
+            n = Self.parseCount(count.label)
+            if n >= 15 { break }
+            usleep(300_000)
+        }
+        XCTAssertGreaterThanOrEqual(n, 15,
+                                    "边缘自动滚动应持续加选（一屏 3 列 ≈12 格，滚动后应超过）：\(count.label)\n\(hierarchy(app))")
+        snap(app, "m12-box-autoscroll")
+    }
+
     // MARK: - S02 快滑 50 + 回滑 50 不卡死不闪退
 
     func testFastSwipe50Times() throws {
@@ -710,7 +885,7 @@ final class StabilityUITests: XCTestCase {
         snap(app, "s12-delete")
     }
 
-    // MARK: - Phase 7 全页面烟测（照片库→查看器→工具各页→返回）
+    // MARK: - Phase 7 全页面烟测（照片库→查看器→工具各页→返回；M12 改走 Library-Tools sheet）
 
     func testAllPagesSmoke() throws {
         let app = XCUIApplication()
@@ -729,8 +904,12 @@ final class StabilityUITests: XCTestCase {
             app.swipeDown()   // 兜底：chrome 淡出时先唤出（KeepChrome 未开时点击屏幕）
             app.otherElements["ViewerRoot"].tap()
         }
-        XCTAssertTrue(app.tabBars.buttons["工具"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["工具"].tap()
+        // M12 R07：左上「工具」→ 工具 sheet（无 TabBar）
+        let toolsEntry = anyElement(app, identifier: "Library-Tools")
+        XCTAssertTrue(toolsEntry.waitForExistence(timeout: 5), "左上缺工具入口\n\(hierarchy(app))")
+        toolsEntry.tap()
+        XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
+                      "工具 sheet 未打开\n\(hierarchy(app))")
         assertAlive(app, "工具页")
 
         // 工具页逐个入口进 → 退
@@ -756,7 +935,11 @@ final class StabilityUITests: XCTestCase {
             back.tap()
             assertAlive(app, "退出\(entry.name)后")
         }
-        app.tabBars.buttons["照片库"].tap()
+        // M12 R07：Tools-Close 关闭 sheet → 回照片库
+        let closeButton = anyElement(app, identifier: "Tools-Close")
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 5), "工具 sheet 缺关闭按钮\n\(hierarchy(app))")
+        closeButton.tap()
+        XCTAssertTrue(app.collectionViews.firstMatch.waitForExistence(timeout: 5), "关闭工具后未回照片库")
         assertAlive(app, "返回照片库")
     }
 }

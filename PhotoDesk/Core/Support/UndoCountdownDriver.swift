@@ -69,8 +69,9 @@ final class UndoCountdownDriver {
     private func startPumpIfNeeded() {
         guard pump == nil else { return }
         let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let weakSelf = self else { return }
             Task { @MainActor in
-                self?.tick()
+                weakSelf.tick()
             }
         }
         RunLoop.main.add(timer, forMode: .common)   // 框选/滚动期间也不停摆

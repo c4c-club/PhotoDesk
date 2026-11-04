@@ -54,16 +54,21 @@ final class LibraryViewController: UIViewController {
         view.isUserInteractionEnabled = false
         return view
     }()
-    /// 框选状态：长按起点（nil = 无长按进行中）
+    /// 框选状态：长按起点（**view 坐标**；R08 单一坐标系——旧版混用 content 坐标画 view 坐标的 overlay）
     private var boxStartPoint: CGPoint?
-    /// 框选进行中（移动超过 4pt 后进入；此时滚动禁用）
+    /// 框选进行中（移动超过 BoxSelectConfig.moveThreshold 后进入；此时滚动禁用、自动滚动接管）
     private var isBoxSelecting = false
+    /// 当前手指位置（view 坐标；自动滚动后用同一坐标 + 新 contentOffset 重算命中）
     private var lastBoxPoint: CGPoint = .zero
     private var boxAutoScrollLink: CADisplayLink?
-    /// 范围选择锚点（docs/13 S07）：.began 时记录 anchor id 与初始选中集
+    /// 范围选择锚点（docs/13 S07）：.began 时记录 anchor id 与基线选中集
     private var boxAnchorID: String?
-    private var boxBaseSelected: [String] = []
-    private var boxDidMove = false
+    /// 基线选中集（进入拖选前；每帧从它重算——R08 往回拖可取消的根因修复）
+    private var boxBaseSelected: Set<String> = []
+    /// 合并语义（写死，docs/16 §2.8 修复 3）：锚点初态已选 → 反选（拖过即取消）；未选 → 加选
+    private var boxAnchorInitiallySelected = false
+    /// 差量刷新锚点（每帧只刷徽标变化的 cell，避免全量 reload 掉帧）
+    private var lastFrameSelected: Set<String> = []
 
     // MARK: - 快照缓存
 
@@ -81,6 +86,11 @@ final class LibraryViewController: UIViewController {
     var onOpenViewer: ((PhotoItem) -> Void)?
     /// 多选操作行「筛选」→ 打开筛选面板（docs/13 S06）
     var onOpenFilter: (() -> Void)?
+    /// M12 R05/R06/R07：唯一顶部栏回调（顶部按钮全部由 UIKit navigationItem 承载）
+    var onOpenSearch: (() -> Void)?
+    var onOpenMonthJump: (() -> Void)?
+    var onOpenTools: (() -> Void)?
+    var onShowVault: (() -> Void)?
 
     // MARK: - 下拉刷新（docs/09 D15）
 
@@ -138,6 +148,7 @@ final class LibraryViewController: UIViewController {
         setupIndexBar()
         setupSelection()
         setupBatchToast()
+        setupNavigationItems()
         wireViewModel()
         // UI 测试钩子：-uiTestingSelectMode 启动即进入多选（绕开长按/工具栏按钮在 XCUITest 中的不可靠性）
         if ProcessInfo.processInfo.arguments.contains("-uiTestingSelectMode") {
@@ -364,6 +375,189 @@ final class LibraryViewController: UIViewController {
         view.layoutIfNeeded()
     }
 
+    // MARK: - 唯一顶部栏（docs/16 M12 §3：R05 无标题 + R06 分类菜单 + R07 工具左上）
+    // 为什么用 UIKit UINavigationItem：iOS 15.5 + Xcode 15.4 下 SwiftUI Toolbar/Menu 按钮的
+    // XCUITest 合成点击与坐标点击均不可靠（docs/15 §3.2 六条 🟨 成因）；UIBarButtonItem /
+    // showsMenuAsPrimaryAction UIButton 为 UIKit 宿主，点击可靠。
+
+    private var sessionBadgeItem: UIBarButtonItem?
+    private weak var categoryMenuButton: UIButton?
+    /// 其他 scope 的异步计数缓存（R06：不切换 results，只读 count(scope:)）
+    private var categoryCounts: [PhotoScope: Int] = [:]
+    #if DEBUG
+    /// UI 测试钩子一次性守卫
+    private var debugChromeHookDone = false
+    #endif
+
+    private func setupNavigationItems() {
+        navigationItem.title = nil                       // R05：顶部无 App 标题
+        navigationItem.largeTitleDisplayMode = .never
+        let iconConfig = UIImage.SymbolConfiguration(textStyle: .body)
+
+        // 左上：工具（R07；点开 ToolsView sheet）
+        let tools = UIBarButtonItem(image: UIImage(systemName: "wrench.and.screwdriver",
+                                                   withConfiguration: iconConfig),
+                                    style: .plain, target: self, action: #selector(toolsTapped))
+        tools.accessibilityIdentifier = "Library-Tools"
+        tools.accessibilityLabel = "工具"
+        navigationItem.leftBarButtonItem = tools
+
+        // 右上（UIKit 反序装配：数组首元素显示在最右）：
+        // [SessionBadge] [多选] [搜索] [月份] [筛选] [分类]
+        let session = UIBarButtonItem(title: "", style: .plain, target: self,
+                                      action: #selector(sessionBadgeTapped))
+        session.accessibilityIdentifier = "SessionBadge"
+        let select = UIBarButtonItem(image: UIImage(systemName: "checkmark.circle",
+                                                    withConfiguration: iconConfig),
+                                     style: .plain, target: self, action: #selector(selectTapped))
+        select.accessibilityIdentifier = "Library-Select"
+        select.accessibilityLabel = "多选"
+        let search = UIBarButtonItem(image: UIImage(systemName: "magnifyingglass",
+                                                    withConfiguration: iconConfig),
+                                     style: .plain, target: self, action: #selector(searchTapped))
+        search.accessibilityIdentifier = "Library-Search"
+        search.accessibilityLabel = "搜索与筛选"
+        let month = UIBarButtonItem(image: UIImage(systemName: "calendar",
+                                                   withConfiguration: iconConfig),
+                                    style: .plain, target: self, action: #selector(monthJumpTapped))
+        month.accessibilityIdentifier = "Library-MonthJump"
+        month.accessibilityLabel = "按月份跳转"
+        let filter = UIBarButtonItem(image: UIImage(systemName: "line.3.horizontal.decrease.circle",
+                                                    withConfiguration: iconConfig),
+                                     style: .plain, target: self, action: #selector(filterTapped))
+        filter.accessibilityIdentifier = "Library-Filter"
+        filter.accessibilityLabel = "筛选"
+
+        // 分类菜单按钮（R06）：UIButton + showsMenuAsPrimaryAction（iOS 15 可用）
+        let categoryButton = UIButton(type: .system)
+        categoryButton.setTitle("分类", for: .normal)
+        categoryButton.setTitleColor(DSColor.tint, for: .normal)
+        categoryButton.titleLabel?.font = DSTypography.font(.body)
+        categoryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        categoryButton.showsMenuAsPrimaryAction = true
+        categoryButton.accessibilityIdentifier = "Library-Category"
+        categoryButton.accessibilityLabel = "分类"
+        categoryButton.menu = makeCategoryMenu()
+        let category = UIBarButtonItem(customView: categoryButton)
+        self.categoryMenuButton = categoryButton
+        self.sessionBadgeItem = session
+
+        navigationItem.rightBarButtonItems = [session, select, search, month, filter, category]
+        refreshSessionBadge()
+        refreshCategoryCountsAsync()
+    }
+
+    /// 分类菜单（R06）：5 项全保留 + .limited 管理入口；勾选由 query.scope 派生
+    private func makeCategoryMenu() -> UIMenu {
+        let items = LibraryCategoryMenuBuilder.items(currentScope: viewModel.query.scope,
+                                                     isLimitedAccess: viewModel.isLimitedAccess,
+                                                     counts: categoryCounts,
+                                                     currentCount: viewModel.filteredItems.count)
+        let actions = items.map { item in
+            UIAction(title: item.displayTitle,
+                     state: item.isSelected ? .on : .off) { [weak self] _ in
+                self?.handleCategorySelection(item)
+            }
+        }
+        return UIMenu(title: "", children: actions)
+    }
+
+    private func handleCategorySelection(_ item: CategoryMenuItem) {
+        if item.isLimitedManagement {
+            viewModel.requestManageLimitedPhotos()   // .limited：接上 DSEmptyState.limited 对应的系统选择器
+            return
+        }
+        guard let scope = item.scope else {
+            onShowVault?()   // 已隐藏：不 setScope，直接弹 Vault（Face ID / 受限提示全保留）
+            return
+        }
+        Task { await viewModel.setScope(scope) }
+    }
+
+    /// 其他 scope 的异步计数（只读、不切换 results；快照变化后刷新缓存并重建菜单）
+    private func refreshCategoryCountsAsync() {
+        let scopes = LibraryCategoryMenuBuilder.scopeOrder
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            var counts: [PhotoScope: Int] = [:]
+            for scope in scopes where scope != self.viewModel.query.scope {
+                counts[scope] = await self.viewModel.count(scope: scope) ?? 0
+            }
+            self.categoryCounts = counts
+            self.categoryMenuButton?.menu = self.makeCategoryMenu()
+        }
+    }
+
+    /// 顶部待处理徽标（docs/09 D16 语义迁移到 UIBarButtonItem；计数入口不丢）
+    private func refreshSessionBadge() {
+        guard let item = sessionBadgeItem else { return }
+        let session = AppContainer.shared.reviewSession
+        let deletes = session.pendingDeleteCount
+        let hides = session.pendingHideCount
+        if deletes == 0 && hides == 0 {
+            item.title = nil
+            item.accessibilityLabel = "没有待处理内容"
+        } else if hides == 0 {
+            item.title = "待删除 \(deletes)"
+            item.accessibilityLabel = "待删除 \(deletes) 张，点按查看整理回顾"
+        } else if deletes == 0 {
+            item.title = "待隐藏 \(hides)"
+            item.accessibilityLabel = "待隐藏 \(hides) 张，点按查看整理回顾"
+        } else {
+            item.title = "待删除 \(deletes) · 待隐藏 \(hides)"
+            item.accessibilityLabel = "待删除 \(deletes) 张，待隐藏 \(hides) 张，点按查看整理回顾"
+        }
+    }
+
+    @objc private func toolsTapped() { onOpenTools?() }
+    @objc private func searchTapped() { onOpenSearch?() }
+    @objc private func monthJumpTapped() { onOpenMonthJump?() }
+    @objc private func filterTapped() { onOpenFilter?() }
+    @objc private func selectTapped() { toggleSelectionMode() }
+    @objc private func sessionBadgeTapped() {
+        let review = SessionReviewView(session: AppContainer.shared.reviewSession,
+                                       pipeline: pipeline,
+                                       settings: settings) { [weak self] in
+            self?.dismiss(animated: true)
+        }
+        let host = UIHostingController(rootView: review)
+        host.view.backgroundColor = DSColor.bgPrimary
+        present(host, animated: true)
+    }
+
+    #if DEBUG
+    /// M12 UI 测试钩子接线（docs/16 §6.3）：网格就绪后触发（与 -uiTestingMonthJump 同位）。
+    /// -uiTestingOpenTools：打开工具 sheet；-uiTestingSelectScope <all|favorites|videos|screenshots>：
+    /// 走同一条 setScope 路径；-uiTestingOpenCategoryMenu：预取异步计数并重建菜单（UIKit 按钮点击可靠，
+    /// 菜单断言直接 tap Library-Category）。
+    private func attemptDebugChromeHooksIfNeeded() {
+        guard !debugChromeHookDone, !currentSections.isEmpty else { return }
+        debugChromeHookDone = true
+        if UITestHooks.enabled("-uiTestingOpenTools") {
+            ViewerTrace.log("hook openTools")
+            onOpenTools?()
+        }
+        if let raw = UITestHooks.stringValue("-uiTestingSelectScope") {
+            let scope: PhotoScope?
+            switch raw {
+            case "all":         scope = .all
+            case "favorites":   scope = .favorites
+            case "videos":      scope = .videos
+            case "screenshots": scope = .screenshots
+            default:            scope = nil
+            }
+            if let scope {
+                ViewerTrace.log("hook selectScope \(raw)")
+                Task { await self.viewModel.setScope(scope) }
+            }
+        }
+        if UITestHooks.enabled("-uiTestingOpenCategoryMenu") {
+            ViewerTrace.log("hook openCategoryMenu")
+            refreshCategoryCountsAsync()
+        }
+    }
+    #endif
+
     // MARK: - 多选模式（docs/09 D12：顶部取消/计数/完成；操作行可横滚；D13：长按拖拽框选）
 
     private func setupSelection() {
@@ -452,7 +646,7 @@ final class LibraryViewController: UIViewController {
         // S07：单个长按手势驱动「进入多选 + 拖拽范围选择」。
         // 0.15s / 不限移动距离（旧版 0.28s + 10pt：自然拖动就失败 → 变滚动，用户感知「不能滑动选择」）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(onBoxLongPress(_:)))
-        longPress.minimumPressDuration = 0.15
+        longPress.minimumPressDuration = BoxSelectConfig.minPressDuration
         longPress.allowableMovement = .greatestFiniteMagnitude
         longPress.delaysTouchesBegan = false
         collectionView.addGestureRecognizer(longPress)
@@ -578,6 +772,24 @@ final class LibraryViewController: UIViewController {
         }
     }
 
+    /// R08：差量刷新（拖选每帧只刷选中态变化的可见 cell——避免全量遍历掉帧）
+    private func reloadSelectionBadges(previous: Set<String>) {
+        let current = selectionState.selectedSet
+        let added = current.subtracting(previous)
+        let removed = previous.subtracting(current)
+        guard !added.isEmpty || !removed.isEmpty else { return }
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell,
+                  let item = dataSource.itemIdentifier(for: indexPath) else { continue }
+            if added.contains(item.id) {
+                cell.setSelectionVisible(true)
+                cell.setSelected(true)
+            } else if removed.contains(item.id) {
+                cell.setSelected(false)
+            }
+        }
+    }
+
     /// 全选/取消全选切换（docs/09 D11 + docs/13 S10）
     @objc private func selectAllTapped() {
         // S10：单月 scope 只在月内全选/取消，不得扩到全库
@@ -614,35 +826,43 @@ final class LibraryViewController: UIViewController {
         }
     }
 
-    // MARK: - 范围选择（docs/13 S07：长按 0.15s 进入，拖动连续选中 anchor→target，边缘自动滚动）
+    // MARK: - 范围选择（docs/16 M12 R08：iOS 原生相册式二维拖选）
 
+    /// R08 坐标系契约（写死）：手势点统一取 `gesture.location(in: view)`（手指/屏幕坐标）；
+    /// selectionOverlay 挂在 view 上直接用该坐标画 rect；命中换算把可见 cell 的 layout frame
+    /// 逐个 convert 到 view 坐标后与拖曳矩形做二维相交（GridHitRegion 纯逻辑）——
+    /// 彻底避开旧版「content 坐标画 overlay / 混算 contentOffset」的错位。
     @objc private func onBoxLongPress(_ gesture: UILongPressGestureRecognizer) {
         switch gesture.state {
         case .began:
-            let point = gesture.location(in: collectionView)
-            if !isSelecting {
-                guard let indexPath = collectionView.indexPathForItem(at: point),
-                      let item = dataSource.itemIdentifier(for: indexPath) else { return }
-                enterSelectionMode(selecting: item.id)
+            let point = gesture.location(in: view)
+            guard let indexPath = collectionView.indexPathForItem(
+                at: collectionView.convert(point, to: collectionView)),
+                  let item = dataSource.itemIdentifier(for: indexPath) else { return }
+            // 合并语义二选一（docs/16 §2.8 修复 3，写死并在测试中锁定）：
+            // 已在多选中且锚点已选 → 反选（拖过即取消）；其余（含长按未选 cell 进入多选）→ 加选。
+            // iOS 原生相册行为：长按未选照片进入多选后拖动 = 扩选；长按已选照片拖动 = 取消路径。
+            let wasSelecting = isSelecting
+            let anchorWasSelected = selectionState.selectedSet.contains(item.id)
+            if !wasSelecting {
+                enterSelectionMode(selecting: item.id)   // 进入多选：锚点 cell 被选中
             }
+            boxAnchorID = item.id
+            boxAnchorInitiallySelected = wasSelecting && anchorWasSelected
+            boxBaseSelected = selectionState.selectedSet
+            lastFrameSelected = boxBaseSelected
             boxStartPoint = point
             lastBoxPoint = point
-            boxDidMove = false
-            // 记录锚点与初始选中集：拖动过程中 replaceSelection(base ∪ range)
-            boxAnchorID = collectionView.indexPathForItem(at: point)
-                .flatMap { dataSource.itemIdentifier(for: $0)?.id }
-            boxBaseSelected = selectionState.selected
 
         case .changed:
             guard let start = boxStartPoint else { return }
-            let location = gesture.location(in: collectionView)
+            let location = gesture.location(in: view)
             lastBoxPoint = location
-            boxDidMove = true
             if !isBoxSelecting {
                 let distance = hypot(location.x - start.x, location.y - start.y)
-                guard distance > 4 else { return }   // 4pt 抖动阈值（docs/13 S07）
+                guard distance > BoxSelectConfig.moveThreshold else { return }   // 抖动阈值
                 isBoxSelecting = true
-                collectionView.isScrollEnabled = false   // 此刻才禁用滚动
+                collectionView.isScrollEnabled = false   // 此刻才禁用滚动（自动滚动接管）
                 selectionOverlay.isHidden = false
                 startBoxAutoScroll()
             }
@@ -652,6 +872,7 @@ final class LibraryViewController: UIViewController {
             boxStartPoint = nil
             boxAnchorID = nil
             boxBaseSelected = []
+            lastFrameSelected = []
             if isBoxSelecting {
                 isBoxSelecting = false
                 selectionOverlay.isHidden = true
@@ -666,32 +887,48 @@ final class LibraryViewController: UIViewController {
     }
 
     private func updateBoxSelection(from start: CGPoint, to location: CGPoint) {
-        // 视觉反馈矩形
+        // 视觉反馈矩形（view 坐标——overlay 就挂在 view 上，严丝合缝）
         let rect = CGRect(x: min(start.x, location.x),
                           y: min(start.y, location.y),
                           width: abs(start.x - location.x),
                           height: abs(start.y - location.y))
         selectionOverlay.frame = rect
-        // S07：范围选择——anchor→target 的连续 id（SelectionRange 纯逻辑），replaceSelection(base ∪ range)
-        guard let anchor = boxAnchorID else { return }
-        let targetPath = collectionView.indexPathForItem(at: location) ?? nearestIndexPath(to: location)
-        guard let target = targetPath.flatMap({ dataSource.itemIdentifier(for: $0)?.id }) else { return }
-        let orderedIDs = currentItemsBySection.flatMap { $0.map(\.id) }
-        let range = SelectionRange.ids(in: orderedIDs, from: anchor, to: target)
-        guard !range.isEmpty else { return }
-        selectionState.replaceSelection(boxBaseSelected + range)
-        reloadSelectionBadges()
+        // R08：二维相交命中（可见 cell layout frame convert 到 view 坐标 → GridHitRegion 纯逻辑）
+        let cells = visibleCellRectsInViewCoordinates()
+        guard !cells.isEmpty else { return }
+        let dragRect = GridRect(from: GridPoint(x: Double(rect.minX), y: Double(rect.minY)),
+                                to: GridPoint(x: Double(rect.maxX), y: Double(rect.maxY)))
+        let hits = GridHitRegion.hitIDs(cells: cells, rect: dragRect,
+                                        threshold: BoxSelectConfig.hitThreshold)
+        // 基线重算（每帧从进入拖选前的基线出发，往回拖自然移除；禁止一维区间累加）
+        let merged = GridHitRegion.mergedSelection(base: boxBaseSelected,
+                                                   hits: hits,
+                                                   anchorInitiallySelected: boxAnchorInitiallySelected)
+        selectionState.replaceSelection(merged.sorted())
+        reloadSelectionBadges(previous: lastFrameSelected)
+        lastFrameSelected = selectionState.selectedSet
         updateSelectionCount()
     }
 
-    /// 手指拖出网格边缘/未落在 cell 上时取最近 cell（docs/13 S07）
-    private func nearestIndexPath(to point: CGPoint) -> IndexPath? {
-        let clampedX = min(max(point.x, 0), max(0, collectionView.contentSize.width - 1))
-        let clampedY = min(max(point.y, 0), max(0, collectionView.contentSize.height - 1))
-        return collectionView.indexPathForItem(at: CGPoint(x: clampedX, y: clampedY))
+    /// 可见 cell 的命中区域（layout frame convert 到 view 坐标；跨 section 天然支持）
+    private func visibleCellRectsInViewCoordinates() -> [GridCellRect] {
+        var result: [GridCellRect] = []
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard let attributes = collectionView.collectionViewLayout
+                      .layoutAttributesForItem(at: indexPath),
+                  let id = dataSource.itemIdentifier(for: indexPath)?.id else { continue }
+            let frameInView = view.convert(attributes.frame, from: collectionView)
+            result.append(GridCellRect(id: id,
+                                       rect: GridRect(x: Double(frameInView.minX),
+                                                      y: Double(frameInView.minY),
+                                                      width: Double(frameInView.width),
+                                                      height: Double(frameInView.height))))
+        }
+        return result
     }
 
-    /// 边缘自动滚动（CADisplayLink：手指距顶/底 < 60pt 时 10pt/帧，docs/09 D13）
+    /// 边缘自动滚动（CADisplayLink .common：手指进入上/下边缘区按步长滚动；
+    /// 滚动后用「同一手指 view 坐标 + 当前 contentOffset」重算命中——R08 命中随滚动正确的关键）
     private func startBoxAutoScroll() {
         boxAutoScrollLink?.invalidate()
         let link = CADisplayLink(target: self, selector: #selector(boxAutoScrollTick))
@@ -701,20 +938,19 @@ final class LibraryViewController: UIViewController {
 
     @objc private func boxAutoScrollTick() {
         guard isBoxSelecting, let start = boxStartPoint else { return }
-        let edge: CGFloat = 60
-        let step: CGFloat = 10
-        let topDistance = lastBoxPoint.y - collectionView.contentOffset.y
-        let bottomDistance = (collectionView.contentOffset.y + collectionView.bounds.height) - lastBoxPoint.y
+        let edge = CGFloat(BoxSelectConfig.autoScrollEdge)
+        let step = CGFloat(BoxSelectConfig.autoScrollStep)
         var delta: CGFloat = 0
-        if topDistance < edge {
-            delta = -step
-        } else if bottomDistance < edge {
-            delta = step
+        if lastBoxPoint.y < view.safeAreaInsets.top + edge {
+            delta = -step   // 手指进入上边缘区 → 向上滚
+        } else if lastBoxPoint.y > view.bounds.height - view.safeAreaInsets.bottom - edge {
+            delta = step    // 手指进入下边缘区 → 向下滚
         }
         guard delta != 0 else { return }
         let maxY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
         let targetY = min(max(0, collectionView.contentOffset.y + delta), maxY)
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
+        // 滚动后同手指 view 坐标重算（旧版混用 content 坐标 + 旧 start/lastBoxPoint → 命中错图）
         updateBoxSelection(from: start, to: lastBoxPoint)
     }
 
@@ -894,6 +1130,9 @@ final class LibraryViewController: UIViewController {
                 self.collectionView.contentOffset.y += (after - before)
                 ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(after - before))")
             }
+            // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
+            self.refreshSessionBadge()
+            self.refreshCategoryCountsAsync()
             // 位置记忆恢复（docs/09 D08；Phase 5 重写为 v2 策略）
             self.restorePositionIfNeeded()
             // 多选中：筛选/pending 变化 → 选中集合收敛到新 scope（docs/09 D11 §3）
@@ -906,6 +1145,7 @@ final class LibraryViewController: UIViewController {
             self.drainPendingSnapshot()   // apply 期间又来了新快照 → 排空
             #if DEBUG
             self.attemptDebugMonthJumpIfNeeded()   // 快照已提交：此时跳转校验必然可过
+            self.attemptDebugChromeHooksIfNeeded() // M12：工具/分类/选择 scope 钩子（走同一条路径）
             #endif
         }
     }
