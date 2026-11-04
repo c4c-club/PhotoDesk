@@ -1,6 +1,7 @@
 // MARK: - 职责说明：诊断日志导出装配（docs/16 M12 Phase 1）——
-// 从 DiagnosticsView 抽出为可测试纯装配：OSLogStore 近 N 小时日志 → 临时文件 → 分享面板。
-// M12 后续提交把 last-exception.log 与 viewer-trace.log 一并纳入导出（取证链，docs/16 §2.2）。
+// 从 DiagnosticsView 抽出为可测试纯装配，导出三段取证链：
+// ① OSLogStore 近 N 小时日志；② last-exception.log（未捕获异常 + 信号级标记，无记录时占位）；
+// ③ viewer-trace.log（查看器面包屑：zoom/img/appear 等，导出前 flush 同步屏障）。
 // 全部只读本机文件，导出动作不联网。
 
 import Foundation
@@ -11,6 +12,13 @@ enum DiagnosticsExporter {
     static func export(hours: Int, now: Date = Date()) -> URL? {
         var lines: [String] = ["PhotoDesk 诊断日志 — \(now)"]
         lines.append(contentsOf: oslogLines(hours: hours))
+        lines.append("")
+        lines.append("===== last-exception.log =====")
+        lines.append(AppCrashLogger.readLastException() ?? "(无崩溃记录)")
+        lines.append("")
+        lines.append("===== viewer-trace.log =====")
+        ViewerTrace.flush()   // 异步落盘同步屏障：确保面包屑已写完再读
+        lines.append(readFile(ViewerTrace.logFileURL) ?? "(无查看器面包屑)")
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("PhotoDesk-diagnostics-\(Int(now.timeIntervalSince1970)).txt")
         do {
@@ -19,6 +27,12 @@ enum DiagnosticsExporter {
         } catch {
             return nil
         }
+    }
+
+    private static func readFile(_ url: URL?) -> String? {
+        guard let url, let text = try? String(contentsOf: url, encoding: .utf8),
+              !text.isEmpty else { return nil }
+        return text
     }
 
     /// OSLog 条目（iOS 15 可用 OSLogStore(scope: .currentProcessIdentifier)）
