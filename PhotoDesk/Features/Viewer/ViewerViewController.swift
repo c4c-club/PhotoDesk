@@ -493,8 +493,8 @@ final class ViewerViewController: UIViewController {
 
     /// 当前页 cell 的缩放状态快照（B1 互斥判定信号源；无 cell = nil）
     private func currentCellZoomState() -> ViewerGesturePolicy.CellState? {
-        collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0))
-            as? ZoomableImageCell
+        (collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0))
+            as? ZoomableImageCell)?.zoomState
     }
 
     /// 删除事务（docs/13 S12）：plan → snapshot 飞出（并行）→ 同一 runloop 内

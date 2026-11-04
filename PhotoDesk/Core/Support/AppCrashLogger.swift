@@ -73,14 +73,18 @@ enum AppCrashLogger {
               pathBytes.count <= 1024 else { return }
         // 固定缓冲一次性填充（进程生命周期持有；处理器内只读、零分配）
         pathBytes.withUnsafeBufferPointer { src in
-            _ = memcpy(signalPathBuffer, src.baseAddress, pathBytes.count)
+            if let base = src.baseAddress {
+                _ = memcpy(signalPathBuffer, base, pathBytes.count)
+            }
         }
         // 文案在 install 时预算（处理器内不构造 String；时间戳由文件 mtime 与系统 .ips 承载）
         let suffix = "\n(信号级兜底：无符号栈——完整崩溃栈见系统 .ips；操作面包屑见同目录 viewer-trace.log)\n"
         let suffixBytes = Array(suffix.utf8)
         let suffixBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: suffixBytes.count)
         suffixBytes.withUnsafeBufferPointer { src in
-            _ = memcpy(suffixBuffer, src.baseAddress ?? suffixBuffer, suffixBytes.count)
+            if let base = src.baseAddress {
+                _ = memcpy(suffixBuffer, base, suffixBytes.count)
+            }
         }
         signalSuffixBuffer = suffixBuffer
         signalSuffixCount = suffixBytes.count
@@ -95,8 +99,8 @@ enum AppCrashLogger {
 /// 零堆分配——路径与文案字节由 AppCrashLogger 在 install 时预写入 malloc 缓冲；
 /// 头部 "signal=" 与信号码用栈上元组承载（Darwin 信号 1–31，最多 2 位十进制）。
 private func signalCrashHandler(_ code: Int32) {
-    guard let path = AppCrashLogger.signalPathBuffer,
-          let suffix = AppCrashLogger.signalSuffixBuffer else { return }
+    let path = AppCrashLogger.signalPathBuffer   // 固定缓冲（install 时分配，非 Optional）
+    guard let suffix = AppCrashLogger.signalSuffixBuffer else { return }
     let fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0o644)
     guard fd >= 0 else { return }
     let prefix: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (115, 105, 103, 110, 97, 108, 61) // "signal="
