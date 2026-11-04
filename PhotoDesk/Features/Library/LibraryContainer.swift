@@ -377,3 +377,38 @@ private extension LibraryRootView {
 
 }
 #endif
+
+/// 多选模式桥（docs/04 §3.1 底部工具栏「多选」入口）：SwiftUI 工具栏按钮 → UIKit 控制器
+final class SelectionModeBridge: ObservableObject {
+    weak var controller: LibraryViewController?
+}
+
+struct LibraryContainer: UIViewControllerRepresentable {
+    @ObservedObject var viewModel: LibraryViewModel
+    /// 点击 cell → 打开全屏浏览器（assetID 上下文，docs/09 D01）
+    let onOpenViewer: (PhotoItem) -> Void
+    /// 工具栏「多选」按钮与 UIKit 控制器的桥
+    let selectionBridge: SelectionModeBridge
+    /// 多选操作行「筛选」按钮 → 打开筛选面板（docs/13 S06）
+    let onOpenFilter: () -> Void
+    @AppStorage("grid.columns") private var gridColumns = 3
+    @AppStorage("grid.sortAsc") private var sortAscending = false
+
+    func makeUIViewController(context: Context) -> LibraryViewController {
+        let controller = LibraryViewController(viewModel: viewModel,
+                                               pipeline: AppContainer.shared.imagePipeline,
+                                               settings: AppContainer.shared.settings,
+                                               positionStore: AppContainer.shared.positionStore)
+        controller.setColumns(gridColumns)
+        controller.onOpenViewer = onOpenViewer
+        controller.onOpenFilter = onOpenFilter
+        selectionBridge.controller = controller
+        return controller
+    }
+
+    func updateUIViewController(_ controller: LibraryViewController, context: Context) {
+        controller.setColumns(gridColumns)
+        controller.onOpenFilter = onOpenFilter
+        selectionBridge.controller = controller
+    }
+}
