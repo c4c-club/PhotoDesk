@@ -1,8 +1,11 @@
-// MARK: - 职责说明：可缩放大图 cell v2（docs/13 §3.3 / S01 重写）——
+// MARK: - 职责说明：可缩放大图 cell v3（docs/13 §3.3 / S01 重写；docs/16 M12 R01/R02 v3）——
 // 视图层级：contentView → scrollView → zoomContentView → imageView；viewForZooming 返回 zoomContentView。
 // 铁律：① 只有 bounds > 0 且 image != nil 才布局/允许缩放；② 缩放过程中绝不改 zoomContentView.frame
 //（scrollViewDidZoom 只更新 contentInset）；③ 双击只调用一次 zoom(to:)，rect 由 ZoomGeometry.clampedZoomRect
 // 钳制；④ 全部几何来自 PhotoDeskCore.ZoomGeometry（红线 2）。
+// M12 v3 修复：A1 imageView 四边约束（旧版恒零尺寸 → 全屏黑）；B2 交互三条件护栏（image/bounds/
+// contentSize 全满足才启用，viewForZooming 零 contentSize 返回 nil）；B3 inset 用未变换 bounds；
+// A2 showCloudPlaceholder()（VC 收到 inCloud 回传后调用的自救占位）。
 // iCloud-only：未下载时显示占位 + 「下载」按钮 + 环形进度（docs/04 §4.13）。
 
 import UIKit
@@ -27,6 +30,7 @@ final class ZoomableImageCell: UICollectionViewCell {
         let view = UIImageView()
         view.contentMode = .scaleAspectFit
         view.isUserInteractionEnabled = false
+        view.translatesAutoresizingMaskIntoConstraints = false   // M12 A1：四边约束（旧版无约束恒 .zero）
         return view
     }()
     /// iCloud 占位（docs/04 §4.13：云图标 + 文案 + 下载按钮 + 环形进度）
@@ -54,6 +58,8 @@ final class ZoomableImageCell: UICollectionViewCell {
     private(set) var loadToken = 0
     /// VC 挂载的在途加载任务（离屏/复用即取消，docs/13 S08）
     var loadTask: Task<Void, Never>?
+    /// 最近一次缩放活动时间（scrollViewDidZoom 刷新；回弹窗口判定用，DSMotion.zoomActivityGrace）
+    private var lastZoomActivity: TimeInterval = 0
 
     /// 开始一次加载：返回 token；回填前用 matches(token:) 校验
     func beginLoad() -> Int {
@@ -119,6 +125,12 @@ final class ZoomableImageCell: UICollectionViewCell {
             scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 
+            // M12 A1：imageView 四边约束到 zoomContentView——frame 恒随内容视图（I5′ 不变量）
+            imageView.topAnchor.constraint(equalTo: zoomContentView.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: zoomContentView.bottomAnchor),
+            imageView.leadingAnchor.constraint(equalTo: zoomContentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: zoomContentView.trailingAnchor),
+
             cloudBox.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             cloudBox.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             cloudBox.widthAnchor.constraint(lessThanOrEqualToConstant: 280),
@@ -148,7 +160,7 @@ final class ZoomableImageCell: UICollectionViewCell {
         cloudBox.isHidden = true
         progressLayer.isHidden = true
         resetZoom()
-        scrollView.isUserInteractionEnabled = false
+        refreshInteraction()
     }
 
     override func layoutSubviews() {
@@ -163,13 +175,20 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     // MARK: - 对外接口
 
-    /// 是否已有图（M12 R01：VC appear 重挂判断 + DEBUG 横幅 img 字段）
-    var hasImage: Bool { imageView.image != nil }
-
     /// 任务 2.2：暴露当前缩放
     var zoomScale: CGFloat { scrollView.zoomScale }
 
     var isZoomed: Bool { scrollView.zoomScale > 1.01 }
+
+    /// 当前缩放状态快照（B1 互斥判定信号源：捏合进行中 / zoomScale / 回弹宽限）
+    var zoomState: ViewerGesturePolicy.CellState {
+        ViewerGesturePolicy.CellState(isZooming: scrollView.isZooming,
+                                      zoomScale: scrollView.zoomScale,
+                                      secondsSinceZoomActivity: CACurrentMediaTime() - lastZoomActivity)
+    }
+
+    /// 是否已有图（VC appear 重挂判断 + DEBUG 横幅 img 字段）
+    var hasImage: Bool { imageView.image != nil }
 
     func setZoomCallback(_ callback: ((CGFloat) -> Void)?) { onZoomChanged = callback }
     func setDownloadHandler(_ handler: ((String) -> Void)?) { onDownloadRequested = handler }
@@ -182,11 +201,18 @@ final class ZoomableImageCell: UICollectionViewCell {
         loadToken += 1   // 使在途回填失效（新 item → 旧 token 不匹配）
         let isPlaceholder = (image == nil && item.isCloudOnly)
         cloudBox.isHidden = !isPlaceholder
-        // 无图（含占位/未加载）时禁用捏合（docs/13 S01：image == nil → 禁交互）
-        scrollView.isUserInteractionEnabled = (image != nil && !isPlaceholder)
         imageView.image = image   // nil 也赋值：清空旧图
         resetZoom()
         layoutImageContent()
+        // M12 B2：交互不在 configure 里直接置 true——由 layoutImageContent 成功路径决定
+        refreshInteraction()
+    }
+
+    /// M12 A2：VC 收到 fullImage 的 inCloud 回传后调用（上游 isCloudOnly 判定缺失时的自救占位）
+    func showCloudPlaceholder() {
+        cloudBox.isHidden = false
+        progressLayer.isHidden = true
+        refreshInteraction()
     }
 
     /// 下载完成回填（iCloud → 大图）
@@ -194,14 +220,12 @@ final class ZoomableImageCell: UICollectionViewCell {
         cloudBox.isHidden = true
         progressLayer.isHidden = true
         imageView.image = image
-        scrollView.isUserInteractionEnabled = true
         resetZoom()
         layoutImageContent()
+        refreshInteraction()
+        // M12 Phase 1：img 面包屑（回填成功取证；加载失败路径由 VC loadImage 的 loadEnd ok=false 覆盖）
+        ViewerTrace.log("img=ok id=\(itemID?.prefix(8) ?? "-") w=\(Int(image.size.width)) h=\(Int(image.size.height))")
     }
-
-    /// M12 R01/A2 占位入口（先红批次脚手架：暂为 no-op——断言红由
-    /// ViewerCellGeometryTests.testShowCloudPlaceholderWorksEvenWhenItemNotMarkedCloudOnly 锁定）
-    func showCloudPlaceholder() {}
 
     func updateDownloadProgress(_ fraction: Double) {
         progressLayer.isHidden = false
@@ -243,13 +267,25 @@ final class ZoomableImageCell: UICollectionViewCell {
                                        size: CGSize(width: fit.width, height: fit.height))
         scrollView.contentSize = zoomContentView.frame.size
         updateCenteringInset()
+        refreshInteraction()
     }
 
-    /// 内容居中 inset（scrollViewDidZoom / 布局后调用；只改 contentInset，不改任何 frame）
+    /// M12 B2：交互三条件护栏——image != nil && bounds > 0 && contentSize > 0 且非占位态
+    private func refreshInteraction() {
+        let allowed = imageView.image != nil
+            && scrollView.bounds.width > 0 && scrollView.bounds.height > 0
+            && scrollView.contentSize.width > 0 && scrollView.contentSize.height > 0
+            && cloudBox.isHidden
+        scrollView.isUserInteractionEnabled = allowed
+    }
+
+    /// 内容居中 inset（scrollViewDidZoom / 布局后调用；只改 contentInset，不改任何 frame）。
+    /// M12 B3：入参用 zoomContentView.bounds（不受 transform 影响）——旧版读 frame（缩放中是
+    /// 变换后包围盒）再乘 zoomScale → 双倍缩放 inset；ZoomGeometry.centeredInset 对 0/NaN/∞ 兜底。
     private func updateCenteringInset() {
         guard scrollView.bounds.width > 0, scrollView.bounds.height > 0 else { return }
-        let inset = ZoomGeometry.centeredInset(contentWidth: Double(zoomContentView.frame.width),
-                                               contentHeight: Double(zoomContentView.frame.height),
+        let inset = ZoomGeometry.centeredInset(contentWidth: Double(zoomContentView.bounds.width),
+                                               contentHeight: Double(zoomContentView.bounds.height),
                                                viewportWidth: Double(scrollView.bounds.width),
                                                viewportHeight: Double(scrollView.bounds.height),
                                                zoomScale: Double(scrollView.zoomScale))
@@ -259,18 +295,6 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     // MARK: - 双击缩放（docs/04 §4.4：点击点为中心，1×↔2.5×；只调用一次 zoom(to:)）
 
-}
-
-#if DEBUG
-// 单元测试 I5′ / 交互护栏断言锚点（docs/16 M12 R01/R02；Release 不编译）
-extension ZoomableImageCell {
-    var test_scrollView: UIScrollView { scrollView }
-    var test_zoomContentView: UIView { zoomContentView }
-    var test_imageView: UIImageView { imageView }
-    var test_cloudBox: UIView { cloudBox }
-}
-
-extension ZoomableImageCell {
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard imageView.image != nil,
               scrollView.bounds.width > 0, scrollView.bounds.height > 0,
@@ -301,11 +325,28 @@ extension ZoomableImageCell {
 }
 
 extension ZoomableImageCell: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? { zoomContentView }
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        // M12 B2：零 contentSize 时返回 nil——旧版返回零尺寸 view 却允许捏合 →
+        // UIScrollView 内部除零 → CALayer position contains NaN
+        guard scrollView.contentSize.width > 0, scrollView.contentSize.height > 0,
+              zoomContentView.frame.width > 0, zoomContentView.frame.height > 0 else { return nil }
+        return zoomContentView
+    }
 
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         // 铁律：缩放过程中只更新 contentInset 居中，绝不改 zoomContentView.frame（docs/13 S01 根因 2）
+        lastZoomActivity = CACurrentMediaTime()
         updateCenteringInset()
         onZoomChanged?(scrollView.zoomScale)
     }
 }
+
+#if DEBUG
+// 单元测试 I5′ / 交互护栏断言锚点（Release 不编译，docs/16 M12 R01/R02）
+extension ZoomableImageCell {
+    var test_scrollView: UIScrollView { scrollView }
+    var test_zoomContentView: UIView { zoomContentView }
+    var test_imageView: UIImageView { imageView }
+    var test_cloudBox: UIView { cloudBox }
+}
+#endif

@@ -8,20 +8,6 @@ import AVFoundation
 import Photos
 import UIKit
 
-/// 大图回传（M12 R01/A2，App 层类型——PhotoDeskCore 不参与）
-struct FullImageResult {
-    let image: UIImage?
-    /// image 为 nil 且 true = 原件在 iCloud 且未下载（禁网或未允许联网）
-    let isInCloud: Bool
-}
-
-extension ImagePipelineProtocol {
-    /// 旧签名兼容（只关心 image 的调用方；PhotoDeskTests 既有用例沿用）
-    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
-        await fullImageWithState(for: id, progress: progress, allowNetwork: allowNetwork).image
-    }
-}
-
 protocol ImagePipelineProtocol: AnyObject {
     /// 缩略图（网格/胶片条）：三级缓存 + 在途合并
     func thumbnail(for id: String, size: CGSize, scale: CGFloat) async -> UIImage?
@@ -32,17 +18,29 @@ protocol ImagePipelineProtocol: AnyObject {
     /// 取消全部在途请求与预取（查看器关闭 / 内存警告，docs/13 S02）
     func cancelAll()
     /// 大图（浏览页）：.highQualityFormat 单回调 + 目标尺寸 ≤2048，progress 上报下载进度。
-    /// M12 R01/A2：回传 inCloud 状态（image=nil 且在云 → VC 显示占位 + 下载按钮）。
+    /// allowNetwork：iCloud 手动下载时由「下载」按钮置 true，否则跟随设置（docs/03 §5.8）。
+    /// M12 R01/A2：回传 inCloud 状态（image=nil 且在云 → VC 显示占位 + 下载按钮，不再纯黑）。
     func fullImageWithState(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> FullImageResult
-    /// 大图（浏览页）：.highQualityFormat 单回调 + 目标尺寸 ≤2048，progress 上报下载进度。
-    /// allowNetwork：iCloud 手动下载时由「下载」按钮置 true，否则跟随设置（docs/03 §5.8）
-    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage?
     /// 视频播放资产（浏览页视频 cell；用 iOS 8+ 的 requestAVAsset，兼容 iOS 15）
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)?
     /// 磁盘缓存占用（设置页显示）
     var diskCacheBytes: Int64 { get }
     /// 清空内存 + 磁盘缓存（设置页「清理缓存」）
     func clearCaches()
+}
+
+extension ImagePipelineProtocol {
+    /// 旧签名兼容（只关心 image 的调用方；PhotoDeskTests 既有用例沿用）
+    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
+        await fullImageWithState(for: id, progress: progress, allowNetwork: allowNetwork).image
+    }
+}
+
+/// 大图回传（M12 R01/A2，App 层类型——PhotoDeskCore 不参与）
+struct FullImageResult {
+    let image: UIImage?
+    /// image 为 nil 且 true = 原件在 iCloud 且未下载（禁网或未允许联网）
+    let isInCloud: Bool
 }
 
 /// 在途任务包装（Task 是结构体，用类做身份比较以便合并/清理）
@@ -96,9 +94,15 @@ final class ImagePipeline: ImagePipelineProtocol {
     private let fullImageGate = AsyncSemaphore(limit: ImagePipeline.maxConcurrentFullImages)
     private var inflight: [String: TaskBox] = [:]
     private let inflightLock = NSLock()
-    /// 大图在途请求 id（cancel(id:)/cancelAll 用）
-    private var fullImageRequestIDs: [String: PHImageRequestID] = [:]
+    /// 大图在途请求 id 盒（M12：requestImage 调用前预注册——旧版在返回后注册，缺失资产同步回调时
+    /// 出现「unregister 先跑 / 陈旧 id 残留 / cancelAll 取消错对象」竞态）
+    private var fullImageRequestBoxes: [String: RequestIDBox] = [:]
     private let requestIDLock = NSLock()
+
+    /// 可变的请求 ID 盒（回调闭包内赋值；取消路径随时可读）
+    final class RequestIDBox: @unchecked Sendable {
+        var id: PHImageRequestID = PHInvalidImageRequestID
+    }
     /// 大图回看缓存（countLimit 6 / costLimit 60MB，docs/13 S02）
     private let fullImageCache = NSCache<NSString, UIImage>()
     /// 预取窗口差量
@@ -194,26 +198,25 @@ final class ImagePipeline: ImagePipelineProtocol {
         boxes.forEach { $0.task.cancel() }
 
         requestIDLock.lock()
-        let ids = fullImageRequestIDs
-        fullImageRequestIDs.removeAll()
+        let requestBoxes = fullImageRequestBoxes
+        fullImageRequestBoxes.removeAll()
         requestIDLock.unlock()
-        ids.values.forEach { requester.cancelImageRequest($0) }
+        requestBoxes.values.forEach { box in
+            let id = box.id
+            if id != PHInvalidImageRequestID {
+                requester.cancelImageRequest(id)
+            }
+        }
 
         let delta = prefetchTracker.reset()
         executeStopOnly(delta)
     }
 
-    /// M12 脚手架：isInCloud 恒 false（基线行为——不查 PHImageResultIsInCloudKey）→ 断言红锚点
     func fullImageWithState(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> FullImageResult {
-        let image = await fullImage(for: id, progress: progress, allowNetwork: allowNetwork)
-        return FullImageResult(image: image, isInCloud: false)
-    }
-
-    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
         // 回看命中（docs/13 S02：滑动回看不再重新解码）
         if let cached = fullImageCache.object(forKey: id as NSString) {
             progress(1)
-            return cached
+            return FullImageResult(image: cached, isInCloud: false)
         }
 
         let options = PHImageRequestOptions()
@@ -227,15 +230,21 @@ final class ImagePipeline: ImagePipelineProtocol {
 
         await fullImageGate.acquire()
         defer { Task { await fullImageGate.release() } }
-        if Task.isCancelled { return nil }
+        if Task.isCancelled { return FullImageResult(image: nil, isInCloud: false) }
 
-        let resumeOnce = ResumeOnce<UIImage?>()
+        // M12：ContinuationBox——取消路径强制 finish(nil)，PhotoKit 取消后不再回调也不悬挂；
+        // 回调与取消竞态时只生效一次
+        let box = ContinuationBox<FullImageResult>()
         let requester = self.requester
         let targetSize = Self.fullImageTargetSize()
+        // 请求 ID 盒在 requestImage 之前注册（旧版返回后注册：缺失资产同步回调 → 注册竞态）
+        let requestBox = RequestIDBox()
+        registerFullImageRequestBox(requestBox, for: id)
 
-        let image: UIImage? = await withTaskCancellationHandler {
+        let result: FullImageResult = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                let requestID = requester.requestImage(
+                box.attach(continuation)
+                requestBox.id = requester.requestImage(
                     id: id,
                     targetSize: targetSize,
                     contentMode: .aspectFit,
@@ -243,24 +252,31 @@ final class ImagePipeline: ImagePipelineProtocol {
                 ) { image, info in
                     let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                     guard !isDegraded else { return }   // .highQualityFormat 不会再有 degraded，防御保留
-                    // iCloud-only 且未允许联网：image 为 nil + PHImageResultIsInCloudKey（「下载」按钮）
-                    resumeOnce.resume(image, continuation)
+                    // M12 R01/A2：iCloud-only 且未允许联网 → image=nil + PHImageResultIsInCloudKey
+                    //（「下载」按钮信号；旧版丢弃该信息 → 无占位无自救 → 纯黑）
+                    let isInCloud = (info?[PHImageResultIsInCloudKey] as? Bool) ?? false
+                    if let image {
+                        box.finish(FullImageResult(image: image, isInCloud: false))
+                    } else {
+                        box.finish(FullImageResult(image: nil, isInCloud: isInCloud))
+                    }
                 }
-                self.registerFullImageRequestID(requestID, for: id)
             }
         } onCancel: {
-            // 立即取消 PhotoKit 解码（requestID 可能尚未注册：register 前的窗口期由 ResumeOnce 兜底）
-            let registered = self.storedFullImageRequestID(for: id)
-            if let registered, registered != PHInvalidImageRequestID {
-                requester.cancelImageRequest(registered)
+            // 立即取消 PhotoKit 解码（requestBox 已预注册，无窗口期）；
+            // 并强制收口——PhotoKit 取消后可能不再回调，不 resume 会悬挂 continuation
+            let requestID = requestBox.id
+            if requestID != PHInvalidImageRequestID {
+                requester.cancelImageRequest(requestID)
             }
+            box.finish(FullImageResult(image: nil, isInCloud: false))
         }
-        unregisterFullImageRequestID(id)
-        if let image {
+        unregisterFullImageRequestBox(id)
+        if let image = result.image {
             let cost = Int(image.size.width * image.scale * image.size.height * image.scale * 4)
             fullImageCache.setObject(image, forKey: id as NSString, cost: max(1, cost))
         }
-        return image
+        return result
     }
 
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)? {
@@ -301,18 +317,15 @@ final class ImagePipeline: ImagePipelineProtocol {
 
     private func requestThumbnail(_ request: ThumbnailRequest) async -> UIImage? {
         let options = Self.thumbnailOptions(allowsNetwork: allowsNetworkAccess())
-        let resumeOnce = ResumeOnce<UIImage?>()
         let requester = self.requester
-
-        /// requestID 在回调闭包内才产生：用 box 递给 onCancel 取消 PhotoKit 解码
-        final class RequestIDBox: @unchecked Sendable {
-            var id: PHImageRequestID = PHInvalidImageRequestID
-        }
-        let box = RequestIDBox()
+        // M12：ContinuationBox——取消路径强制 finish(nil)，PhotoKit 不再回调也不悬挂
+        let box = ContinuationBox<UIImage?>()
+        let requestBox = RequestIDBox()
 
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                box.id = requester.requestImage(
+                box.attach(continuation)
+                requestBox.id = requester.requestImage(
                     id: request.id,
                     targetSize: request.pixelSize,
                     contentMode: .aspectFill,
@@ -321,18 +334,19 @@ final class ImagePipeline: ImagePipelineProtocol {
                     let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                     guard !isDegraded else { return }
                     guard let image else {
-                        resumeOnce.resume(nil, continuation)
+                        box.finish(nil)
                         return
                     }
                     self?.cacheAside(image, request: request)
-                    resumeOnce.resume(image, continuation)
+                    box.finish(image)
                 }
             }
         } onCancel: {
-            let id = box.id
+            let id = requestBox.id
             if id != PHInvalidImageRequestID {
                 requester.cancelImageRequest(id)
             }
+            box.finish(nil)   // 取消强制收口（旧版悬挂根因）
         }
     }
 
@@ -403,29 +417,23 @@ final class ImagePipeline: ImagePipelineProtocol {
         inflightLock.unlock()
     }
 
-    private func registerFullImageRequestID(_ id: PHImageRequestID, for assetID: String) {
+    private func registerFullImageRequestBox(_ box: RequestIDBox, for assetID: String) {
         requestIDLock.lock()
-        fullImageRequestIDs[assetID] = id
+        fullImageRequestBoxes[assetID] = box
         requestIDLock.unlock()
     }
 
-    private func storedFullImageRequestID(for assetID: String) -> PHImageRequestID? {
+    private func unregisterFullImageRequestBox(_ assetID: String) {
         requestIDLock.lock()
-        defer { requestIDLock.unlock() }
-        return fullImageRequestIDs[assetID]
-    }
-
-    private func unregisterFullImageRequestID(_ assetID: String) {
-        requestIDLock.lock()
-        fullImageRequestIDs.removeValue(forKey: assetID)
+        fullImageRequestBoxes.removeValue(forKey: assetID)
         requestIDLock.unlock()
     }
 
     private func cancelFullImageRequest(_ assetID: String) {
         requestIDLock.lock()
-        let id = fullImageRequestIDs.removeValue(forKey: assetID)
+        let box = fullImageRequestBoxes.removeValue(forKey: assetID)
         requestIDLock.unlock()
-        if let id, id != PHInvalidImageRequestID {
+        if let id = box?.id, id != PHInvalidImageRequestID {
             requester.cancelImageRequest(id)
         }
     }
