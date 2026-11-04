@@ -1,9 +1,8 @@
-// MARK: - 职责说明：诊断日志导出（docs/05 M7 任务 7 / docs/03 §5.9）——
-// OSLogStore(scope: .currentProcessIdentifier)（iOS 15 可用）读取近 N 小时日志 →
-// 临时文件 → 系统分享面板（保存到「文件」/隔空投送等，仍在本机）。
+// MARK: - 职责说明：诊断日志导出页（docs/05 M7 任务 7 / docs/03 §5.9）——
+// 装配在 DiagnosticsExporter（docs/16 M12 Phase 1 抽出为可测试纯装配）：
+// 读取近 N 小时日志 → 临时文件 → 系统分享面板（保存到「文件」/隔空投送等，仍在本机，不联网）。
 
 import SwiftUI
-import OSLog
 import UniformTypeIdentifiers
 
 struct DiagnosticsView: View {
@@ -65,25 +64,11 @@ struct DiagnosticsView: View {
         errorMessage = nil
         defer { isExporting = false }
 
-        do {
-            let store = try OSLogStore(scope: .currentProcessIdentifier)
-            let position = store.position(date: Date().addingTimeInterval(-Double(hours.rawValue) * 3600))
-            let entries = try store.getEntries(at: position)
-            var lines: [String] = ["PhotoDesk 诊断日志 — \(Date())"]
-            var count = 0
-            for entry in entries {
-                // iOS SDK 下 OSLogEntryWithPayload 的载荷属性不可见——用条目描述（NSObject 描述含时间与内容）
-                lines.append(String(describing: entry))
-                count += 1
-                if count > 5_000 { break }   // 防超大文件
-            }
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("PhotoDesk-diagnostics-\(Int(Date().timeIntervalSince1970)).txt")
-            try lines.joined(separator: "\n").data(using: .utf8)?.write(to: url)
-            exportURL = url
-            showShare = true
-        } catch {
-            errorMessage = "导出失败：\(error.localizedDescription)"
+        guard let url = DiagnosticsExporter.export(hours: hours.rawValue) else {
+            errorMessage = "导出失败：无法写入临时文件"
+            return
         }
+        exportURL = url
+        showShare = true
     }
 }
