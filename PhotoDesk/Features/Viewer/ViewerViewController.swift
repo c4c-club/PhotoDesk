@@ -64,11 +64,6 @@ final class ViewerViewController: UIViewController {
         fatalError("init(coder:) 未使用")
     }
 
-    #if DEBUG
-    /// 单元测试布局断言锚点（docs/16 M12 R01/A4；Release 不编译）
-    var test_collectionView: UICollectionView { collectionView }
-    #endif
-
     // MARK: - 生命周期
 
     override func viewDidLoad() {
@@ -97,6 +92,14 @@ final class ViewerViewController: UIViewController {
         modalPresentationStyle = .fullScreen
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // M12 Phase 1：appear 面包屑（present 信息/编辑/分享或切 Tab 返回的取证锚点）
+        ViewerTrace.log("appear idx=\(viewModel.currentIndex) count=\(viewModel.items.count)")
+        // M12 A3：appear 时当前 cell 必有 image 或在途任务（present 信息/编辑/分享、切 Tab 返回的恢复路径）
+        remountCurrentLoadIfNeeded()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 浮层锚点：上滑 = 上方 1/4，下滑 = 下方 1/4（docs/04 §3.2）
@@ -111,6 +114,17 @@ final class ViewerViewController: UIViewController {
         accessibilityBar.isHidden = !showBar
         filmStrip.isHidden = showBar ? true : filmStrip.isHidden
         view.bringSubviewToFront(accessibilityBar)
+        // M12 A4：itemSize 跟随真实 bounds——fullScreenCover 首布局 bounds 为 .zero/占位值，
+        // 旧版只在 viewDidLoad 设一次 → 全部 cell 零尺寸 → 整页空白
+        if let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout,
+           collectionView.bounds.width > 0, collectionView.bounds.height > 0,
+           layout.itemSize != collectionView.bounds.size {
+            layout.itemSize = collectionView.bounds.size
+            layout.invalidateLayout()
+            if !needsInitialPositioning {
+                positionAtCurrentIndex()   // 布局变化后保持页码（内部 isProgrammaticScroll 包裹）
+            }
+        }
         // D01：首次拿到有效宽度后按当前 index 定位（contentOffset 直设，不触发 didScroll 写回）
         if needsInitialPositioning, width > 0, !collectionView.isHidden {
             needsInitialPositioning = false
@@ -118,11 +132,28 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// 离开查看器：取消全部在途请求与预取（docs/13 S02 验收项 7）
+    /// 离开查看器：取消全部在途请求与预取（docs/13 S02 验收项 7）。
+    /// M12 A3：仅在真正离开（被关闭）时取消——present 信息/编辑/分享或切 Tab 返回后必须恢复显示
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        guard isBeingDismissed || isMovingFromParent else { return }
         prefetchDebounceTask?.cancel()
         pipeline.cancelAll()
+    }
+
+    /// M12 A3：重挂当前页加载（无图且无有效在途任务时；A1 修复后 cell 无图 = 未加载或被取消）
+    private func remountCurrentLoadIfNeeded() {
+        guard isViewLoaded, collectionView.bounds.width > 0 else { return }
+        let index = viewModel.currentIndex
+        guard index < viewModel.items.count,
+              let item = viewModel.items[safe: index],
+              let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell,
+              !cell.hasImage else { return }
+        // loadTask 为 nil 或已取消都算「无在途」——present 信息页返回后正是被取消的旧任务
+        let hasLiveTask = !(cell.loadTask?.isCancelled ?? true)
+        guard !hasLiveTask else { return }
+        ViewerTrace.log("remount idx=\(index) id=\(item.id.prefix(8))")
+        loadImage(for: item, at: index, cell: cell)
     }
 
     /// 旋转 / 分屏（docs/09 Phase 7）：更新 itemSize，按当前 assetID 保持页码不跳回第 1 张
@@ -199,7 +230,7 @@ final class ViewerViewController: UIViewController {
         label.layer.cornerRadius = 4
         label.clipsToBounds = true
         label.text = "viewer:ready"
-        // UI 测试（docs/09 D01 + docs/13 S01/S08）：横幅含 items/idx/id/zoom/load 字段
+        // UI 测试（docs/09 D01 + docs/13 S01/S08）：横幅含 items/idx/id/zoom/load/img 字段
         label.accessibilityIdentifier = "Viewer-Debug"
         return label
     }()
@@ -211,14 +242,19 @@ final class ViewerViewController: UIViewController {
     /// 当前 zoom 字段（cell 缩放回调写入；NaN 时 %.2f 会渲染成 "nan" 被 UI 测试捕获）
     private var debugZoomScale: Double = 1
 
-    /// 带全部状态字段的横幅（items/idx/id/zoom/load，docs/13 §3.9）
+    /// 带全部状态字段的横幅（items/idx/id/zoom/load/img，docs/13 §3.9 + docs/16 M12 R02）
     private func refreshDebugBanner() {
         guard isViewLoaded else { return }
         let index = viewModel.currentIndex
         let idPart = viewModel.items[safe: index].map { "id=\($0.id)" } ?? "id=-"
+        let imgPart = (collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell)
+            .map { "img=\($0.hasImage ? "ok" : "nil")" } ?? "img=-"
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount)")
+                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount) \(imgPart)")
     }
+
+    /// 单元测试布局断言锚点（A4：itemSize 刷新；Release 不编译）
+    var test_collectionView: UICollectionView { collectionView }
     #else
     private func refreshDebugBanner() {}
     #endif
@@ -371,6 +407,16 @@ final class ViewerViewController: UIViewController {
             engine.begin()
 
         case .changed:
+            // M12 B1：持续复查（不只 shouldBegin 起始判一次）——cell 进入缩放事务立即让位
+            guard ViewerGesturePolicy.shouldPanBegin(
+                gesturesEnabled: settings.gesturesEnabled,
+                numberOfTouches: gesture.numberOfTouches,
+                cell: currentCellZoomState()) else {
+                engine.cancel()
+                hideOverlays()
+                if !collectionView.isScrollEnabled { collectionView.isScrollEnabled = true }
+                return
+            }
             let output = engine.update(translation: translation, velocity: velocity)
             if output.isHorizontal {
                 hideOverlays()
@@ -434,17 +480,31 @@ final class ViewerViewController: UIViewController {
 
         switch action {
         case .moveToRecentlyDeleted, .hide:
+            // M12 B1：缩放事务与删除事务互斥——pinchActive 期间一律 guard 早退
+            guard ViewerGesturePolicy.allowsRemovalTransaction(cell: currentCellZoomState()) else {
+                ViewerTrace.log("action-blocked-zooming \(action) idx=\(viewModel.currentIndex)")
+                return
+            }
             performStaged(action: action, exitEdge: exitEdge)
         default:
             perform(action: action, direction: direction)
         }
     }
 
+    /// 当前页 cell 的缩放状态快照（B1 互斥判定信号源；无 cell = nil）
+    private func currentCellZoomState() -> ViewerGesturePolicy.CellState? {
+        collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0))
+            as? ZoomableImageCell
+    }
+
     /// 删除事务（docs/13 S12）：plan → snapshot 飞出（并行）→ 同一 runloop 内
     /// performBatchUpdates { commitRemoval + deleteItems } → completion 定位/关闭。
     /// isRemovalInFlight 串行化：事务期间忽略新动作（最多丢一次滑动，好过崩溃）。
+    /// M12 B1：缩放事务中一律 guard 早退（performBatchUpdates 与 UIScrollView 缩放事务互斥）。
     private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?) {
-        guard !isRemovalInFlight, let item = viewModel.current,
+        guard !isRemovalInFlight,
+              ViewerGesturePolicy.allowsRemovalTransaction(cell: currentCellZoomState()),
+              let item = viewModel.current,
               let staged = viewModel.planRemoval(action: action, forItemID: item.id, exitEdge: exitEdge) else { return }
         isRemovalInFlight = true
         ViewerTrace.log("stage \(action) idx=\(staged.removedIndex) count=\(viewModel.items.count)")
@@ -564,7 +624,8 @@ final class ViewerViewController: UIViewController {
     // MARK: - Toast / 撤销
 
     private func showToast(text: String, icon: String, allowUndo: Bool) {
-        // staged 撤销走 undoStaged（零 PhotoKit 写）；即时写撤销走 UndoCenter
+        // staged 撤销走 undoStaged（零 PhotoKit 写）；即时写撤销走 UndoCenter。
+        // R04：到 0 由唯一时钟驱动统一触发——staged 路径撤销入口失效（expireStaged）
         let isStaged = viewModel.hasUndoableStaged
         toast.show(icon: icon,
                    text: text + (allowUndo ? " · 撤销" : ""),
@@ -578,6 +639,9 @@ final class ViewerViewController: UIViewController {
                 Task { await self.viewModel.undoLast() }
             }
         },
+                   onExpire: isStaged ? { [weak self] in
+            self?.viewModel.expireStaged()
+        } : nil,
                    onDismissFinished: nil)
         scheduleChromeHide()
     }
@@ -825,6 +889,27 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - 翻页与图片加载
 
+    /// zoom 回调统一入口（M12 Phase 1）：DEBUG 横幅 + ViewerTrace 面包屑（限流：60fps 回调不能逐帧落盘，
+    /// 变化 >0.1 才记一条；非有限值只记一次取证标记——捏合崩溃时序还原的关键证据）
+    private func handleZoomCallback(_ scale: CGFloat) {
+        #if DEBUG
+        debugZoomScale = Double(scale)
+        refreshDebugBanner()
+        #endif
+        if scale.isFinite {
+            let value = Double(scale)
+            if abs(value - lastLoggedZoom) > 0.1 {
+                lastLoggedZoom = value
+                ViewerTrace.log("zoom=\(String(format: "%.2f", value)) idx=\(viewModel.currentIndex)")
+            }
+        } else if !didLogNonFiniteZoom {
+            didLogNonFiniteZoom = true
+            ViewerTrace.log("zoom=\(scale) idx=\(viewModel.currentIndex)（非有限值）")
+        }
+    }
+    private var lastLoggedZoom: Double = -1
+    private var didLogNonFiniteZoom = false
+
     private func scrollTo(index: Int, animated: Bool = true) {
         guard index >= 0, index < viewModel.items.count else { return }
         isProgrammaticScroll = true
@@ -868,7 +953,8 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// 大图加载：Task 挂到 cell（离屏/复用即取消，docs/13 S08）；在途计数供 DEBUG 横幅
+    /// 大图加载：Task 挂到 cell（离屏/复用即取消，docs/13 S08）；在途计数供 DEBUG 横幅。
+    /// M12 A2：inCloud 回传 → 占位 + 下载按钮（不再纯黑无自救）。
     private func loadImage(for item: PhotoItem, at index: Int, cell: ZoomableImageCell) {
         // cell 级 token（docs/09 D02：回填前校验 cell.itemID 与 item.id 一致且 token 未过期）
         let token = cell.beginLoad()
@@ -879,15 +965,18 @@ final class ViewerViewController: UIViewController {
         cell.loadTask = Task { [weak self, weak cell] in
             guard let self else { return }
             defer { self.inflightLoadCount = max(0, self.inflightLoadCount - 1) }
-            let image = await self.pipeline.fullImage(for: item.id, progress: { fraction in
+            let result = await self.pipeline.fullImageWithState(for: item.id, progress: { fraction in
                 Task { @MainActor in
                     cell?.updateDownloadProgress(fraction)
                 }
             }, allowNetwork: false)
-            ViewerTrace.log("loadEnd idx=\(index) ok=\(image != nil)")
+            ViewerTrace.log("loadEnd idx=\(index) ok=\(result.image != nil) cloud=\(result.isInCloud)")
             guard !Task.isCancelled, let cell, cell.itemID == item.id, cell.matches(token: token) else { return }
-            if let image {
+            if let image = result.image {
                 cell.applyDownloadedImage(image)
+            } else if result.isInCloud {
+                // 禁网 + iCloud-only：占位 + 下载入口（A2 自救路径）
+                cell.showCloudPlaceholder()
             }
         }
     }
@@ -896,16 +985,36 @@ final class ViewerViewController: UIViewController {
 // MARK: - DataSource / Delegate
 
 extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+    /// 越界分支的空态条目（已 configure 的占位 cell 用；不进入任何业务路径）
+    static let emptyItem = PhotoItem(id: "",
+                                     mediaType: .image,
+                                     mediaSubtypes: [],
+                                     creationDate: nil,
+                                     modificationDate: nil,
+                                     pixelWidth: 1,
+                                     pixelHeight: 1,
+                                     duration: 0,
+                                     isFavorite: false,
+                                     isHidden: false,
+                                     location: nil,
+                                     burstIdentifier: nil,
+                                     isCloudOnly: false)
+
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         max(0, viewModel.items.count)
     }
 
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        // 边界保护（docs/13 S08/S12：删除事务窗口内可能收到旧 index 的请求）
+        // 边界保护（docs/13 S08/S12：删除事务窗口内可能收到旧 index 的请求）。
+        // M12 附带：越界分支返回已 configure 的空态 cell（旧版返回未配置 cell → 携带复用前的旧图/旧交互态）
         guard indexPath.item < viewModel.items.count else {
-            return collectionView.dequeueReusableCell(withReuseIdentifier: ZoomableImageCell.reuseID,
-                                                      for: indexPath)
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ZoomableImageCell.reuseID,
+                                                          for: indexPath)
+            if let imageCell = cell as? ZoomableImageCell {
+                imageCell.configure(item: Self.emptyItem, image: nil)
+            }
+            return cell
         }
         let item = viewModel.items[indexPath.item]
         if item.mediaType == .video {
@@ -922,14 +1031,11 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
             guard let self, let imageCell else { return }
             self.downloadFromCloud(id: id, cell: imageCell)
         }
-        #if DEBUG
-        // 缩放回调 → 横幅 zoom 字段（UI 测试断言有限数字，docs/13 S01）
+        // M12 Phase 1：zoom 回调不再过滤 NaN/inf（旧 guard scale.isFinite 让「横幅无 nan」恒真——
+        // docs/16 §0.2 假绿 1）。横幅原样渲染（DEBUG），ViewerTrace 面包屑 Release 同样生效。
         imageCell.setZoomCallback { [weak self] scale in
-            guard let self, scale.isFinite else { return }
-            self.debugZoomScale = Double(scale)
-            self.refreshDebugBanner()
+            self?.handleZoomCallback(scale)
         }
-        #endif
         loadImage(for: item, at: indexPath.item, cell: imageCell)
         return imageCell
     }
@@ -940,12 +1046,16 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
         cell.loadTask = Task { [weak self, weak cell] in
             guard let self else { return }
             defer { self.inflightLoadCount = max(0, self.inflightLoadCount - 1) }
-            let image = await self.pipeline.fullImage(for: id, progress: { fraction in
+            let result = await self.pipeline.fullImageWithState(for: id, progress: { fraction in
                 Task { @MainActor in cell?.updateDownloadProgress(fraction) }
             }, allowNetwork: true)
+            ViewerTrace.log("downloadEnd id=\(id.prefix(8)) ok=\(result.image != nil)")
             guard !Task.isCancelled, let cell, cell.itemID == id, cell.matches(token: token) else { return }
-            if let image {
+            if let image = result.image {
                 cell.applyDownloadedImage(image)
+            } else {
+                // 仍未拿到（下载失败/仍受限）：保持占位态，用户可重试
+                cell.showCloudPlaceholder()
             }
         }
     }
@@ -1007,23 +1117,24 @@ extension ViewerViewController: UICollectionViewDataSourcePrefetching {
 // MARK: - 手势冲突（docs/03 §5.1）
 
 extension ViewerViewController: UIGestureRecognizerDelegate {
-    /// 放大状态（> 1.01）或双指操作时禁用上下滑（AGENTS.md §7 常见陷阱）
+    /// M12 B1：pan 开始判定收口到 ViewerGesturePolicy（放大 > 1.01 / 捏合中 / 回弹宽限 / 双指 /
+    /// 无障碍关闭 → 一律拒绝；旧版 isZoomed 只在起始判一次且双指分支是死代码）
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
-        guard settings.gesturesEnabled else { return false }                 // 无障碍：手势总开关关闭
-        if pan.numberOfTouches > 1 { return false }                       // 双指 → 捏合
-        if let cell = collectionView.cellForItem(
-            at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell,
-           cell.isZoomed {
-            return false                                                  // 放大 → 拖动查看
-        }
-        return true
+        return ViewerGesturePolicy.shouldPanBegin(
+            gesturesEnabled: settings.gesturesEnabled,
+            numberOfTouches: pan.numberOfTouches,
+            cell: currentCellZoomState())
     }
 
-    /// 与分页手势同时识别，靠 SwipeGestureEngine 的方向锁裁决（docs/03 §5.1）
+    /// M12 B1：与捏合互斥——旧版无条件 true → 捏合两指中的单指位移触发垂直锁 →
+    /// 删除事务在 UIScrollView 缩放事务中执行 → CALayer position NaN 崩溃
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        true
+        if other is UIPinchGestureRecognizer { return false }
+        if let otherPan = other as? UIPanGestureRecognizer, otherPan.numberOfTouches >= 2 { return false }
+        // 与分页手势同时识别，靠 SwipeGestureEngine 的方向锁裁决（docs/03 §5.1）
+        return true
     }
 }
 
