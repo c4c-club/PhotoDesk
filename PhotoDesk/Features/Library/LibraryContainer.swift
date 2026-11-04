@@ -159,13 +159,8 @@ struct LibraryRootView: View {
             }
         }
         .fullScreenCover(item: $viewerContext) { context in
-            // 拆小表达式（docs/13 轮 6：复杂泛型链会拖垮类型检查）
-            let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
-            let handleClose: () -> Void = {
-                // M12 R01：复位 viewerContext（旧版不复位 → 复开复用旧 VM）
-                viewerContext = nil
-            }
-            ViewerContainer(viewModel: viewerViewModel, onClose: handleClose)
+            // 拆小表达式（docs/13 轮 6：复杂泛型链会拖垮类型检查——独立 View 承载）
+            ViewerCover(context: context, viewerContext: $viewerContext)
         }
         .onAppear {
             Task { await viewModel.start() }
@@ -280,6 +275,18 @@ private extension LibraryRootView {
     }
 }
 #endif
+
+/// 查看器承载视图（R01：onClose 复位 viewerContext；独立 View 规避 body 类型检查超时）
+private struct ViewerCover: View {
+    let context: ViewerContext
+    @Binding var viewerContext: ViewerContext?
+
+    var body: some View {
+        let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
+        ViewerContainer(viewModel: viewerViewModel,
+                        onClose: { viewerContext = nil })
+    }
+}
 
 /// 多选模式桥（docs/04 §3.1「多选」入口）：SwiftUI/UIBarButtonItem → UIKit 控制器
 final class SelectionModeBridge: ObservableObject {
