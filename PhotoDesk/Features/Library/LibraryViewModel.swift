@@ -87,7 +87,8 @@ final class LibraryViewModel: ObservableObject {
          trashBin: TrashBin,
          undoCenter: UndoCenter,
          settings: SettingsStore,
-         reviewSession: ReviewSessionController) {
+         reviewSession: ReviewSessionController,
+         positionStore: LibraryPositionStore? = nil) {
         self.service = service
         self.repository = repository
         self.pipeline = pipeline
@@ -496,6 +497,23 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private var onSnapshotUpdate: ((LibrarySnapshot) -> Void)?
+
+    #if DEBUG
+    /// R03 单测驱动：直接推快照（等价 pushSections 的输出路径，绕开 PhotoKit 依赖）
+    func pushSnapshotForTesting(sections: [MonthSection],
+                                itemsBySection: [[PhotoItem]],
+                                queryKey: String,
+                                indexComplete: Bool) {
+        self.isIndexComplete = indexComplete
+        self.filteredItems = itemsBySection.flatMap { $0 }
+        self.sections = sections
+        self.itemsBySection = itemsBySection
+        onSnapshotUpdate?(LibrarySnapshot(sections: sections,
+                                          itemsBySection: itemsBySection,
+                                          animated: false,
+                                          queryKey: queryKey))
+    }
+    #endif
 
     // MARK: - 筛选持久化（library.filter.<scope>；docs/09 D10）
 

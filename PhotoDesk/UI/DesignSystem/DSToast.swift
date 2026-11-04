@@ -26,6 +26,14 @@ final class DSToast: UIView {
         button.accessibilityIdentifier = "Toast-Undo"
         return button
     }()
+    /// M12 R04 独立环视图（先红批次脚手架：创建即隐藏、不参与布局——
+    /// 断言红由 DSToastUndoTests.testCountdownRingDoesNotOverlapUndoLabel 锁定）
+    private let countdownRingView: UIView = {
+        let view = UIView()
+        view.isHidden = true
+        view.isUserInteractionEnabled = false
+        return view
+    }()
     /// 环形倒计时描边
     private let ringLayer = CAShapeLayer()
     private var ringTimer: Timer?
@@ -117,6 +125,14 @@ final class DSToast: UIView {
         // docs/13 S05 根因 3：init 即隐藏——不占位、不参与命中测试
         isHidden = true
     }
+
+    #if DEBUG
+    // 单元测试断言锚点（docs/16 M12 R04；Release 不编译）
+    var test_countdownRingView: UIView { countdownRingView }
+    var test_undoButton: UIButton { undoButton }
+    var test_effectView: UIView { effectView }
+    var test_messageLabel: UILabel { messageLabel }
+    #endif
 
     override func layoutSubviews() {
         super.layoutSubviews()

@@ -55,7 +55,10 @@ private final class FakeImagePipeline: ImagePipelineProtocol {
     func prefetch(ids: [String], size: CGSize) {}
     func cancel(id: String) {}
     func cancelAll() {}
-    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? { nil }
+    func fullImageWithState(for id: String, progress: @escaping (Double) -> Void,
+                            allowNetwork: Bool) async -> FullImageResult {
+        FullImageResult(image: nil, isInCloud: false)
+    }
     func videoAsset(for id: String) async -> (asset: AVAsset, audioMix: AVAudioMix?)? { nil }
     var diskCacheBytes: Int64 { 0 }
     func clearCaches() {}

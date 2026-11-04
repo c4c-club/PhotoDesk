@@ -14,6 +14,8 @@ protocol AssetRepositoryProtocol: AnyObject {
     func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int
     /// 分批取窗口 [offset, offset + limit) 内的条目（映射 PhotoItem）
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem]
+    /// 锚点 assetID 在完整结果中的全局 index（docs/16 M12 R03 锚点窗口用；找不到返回 nil）
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int?
     /// 按 id 批量取（Vault 合并待隐藏项用；docs/09 D05）
     func fetch(ids: [String]) async -> [PhotoItem]
     /// 当前 scope 的底层结果（PhotoChangeObserver 监听用）
@@ -72,6 +74,9 @@ final class AssetRepository: AssetRepositoryProtocol {
             result.objects(at: indexSet).map { repository.map($0) }
         }.value
     }
+
+    /// M12 脚手架：恒 nil（基线行为——无锚点定位能力）→ 锚点窗口断言红锚点
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? { nil }
 
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {
         results[scope] = result

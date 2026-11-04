@@ -64,6 +64,11 @@ final class ViewerViewController: UIViewController {
         fatalError("init(coder:) 未使用")
     }
 
+    #if DEBUG
+    /// 单元测试布局断言锚点（docs/16 M12 R01/A4；Release 不编译）
+    var test_collectionView: UICollectionView { collectionView }
+    #endif
+
     // MARK: - 生命周期
 
     override func viewDidLoad() {

@@ -22,4 +22,6 @@ enum DSSpacing {
     // 通用留白与 Toast（docs/04 §3.2：距底部 16pt）
     static let screenPadding: CGFloat = 16
     static let toastBottomOffset: CGFloat = 16
+    /// 撤销条倒计时环直径（docs/16 M12 R04：独立环视图尺寸 token）
+    static let toastRingSize: CGFloat = 24
 }

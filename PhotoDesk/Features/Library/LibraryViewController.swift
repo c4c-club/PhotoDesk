@@ -64,7 +64,18 @@ final class LibraryViewController: UIViewController {
     private var boxBaseSelected: [String] = []
     private var boxDidMove = false
 
-    // MARK: - 快照缓存
+    /// R03：恢复遮罩（先红批次脚手架：创建即隐藏、无任何逻辑——断言红由
+    /// LibraryPositionRestoreTests.testRestoreDoesNotOverwriteAnchorWithIntermediatePosition 锁定）
+    private let restoreMaskView: UIView = {
+        let view = UIView()
+        view.backgroundColor = DSColor.bgPrimary
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.accessibilityIdentifier = "Library-RestoreMask"
+        return view
+    }()
+
+    // MARK: - 快照缓存    // MARK: - 快照缓存
 
     private var currentSections: [MonthSection] = []
     private var currentItemsBySection: [[PhotoItem]] = []
@@ -181,6 +192,13 @@ final class LibraryViewController: UIViewController {
     }
 
     // MARK: - 构建
+
+    #if DEBUG
+    /// 单元测试断言锚点（R03 恢复遮罩 / R04 Toast 位置；Release 不编译）
+    var test_restoreMask: UIView { restoreMaskView }
+    var test_batchToast: DSToast { batchToast }
+    var test_selectionBar: UIView { selectionBar }
+    #endif
 
     private func setupCollectionView() {
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: makeLayout(columns: columns))

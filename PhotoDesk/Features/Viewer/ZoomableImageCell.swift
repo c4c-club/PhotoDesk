@@ -163,6 +163,9 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     // MARK: - 对外接口
 
+    /// 是否已有图（M12 R01：VC appear 重挂判断 + DEBUG 横幅 img 字段）
+    var hasImage: Bool { imageView.image != nil }
+
     /// 任务 2.2：暴露当前缩放
     var zoomScale: CGFloat { scrollView.zoomScale }
 
@@ -195,6 +198,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         resetZoom()
         layoutImageContent()
     }
+
+    /// M12 R01/A2 占位入口（先红批次脚手架：暂为 no-op——断言红由
+    /// ViewerCellGeometryTests.testShowCloudPlaceholderWorksEvenWhenItemNotMarkedCloudOnly 锁定）
+    func showCloudPlaceholder() {}
 
     func updateDownloadProgress(_ fraction: Double) {
         progressLayer.isHidden = false
@@ -252,6 +259,18 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     // MARK: - 双击缩放（docs/04 §4.4：点击点为中心，1×↔2.5×；只调用一次 zoom(to:)）
 
+}
+
+#if DEBUG
+// 单元测试 I5′ / 交互护栏断言锚点（docs/16 M12 R01/R02；Release 不编译）
+extension ZoomableImageCell {
+    var test_scrollView: UIScrollView { scrollView }
+    var test_zoomContentView: UIView { zoomContentView }
+    var test_imageView: UIImageView { imageView }
+    var test_cloudBox: UIView { cloudBox }
+}
+
+extension ZoomableImageCell {
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard imageView.image != nil,
               scrollView.bounds.width > 0, scrollView.bounds.height > 0,

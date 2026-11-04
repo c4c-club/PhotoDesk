@@ -8,6 +8,20 @@ import AVFoundation
 import Photos
 import UIKit
 
+/// 大图回传（M12 R01/A2，App 层类型——PhotoDeskCore 不参与）
+struct FullImageResult {
+    let image: UIImage?
+    /// image 为 nil 且 true = 原件在 iCloud 且未下载（禁网或未允许联网）
+    let isInCloud: Bool
+}
+
+extension ImagePipelineProtocol {
+    /// 旧签名兼容（只关心 image 的调用方；PhotoDeskTests 既有用例沿用）
+    func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {
+        await fullImageWithState(for: id, progress: progress, allowNetwork: allowNetwork).image
+    }
+}
+
 protocol ImagePipelineProtocol: AnyObject {
     /// 缩略图（网格/胶片条）：三级缓存 + 在途合并
     func thumbnail(for id: String, size: CGSize, scale: CGFloat) async -> UIImage?
@@ -17,6 +31,9 @@ protocol ImagePipelineProtocol: AnyObject {
     func cancel(id: String)
     /// 取消全部在途请求与预取（查看器关闭 / 内存警告，docs/13 S02）
     func cancelAll()
+    /// 大图（浏览页）：.highQualityFormat 单回调 + 目标尺寸 ≤2048，progress 上报下载进度。
+    /// M12 R01/A2：回传 inCloud 状态（image=nil 且在云 → VC 显示占位 + 下载按钮）。
+    func fullImageWithState(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> FullImageResult
     /// 大图（浏览页）：.highQualityFormat 单回调 + 目标尺寸 ≤2048，progress 上报下载进度。
     /// allowNetwork：iCloud 手动下载时由「下载」按钮置 true，否则跟随设置（docs/03 §5.8）
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage?
@@ -184,6 +201,12 @@ final class ImagePipeline: ImagePipelineProtocol {
 
         let delta = prefetchTracker.reset()
         executeStopOnly(delta)
+    }
+
+    /// M12 脚手架：isInCloud 恒 false（基线行为——不查 PHImageResultIsInCloudKey）→ 断言红锚点
+    func fullImageWithState(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> FullImageResult {
+        let image = await fullImage(for: id, progress: progress, allowNetwork: allowNetwork)
+        return FullImageResult(image: image, isInCloud: false)
     }
 
     func fullImage(for id: String, progress: @escaping (Double) -> Void, allowNetwork: Bool) async -> UIImage? {

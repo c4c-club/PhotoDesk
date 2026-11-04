@@ -50,7 +50,10 @@ final class UndoCenter: ObservableObject {
     init(writer: PhotoWriterProtocol,
          trashBin: TrashBin? = nil,
          persistence: PersistenceController = .shared,
-         clock: Clock = SystemClock()) {
+         clock: Clock = SystemClock(),
+         countdownDriver: UndoCountdownDriver = UndoCountdownDriver()) {
+        // M12 R04 先红批次脚手架：驱动已注入但尚未接线（保留旧 0.25s 自建 Timer——
+        // 断言红由 DSToastUndoTests.testCountdownAndUndoExpireTogether 锁定）；实现提交替换
         self.writer = writer
         self.trashBin = trashBin
         self.persistence = persistence

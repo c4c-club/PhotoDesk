@@ -192,6 +192,46 @@ final class StabilityUITests: XCTestCase {
         add(attachment)
     }
 
+    /// 截图中心区域「非背景色」像素占比（docs/16 M12 R01：全屏黑 = 大图不可见）。
+    /// 采样窗口避开顶部栏 / DEBUG 横幅 / 底部胶片条；bgViewer 为纯黑，阈值 24/255。
+    private func centerNonBlackRatio(_ screenshot: XCUIScreenshot) -> Double {
+        guard let cg = screenshot.image.cgImage else { return 0 }
+        let width = cg.width
+        let height = cg.height
+        let x0 = Int(Double(width) * 0.15)
+        let x1 = Int(Double(width) * 0.85)
+        let y0 = Int(Double(height) * 0.20)
+        let y1 = Int(Double(height) * 0.72)
+        guard x1 > x0, y1 > y0 else { return 0 }
+        let region = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+        guard let context = CGContext(data: nil,
+                                      width: region.width,
+                                      height: region.height,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: region.width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data else { return 0 }
+        context.draw(cg, in: CGRect(origin: .zero, size: region.size))
+        let total = region.width * region.height
+        let buffer = data.bindMemory(to: UInt8.self, capacity: total * 4)
+        var nonBlack = 0
+        for index in 0..<total {
+            let r = buffer[index * 4]
+            let g = buffer[index * 4 + 1]
+            let b = buffer[index * 4 + 2]
+            if r > 24 || g > 24 || b > 24 { nonBlack += 1 }
+        }
+        return Double(nonBlack) / Double(max(1, total))
+    }
+
+    /// 断言查看器中心区域可见图像（R01 硬指标：非背景像素占比 > 5%）
+    private func assertViewerImageVisible(_ app: XCUIApplication, _ message: String) {
+        let ratio = centerNonBlackRatio(app.screenshot())
+        XCTAssertGreaterThan(ratio, 0.05,
+                             "\(message)：中心区域非背景像素占比 \(String(format: "%.3f", ratio))（旧版全屏黑 = imageView 恒零尺寸）")
+    }
+
     /// 「已选择 N 项 · 本月」→ N
     private static func parseCount(_ label: String) -> Int {
         guard let regex = try? NSRegularExpression(pattern: "[0-9]+"),
@@ -237,7 +277,133 @@ final class StabilityUITests: XCTestCase {
         let label = banner.label.lowercased()
         XCTAssertFalse(label.contains("nan"), "横幅出现 NaN：\(banner.label)")
         XCTAssertFalse(label.contains("inf"), "横幅出现 inf：\(banner.label)")
+        // M12 R02 加强：不再只验 app.state——图像必须可见 + 无删除事务
+        XCTAssertTrue(banner.label.contains("img=ok"),
+                      "横幅缺 img=ok（当前图未成功加载/回填）：\(banner.label)")
+        assertViewerImageVisible(app, "20 轮捏合后大图必须可见")
+        let badge = anyElement(app, identifier: "SessionBadge")
+        let badgeLabel = badge.exists ? badge.label : ""
+        XCTAssertFalse(badgeLabel.contains("待删除"),
+                       "捏合全过程 pendingDeleteCount 必须为 0（badge=\(badgeLabel)）")
         snap(app, "s01-zoom")
+    }
+
+    // MARK: - M12 R03：真冷启动锚点恢复（无可见跳转）
+
+    /// 杀进程冷启动 → 首帧即锚点月份；恢复不弹「已跳到」横幅（那是用户主动跳转专用）
+    func testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump() throws {
+        let app = XCUIApplication()
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        app.terminate()
+        _ = launchToGrid(app)
+        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
+                      "冷启动后应直达锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        Thread.sleep(forTimeInterval: 0.5)
+        let banner = anyElement(app, identifier: "Library-JumpBanner")
+        XCTAssertFalse(banner.exists && banner.isHittable,
+                       "冷启动恢复不得显示跳转横幅（R03 不变量）")
+        assertAlive(app, "冷启动锚点恢复后")
+        snap(app, "m12-cold-launch-anchor")
+    }
+
+    /// 旋转后锚点保持（不跳回最新月份，误差 ≤ 1 行 ≈ 同月）
+    func testRotationKeepsAnchorWithinOneRow() throws {
+        let app = XCUIApplication()
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
+                      "横屏后应保持锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        XCUIDevice.shared.orientation = .portrait
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
+                      "回竖屏后应保持锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+        assertAlive(app, "旋转锚点保持后")
+        XCUIDevice.shared.orientation = .portrait
+        snap(app, "m12-rotation-anchor")
+    }
+
+    // MARK: - M12 R01/R02：查看器图像可见性 / 生命周期恢复 / 捏合-删除互斥
+
+    /// 打开查看器即见大图（R01 硬指标：截图像素非背景色）
+    func testViewerShowsImageOnOpen() throws {
+        let app = XCUIApplication()
+        _ = openViewer(app, startIndex: 7)
+        Thread.sleep(forTimeInterval: 1.5)   // 大图解码
+        assertViewerImageVisible(app, "R01：查看器打开 1.5s 后中心区域近乎全黑（A1 imageView 恒零尺寸）")
+        snap(app, "m12-viewer-image-on-open")
+    }
+
+    /// present 信息页 → 返回后大图必须恢复（R01/A3：viewDidDisappear 无条件 cancelAll 且不重挂）
+    func testPresentInfoThenDismissRestoresImage() throws {
+        let app = XCUIApplication()
+        _ = openViewer(app, startIndex: 3)
+        Thread.sleep(forTimeInterval: 1.0)
+        // 顶部栏为 UIToolbar（KeepChrome 已开）；UIBarButtonItem label 定位
+        let info = app.buttons.matching(NSPredicate(format: "label == '查看信息'")).firstMatch
+        XCTAssertTrue(info.waitForExistence(timeout: 5), "查看器缺「查看信息」按钮\n\(hierarchy(app))")
+        info.tap()
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5),
+                      "信息页未打开\n\(hierarchy(app))")
+        Thread.sleep(forTimeInterval: 0.5)
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        if back.exists {
+            back.tap()
+        } else {
+            app.swipeDown()
+        }
+        XCTAssertTrue(viewerRoot(app).waitForExistence(timeout: 5), "返回后查看器应仍在")
+        Thread.sleep(forTimeInterval: 1.0)
+        assertViewerImageVisible(app, "R01/A3：present 信息页返回后大图必须恢复显示")
+        snap(app, "m12-viewer-after-info")
+    }
+
+    /// 捏合全程零删除事务（R02/B1）：配 moveToRecentlyDeleted 下滑动作，捏合后待删除计数必须为 0
+    func testPinchDoesNotTriggerRemoval() throws {
+        let app = XCUIApplication()
+        let viewer = openViewer(app, startIndex: 5, downAction: "moveToRecentlyDeleted")
+        Thread.sleep(forTimeInterval: 1.0)
+        // 捏合目标尽量命中网格内 scrollView（cell 覆盖全屏；collectionViews 为查看器分页器）
+        let target: XCUIElement = app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch
+            : viewer
+        for _ in 0..<10 {
+            target.pinch(withScale: 2.5, velocity: 2)
+            target.pinch(withScale: 0.4, velocity: -2)
+        }
+        assertAlive(app, "10 轮捏合后")
+        let badge = anyElement(app, identifier: "SessionBadge")
+        let badgeLabel = badge.exists ? badge.label : ""
+        XCTAssertFalse(badgeLabel.contains("待删除"),
+                       "R02/B1：捏合过程不得触发删除事务（badge=\(badgeLabel)）")
+        // 双击缩放链路核验：手势确实进入 cell 内 scrollView（zoom 字段 > 1）
+        viewer.doubleTap()
+        Thread.sleep(forTimeInterval: 0.6)
+        let banner = viewerBanner(app)
+        if banner.exists {
+            let zoom = Self.parseField(banner.label, "zoom")
+            XCTAssertGreaterThan(zoom, 1, "双击后 zoom 应 > 1（手势链路核验）：\(banner.label)")
+        }
+        snap(app, "m12-pinch-no-removal")
+    }
+
+    /// 捏合后翻页仍生效（R02：collectionView.isScrollEnabled 不被误关）
+    func testPinchKeepsCollectionViewScrollEnabled() throws {
+        let app = XCUIApplication()
+        let viewer = openViewer(app, startIndex: 0)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现")
+        for _ in 0..<5 {
+            viewer.pinch(withScale: 2.5, velocity: 2)
+            viewer.pinch(withScale: 0.4, velocity: -2)
+        }
+        swipeLeftFast(in: viewer)
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5))
+        let idx = Self.parseField(banner.label, "idx")
+        XCTAssertGreaterThanOrEqual(idx, 1,
+                                    "捏合后翻页应生效（isScrollEnabled 未被误关）：\(banner.label)")
+        assertAlive(app, "捏合 + 翻页后")
     }
 
     // MARK: - S02 快滑 50 + 回滑 50 不卡死不闪退
