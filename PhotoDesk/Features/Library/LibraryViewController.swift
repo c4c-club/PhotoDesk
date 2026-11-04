@@ -474,11 +474,17 @@ final class LibraryViewController: UIViewController {
         Task { await viewModel.setScope(scope) }
     }
 
-    /// 其他 scope 的异步计数（只读、不切换 results；快照变化后刷新缓存并重建菜单）
+    /// 其他 scope 的异步计数（只读、不切换 results；快照变化后刷新缓存并重建菜单）。
+    /// 在飞守卫：同一时刻只允许一轮（快照高频推送时防止后台 PhotoKit 查询堆积——验证轮 6/7
+    /// 级联「网格无 cell」的可疑放大器之一）。
+    private var isCountRefreshInFlight = false
     private func refreshCategoryCountsAsync() {
+        guard !isCountRefreshInFlight else { return }
+        isCountRefreshInFlight = true
         let scopes = LibraryCategoryMenuBuilder.scopeOrder
         Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { self.isCountRefreshInFlight = false }
             var counts: [PhotoScope: Int] = [:]
             for scope in scopes where scope != self.viewModel.query.scope {
                 counts[scope] = await self.viewModel.count(scope: scope) ?? 0
