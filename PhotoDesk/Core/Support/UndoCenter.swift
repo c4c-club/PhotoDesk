@@ -51,6 +51,14 @@ final class UndoCenter: ObservableObject {
          trashBin: TrashBin? = nil,
          persistence: PersistenceController = .shared,
          clock: Clock = SystemClock(),
+         countdownDriver: UndoCountdownDriver? = nil) {
+        // M12 R04 先红批次脚手架：驱动已注入但尚未接线（保留旧 0.25s 自建 Timer——
+        // 断言红由 DSToastUndoTests.testCountdownAndUndoExpireTogether 锁定）；实现提交替换
+        // 默认驱动就地创建（默认参数会在非隔离上下文求值，不能写进参数默认值）
+    init(writer: PhotoWriterProtocol,
+         trashBin: TrashBin? = nil,
+         persistence: PersistenceController = .shared,
+         clock: Clock = SystemClock(),
          countdownDriver: UndoCountdownDriver = UndoCountdownDriver()) {
         // M12 R04 先红批次脚手架：驱动已注入但尚未接线（保留旧 0.25s 自建 Timer——
         // 断言红由 DSToastUndoTests.testCountdownAndUndoExpireTogether 锁定）；实现提交替换
@@ -58,6 +66,7 @@ final class UndoCenter: ObservableObject {
         self.trashBin = trashBin
         self.persistence = persistence
         self.clock = clock
+        _ = countdownDriver   // 脚手架：未接线
     }
 
     // MARK: - 入栈（执行成功后调用）

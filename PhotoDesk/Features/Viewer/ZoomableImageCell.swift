@@ -259,20 +259,10 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     // MARK: - 双击缩放（docs/04 §4.4：点击点为中心，1×↔2.5×；只调用一次 zoom(to:)）
 
-}
-
-#if DEBUG
-// 单元测试 I5′ / 交互护栏断言锚点（docs/16 M12 R01/R02；Release 不编译）
-extension ZoomableImageCell {
-    var test_scrollView: UIScrollView { scrollView }
-    var test_zoomContentView: UIView { zoomContentView }
-    var test_imageView: UIImageView { imageView }
-    var test_cloudBox: UIView { cloudBox }
-}
-
-extension ZoomableImageCell {
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard imageView.image != nil,    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard imageView.image != nil,
+
               scrollView.bounds.width > 0, scrollView.bounds.height > 0,
               scrollView.zoomScale.isFinite else { return }
         let reduceMotion = UIAccessibility.isReduceMotionEnabled && AppContainer.shared.settings.respectReduceMotion
@@ -309,3 +299,13 @@ extension ZoomableImageCell: UIScrollViewDelegate {
         onZoomChanged?(scrollView.zoomScale)
     }
 }
+
+#if DEBUG
+// 单元测试 I5′ / 交互护栏断言锚点（docs/16 M12 R01/R02；Release 不编译）
+extension ZoomableImageCell {
+    var test_scrollView: UIScrollView { scrollView }
+    var test_zoomContentView: UIView { zoomContentView }
+    var test_imageView: UIImageView { imageView }
+    var test_cloudBox: UIView { cloudBox }
+}
+#endif
