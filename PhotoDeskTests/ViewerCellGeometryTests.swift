@@ -34,13 +34,23 @@ final class ViewerCellGeometryTests: XCTestCase {
         }
     }
 
+    /// 离屏 cell 挂到真实 UIWindow 强制完整布局链（cell.layoutIfNeeded 对孤儿视图不触发布局——CI 实测）
+    private func layoutInWindow(_ cell: UICollectionViewCell, frame: CGRect) {
+        let window = UIWindow(frame: frame)
+        window.addSubview(cell)
+        cell.frame = window.bounds.insetBy(dx: 0, dy: 0)
+        window.layoutIfNeeded()
+        cell.setNeedsLayout()
+        cell.layoutIfNeeded()
+    }
+
     // MARK: - R01/A1：imageView 尺寸
 
     /// 赋图并布局后：imageView.frame == zoomContentView.frame > 0，contentSize 与之一致（I5′）
     func testImageViewFrameMatchesZoomContentViewAfterImageApplied() {
         let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         cell.configure(item: makeItem(), image: makeImage())
-        cell.layoutIfNeeded()
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let zoom = cell.test_zoomContentView.frame
         XCTAssertGreaterThan(zoom.width, 0, "zoomContentView 必须有尺寸")
         XCTAssertGreaterThan(zoom.height, 0)
@@ -57,9 +67,7 @@ final class ViewerCellGeometryTests: XCTestCase {
         // B2 护栏：零 bounds 无图可显示 → 交互必须关闭（旧版 configure 直接置 true → 红点）
         XCTAssertFalse(cell.test_scrollView.isUserInteractionEnabled,
                        "B2：零 bounds 时禁止捏合交互")
-        cell.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        cell.setNeedsLayout()
-        cell.layoutIfNeeded()
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         XCTAssertEqual(cell.test_imageView.frame.size, cell.test_zoomContentView.frame.size,
                        "布局恢复后 imageView 必须拿到尺寸")
         XCTAssertGreaterThan(cell.test_imageView.frame.width, 0)
@@ -93,7 +101,7 @@ final class ViewerCellGeometryTests: XCTestCase {
     func testCenteringInsetUsesUntransformedBounds() {
         let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         cell.configure(item: makeItem(), image: makeImage(500, 200))
-        cell.layoutIfNeeded()
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let baseHeight = cell.test_zoomContentView.bounds.height
         XCTAssertEqual(baseHeight, 156, accuracy: 1.0, "aspectFit 基准高度应为 156")
         cell.test_scrollView.setZoomScale(2, animated: false)
@@ -111,7 +119,7 @@ final class ViewerCellGeometryTests: XCTestCase {
     func testShowCloudPlaceholderWorksEvenWhenItemNotMarkedCloudOnly() {
         let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         cell.configure(item: makeItem(isCloudOnly: false), image: nil)
-        cell.layoutIfNeeded()
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         XCTAssertTrue(cell.test_cloudBox.isHidden, "非云图回传前不主动占位")
         cell.showCloudPlaceholder()
         XCTAssertFalse(cell.test_cloudBox.isHidden,
@@ -122,7 +130,7 @@ final class ViewerCellGeometryTests: XCTestCase {
     func testCloudOnlyItemConfiguresPlaceholder() {
         let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         cell.configure(item: makeItem(isCloudOnly: true), image: nil)
-        cell.layoutIfNeeded()
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         XCTAssertFalse(cell.test_cloudBox.isHidden, "云图配置即应显示占位")
         XCTAssertTrue(cell.test_scrollView.isUserInteractionEnabled == false,
                       "占位态禁用捏合")

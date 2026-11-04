@@ -1,10 +1,12 @@
-// MARK: - 职责说明：照片库 SwiftUI 桥接与根视图（docs/05 M1；docs/16 M12 R05/R06/R07 重构）——
-// R05：顶部无 App 标题（.navigationTitle 移除；Info.plist 的 CFBundleDisplayName 是系统桌面名，不动）；
+// MARK: - 职责说明：照片库 SwiftUI 桥接与根视图（docs/05 M1；docs/16 M12 R05/R06/R07 重构 v2）——
+// R05：顶部无 App 标题（无 .navigationTitle；Info.plist 的 CFBundleDisplayName 是系统桌面名，不动）；
 // R06：五段 ScopePicker 整行移除 → 顶部栏「分类」菜单按钮（LibraryCategoryMenuBuilder，紧邻筛选，
 //      分类与筛选是两个独立控件，绝不合并）；
-// R07：TabView 移除 → 左上「工具」小按钮点开 ToolsView sheet；顶部栏按钮全部由 UIKit
-//      navigationItem 承载（LibraryViewController.setupNavigationItems——iOS 15.5 下 SwiftUI
-//      Toolbar/Menu 对 XCUITest 合成点击不可靠，docs/15 §3.2 六条 🟨 成因）。
+// R07：TabView 移除 → 左上「工具」小按钮点开 ToolsView sheet。
+// v2 关键（docs/16 §3.2「薄 UINavigationController host」路线）：SwiftUI NavigationView 内嵌
+// UIViewControllerRepresentable 的 navigationItem 不会显示（导航栈宿主是 SwiftUI 的 hosting VC）——
+// LibraryContainer 直接返回 UINavigationController(rootViewController:)，顶部栏按钮全部由 UIKit
+// navigationItem 承载（iOS 15.5 下 SwiftUI Toolbar/Menu 对 XCUITest 合成点击不可靠，docs/15 §3.2）。
 // 保留：授权四态、筛选空态、Vault fullScreenCover（Face ID）、查看器 ViewerContext、会话徽标、
 //       恢复横幅、隐私遮罩/App 锁（在 PhotoDeskApp）、UI 测试钩子。
 
@@ -40,58 +42,55 @@ struct LibraryRootView: View {
     #endif
 
     var body: some View {
-        NavigationView {
-            Group {
-                switch viewModel.viewState {
-                case .notDetermined:
-                    PermissionIntroView(mode: .intro) {
-                        Task { await viewModel.requestAccess() }
-                    }
-                case .denied:
-                    PermissionIntroView(mode: .denied) {
-                        Task { await viewModel.requestAccess() }
-                    }
-                case .restricted:
-                    PermissionIntroView(mode: .restricted, action: nil)
-                case .loading:
-                    DSEmptyState(kind: .loading)
-                case .empty:
-                    DSEmptyState(kind: .empty)
-                case .ready:
-                    // docs/16 M12：VStack 只剩网格（五段 ScopePicker 整行已移除 → 顶部栏分类菜单）
-                    ZStack {
-                        LibraryContainer(viewModel: viewModel,
-                                         onOpenViewer: { item in
-                                             viewerContext = ViewerContext(
-                                                 items: viewModel.filteredItems,
-                                                 startItemID: item.id,
-                                                 queryKey: viewModel.query.key)
-                                         },
-                                         selectionBridge: selectionBridge,
-                                         onOpenFilter: {
-                                             showFilterSheet = true
-                                         },
-                                         onOpenSearch: {
-                                             showSearch = true
-                                         },
-                                         onOpenMonthJump: {
-                                             showMonthJump = true
-                                         },
-                                         onOpenTools: {
-                                             showTools = true
-                                         },
-                                         onShowVault: {
-                                             showVault = true
-                                         })
-                        if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
-                            filterEmptyState
-                        }
+        Group {
+            switch viewModel.viewState {
+            case .notDetermined:
+                PermissionIntroView(mode: .intro) {
+                    Task { await viewModel.requestAccess() }
+                }
+            case .denied:
+                PermissionIntroView(mode: .denied) {
+                    Task { await viewModel.requestAccess() }
+                }
+            case .restricted:
+                PermissionIntroView(mode: .restricted, action: nil)
+            case .loading:
+                DSEmptyState(kind: .loading)
+            case .empty:
+                DSEmptyState(kind: .empty)
+            case .ready:
+                // docs/16 M12：只剩网格（五段 ScopePicker 整行已移除 → 顶部栏分类菜单）；
+                // 顶部栏由 LibraryContainer 的 UINavigationController 承载（无 App 标题）
+                ZStack {
+                    LibraryContainer(viewModel: viewModel,
+                                     onOpenViewer: { item in
+                                         viewerContext = ViewerContext(
+                                             items: viewModel.filteredItems,
+                                             startItemID: item.id,
+                                             queryKey: viewModel.query.key)
+                                     },
+                                     selectionBridge: selectionBridge,
+                                     onOpenFilter: {
+                                         showFilterSheet = true
+                                     },
+                                     onOpenSearch: {
+                                         showSearch = true
+                                     },
+                                     onOpenMonthJump: {
+                                         showMonthJump = true
+                                     },
+                                     onOpenTools: {
+                                         showTools = true
+                                     },
+                                     onShowVault: {
+                                         showVault = true
+                                     })
+                    if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
+                        filterEmptyState
                     }
                 }
             }
-            // R05：无 .navigationTitle——顶部栏由 UIKit navigationItem 承载（无 App 标题）
         }
-        .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
         .sheet(isPresented: $showSearch) {
             SearchView(items: viewModel.itemsSnapshot) { predicate in
                 // 「应用筛选到主库」（docs/09 D15）
@@ -243,6 +242,18 @@ struct LibraryRootView: View {
     }
 }
 
+/// 查看器承载视图（R01：onClose 复位 viewerContext；独立 View 规避 body 类型检查超时）
+private struct ViewerCover: View {
+    let context: ViewerContext
+    @Binding var viewerContext: ViewerContext?
+
+    var body: some View {
+        let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
+        ViewerContainer(viewModel: viewerViewModel,
+                        onClose: { viewerContext = nil })
+    }
+}
+
 /// UI 测试钩子（docs/09 Phase 0）：网格就绪后自动打开第 n 张查看器
 #if DEBUG
 private extension LibraryRootView {
@@ -276,23 +287,13 @@ private extension LibraryRootView {
 }
 #endif
 
-/// 查看器承载视图（R01：onClose 复位 viewerContext；独立 View 规避 body 类型检查超时）
-private struct ViewerCover: View {
-    let context: ViewerContext
-    @Binding var viewerContext: ViewerContext?
-
-    var body: some View {
-        let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
-        ViewerContainer(viewModel: viewerViewModel,
-                        onClose: { viewerContext = nil })
-    }
-}
-
-/// 多选模式桥（docs/04 §3.1「多选」入口）：SwiftUI/UIBarButtonItem → UIKit 控制器
+/// 多选模式桥（docs/04 §3.1「多选」入口）：UIBarButtonItem → UIKit 控制器
 final class SelectionModeBridge: ObservableObject {
     weak var controller: LibraryViewController?
 }
 
+/// 薄 UINavigationController host（docs/16 M12 §3.2）：
+/// LibraryViewController 作为导航根，顶部栏按钮由其 navigationItem 承载。
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel
     /// 点击 cell → 打开全屏浏览器（assetID 上下文，docs/09 D01）
@@ -309,7 +310,7 @@ struct LibraryContainer: UIViewControllerRepresentable {
     @AppStorage("grid.columns") private var gridColumns = 3
     @AppStorage("grid.sortAsc") private var sortAscending = false
 
-    func makeUIViewController(context: Context) -> LibraryViewController {
+    func makeUIViewController(context: Context) -> UINavigationController {
         let controller = LibraryViewController(viewModel: viewModel,
                                                pipeline: AppContainer.shared.imagePipeline,
                                                settings: AppContainer.shared.settings,
@@ -322,11 +323,16 @@ struct LibraryContainer: UIViewControllerRepresentable {
         controller.onOpenTools = onOpenTools
         controller.onShowVault = onShowVault
         selectionBridge.controller = controller
-        return controller
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.setNavigationBarHidden(false, animated: false)
+        return navigationController
     }
 
-    func updateUIViewController(_ controller: LibraryViewController, context: Context) {
+    func updateUIViewController(_ navigationController: UINavigationController, context: Context) {
+        guard let controller = navigationController.viewControllers.first as? LibraryViewController
+        else { return }
         controller.setColumns(gridColumns)
+        controller.onOpenViewer = onOpenViewer
         controller.onOpenFilter = onOpenFilter
         controller.onOpenSearch = onOpenSearch
         controller.onOpenMonthJump = onOpenMonthJump
