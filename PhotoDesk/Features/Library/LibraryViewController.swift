@@ -1148,8 +1148,6 @@ final class LibraryViewController: UIViewController {
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
             self.refreshCategoryCountsAsync()
-            // 位置记忆恢复（docs/09 D08；Phase 5 重写为 v2 策略）
-            self.restorePositionIfNeeded()
             // 多选中：筛选/pending 变化 → 选中集合收敛到新 scope（docs/09 D11 §3）
             if self.isSelecting {
                 let newScope = Set(self.currentItemsBySection.flatMap { $0.map(\.id) })
@@ -1157,11 +1155,18 @@ final class LibraryViewController: UIViewController {
                 self.reloadSelectionBadges()
                 self.updateSelectionCount()
             }
-            self.drainPendingSnapshot()   // apply 期间又来了新快照 → 排空
             #if DEBUG
             self.attemptDebugMonthJumpIfNeeded()   // 快照已提交：此时跳转校验必然可过
             self.attemptDebugChromeHooksIfNeeded() // M12：工具/分类/选择 scope 钩子（走同一条路径）
             #endif
+            // M12（验证轮 10 .ips 实锤）：apply completion 内不得嵌套再次 apply / 触发布局——
+            // 恢复与排空全部推迟到下一轮主循环（杜绝 _existingNumberOfItemsInSection abort）
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isViewLoaded else { return }
+                // 位置记忆恢复（docs/09 D08；docs/16 M12 R03 v2 策略）
+                self.restorePositionIfNeeded()
+                self.drainPendingSnapshot()   // apply 期间又来了新快照 → 下一轮排空
+            }
         }
     }
 

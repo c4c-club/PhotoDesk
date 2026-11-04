@@ -911,7 +911,7 @@ final class StabilityUITests: XCTestCase {
         // M12 R07：左上「工具」→ 工具 sheet（无 TabBar）
         let toolsEntry = anyElement(app, identifier: "Library-Tools")
         XCTAssertTrue(toolsEntry.waitForExistence(timeout: 5), "左上缺工具入口\n\(hierarchy(app))")
-        toolsEntry.tap()
+        tapBarElement(toolsEntry)   // M11 已证 scroll-to-visible 不可靠——坐标直达
         XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
                       "工具 sheet 未打开\n\(hierarchy(app))")
         assertAlive(app, "工具页")
