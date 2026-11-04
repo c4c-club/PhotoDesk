@@ -75,11 +75,27 @@ final class AssetRepository: AssetRepositoryProtocol {
         }.value
     }
 
-    /// M12 脚手架：恒 nil（基线行为——无锚点定位能力）→ 锚点窗口断言红锚点
-    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? { nil }
-
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {
         results[scope] = result
+    }
+
+    /// 锚点全局 index（R03）：PHAsset.fetchAssets 定位对象 → result.index(of:)（后台枚举，
+    /// 不阻塞主线程；找不到/已删除 → nil，调用方回退「最新 500」策略）
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? {
+        let result: PHFetchResult<PHAsset>
+        if let cached = results[scope] {
+            result = cached
+        } else {
+            result = await Self.makeResultInBackground(scope: scope, sortAscending: false)
+            results[scope] = result
+        }
+        guard result.count > 0 else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> Int? in
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject
+            else { return nil }
+            let index = result.index(of: asset)
+            return index == NSNotFound ? nil : index
+        }.value
     }
 
     func fetch(ids: [String]) async -> [PhotoItem] {

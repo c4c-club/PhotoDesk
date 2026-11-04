@@ -42,8 +42,9 @@ final class LibraryViewController: UIViewController {
         return label
     }()
     private let batchToast = DSToast(frame: .zero)
-    /// 底部 Toast 约束（多选时上移到 selectionBar 之上，docs/13 S05）
-    private var toastBottomConstraint: NSLayoutConstraint?
+    /// 底部 Toast 约束（R04：约束引用切换——safeArea / selectionBar 顶部二选一）
+    private var toastSafeAreaConstraint: NSLayoutConstraint?
+    private var toastAboveSelectionConstraint: NSLayoutConstraint?
     private let selectionOverlay: UIView = {
         let view = UIView()
         view.backgroundColor = DSColor.tint.withAlphaComponent(0.15)
@@ -64,18 +65,7 @@ final class LibraryViewController: UIViewController {
     private var boxBaseSelected: [String] = []
     private var boxDidMove = false
 
-    /// R03：恢复遮罩（先红批次脚手架：创建即隐藏、无任何逻辑——断言红由
-    /// LibraryPositionRestoreTests.testRestoreDoesNotOverwriteAnchorWithIntermediatePosition 锁定）
-    private let restoreMaskView: UIView = {
-        let view = UIView()
-        view.backgroundColor = DSColor.bgPrimary
-        view.isHidden = true
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.accessibilityIdentifier = "Library-RestoreMask"
-        return view
-    }()
-
-    // MARK: - 快照缓存    // MARK: - 快照缓存
+    // MARK: - 快照缓存
 
     private var currentSections: [MonthSection] = []
     private var currentItemsBySection: [[PhotoItem]] = []
@@ -101,6 +91,25 @@ final class LibraryViewController: UIViewController {
     private var isRestoringPosition = false
     private var didRestorePosition = false
     private var positionSaveTimer: Timer?
+    /// R03：锚点恢复流程进行中（首帧遮罩盖住网格；期间零位置回写，绝不把中间位置覆盖锚点）
+    private var isPositionRestoreInFlight = false
+    /// R03：恢复遮罩（锚点定位完成前盖住网格，用户看不到中间位置/两阶段跳转）
+    private let restoreMaskView: UIView = {
+        let view = UIView()
+        view.backgroundColor = DSColor.bgPrimary
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.accessibilityIdentifier = "Library-RestoreMask"
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        view.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ])
+        return view
+    }()
 
     init(viewModel: LibraryViewModel,
          pipeline: ImagePipelineProtocol,
@@ -157,6 +166,15 @@ final class LibraryViewController: UIViewController {
             }
         }
 
+        // R03：恢复遮罩盖住网格（锚点定位完成才移除——用户看不到「先在别处、再滚过去」）
+        view.addSubview(restoreMaskView)
+        NSLayoutConstraint.activate([
+            restoreMaskView.topAnchor.constraint(equalTo: view.topAnchor),
+            restoreMaskView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            restoreMaskView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            restoreMaskView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+
         // 月份跳转横幅（docs/13 S11）
         view.addSubview(jumpBanner)
         NSLayoutConstraint.activate([
@@ -192,13 +210,6 @@ final class LibraryViewController: UIViewController {
     }
 
     // MARK: - 构建
-
-    #if DEBUG
-    /// 单元测试断言锚点（R03 恢复遮罩 / R04 Toast 位置；Release 不编译）
-    var test_restoreMask: UIView { restoreMaskView }
-    var test_batchToast: DSToast { batchToast }
-    var test_selectionBar: UIView { selectionBar }
-    #endif
 
     private func setupCollectionView() {
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: makeLayout(columns: columns))
@@ -322,20 +333,35 @@ final class LibraryViewController: UIViewController {
     private func setupBatchToast() {
         batchToast.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(batchToast)
-        let bottomConstraint = batchToast.bottomAnchor.constraint(
+        // docs/16 M12 R04：约束引用切换（activate/deactivate），删除 -(84+12) 魔法数——
+        // 常规贴 safeArea 底部；多选时贴 selectionBar 顶部（间距同 token）
+        let safeAreaConstraint = batchToast.bottomAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.bottomAnchor,
             constant: -DSSpacing.toastBottomOffset)
-        toastBottomConstraint = bottomConstraint
+        let aboveSelectionConstraint = batchToast.bottomAnchor.constraint(
+            equalTo: selectionBar.topAnchor,
+            constant: -DSSpacing.toastBottomOffset)
+        toastSafeAreaConstraint = safeAreaConstraint
+        toastAboveSelectionConstraint = aboveSelectionConstraint
         NSLayoutConstraint.activate([
             batchToast.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: DSSpacing.screenPadding),
             batchToast.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -DSSpacing.screenPadding),
-            bottomConstraint,
+            safeAreaConstraint,
         ])
     }
 
-    /// Toast 底部位置随多选工具栏上移（docs/13 S05：多选时 bottom = -(84+12)，退出恢复）
+    /// R04：Toast 底部位置约束引用切换（多选 = selectionBar.topAnchor；常规 = safeArea 底部）
     private func updateToastPosition() {
-        toastBottomConstraint?.constant = isSelecting ? -(84 + 12) : -DSSpacing.toastBottomOffset
+        guard let safeAreaConstraint = toastSafeAreaConstraint,
+              let aboveSelectionConstraint = toastAboveSelectionConstraint else { return }
+        if isSelecting {
+            safeAreaConstraint.isActive = false
+            aboveSelectionConstraint.isActive = true
+        } else {
+            aboveSelectionConstraint.isActive = false
+            safeAreaConstraint.isActive = true
+        }
+        view.layoutIfNeeded()
     }
 
     // MARK: - 多选模式（docs/09 D12：顶部取消/计数/完成；操作行可横滚；D13：长按拖拽框选）
@@ -830,6 +856,19 @@ final class LibraryViewController: UIViewController {
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
 
+        // R03 前插补偿：记录「首可见 item」apply 前的布局 minY，apply 后同 item 的 minY 差值
+        // 精确补偿 contentOffset——锚点之前插入 section 时首可见 assetID 不得漂移（≤ 1 行不变量）
+        var compensationItem: PhotoItem?
+        var compensationMinYBefore: CGFloat?
+        if !collectionView.isTracking, !collectionView.isDecelerating {
+            if let firstVisible = collectionView.indexPathsForVisibleItems.sorted().first,
+               let item = dataSource.itemIdentifier(for: firstVisible) {
+                compensationItem = item
+                compensationMinYBefore = collectionView.collectionViewLayout
+                    .layoutAttributesForItem(at: firstVisible)?.frame.minY
+            }
+        }
+
         var diffable = NSDiffableDataSourceSnapshot<MonthSection, PhotoItem>()
         diffable.appendSections(pending.sections)
         for (section, items) in zip(pending.sections, pending.itemsBySection) {
@@ -846,6 +885,15 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
+            // R03：前插补偿（头部回填月份时首可见 assetID 不漂移）
+            if let item = compensationItem, let before = compensationMinYBefore,
+               let newPath = self.dataSource.indexPath(for: item),
+               let after = self.collectionView.collectionViewLayout
+                   .layoutAttributesForItem(at: newPath)?.frame.minY,
+               abs(after - before) > 0.5 {
+                self.collectionView.contentOffset.y += (after - before)
+                ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(after - before))")
+            }
             // 位置记忆恢复（docs/09 D08；Phase 5 重写为 v2 策略）
             self.restorePositionIfNeeded()
             // 多选中：筛选/pending 变化 → 选中集合收敛到新 scope（docs/09 D11 §3）
@@ -863,6 +911,11 @@ final class LibraryViewController: UIViewController {
     }
 
     #if DEBUG
+    /// 单元测试断言锚点（R03 恢复遮罩 / R04 Toast 位置）
+    var test_restoreMask: UIView { restoreMaskView }
+    var test_batchToast: DSToast { batchToast }
+    var test_selectionBar: UIView { selectionBar }
+
     /// docs/13 M11：viewDidLoad 应用 -uiTestingFilterYear（0 = 清空）。
     /// 等价用户在面板选年并应用（同一条 setFilter 路径）；每次 launch 只执行一次（viewDidLoad 语义）
     private func applyDebugFilterHookIfNeeded() {
@@ -902,9 +955,10 @@ final class LibraryViewController: UIViewController {
     private var resignActiveObserver: NSObjectProtocol?
 
     /// 统一保存入口：所有触发点都走这里（滚动停止 / 拖拽结束 / 消失 / 后台 / 跳转完成）
-    /// 保存用 currentSnapshotQueryKey（快照时的 key），不用 viewModel.query.key（S04 根因 3）
+    /// 保存用 currentSnapshotQueryKey（快照时的 key），不用 viewModel.query.key（S04 根因 3）。
+    /// R03：锚点恢复流程进行中一律不写（恢复期间的中间位置绝不能覆盖锚点）
     func savePositionNow(reason: String) {
-        guard positionStore.isEnabled, !isRestoringPosition,
+        guard positionStore.isEnabled, !isRestoringPosition, !isPositionRestoreInFlight,
               let queryKey = currentSnapshotQueryKey,
               !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
         guard let indexPath = collectionView.indexPathsForVisibleItems.sorted().first,
@@ -924,29 +978,36 @@ final class LibraryViewController: UIViewController {
 
     /// 每次 apply completion 后尝试恢复；策略：assetID → sectionID + itemIndexInSection → offsetRatio。
     /// 索引未完成且 assetID 找不到 → 保持 pending 等下一批（不提前放弃，S04 根因 1）。
+    /// R03：锚点存在期间显示遮罩 + 禁回写，定位完成（或回退完成）才移除。
     private func restorePositionIfNeeded() {
         // query 变化 → 重新加载该查询键的位置
         if lastRestoredQueryKey != currentSnapshotQueryKey {
             lastRestoredQueryKey = currentSnapshotQueryKey
             pendingRestorePosition = nil
             didRestorePosition = false
+            isPositionRestoreInFlight = false
+            hideRestoreMask()
         }
         if !didRestorePosition {
             guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
             didRestorePosition = true   // load 已尝试；找不到 asset 时由 pending 续等
             pendingRestorePosition = positionStore.load(queryKey: currentSnapshotQueryKey ?? viewModel.query.key)
+            if pendingRestorePosition != nil {
+                isPositionRestoreInFlight = true
+                showRestoreMask()
+            }
         }
         guard let position = pendingRestorePosition else { return }
         guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
 
-        // 策略 1：assetID 精确定位
+        // 策略 1：assetID 精确定位（R03 锚点窗口首屏即含锚点 → 首帧即位、零可见跳转）
         for (sectionIndex, items) in currentItemsBySection.enumerated() {
             if let itemIndex = items.firstIndex(where: { $0.id == position.assetID }) {
                 applyRestore(sectionIndex: sectionIndex, itemIndex: itemIndex, position: position, by: "asset")
                 return
             }
         }
-        // 索引未完成 → 等下一批快照再试（不标记完成）
+        // 索引未完成 → 等下一批快照再试（不标记完成；遮罩保持，禁回写）
         guard viewModel.isIndexComplete else {
             viewModel.debugRestoreNote = "restore=pending"
             return
@@ -971,6 +1032,8 @@ final class LibraryViewController: UIViewController {
         collectionView.scrollToItem(at: IndexPath(item: itemIndex, section: sectionIndex),
                                     at: .centeredVertically, animated: false)
         isRestoringPosition = false
+        // R03：恢复完成 → 移除遮罩、解除回写禁令（此后才能 savePositionNow）
+        finishPositionRestore()
         viewModel.debugRestoreNote = "restore=ok section=\(position.sectionID) by=\(strategy)"
         ViewerTrace.log("position.restore ok section=\(position.sectionID) idx=\(itemIndex) by=\(strategy)")
     }
@@ -982,8 +1045,25 @@ final class LibraryViewController: UIViewController {
         let scrollable = max(0, collectionView.contentSize.height - collectionView.bounds.height)
         collectionView.setContentOffset(CGPoint(x: 0, y: position.offsetRatio * scrollable), animated: false)
         isRestoringPosition = false
+        finishPositionRestore()
         viewModel.debugRestoreNote = "restore=ratio section=\(position.sectionID)"
         ViewerTrace.log("position.restore ratio section=\(position.sectionID)")
+        // R03 回退路径：锚点已失效 → 立即写一次新锚点（此后正常滚动回写接管）
+        savePositionNow(reason: "restore-fallback")
+    }
+
+    private func finishPositionRestore() {
+        isPositionRestoreInFlight = false
+        hideRestoreMask()
+    }
+
+    private func showRestoreMask() {
+        restoreMaskView.isHidden = false
+        view.bringSubviewToFront(restoreMaskView)
+    }
+
+    private func hideRestoreMask() {
+        restoreMaskView.isHidden = true
     }
 
     /// 月份/索引条跳转（docs/13 S09/S11）：校验 → 滚动 → 抵消粘性 header → 同步保存 → 顶部细横幅
@@ -1177,8 +1257,9 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // 位置记忆：滚动停止 0.3 秒兜底保存（docs/13 S04：0.5s → 0.3s）
-        guard !isRestoringPosition else { return }
+        // 位置记忆：滚动停止 0.3 秒兜底保存（docs/13 S04：0.5s → 0.3s）。
+        // R03：锚点恢复流程进行中不启动保存 Timer（中间位置绝不回写）
+        guard !isRestoringPosition, !isPositionRestoreInFlight else { return }
         positionSaveTimer?.invalidate()
         positionSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
             Task { @MainActor in
