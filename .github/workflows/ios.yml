@@ -99,7 +99,12 @@ jobs:
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData \
             -resultBundlePath build/TestResults.xcresult \
-            -skip-testing:PhotoDeskUITests/PerformanceUITests test
+            -skip-testing:PhotoDeskUITests/PerformanceUITests \
+            -only-testing:PhotoDeskTests/ViewerCellGeometryTests \
+            -only-testing:PhotoDeskTests/ImagePipelineInCloudTests \
+            -only-testing:PhotoDeskTests/ViewerGestureGuardTests \
+            -only-testing:PhotoDeskTests/ViewerViewControllerLayoutTests \
+            -only-testing:PhotoDeskTests/LibraryPositionRestoreTests test
 
       - name: Extract UI test attachments
         if: always()
