@@ -14,6 +14,8 @@ final class AppContainer: ObservableObject {
     let assetRepository: AssetRepositoryProtocol
     let imagePipeline: ImagePipelineProtocol
     let photoWriter = PhotoWriter()
+    /// 撤销倒计时唯一时钟（docs/16 M12 R04：DSToast 环 + UndoCenter 到期共用）
+    let undoCountdownDriver = UndoCountdownDriver()
     let undoCenter: UndoCenter
     let trashBin: TrashBin
     let vaultService = VaultService()
@@ -70,7 +72,8 @@ final class AppContainer: ObservableObject {
                                                  trashBin: trashBin,
                                                  undoCenter: undoCenter,
                                                  settings: settings,
-                                                 reviewSession: reviewSession)
+                                                 reviewSession: reviewSession,
+                                                 positionStore: positionStore)
 
     /// 浏览页每次打开新建：按 assetID 定位（docs/09 D01）
     func makeViewerViewModel(context: ViewerContext) -> ViewerViewModel {
@@ -122,7 +125,8 @@ final class AppContainer: ObservableObject {
         let writerRef = photoWriter
         imagePipeline = ImagePipeline(allowsNetworkAccess: { settingsRef.autoDownloadOriginal })
         trashBin = TrashBin(persistence: persistence, settings: settingsRef)
-        undoCenter = UndoCenter(writer: writerRef, trashBin: trashBin, persistence: persistence)
+        undoCenter = UndoCenter(writer: writerRef, trashBin: trashBin, persistence: persistence,
+                                countdownDriver: undoCountdownDriver)
         fingerprintService = FingerprintService(persistence: persistence)
         scanCoordinator = ScanCoordinator(repository: assetRepository,
                                           fingerprintService: fingerprintService,

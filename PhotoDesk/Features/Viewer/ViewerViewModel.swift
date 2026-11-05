@@ -165,6 +165,12 @@ final class ViewerViewModel: ObservableObject {
         onItemRestored?()
     }
 
+    /// staged 撤销窗口到期（docs/16 M12 R04：唯一时钟驱动到点调用）——
+    /// 撤销入口失效；会话暂存保持（整理回顾仍可处理），不做任何 PhotoKit 写
+    func expireStaged() {
+        lastStaged = nil
+    }
+
     var hasUndoableStaged: Bool { lastStaged != nil }
 
     // MARK: - 即时写动作（收藏 / 取消收藏 / 取消隐藏；docs/09 §2.4 动作策略表）

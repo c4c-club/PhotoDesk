@@ -58,6 +58,8 @@ final class LibraryPositionRestoreTests: XCTestCase {
     private var testDefaults: UserDefaults!
     private var testSuiteName: String = ""
     private var snapshots: [LibrarySnapshot] = []
+    /// 布局门禁要求集合视图在真实窗口内——窗口由测试类持有（局部变量会被释放）
+    private var hostWindow: UIWindow?
 
     override func setUp() async throws {
         // 测试隔离：清筛选持久化（同 LibraryViewModelTests 的 CI 实测根因规避）
@@ -85,6 +87,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         if !testSuiteName.isEmpty {
             UserDefaults().removePersistentDomain(forName: testSuiteName)
         }
+        hostWindow = nil
     }
 
     // MARK: - 夹具
@@ -122,10 +125,18 @@ final class LibraryPositionRestoreTests: XCTestCase {
 
     private func makeViewController(viewModel: LibraryViewModel,
                                     store: LibraryPositionStore) -> LibraryViewController {
-        LibraryViewController(viewModel: viewModel,
-                              pipeline: FakeAnchorPipeline(),
-                              settings: settings,
-                              positionStore: store)
+        let controller = LibraryViewController(viewModel: viewModel,
+                                               pipeline: FakeAnchorPipeline(),
+                                               settings: settings,
+                                               positionStore: store)
+        // M12：快照应用带布局门禁（集合视图须完成初次布局）——VC 视图挂真实 UIWindow
+        //（单测宿主内 UIWindow 布局链可用，ViewerCellGeometryTests 同款）
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.addSubview(controller.view)
+        controller.view.frame = window.bounds
+        window.layoutIfNeeded()
+        hostWindow = window   // 强持有（验证轮 18 实测：局部 window 释放后布局门禁永久挂起）
+        return controller
     }
 
     private func waitUntil(timeout: TimeInterval = 5,

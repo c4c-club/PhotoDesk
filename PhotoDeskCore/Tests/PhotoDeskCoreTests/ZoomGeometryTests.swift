@@ -123,6 +123,44 @@ final class ZoomGeometryTests: XCTestCase {
         XCTAssertEqual(rect, DoubleRect(x: 450, y: 450, width: 100, height: 100))
     }
 
+    // MARK: - M12 R02/B4：双击焦点 0 边界（x=0 / y=0 是合法点；旧实现 > 0 拒绝 → 双击边缘静默失败）
+
+    func testClampedZoomRectFocusAtXZeroReturnsRect() {
+        let rect = ZoomGeometry.clampedZoomRect(zoomScale: 2.5, focusX: 0, focusY: 50,
+                                                viewportWidth: 100, viewportHeight: 100,
+                                                imageWidth: 200, imageHeight: 200)
+        XCTAssertNotNil(rect, "x=0 是合法边界焦点：双击左边缘必须能缩放（docs/16 R02/B4）")
+        if let rect {
+            XCTAssertEqual(rect.width, 40, accuracy: 0.0001)
+            XCTAssertEqual(rect.x, 0, accuracy: 0.0001)
+        }
+    }
+
+    func testClampedZoomRectFocusAtYZeroReturnsRect() {
+        let rect = ZoomGeometry.clampedZoomRect(zoomScale: 2.5, focusX: 50, focusY: 0,
+                                                viewportWidth: 100, viewportHeight: 100,
+                                                imageWidth: 200, imageHeight: 200)
+        XCTAssertNotNil(rect, "y=0 是合法边界焦点：双击上边缘必须能缩放（docs/16 R02/B4）")
+        if let rect {
+            XCTAssertEqual(rect.y, 0, accuracy: 0.0001)
+        }
+    }
+
+    func testClampedZoomRectStillRejectsNegativeOrNaNFocus() {
+        XCTAssertNil(ZoomGeometry.clampedZoomRect(zoomScale: 2.5, focusX: -1, focusY: 50,
+                                                  viewportWidth: 100, viewportHeight: 100,
+                                                  imageWidth: 200, imageHeight: 200),
+                     "负数焦点仍拒绝")
+        XCTAssertNil(ZoomGeometry.clampedZoomRect(zoomScale: 2.5, focusX: 50, focusY: .nan,
+                                                  viewportWidth: 100, viewportHeight: 100,
+                                                  imageWidth: 200, imageHeight: 200),
+                     "NaN 焦点仍拒绝")
+        XCTAssertNil(ZoomGeometry.clampedZoomRect(zoomScale: 2.5, focusX: 50, focusY: .infinity,
+                                                  viewportWidth: 100, viewportHeight: 100,
+                                                  imageWidth: 200, imageHeight: 200),
+                     "∞ 焦点仍拒绝")
+    }
+
     // MARK: - sanitizedScale
 
     func testSanitizedScalePassThrough() {

@@ -106,6 +106,29 @@ jobs:
             -only-testing:PhotoDeskTests/ViewerViewControllerLayoutTests \
             -only-testing:PhotoDeskTests/LibraryPositionRestoreTests test
 
+      # M12 取证：UI 测试失败时 App 视觉现场（iOS 15 模拟器 AX 树可能整体失效——
+      # docs/15 §3.2 同源；simctl 截图不依赖 AX，是可靠取证通道）
+      - name: Capture simulator state on failure
+        if: failure()
+        run: |
+          mkdir -p build/screenshots
+          xcrun simctl io CI-iPhone13 screenshot build/screenshots/failure-sim-state.png || true
+          # M12 取证：App 自写崩溃日志（AppCrashLogger 记录 NSException 精确 reason）
+          APP_DATA=$(xcrun simctl get_app_container CI-iPhone13 com.example.PhotoDesk data 2>/dev/null || true)
+          if [ -n "$APP_DATA" ]; then
+            cp "$APP_DATA/Library/Application Support/Logs/last-exception.log" build/screenshots/last-exception.log 2>/dev/null || true
+            cp "$APP_DATA/Library/Application Support/Logs/signal-crash.log" build/screenshots/signal-crash.log 2>/dev/null || true
+            cp "$APP_DATA/Library/Application Support/Logs/viewer-trace.log" build/screenshots/viewer-trace.log 2>/dev/null || true
+            tail -40 "$APP_DATA/Library/Application Support/Logs/viewer-trace.log" 2>/dev/null || true
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: failure-screenshot
+          path: build/screenshots
+          if-no-files-found: ignore
+
       - name: Extract UI test attachments
         if: always()
         run: |

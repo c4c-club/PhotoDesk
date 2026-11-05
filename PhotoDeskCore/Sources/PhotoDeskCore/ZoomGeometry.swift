@@ -82,6 +82,8 @@ public enum ZoomGeometry {
 
     /// 双击缩放目标矩形（zoom(to:) 用，zooming view 未缩放坐标系）：
     /// 以 focus 为中心取 viewport/zoomScale 的矩形，钳制在图片范围内；非法输入返回 nil（不缩放）。
+    /// M12 R02/B4：focus 的 0 边界合法（双击图片左/上边缘必须生效）——旧实现要求 focusX/focusY > 0，
+    /// x=0 / y=0 返回 nil → 双击边缘静默失败；负数 / NaN / ∞ 仍拒绝。
     public static func clampedZoomRect(zoomScale: Double,
                                        focusX: Double, focusY: Double,
                                        viewportWidth: Double, viewportHeight: Double,
@@ -89,7 +91,9 @@ public enum ZoomGeometry {
         guard isSafePositive(viewportWidth), isSafePositive(viewportHeight),
               isSafePositive(imageWidth), isSafePositive(imageHeight) else { return nil }
         let scale = sanitizedScale(zoomScale)
-        guard scale.isFinite, scale > 0, isSafePositive(focusX), isSafePositive(focusY) else { return nil }
+        guard scale.isFinite, scale > 0,
+              focusX.isFinite, focusY.isFinite,
+              focusX >= 0, focusY >= 0 else { return nil }
 
         var width = viewportWidth / scale
         var height = viewportHeight / scale

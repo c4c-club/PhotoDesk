@@ -2,6 +2,8 @@
 // 灵敏度越高（阈值越小）越易触发；与设置项 gesture.sensitivity 一一对应。
 // 设置联动已于 M7 落地：App 侧 SwipeGestureEngine.config(for:) 每次判定时实时读取 gesture.sensitivity。
 
+import Foundation
+
 public enum Sensitivity: String, CaseIterable {
     /// 舒适：轻滑即触发
     case comfortable
@@ -27,4 +29,18 @@ public enum Sensitivity: String, CaseIterable {
         case .conservative: return 900
         }
     }
+}
+
+/// 拖动框选阈值（docs/16 M12 R08：全部魔法数收口，App 侧只引用不散落）
+public enum BoxSelectConfig {
+    /// 长按起手时长（s）
+    public static let minPressDuration: TimeInterval = 0.15
+    /// 进入框选的位移阈值（pt）
+    public static let moveThreshold: Double = 4
+    /// 上/下边缘自动滚动触发区高度（pt）
+    public static let autoScrollEdge: Double = 60
+    /// 自动滚动步长（pt/帧）
+    public static let autoScrollStep: Double = 10
+    /// 二维相交命中阈值（相交面积 / cell 面积；原生相册手感：扫过约 1/5 格即命中）
+    public static let hitThreshold: Double = 0.2
 }

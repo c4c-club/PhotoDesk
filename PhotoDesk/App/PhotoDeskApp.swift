@@ -1,7 +1,8 @@
-// MARK: - 职责说明：App 入口——两个 Tab：照片库 / 工具（docs/04 §2 信息架构）。
-// 照片库 Tab 由 LibraryRootView 驱动：授权引导 → 加载骨架 → 网格（空态/受限横幅随状态切换）。
-// docs/09 D06：App 锁覆盖层（冷启动/后台超时重新锁）+ scenePhase 隐私遮罩（防 App Switcher 截屏）。
-// 颜色一律取自 DesignSystem token（AGENTS.md §5）。
+// MARK: - 职责说明：App 入口——R07：无底部分页（TabView 移除），照片库即根视图；
+// 工具页由照片库左上「工具」按钮（Library-Tools）点开 sheet（docs/16 M12 §3）。
+// LibraryRootView 驱动：授权引导 → 加载骨架 → 网格（空态/受限横幅随状态切换）。
+// docs/09 D06：App 锁覆盖层（冷启动/后台超时重新锁）+ scenePhase 隐私遮罩（防 App Switcher 截屏），
+// zIndex 保持 1/2 不变。颜色一律取自 DesignSystem token（AGENTS.md §5）。
 
 import SwiftUI
 
@@ -24,15 +25,10 @@ struct PhotoDeskApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                TabView {
-                    LibraryRootView(viewModel: container.libraryViewModel,
-                                    service: container.libraryService,
-                                    undoCenter: container.undoCenter)
-                        .tabItem { Label("照片库", systemImage: "photo.stack") }
-
-                    ToolsView()
-                        .tabItem { Label("工具", systemImage: "wrench.and.screwdriver") }
-                }
+                // R07：直接放 LibraryRootView（无 TabBar；libraryViewModel 常驻不丢）
+                LibraryRootView(viewModel: container.libraryViewModel,
+                                service: container.libraryService,
+                                undoCenter: container.undoCenter)
                 // 隐私遮罩：切后台瞬间盖住内容（App 锁开启或保险箱已解锁时）
                 if scenePhase != .active,
                    container.appLock.lockEnabled || container.vaultService.isUnlocked {

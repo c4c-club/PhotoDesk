@@ -158,8 +158,9 @@ final class PhotoGridCell: UICollectionViewCell {
         updateBadges(item: item)
         accessibilityLabel = Self.accessibilityLabel(for: item)
         #if DEBUG
-        // UI 测试（docs/09 D01/D11）：cell 可查询 assetID；选中态由 setSelected 追加 "selected"
-        accessibilityValue = item.id
+        // UI 测试（docs/09 D01/D11）：cell 可查询 assetID；选中态后缀按当前态同步——
+        // R08：configure 重置 value 后必须立刻补 selected/none（cell 复用后徽标/AX 不一致的根因）
+        accessibilityValue = item.id + (isSelectedCell ? " selected" : " none")
         #endif
 
         imageView.image = nil

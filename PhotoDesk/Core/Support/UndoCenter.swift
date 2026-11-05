@@ -45,21 +45,21 @@ final class UndoCenter: ObservableObject {
     private let trashBin: TrashBin?
     private let persistence: PersistenceController
     private let clock: Clock
-    private var ticker: Timer?
+    /// R04：唯一倒计时驱动（与 DSToast 环共用同一泵——环归零 / 按钮失效 / 实际撤销截止同刻）
+    private let countdownDriver: UndoCountdownDriver
+    private var countdownSession: UUID?
 
     init(writer: PhotoWriterProtocol,
          trashBin: TrashBin? = nil,
          persistence: PersistenceController = .shared,
          clock: Clock = SystemClock(),
          countdownDriver: UndoCountdownDriver? = nil) {
-        // M12 R04 先红批次脚手架：驱动已注入但尚未接线（保留旧 0.25s 自建 Timer——
-        // 断言红由 DSToastUndoTests.testCountdownAndUndoExpireTogether 锁定）；实现提交替换
-        // 默认驱动就地创建（默认参数会在非隔离上下文求值，不能写进参数默认值）
         self.writer = writer
         self.trashBin = trashBin
         self.persistence = persistence
         self.clock = clock
-        _ = countdownDriver   // 脚手架：未接线
+        // 默认驱动就地创建（默认参数会在非隔离上下文求值，不能写进参数默认值）
+        self.countdownDriver = countdownDriver ?? UndoCountdownDriver()
     }
 
     // MARK: - 入栈（执行成功后调用）
@@ -80,7 +80,7 @@ final class UndoCenter: ObservableObject {
                           expiresAt: clock.now.addingTimeInterval(window))
         activeEntry = entry
         persist(entry)
-        startTicker()
+        startCountdown()
         return entry
     }
 
@@ -90,7 +90,7 @@ final class UndoCenter: ObservableObject {
     func undo() async -> Entry? {
         guard let entry = activeEntry else { return nil }
         activeEntry = nil
-        stopTicker()
+        cancelCountdown()
         do {
             switch entry.kind {
             case .favorite:           try await writer.setFavorite(ids: entry.assetIDs, isFavorite: false)
@@ -111,7 +111,7 @@ final class UndoCenter: ObservableObject {
         } catch {
             // 撤销失败：保留条目（窗口内可重试）
             activeEntry = entry
-            startTicker()
+            startCountdown()
             return nil
         }
     }
@@ -119,7 +119,7 @@ final class UndoCenter: ObservableObject {
     func dismissActive() {
         guard let entry = activeEntry else { return }
         activeEntry = nil
-        stopTicker()
+        cancelCountdown()
         markUndone(entry)
     }
 
@@ -144,32 +144,34 @@ final class UndoCenter: ObservableObject {
                           createdAt: row.createdAt,
                           expiresAt: row.expiresAt)
         activeEntry = entry
-        startTicker()
+        startCountdown()
         return entry
     }
 
-    // MARK: - 过期计时
+    // MARK: - 过期计时（R04：唯一时钟驱动，替换旧 0.25s 自建 Timer）
 
-
-    private func startTicker() {
-        stopTicker()
-        ticker = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-            guard let weakSelf = self else { return }
-            Task { @MainActor in
-                weakSelf.expireIfNeeded()
-            }
-        }
+    private func startCountdown() {
+        cancelCountdown()
+        guard let entry = activeEntry else { return }
+        let remaining = max(0.05, entry.expiresAt.timeIntervalSince(clock.now))
+        countdownSession = countdownDriver.start(duration: remaining,
+                                                 onTick: nil,
+                                                 onExpire: { [weak self] in
+                                                     self?.expireIfNeeded()
+                                                 })
     }
 
-    private func stopTicker() {
-        ticker?.invalidate()
-        ticker = nil
+    private func cancelCountdown() {
+        if let session = countdownSession {
+            countdownDriver.cancel(id: session)
+            countdownSession = nil
+        }
     }
 
     private func expireIfNeeded() {
         guard let entry = activeEntry, clock.now >= entry.expiresAt else { return }
         activeEntry = nil
-        stopTicker()
+        cancelCountdown()
         removeRow(id: entry.id)
         onExpire?(entry)
     }

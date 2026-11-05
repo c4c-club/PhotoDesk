@@ -17,6 +17,9 @@ enum DSMotion {
     static let springVelocity: CGFloat = 0.3
     /// 双击缩放回弹（spring，较短）
     static let zoomDuration: TimeInterval = 0.25
+    /// 缩放事务宽限窗口（docs/16 M12 R02/B1：scrollViewDidZoom 后该时间内仍视为缩放事务中，
+    /// 删除/隐藏事务与 pan 一律 guard 早退）
+    static let zoomActivityGrace: TimeInterval = 0.4
 
     /// 统一 easeOut 参数（Toast/淡入淡出共用）
     static var fadeOptions: UIView.AnimationOptions { [.curveEaseOut, .beginFromCurrentState] }

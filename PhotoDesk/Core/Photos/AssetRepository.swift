@@ -16,6 +16,8 @@ protocol AssetRepositoryProtocol: AnyObject {
     func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem]
     /// 锚点 assetID 在完整结果中的全局 index（docs/16 M12 R03 锚点窗口用；找不到返回 nil）
     func globalIndex(of assetID: String, scope: PhotoScope) async -> Int?
+    /// scope 只读计数（docs/16 M12 R06 分类菜单用：不切换 results、不触碰主库快照）
+    func count(scope: PhotoScope) async -> Int
     /// 按 id 批量取（Vault 合并待隐藏项用；docs/09 D05）
     func fetch(ids: [String]) async -> [PhotoItem]
     /// 当前 scope 的底层结果（PhotoChangeObserver 监听用）
@@ -75,11 +77,27 @@ final class AssetRepository: AssetRepositoryProtocol {
         }.value
     }
 
-    /// M12 脚手架：恒 nil（基线行为——无锚点定位能力）→ 锚点窗口断言红锚点
-    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? { nil }
-
     func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {
         results[scope] = result
+    }
+
+    /// 锚点全局 index（R03）：PHAsset.fetchAssets 定位对象 → result.index(of:)（后台枚举，
+    /// 不阻塞主线程；找不到/已删除 → nil，调用方回退「最新 500」策略）
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? {
+        let result: PHFetchResult<PHAsset>
+        if let cached = results[scope] {
+            result = cached
+        } else {
+            result = await Self.makeResultInBackground(scope: scope, sortAscending: false)
+            results[scope] = result
+        }
+        guard result.count > 0 else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> Int? in
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject
+            else { return nil }
+            let index = result.index(of: asset)
+            return index == NSNotFound ? nil : index
+        }.value
     }
 
     func fetch(ids: [String]) async -> [PhotoItem] {
@@ -88,6 +106,13 @@ final class AssetRepository: AssetRepositoryProtocol {
         return await Task.detached(priority: .userInitiated) { () -> [PhotoItem] in
             let result = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
             return (0..<result.count).map { repository.map(result.object(at: $0)) }
+        }.value
+    }
+
+    /// scope 只读计数（R06 分类菜单；后台建查询取 count，不缓存、不切换 results）
+    func count(scope: PhotoScope) async -> Int {
+        await Task.detached(priority: .userInitiated) {
+            Self.makeFetchResult(scope: scope, sortAscending: false).count
         }.value
     }
 

@@ -1,54 +1,33 @@
-// MARK: - 职责说明：照片库 SwiftUI 桥接与根视图（docs/05 M1 任务 1.4/1.8；docs/09 Phase 2 重做）——
-// LibraryRootView：顶部五段 ScopePicker（全部/收藏/视频/截图/已隐藏）+ 筛选栏 + 网格 + 会话徽标；
-// 「已隐藏」弹出 VaultView（fullScreenCover）；筛选无结果空态（清除筛选）；筛选面板 sheet。
-// LibraryContainer：UIViewControllerRepresentable 包装 LibraryViewController（UIKit 网格）。
-// 查看器打开走 ViewerContext（assetID 定位，docs/09 D01）。
+// MARK: - 职责说明：照片库 SwiftUI 桥接与根视图（docs/05 M1；docs/16 M12 R05/R06/R07 重构 v2）——
+// R05：顶部无 App 标题（无 .navigationTitle；Info.plist 的 CFBundleDisplayName 是系统桌面名，不动）；
+// R06：五段 ScopePicker 整行移除 → 顶部栏「分类」菜单按钮（LibraryCategoryMenuBuilder，紧邻筛选，
+//      分类与筛选是两个独立控件，绝不合并）；
+// R07：TabView 移除 → 左上「工具」小按钮点开 ToolsView sheet。
+// v2 关键（docs/16 §3.2「薄 UINavigationController host」路线）：SwiftUI NavigationView 内嵌
+// UIViewControllerRepresentable 的 navigationItem 不会显示（导航栈宿主是 SwiftUI 的 hosting VC）——
+// LibraryContainer 直接返回 UINavigationController(rootViewController:)，顶部栏按钮全部由 UIKit
+// navigationItem 承载（iOS 15.5 下 SwiftUI Toolbar/Menu 对 XCUITest 合成点击不可靠，docs/15 §3.2）。
+// 保留：授权四态、筛选空态、Vault fullScreenCover（Face ID）、查看器 ViewerContext、会话徽标、
+//       恢复横幅、隐私遮罩/App 锁（在 PhotoDeskApp）、UI 测试钩子。
 
 import SwiftUI
 import UIKit
-
-/// 顶部视图切换（docs/09 D15：全部/收藏/视频/截图/已隐藏）
-enum LibraryScopeOption: String, CaseIterable, Identifiable {
-    case all, favorites, videos, screenshots, hidden
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all:         return "全部"
-        case .favorites:   return "收藏"
-        case .videos:      return "视频"
-        case .screenshots: return "截图"
-        case .hidden:      return "已隐藏"
-        }
-    }
-
-    var scope: PhotoScope? {
-        switch self {
-        case .all:         return .all
-        case .favorites:   return .favorites
-        case .videos:      return .videos
-        case .screenshots: return .screenshots
-        case .hidden:      return nil   // 走 VaultView，不是普通 scope
-        }
-    }
-}
 
 struct LibraryRootView: View {
     @ObservedObject var viewModel: LibraryViewModel
     @ObservedObject var service: PhotoLibraryService
     @ObservedObject var undoCenter: UndoCenter
-    /// 五段切换选中项（.hidden 只短暂存在，立即回弹并弹出 Vault）
-    @State private var scopeOption: LibraryScopeOption = .all
     @State private var viewerContext: ViewerContext?
     @State private var showSearch = false
     @State private var showFilterSheet = false
     @State private var showMonthJump = false
     @State private var showVault = false
+    /// R07：左上「工具」按钮 → ToolsView sheet
+    @State private var showTools = false
     @State private var showSessionReview = false
     /// 排序接线（docs/09 D10）：外观设置页 @AppStorage("grid.sortAsc") 变化 → 查询重载
     @AppStorage("grid.sortAsc") private var sortAscending = false
-    /// 「多选」工具栏按钮 → UIKit 控制器桥
+    /// 「多选」按钮 → UIKit 控制器桥
     @StateObject private var selectionBridge = SelectionModeBridge()
     /// 重启恢复横幅（docs/05 M3 验收：重启后 10 秒内提示「上次有 N 个操作可撤销」）
     @State private var recoveryCount = 0
@@ -58,107 +37,60 @@ struct LibraryRootView: View {
     #if DEBUG
     /// UI 测试钩子：-uiTestingViewerStartIndex 启动即打开第 n 张查看器（只触发一次）
     @State private var hookViewerOpened = false
-    /// UI 测试钩子：网格就绪后自动打开筛选/月份面板（docs/13 M11——SwiftUI 导航栏按钮对
-    /// XCUITest 合成点击不响应（CI 两轮实测），测试改走启动钩子；仅 DEBUG + 启动参数）
+    /// UI 测试钩子：网格就绪后自动打开筛选/月份面板（docs/13 M11）
     @State private var hookSheetOpened = false
     #endif
 
     var body: some View {
-        NavigationView {
-            Group {
-                switch viewModel.viewState {
-                case .notDetermined:
-                    PermissionIntroView(mode: .intro) {
-                        Task { await viewModel.requestAccess() }
-                    }
-                case .denied:
-                    PermissionIntroView(mode: .denied) {
-                        Task { await viewModel.requestAccess() }
-                    }
-                case .restricted:
-                    PermissionIntroView(mode: .restricted, action: nil)
-                case .loading:
-                    DSEmptyState(kind: .loading)
-                case .empty:
-                    DSEmptyState(kind: .empty)
-                case .ready:
-                    // docs/13 S06：VStack 只保留 ScopePicker + 网格（顶部筛选栏已移除，入口在导航栏）
-                    VStack(spacing: 0) {
-                        scopePicker
-                        ZStack {
-                            LibraryContainer(viewModel: viewModel,
-                                             onOpenViewer: { item in
-                                                 viewerContext = ViewerContext(
-                                                     items: viewModel.filteredItems,
-                                                     startItemID: item.id,
-                                                     queryKey: viewModel.query.key)
-                                             },
-                                             selectionBridge: selectionBridge,
-                                             onOpenFilter: {
-                                                 showFilterSheet = true
-                                             })
-                            if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
-                                filterEmptyState
-                            }
-                        }
-                    }
+        Group {
+            switch viewModel.viewState {
+            case .notDetermined:
+                PermissionIntroView(mode: .intro) {
+                    Task { await viewModel.requestAccess() }
                 }
-            }
-            .navigationTitle("照片管家")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    SessionBadgeView(session: AppContainer.shared.reviewSession) {
-                        showSessionReview = true
-                    }
+            case .denied:
+                PermissionIntroView(mode: .denied) {
+                    Task { await viewModel.requestAccess() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    // docs/13 S09：「月份」跳转面板
-                    Button {
-                        showMonthJump = true
-                    } label: {
-                        Image(systemName: "calendar")
+            case .restricted:
+                PermissionIntroView(mode: .restricted, action: nil)
+            case .loading:
+                DSEmptyState(kind: .loading)
+            case .empty:
+                DSEmptyState(kind: .empty)
+            case .ready:
+                // docs/16 M12：只剩网格（五段 ScopePicker 整行已移除 → 顶部栏分类菜单）；
+                // 顶部栏由 LibraryContainer 的 UINavigationController 承载（无 App 标题）
+                ZStack {
+                    LibraryContainer(viewModel: viewModel,
+                                     onOpenViewer: { item in
+                                         viewerContext = ViewerContext(
+                                             items: viewModel.filteredItems,
+                                             startItemID: item.id,
+                                             queryKey: viewModel.query.key)
+                                     },
+                                     selectionBridge: selectionBridge,
+                                     onOpenFilter: {
+                                         showFilterSheet = true
+                                     },
+                                     onOpenSearch: {
+                                         showSearch = true
+                                     },
+                                     onOpenMonthJump: {
+                                         showMonthJump = true
+                                     },
+                                     onOpenTools: {
+                                         showTools = true
+                                     },
+                                     onShowVault: {
+                                         showVault = true
+                                     })
+                    if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
+                        filterEmptyState
                     }
-                    .accessibilityIdentifier("Library-MonthJump")
-                    .accessibilityLabel("按月份跳转")
-                    .disabled(viewModel.viewState != .ready)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    // docs/13 S06：筛选入口（导航栏按钮，active 时实心图标），位于搜索左侧
-                    Button {
-                        showFilterSheet = true
-                    } label: {
-                        Image(systemName: viewModel.query.filter.isActive
-                              ? "line.3.horizontal.decrease.circle.fill"
-                              : "line.3.horizontal.decrease.circle")
-                    }
-                    .accessibilityIdentifier("Library-Filter")
-                    .accessibilityLabel("筛选")
-                    .disabled(viewModel.viewState != .ready)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSearch = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
-                    .accessibilityLabel("搜索与筛选")
-                    .disabled(viewModel.viewState != .ready)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    // docs/04 §3.1 底部工具栏「多选」入口（导航栏承载；与长按进入等价）
-                    Button {
-                        selectionBridge.controller?.toggleSelectionMode()
-                    } label: {
-                        Image(systemName: "checkmark.circle")
-                    }
-                    .accessibilityIdentifier("Library-Select")
-                    .accessibilityLabel("多选")
-                    .disabled(viewModel.viewState != .ready)
                 }
             }
         }
-        .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
         .sheet(isPresented: $showSearch) {
             SearchView(items: viewModel.itemsSnapshot) { predicate in
                 // 「应用筛选到主库」（docs/09 D15）
@@ -180,6 +112,10 @@ struct LibraryRootView: View {
                            onScrollToTop: {
                                selectionBridge.controller?.scrollToTop()
                            })
+        }
+        .sheet(isPresented: $showTools) {
+            // R07：工具页改左上入口 sheet（保留 NavigationView(.stack) 支撑子页推入）
+            ToolsView()
         }
         .sheet(isPresented: $showSessionReview) {
             SessionReviewView(session: AppContainer.shared.reviewSession,
@@ -222,7 +158,8 @@ struct LibraryRootView: View {
             }
         }
         .fullScreenCover(item: $viewerContext) { context in
-            ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))
+            // 拆小表达式（docs/13 轮 6：复杂泛型链会拖垮类型检查——独立 View 承载）
+            ViewerCover(context: context, viewerContext: $viewerContext)
         }
         .onAppear {
             Task { await viewModel.start() }
@@ -231,7 +168,7 @@ struct LibraryRootView: View {
             undoCenter.restoreLatestIfNeeded()
             showRecovery = recoveryCount > 0
         #if DEBUG
-        runHooksIfNeeded()
+            runHooksIfNeeded()
         #endif
         }
         .onChange(of: viewModel.viewState) { _ in
@@ -277,45 +214,6 @@ struct LibraryRootView: View {
         #endif
     }
 
-    // MARK: - 顶部五段切换
-
-    private var scopePicker: some View {
-        Picker("视图", selection: $scopeOption) {
-            ForEach(LibraryScopeOption.allCases) { option in
-                Text(option.title).tag(option)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, DSSpacing.screenPadding)
-        .padding(.vertical, 6)
-        .accessibilityIdentifier("Library-ScopePicker")
-        .onChange(of: scopeOption) { option in
-            handleScopeChange(option)
-        }
-    }
-
-    private func handleScopeChange(_ option: LibraryScopeOption) {
-        guard let scope = option.scope else {
-            // 「已隐藏」：弹出 Vault（docs/09 D15）；关闭后回弹到原 scope
-            showVault = true
-            DispatchQueue.main.async {
-                scopeOption = scopeBeforeHidden
-            }
-            return
-        }
-        Task { await viewModel.setScope(scope) }
-    }
-
-    /// 进入「已隐藏」前的 scope（回弹目标）
-    private var scopeBeforeHidden: LibraryScopeOption {
-        switch viewModel.query.scope {
-        case .favorites: return .favorites
-        case .videos:    return .videos
-        case .screenshots: return .screenshots
-        default:         return .all
-        }
-    }
-
     // MARK: - 筛选无结果空态（docs/09 D10 §6）
 
     private var filterEmptyState: some View {
@@ -341,6 +239,18 @@ struct LibraryRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(ds: DSColor.bgPrimary))
+    }
+}
+
+/// 查看器承载视图（R01：onClose 复位 viewerContext；独立 View 规避 body 类型检查超时）
+private struct ViewerCover: View {
+    let context: ViewerContext
+    @Binding var viewerContext: ViewerContext?
+
+    var body: some View {
+        let viewerViewModel = AppContainer.shared.makeViewerViewModel(context: context)
+        ViewerContainer(viewModel: viewerViewModel,
+                        onClose: { viewerContext = nil })
     }
 }
 
@@ -374,27 +284,33 @@ private extension LibraryRootView {
             showMonthJump = true
         }
     }
-
 }
 #endif
 
-/// 多选模式桥（docs/04 §3.1 底部工具栏「多选」入口）：SwiftUI 工具栏按钮 → UIKit 控制器
+/// 多选模式桥（docs/04 §3.1「多选」入口）：UIBarButtonItem → UIKit 控制器
 final class SelectionModeBridge: ObservableObject {
     weak var controller: LibraryViewController?
 }
 
+/// 薄 UINavigationController host（docs/16 M12 §3.2）：
+/// LibraryViewController 作为导航根，顶部栏按钮由其 navigationItem 承载。
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel
     /// 点击 cell → 打开全屏浏览器（assetID 上下文，docs/09 D01）
     let onOpenViewer: (PhotoItem) -> Void
-    /// 工具栏「多选」按钮与 UIKit 控制器的桥
+    /// 「多选」按钮与 UIKit 控制器的桥
     let selectionBridge: SelectionModeBridge
     /// 多选操作行「筛选」按钮 → 打开筛选面板（docs/13 S06）
     let onOpenFilter: () -> Void
+    /// M12 R05/R06/R07：唯一顶部栏回调（UIKit navigationItem 按钮 → SwiftUI sheet/cover）
+    let onOpenSearch: () -> Void
+    let onOpenMonthJump: () -> Void
+    let onOpenTools: () -> Void
+    let onShowVault: () -> Void
     @AppStorage("grid.columns") private var gridColumns = 3
     @AppStorage("grid.sortAsc") private var sortAscending = false
 
-    func makeUIViewController(context: Context) -> LibraryViewController {
+    func makeUIViewController(context: Context) -> UINavigationController {
         let controller = LibraryViewController(viewModel: viewModel,
                                                pipeline: AppContainer.shared.imagePipeline,
                                                settings: AppContainer.shared.settings,
@@ -402,13 +318,26 @@ struct LibraryContainer: UIViewControllerRepresentable {
         controller.setColumns(gridColumns)
         controller.onOpenViewer = onOpenViewer
         controller.onOpenFilter = onOpenFilter
+        controller.onOpenSearch = onOpenSearch
+        controller.onOpenMonthJump = onOpenMonthJump
+        controller.onOpenTools = onOpenTools
+        controller.onShowVault = onShowVault
         selectionBridge.controller = controller
-        return controller
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.setNavigationBarHidden(false, animated: false)
+        return navigationController
     }
 
-    func updateUIViewController(_ controller: LibraryViewController, context: Context) {
+    func updateUIViewController(_ navigationController: UINavigationController, context: Context) {
+        guard let controller = navigationController.viewControllers.first as? LibraryViewController
+        else { return }
         controller.setColumns(gridColumns)
+        controller.onOpenViewer = onOpenViewer
         controller.onOpenFilter = onOpenFilter
+        controller.onOpenSearch = onOpenSearch
+        controller.onOpenMonthJump = onOpenMonthJump
+        controller.onOpenTools = onOpenTools
+        controller.onShowVault = onShowVault
         selectionBridge.controller = controller
     }
 }

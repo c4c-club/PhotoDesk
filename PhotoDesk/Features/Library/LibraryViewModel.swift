@@ -71,6 +71,8 @@ final class LibraryViewModel: ObservableObject {
     private let undoCenter: UndoCenter
     private let settings: SettingsStore
     private let reviewSession: ReviewSessionController
+    /// 位置记忆（docs/16 M12 R03：锚点窗口首屏；nil = 测试注入缺省，走「最新 500」）
+    private let positionStore: LibraryPositionStore?
     private let batchSize = AssetRepository.batchSize
 
     // MARK: - 内部状态
@@ -79,6 +81,8 @@ final class LibraryViewModel: ObservableObject {
     private var changeObserver: PhotoChangeObserver?
     private var hasLoadedOnce = false
     private var indexingTask: Task<Void, Never>?
+    /// 首批窗口在全量结果中的起始 offset（R03：锚点窗口 > 0 时，头部月份延后回填）
+    private var firstBatchWindowStart = 0
 
     init(service: PhotoLibraryService,
          repository: AssetRepositoryProtocol,
@@ -97,6 +101,7 @@ final class LibraryViewModel: ObservableObject {
         self.undoCenter = undoCenter
         self.settings = settings
         self.reviewSession = reviewSession
+        self.positionStore = positionStore
         // 初始排序跟随设置（grid.sortAsc，docs/09 D10 接线）
         query.sortAscending = settings.sortAscending
         // 筛选持久化（docs/09 D10：library.filter.<scope>，各 scope 独立保留）
@@ -137,11 +142,13 @@ final class LibraryViewModel: ObservableObject {
     /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
     /// debugRestoreNote：位置恢复状态（restore=ok/pending/ratio，docs/13 S04；VC 写入）
     var debugRestoreNote = ""
+    /// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）
+    var debugScrollNote = ""
     var debugSummary: String {
         "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
             "sections=\(sections.count) indexing=\(isIndexing) done=\(isIndexComplete) " +
             "del=\(reviewSession.pendingDeleteCount) hide=\(reviewSession.pendingHideCount)" +
-            (debugRestoreNote.isEmpty ? "" : " \(debugRestoreNote)")
+            (debugRestoreNote.isEmpty ? "" : " \(debugRestoreNote)") + " \(debugScrollNote)"
     }
 
     /// 浏览页/搜索快照入口：当前筛选结果（docs/09 §2.1 单一事实来源）
@@ -151,6 +158,15 @@ final class LibraryViewModel: ObservableObject {
     /// 库侧撤销（批量操作 Toast / 重启恢复横幅共用）：PhotoKit 反向写后经 observer 增量同步网格
     func undoLatest() async {
         _ = await undoCenter.undo()
+    }
+
+    /// 分类菜单异步计数（docs/16 M12 R06）：只读、不切换 results；
+    /// 仅基于授权可见资产、主库不含隐藏（PhotoFetchOptions.includeHiddenAssets = false）；
+    /// hidden 不计数（解锁前不泄露数量，调用方已挡）。
+    func count(scope: PhotoScope) async -> Int? {
+        guard scope != .hidden else { return nil }
+        if scope == query.scope { return filteredItems.count }
+        return await repository.count(scope: scope)
     }
 
     // MARK: - 查询更新（D10）
@@ -267,14 +283,29 @@ final class LibraryViewModel: ObservableObject {
             viewState = .empty
             return
         }
-        allItems = await repository.fetch(scope: query.scope,
-                                          offset: 0,
-                                          limit: min(batchSize, totalCount))
+        // docs/16 M12 R03：锚点窗口优先——首批以锚点为中心（前后各半批），锚点页首帧即位、零可见跳转；
+        // 锚点已删除/不在结果中 → 回退「最新 500」（windowStart = 0）
+        allItems = await fetchFirstBatch()
         indexProgress = (allItems.count, totalCount)
         isIndexComplete = allItems.count >= totalCount
         rebuildDerived(animated: false)
         viewState = .ready
         startIndexCompletion()
+    }
+
+    /// 首批窗口：有锚点 → 以锚点为中心；无锚点 → 最新 batchSize（每批 ≤ 500，分批 fetch 规则不变）
+    private func fetchFirstBatch() async -> [PhotoItem] {
+        var windowStart = 0
+        if let anchor = positionStore?.load(queryKey: query.key) {
+            if let anchorIndex = await repository.globalIndex(of: anchor.assetID, scope: query.scope) {
+                windowStart = max(0, anchorIndex - batchSize / 2)
+                ViewerTrace.log("anchor-window key=\(query.key.prefix(8)) anchorIdx=\(anchorIndex) start=\(windowStart)")
+            }
+        }
+        firstBatchWindowStart = windowStart
+        let limit = min(batchSize, totalCount - windowStart)
+        guard limit > 0 else { return [] }
+        return await repository.fetch(scope: query.scope, offset: windowStart, limit: limit)
     }
 
     /// 后台补齐全量索引（500/批；每 2,000 条合并一次重建，docs/09 §2.2）
@@ -297,9 +328,11 @@ final class LibraryViewModel: ObservableObject {
             isIndexing = false
             indexProgress = (min(allItems.count, totalCount), totalCount)
         }
-        while !Task.isCancelled, allItems.count < totalCount {
+        // 尾部补齐：从首批窗口末尾继续（R03：窗口 > 0 时 offset 不再等于 allItems.count）
+        var tailOffset = firstBatchWindowStart + allItems.count
+        while !Task.isCancelled, tailOffset < totalCount {
             let page = await repository.fetch(scope: query.scope,
-                                              offset: allItems.count,
+                                              offset: tailOffset,
                                               limit: batchSize)
             guard !page.isEmpty, !Task.isCancelled else { break }
             // docs/13 S03 修复 5：追加去重（索引期间库变更可能造成 offset 偏移 → 重复 id → Diffable fatal）
@@ -307,11 +340,24 @@ final class LibraryViewModel: ObservableObject {
             let fresh = page.filter { seen.insert($0.id).inserted }
             guard !fresh.isEmpty else { break }   // 本批全部重复：索引无法推进，避免死循环
             allItems += fresh
+            tailOffset += page.count
             sinceRebuild += fresh.count
-            indexProgress = (allItems.count, totalCount)
+            indexProgress = (min(allItems.count, totalCount), totalCount)
             if sinceRebuild >= 2_000 {
                 rebuildDerived(animated: false)
                 sinceRebuild = 0
+            }
+        }
+        // R03：头部回填（锚点窗口之前的更早月份）——Diffable 前插，VC 侧按布局 minY 差值补偿 contentOffset
+        if !Task.isCancelled, firstBatchWindowStart > 0 {
+            let head = await repository.fetch(scope: query.scope, offset: 0, limit: firstBatchWindowStart)
+            if !head.isEmpty {
+                let existing = Set(allItems.map(\.id))
+                let freshHead = head.filter { !existing.contains($0.id) }
+                if !freshHead.isEmpty {
+                    allItems = freshHead + allItems
+                    sinceRebuild += freshHead.count
+                }
             }
         }
         if !Task.isCancelled {
@@ -481,14 +527,14 @@ final class LibraryViewModel: ObservableObject {
         totalCount = await repository.prepare(scope: query.scope, sortAscending: query.sortAscending)
         restartObserving()
         guard totalCount > 0 else {
+            firstBatchWindowStart = 0
             allItems = []
             rebuildDerived(animated: false)
             viewState = .empty
             return
         }
-        allItems = await repository.fetch(scope: query.scope,
-                                          offset: 0,
-                                          limit: min(batchSize, totalCount))
+        // R03：切查询同样锚点优先（每个 scope/filter 的位置键独立，library.filter.<scope> 语义不变）
+        allItems = await fetchFirstBatch()
         indexProgress = (allItems.count, totalCount)
         isIndexComplete = allItems.count >= totalCount
         rebuildDerived(animated: false)
@@ -499,7 +545,8 @@ final class LibraryViewModel: ObservableObject {
     private var onSnapshotUpdate: ((LibrarySnapshot) -> Void)?
 
     #if DEBUG
-    /// R03 单测驱动：直接推快照（等价 pushSections 的输出路径，绕开 PhotoKit 依赖）
+    /// R03 单测驱动：直接推快照（等价 pushSections 的输出路径，绕开 PhotoKit 依赖；
+    /// indexComplete 同步置位以覆盖「两阶段恢复」的各阶段）
     func pushSnapshotForTesting(sections: [MonthSection],
                                 itemsBySection: [[PhotoItem]],
                                 queryKey: String,

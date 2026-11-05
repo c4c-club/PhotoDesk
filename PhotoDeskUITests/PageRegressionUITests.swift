@@ -172,7 +172,10 @@ final class PageRegressionUITests: XCTestCase {
         // FlowUITests 同款问题：用坐标点击绕开）
         let badge = anyElement(app, identifier: "SessionBadge")
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "待处理徽标未出现")
-        badge.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        // UIToolbar 按钮受 scroll-to-visible 限制——按 frame 中心换算绝对坐标直击
+        let badgeFrame = badge.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: badgeFrame.midX, dy: badgeFrame.midY)).tap()
         // 整理回顾页：直接等「全部移到最近删除」按钮（NavigationView 本身不暴露 AX 元素）
         let commit = anyElement(app, identifier: "SessionReview-CommitDelete")
         XCTAssertTrue(commit.waitForExistence(timeout: 8), "整理回顾页未出现\n\(hierarchy(app))")
@@ -250,7 +253,7 @@ final class PageRegressionUITests: XCTestCase {
             app.tap()
         }
 
-        app.tabBars.buttons["工具"].tap()
+        app.descendants(matching: .any)["Library-Tools"].firstMatch.tap()
         let entry = app.buttons["存储统计"]
         XCTAssertTrue(entry.waitForExistence(timeout: 5), "工具页缺存储统计入口")
         entry.tap()

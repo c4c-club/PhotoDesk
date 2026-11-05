@@ -117,7 +117,7 @@ final class FlowUITests: XCTestCase {
         app.launchArguments += ["-CleanupAutoStart"]
         launchToGrid(app)
 
-        app.tabBars.buttons["工具"].tap()
+        app.descendants(matching: .any)["Library-Tools"].firstMatch.tap()
         let cleanupEntry = app.buttons["智能清理"]
         XCTAssertTrue(cleanupEntry.waitForExistence(timeout: 5), "工具页缺智能清理入口")
         cleanupEntry.tap()
