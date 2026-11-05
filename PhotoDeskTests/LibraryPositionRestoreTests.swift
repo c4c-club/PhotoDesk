@@ -122,10 +122,17 @@ final class LibraryPositionRestoreTests: XCTestCase {
 
     private func makeViewController(viewModel: LibraryViewModel,
                                     store: LibraryPositionStore) -> LibraryViewController {
-        LibraryViewController(viewModel: viewModel,
-                              pipeline: FakeAnchorPipeline(),
-                              settings: settings,
-                              positionStore: store)
+        let controller = LibraryViewController(viewModel: viewModel,
+                                               pipeline: FakeAnchorPipeline(),
+                                               settings: settings,
+                                               positionStore: store)
+        // M12：快照应用带布局门禁（集合视图须完成初次布局）——VC 视图挂真实 UIWindow
+        //（单测宿主内 UIWindow 布局链可用，ViewerCellGeometryTests 同款）
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.addSubview(controller.view)
+        controller.view.frame = window.bounds
+        window.layoutIfNeeded()
+        return controller
     }
 
     private func waitUntil(timeout: TimeInterval = 5,
