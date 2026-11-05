@@ -359,7 +359,7 @@ final class StabilityUITests: XCTestCase {
         // 顶部栏为 UIToolbar（KeepChrome 已开）；UIBarButtonItem label 定位
         let info = app.buttons.matching(NSPredicate(format: "label == '查看信息'")).firstMatch
         XCTAssertTrue(info.waitForExistence(timeout: 5), "查看器缺「查看信息」按钮\n\(hierarchy(app))")
-        info.tap()
+        tapBarElement(info, in: app)
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5),
                       "信息页未打开\n\(hierarchy(app))")
         Thread.sleep(forTimeInterval: 0.5)
@@ -462,7 +462,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5), "缺分类按钮\n\(hierarchy(app))")
-        category.tap()
+        tapBarElement(category, in: app)
         for title in ["全部", "收藏", "视频", "截图", "已隐藏"] {
             XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 3),
                           "分类菜单缺「\(title)」\n\(hierarchy(app))")
@@ -473,7 +473,7 @@ final class StabilityUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.2)
         assertAlive(app, "切到收藏后")
         // 已隐藏 → Vault（不 setScope；Face ID bypass 直解锁）
-        category.tap()
+        tapBarElement(category, in: app)
         let hidden = app.buttons["已隐藏"]
         if hidden.waitForExistence(timeout: 3) {
             hidden.tap()
@@ -491,7 +491,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let tools = anyElement(app, identifier: "Library-Tools")
         XCTAssertTrue(tools.waitForExistence(timeout: 5), "缺左上工具按钮\n\(hierarchy(app))")
-        tools.tap()
+        tapBarElement(tools, in: app)
         XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
                       "工具 sheet 未打开\n\(hierarchy(app))")
         assertAlive(app, "打开工具 sheet 后")
@@ -519,7 +519,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5))
-        category.tap()
+        tapBarElement(category, in: app)
         Thread.sleep(forTimeInterval: 0.8)
         XCTAssertFalse(app.buttons["管理可见照片"].exists,
                        "非 .limited 授权不得出现「管理可见照片」入口\n\(hierarchy(app))")
