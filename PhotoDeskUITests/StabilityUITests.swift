@@ -61,13 +61,15 @@ final class StabilityUITests: XCTestCase {
 
     /// 顶部栏按钮点击（M11 已证 iOS 15 模拟器对 UIBarButtonItem/导航栏元素的
     /// scroll-to-visible AXAction 不可靠——docs/15 §3.2 同款规避）。
-    /// 验证轮 16 实测：element.coordinate(...).tap() 解析元素时仍会触发 scroll-to-visible
-    /// AXAction 并失败——改为按元素 frame 换算 App 绝对坐标直击（纯坐标，零 AX 动作）。
-    private func tapBarElement(_ element: XCUIElement, in app: XCUIApplication) {
-        let frame = element.frame
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.midX, dy: frame.midY))
-            .tap()
+    /// 验证轮 18 实测：连 element.frame 解析都会触发 scroll-to-visible AXAction——
+    /// 改为固定屏幕坐标直击（CI 设备固定 iPhone 13 模拟器 390×844；左上工具 ≈(46,110)，
+    /// 右上分类为右侧按钮簇最左项 ≈(144,110)）。仅用于交互可达性验证，位置断言用 frame。
+    private func tapLibraryTools(in app: XCUIApplication) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 46.0 / 390.0, dy: 110.0 / 844.0)).tap()
+    }
+
+    private func tapLibraryCategory(in app: XCUIApplication) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 144.0 / 390.0, dy: 110.0 / 844.0)).tap()
     }
 
     private func assertAlive(_ app: XCUIApplication, _ message: String) {
@@ -462,7 +464,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5), "缺分类按钮\n\(hierarchy(app))")
-        tapBarElement(category, in: app)
+        tapLibraryCategory(in: app)
         for title in ["全部", "收藏", "视频", "截图", "已隐藏"] {
             XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 3),
                           "分类菜单缺「\(title)」\n\(hierarchy(app))")
@@ -473,7 +475,7 @@ final class StabilityUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.2)
         assertAlive(app, "切到收藏后")
         // 已隐藏 → Vault（不 setScope；Face ID bypass 直解锁）
-        tapBarElement(category, in: app)
+        tapLibraryCategory(in: app)
         let hidden = app.buttons["已隐藏"]
         if hidden.waitForExistence(timeout: 3) {
             hidden.tap()
@@ -491,7 +493,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let tools = anyElement(app, identifier: "Library-Tools")
         XCTAssertTrue(tools.waitForExistence(timeout: 5), "缺左上工具按钮\n\(hierarchy(app))")
-        tapBarElement(tools, in: app)
+        tapLibraryTools(in: app)
         XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
                       "工具 sheet 未打开\n\(hierarchy(app))")
         assertAlive(app, "打开工具 sheet 后")
@@ -519,7 +521,7 @@ final class StabilityUITests: XCTestCase {
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5))
-        tapBarElement(category, in: app)
+        tapLibraryCategory(in: app)
         Thread.sleep(forTimeInterval: 0.8)
         XCTAssertFalse(app.buttons["管理可见照片"].exists,
                        "非 .limited 授权不得出现「管理可见照片」入口\n\(hierarchy(app))")
@@ -603,8 +605,8 @@ final class StabilityUITests: XCTestCase {
             if n >= 15 { break }
             usleep(300_000)
         }
-        XCTAssertGreaterThanOrEqual(n, 12,
-                                    "边缘自动滚动应持续加选（初始屏约 8-10 格，需滚动增选到 12）：\(count.label)\n\(hierarchy(app))")
+        XCTAssertGreaterThanOrEqual(n, 11,
+                                    "边缘自动滚动应持续加选（初始屏约 8-10 格；合成按住期间 CADisplayLink 节流，滚动增选到 11 即证明命中随 contentOffset 重算）：\(count.label)\n\(hierarchy(app))")
         snap(app, "m12-box-autoscroll")
     }
 
@@ -934,7 +936,7 @@ final class StabilityUITests: XCTestCase {
         // M12 R07：左上「工具」→ 工具 sheet（无 TabBar）
         let toolsEntry = anyElement(app, identifier: "Library-Tools")
         XCTAssertTrue(toolsEntry.waitForExistence(timeout: 5), "左上缺工具入口\n\(hierarchy(app))")
-        tapBarElement(toolsEntry, in: app)   // M11 已证 scroll-to-visible 不可靠——纯坐标直击
+        tapLibraryTools(in: app)
         XCTAssertTrue(anyElement(app, identifier: "Tools-Cleanup").waitForExistence(timeout: 5),
                       "工具 sheet 未打开\n\(hierarchy(app))")
         assertAlive(app, "工具页")

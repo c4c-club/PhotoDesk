@@ -58,6 +58,8 @@ final class LibraryPositionRestoreTests: XCTestCase {
     private var testDefaults: UserDefaults!
     private var testSuiteName: String = ""
     private var snapshots: [LibrarySnapshot] = []
+    /// 布局门禁要求集合视图在真实窗口内——窗口由测试类持有（局部变量会被释放）
+    private var hostWindow: UIWindow?
 
     override func setUp() async throws {
         // 测试隔离：清筛选持久化（同 LibraryViewModelTests 的 CI 实测根因规避）
@@ -85,6 +87,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         if !testSuiteName.isEmpty {
             UserDefaults().removePersistentDomain(forName: testSuiteName)
         }
+        hostWindow = nil
     }
 
     // MARK: - 夹具
@@ -132,6 +135,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         window.addSubview(controller.view)
         controller.view.frame = window.bounds
         window.layoutIfNeeded()
+        hostWindow = window   // 强持有（验证轮 18 实测：局部 window 释放后布局门禁永久挂起）
         return controller
     }
 
