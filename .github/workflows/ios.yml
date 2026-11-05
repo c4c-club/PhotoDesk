@@ -101,7 +101,7 @@ jobs:
             -destination 'platform=iOS Simulator,name=CI-iPhone13,OS=15.5' \
             -derivedDataPath build/DerivedData \
             -resultBundlePath build/TestResults.xcresult \
-            -skip-testing:PhotoDeskUITests/PerformanceUITests \ \ \ \ \ test
+            -skip-testing:PhotoDeskUITests/PerformanceUITests test
 
       # M12 取证：UI 测试失败时 App 视觉现场（iOS 15 模拟器 AX 树可能整体失效——
       # docs/15 §3.2 同源；simctl 截图不依赖 AX，是可靠取证通道）
