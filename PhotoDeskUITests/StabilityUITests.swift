@@ -59,6 +59,12 @@ final class StabilityUITests: XCTestCase {
         return tree.count > 8000 ? String(tree.prefix(8000)) + "…(截断)" : tree
     }
 
+    /// 顶部栏按钮点击（M11 已证 iOS 15 模拟器对 UIBarButtonItem/导航栏元素的
+    /// scroll-to-visible AXAction 不可靠——坐标点击直达，docs/15 §3.2 同款规避）
+    private func tapBarElement(_ element: XCUIElement) {
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
     private func assertAlive(_ app: XCUIApplication, _ message: String) {
         XCTAssertEqual(app.state, .runningForeground,
                        "\(message)（app.state=\(app.state.rawValue)）\n\(hierarchy(app))")
