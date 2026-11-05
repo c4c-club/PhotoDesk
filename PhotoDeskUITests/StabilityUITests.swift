@@ -85,6 +85,21 @@ final class StabilityUITests: XCTestCase {
             .withOffset(CGVector(dx: bar.maxX - 246, dy: bar.midY)).tap()
     }
 
+    /// sheet/push 页返回键：取最后一个导航栏（最前层）的第一个按钮并按 frame 直击。
+    /// M12（验证轮 22 实测）：sheet 打开时 app.navigationBars 含底层库导航栏，
+    /// boundBy:0 会误绑 Library-Tools（左上第一键）→ scroll-to-visible 失败。
+    @discardableResult
+    private func tapFrontmostBackButton(in app: XCUIApplication) -> Bool {
+        let bars = app.navigationBars
+        let last = bars.element(boundBy: bars.count - 1)
+        let back = last.buttons.element(boundBy: 0)
+        guard back.waitForExistence(timeout: 5) else { return false }
+        let f = back.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: f.midX, dy: f.midY)).tap()
+        return true
+    }
+
     private func assertAlive(_ app: XCUIApplication, _ message: String) {
         XCTAssertEqual(app.state, .runningForeground,
                        "\(message)（app.state=\(app.state.rawValue)）\n\(hierarchy(app))")
@@ -381,10 +396,7 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5),
                       "信息页未打开\n\(hierarchy(app))")
         Thread.sleep(forTimeInterval: 0.5)
-        let back = app.navigationBars.buttons.element(boundBy: 0)
-        if back.exists {
-            back.tap()
-        } else {
+        if !tapFrontmostBackButton(in: app) {
             app.swipeDown()
         }
         XCTAssertTrue(viewerRoot(app).waitForExistence(timeout: 5), "返回后查看器应仍在")
