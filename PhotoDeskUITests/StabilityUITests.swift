@@ -361,7 +361,10 @@ final class StabilityUITests: XCTestCase {
         // 顶部栏为 UIToolbar（KeepChrome 已开）；UIBarButtonItem label 定位
         let info = app.buttons.matching(NSPredicate(format: "label == '查看信息'")).firstMatch
         XCTAssertTrue(info.waitForExistence(timeout: 5), "查看器缺「查看信息」按钮\n\(hierarchy(app))")
-        tapBarElement(info, in: app)
+        // 查看器顶栏 UIToolbar 按钮同样受 scroll-to-visible 限制——按 frame 中心换算绝对坐标直击
+        let infoFrame = info.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: infoFrame.midX, dy: infoFrame.midY)).tap()
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5),
                       "信息页未打开\n\(hierarchy(app))")
         Thread.sleep(forTimeInterval: 0.5)
