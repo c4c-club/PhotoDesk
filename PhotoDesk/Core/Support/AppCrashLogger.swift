@@ -67,8 +67,19 @@ enum AppCrashLogger {
 
     // MARK: - 信号级兜底（docs/16 M12 Phase 1）
 
+    /// 信号标记独立文件（不覆盖 NSException 路径写的 last-exception.log——
+    /// ObjC 异常先走 UncaughtExceptionHandler 写入 reason、随后 abort 的 SIGABRT
+    /// 会再进信号处理器；验证轮 12 实测同一文件被截断成只剩 signal=6，reason 丢失）
+    static var signalLogFileURL: URL? {
+        guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        else { return nil }
+        let logs = dir.appendingPathComponent("Logs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        return logs.appendingPathComponent("signal-crash.log")
+    }
+
     private static func installSignalHandlers() {
-        guard let url = logFileURL,
+        guard let url = signalLogFileURL,
               let pathBytes = url.path.cString(using: .utf8),
               pathBytes.count <= 1024 else { return }
         // 固定缓冲一次性填充（进程生命周期持有；处理器内只读、零分配）
