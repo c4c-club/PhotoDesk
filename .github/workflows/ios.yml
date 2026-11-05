@@ -1,7 +1,8 @@
 # .github/workflows/ios.yml —— CI 编译/测试/出包通道（docs/06 §5 + §7.4）
 # 职责说明：
 #   core-linux：无 Mac 验证 PhotoDeskCore 纯逻辑（与本地 scripts/test-core.ps1 同一条命令）
-#   build     ：macos-14 上 xcodegen → 模拟器 build/test（iOS 15.5）→ 产物两件：模拟器 .app.zip + 未签名 ipa（AltServer 签名装真机用）
+#   build     ：macos-15 上 xcodegen → 模拟器 build/test（iOS 15.5 运行时 + Xcode 16.4）→ 产物两件：模拟器 .app.zip + 未签名 ipa（AltServer 签名装真机用）
+#   （M12 迁移：macos-14 镜像 2026-11-02 退役；macos-15 不再预装 Xcode 15.4（2025-05 移除），改用 Xcode 16.4）
 name: Build & Test
 
 # docs-only 变更不触发（省 macOS 时长）
@@ -42,7 +43,7 @@ jobs:
           fi
 
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     needs: core-linux
     timeout-minutes: 90
     steps:
@@ -50,7 +51,8 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.4'
+          # macos-15 镜像无 Xcode 15.4（2025-05 移除）；16.4 为当前镜像默认（runner-images #12520）
+          xcode-version: '16.4'
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -63,7 +65,7 @@ jobs:
           sed -i '' -E 's/objectVersion = [0-9]+/objectVersion = 63/' PhotoDesk.xcodeproj/project.pbxproj
           grep -m1 objectVersion PhotoDesk.xcodeproj/project.pbxproj
 
-      # macos-14 镜像可能未预装 iOS 15.5 运行时；没有则现场下载（一次约 7GB，之后走 runner 缓存无此步）
+      # macos-15 镜像未预装 iOS 15.5 运行时；每次现场下载（约 7GB，runner 不缓存）
       - name: Ensure iOS 15.5 simulator runtime
         run: |
           if xcrun simctl list runtimes | grep -q "iOS 15.5"; then
