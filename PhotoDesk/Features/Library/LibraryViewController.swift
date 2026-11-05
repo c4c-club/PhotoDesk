@@ -1120,6 +1120,14 @@ final class LibraryViewController: UIViewController {
         for (section, items) in zip(pending.sections, pending.itemsBySection) {
             diffable.appendItems(items, toSection: section)
         }
+        // M12（验证轮 14 last-exception.log 实锤）：apply 批更新时集合视图 0 sections 而
+        // diffable 旧快照有条目 → updater 查 live 计数即 NSInternalInconsistencyException
+        //（「request for number of items in section 0 when there are only 0 sections」）。
+        // 集合视图尚未完成初次加载时先 reloadData 同步到数据源当前快照，再应用新快照
+        //（批更新两端一致；此处在两次 apply 之间执行，无进行中的批更新可撞）。
+        if collectionView.numberOfSections == 0, !pending.sections.isEmpty {
+            collectionView.reloadData()
+        }
         // 筛选/年份切换一律无动画；增量且不在滚动/多选时才动画（docs/13 §3.4）
         let shouldAnimate = pending.animated && usesMotion && !isSelecting
             && !collectionView.isTracking && !collectionView.isDecelerating
