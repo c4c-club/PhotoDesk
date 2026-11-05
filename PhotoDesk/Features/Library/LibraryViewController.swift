@@ -1420,10 +1420,22 @@ final class LibraryViewController: UIViewController {
         columns = clamped
         let finish = { [weak self] in
             guard let self else { return }
-            // 列宽变化 → cell 内取图尺寸变化 → 重载可视 cell（缓存键含尺寸）
-            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
-            if let anchor, anchor.section < self.currentSections.count {
-                self.collectionView.scrollToItem(at: anchor, at: .centeredVertically, animated: false)
+            // 列宽变化 → cell 内取图尺寸变化 → 重载可视 cell（缓存键含尺寸）。
+            // M12：apply 窗口内推迟（绕过 Diffable 的更新与 dataSource.apply 撞车 = abort）
+            let applyReload = { [weak self] in
+                guard let self else { return }
+                self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+                if let anchor, anchor.section < self.currentSections.count {
+                    self.collectionView.scrollToItem(at: anchor, at: .centeredVertically, animated: false)
+                }
+            }
+            if self.isApplyingSnapshot {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !self.isApplyingSnapshot else { return }
+                    applyReload()
+                }
+            } else {
+                applyReload()
             }
         }
         if animated && usesMotion {
@@ -1466,10 +1478,21 @@ final class LibraryViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // 首次布局前 dequeue 的 cell 拿到的是占位尺寸：布局稳定后重配可视 cell（缓存键含尺寸）
+        // 首次布局前 dequeue 的 cell 拿到的是占位尺寸：布局稳定后重配可视 cell（缓存键含尺寸）。
+        // M12（验证轮 12 .ips 实锤）：reloadItems 绕过 Diffable 数据源——与进行中的 dataSource.apply
+        // 撞车即触发 _existingNumberOfItemsInSection abort；apply 窗口内推迟到下一轮主循环。
         let pixel = cellPixelSize
         if lastConfiguredPixelSize != .zero, pixel != lastConfiguredPixelSize {
-            collectionView.reloadItems(at: collectionView.indexPathsForVisibleItems)
+            if isApplyingSnapshot {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !self.isApplyingSnapshot,
+                          let layout = self.collectionView.collectionViewLayout as? UICollectionViewCompositionalLayout
+                    else { return }
+                    self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+                }
+            } else {
+                collectionView.reloadItems(at: collectionView.indexPathsForVisibleItems)
+            }
         }
         lastConfiguredPixelSize = pixel
     }
