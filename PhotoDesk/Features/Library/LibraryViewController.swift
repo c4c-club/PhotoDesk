@@ -1098,6 +1098,12 @@ final class LibraryViewController: UIViewController {
 
     private func drainPendingSnapshot() {
         guard let pending = pendingSnapshot else { return }
+        // M12（验证轮 15 实锤）：集合视图未完成初次布局（0 sections、零宽）时应用
+        // 「空 → 多 section」快照，iOS 15 diffable 批更新以 NSInternalInconsistencyException
+        //（「request for number of items in section 0 when there are only 0 sections」）崩溃。
+        // 处置：保持 pending 不清空，推迟到 viewDidLayoutSubviews 布局生效后排空
+        //（applySnapshot 语义不变：新快照仍覆盖 pending，最新者胜）。
+        guard collectionView.window != nil, collectionView.bounds.width > 0 else { return }
         pendingSnapshot = nil
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
@@ -1120,14 +1126,7 @@ final class LibraryViewController: UIViewController {
         for (section, items) in zip(pending.sections, pending.itemsBySection) {
             diffable.appendItems(items, toSection: section)
         }
-        // M12（验证轮 14 last-exception.log 实锤）：apply 批更新时集合视图 0 sections 而
-        // diffable 旧快照有条目 → updater 查 live 计数即 NSInternalInconsistencyException
-        //（「request for number of items in section 0 when there are only 0 sections」）。
-        // 集合视图尚未完成初次加载时先 reloadData 同步到数据源当前快照，再应用新快照
-        //（批更新两端一致；此处在两次 apply 之间执行，无进行中的批更新可撞）。
-        if collectionView.numberOfSections == 0, !pending.sections.isEmpty {
-            collectionView.reloadData()
-        }
+
         // 筛选/年份切换一律无动画；增量且不在滚动/多选时才动画（docs/13 §3.4）
         let shouldAnimate = pending.animated && usesMotion && !isSelecting
             && !collectionView.isTracking && !collectionView.isDecelerating
@@ -1503,6 +1502,10 @@ final class LibraryViewController: UIViewController {
             }
         }
         lastConfiguredPixelSize = pixel
+        // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
+        if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
+            drainPendingSnapshot()
+        }
     }
 
     /// 单个 cell 的像素尺寸（正方形；缓存键与预取共用，列数切换时随之变化）
