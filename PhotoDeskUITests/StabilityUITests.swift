@@ -64,12 +64,25 @@ final class StabilityUITests: XCTestCase {
     /// 验证轮 18 实测：连 element.frame 解析都会触发 scroll-to-visible AXAction——
     /// 改为固定屏幕坐标直击（CI 设备固定 iPhone 13 模拟器 390×844；左上工具 ≈(46,110)，
     /// 右上分类为右侧按钮簇最左项 ≈(144,110)）。仅用于交互可达性验证，位置断言用 frame。
+    /// 顶部栏按钮坐标：从 navigationBars.frame 推算（验证轮 20 实测：UIBarButtonItem 的
+    /// element.frame / element.coordinate 解析都会触发 scroll-to-visible AXAction 并失败，
+    /// 而 navigationBars 容器元素可安全解析）。布局：左上工具；右侧按钮簇从右到左
+    /// [Session(tray)] [多选] [搜索] [月份] [筛选] [分类]，每项 ≈44pt。
+    private func libraryBarFrame(in app: XCUIApplication) -> CGRect {
+        app.navigationBars.firstMatch.frame
+    }
+
     private func tapLibraryTools(in app: XCUIApplication) {
-        app.coordinate(withNormalizedOffset: CGVector(dx: 46.0 / 390.0, dy: 110.0 / 844.0)).tap()
+        let bar = libraryBarFrame(in: app)
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: bar.minX + 46, dy: bar.midY)).tap()
     }
 
     private func tapLibraryCategory(in app: XCUIApplication) {
-        app.coordinate(withNormalizedOffset: CGVector(dx: 144.0 / 390.0, dy: 110.0 / 844.0)).tap()
+        let bar = libraryBarFrame(in: app)
+        // 分类 = 右簇最左项：bar.maxX - 8(右距) - 40(Session) - 44×5 + 22(半宽)
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: bar.maxX - 246, dy: bar.midY)).tap()
     }
 
     private func assertAlive(_ app: XCUIApplication, _ message: String) {
@@ -595,10 +608,17 @@ final class StabilityUITests: XCTestCase {
         let collection = launchToGrid(app)
         let firstCell = collection.cells.firstMatch
         XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
+        // 多段拖拽：第一段长按起手进入框选拖到底边缘，后续 3 段每段从屏中拖回底边缘
+        //（拖拽进行中 CADisplayLink 正常 tick；合成「按住不动」反而被节流——验证轮 20 实测）
         let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.96))
         start.press(forDuration: 0.2, thenDragTo: bottomEdge,
-                    withVelocity: .slow, thenHoldForDuration: 6.0)
+                    withVelocity: .slow, thenHoldForDuration: 2.0)
+        for _ in 0..<3 {
+            let anchor = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            anchor.press(forDuration: 0.1, thenDragTo: bottomEdge,
+                         withVelocity: .slow, thenHoldForDuration: 1.5)
+        }
         let count = selectionCountLabel(app)
         XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
         let deadline = Date().addingTimeInterval(5)
