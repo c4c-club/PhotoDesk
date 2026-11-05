@@ -528,9 +528,8 @@ final class StabilityUITests: XCTestCase {
         // 子页推入 → 返回工具列表
         anyElement(app, identifier: "Tools-Cleanup").tap()
         assertAlive(app, "进入智能清理后")
-        let back = app.navigationBars.buttons.element(boundBy: 0)
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "智能清理页缺返回按钮\n\(hierarchy(app))")
-        back.tap()
+        XCTAssertTrue(tapFrontmostBackButton(in: app), "返回按钮缺失
+\(hierarchy(app))")
         assertAlive(app, "返回工具列表后")
         // 关闭 sheet → 回库
         let close = anyElement(app, identifier: "Tools-Close")
@@ -994,9 +993,8 @@ final class StabilityUITests: XCTestCase {
             }
             link.tap()
             assertAlive(app, "进入\(entry.name)后")
-            let back = app.navigationBars.buttons.element(boundBy: 0)
-            XCTAssertTrue(back.waitForExistence(timeout: 5), "\(entry.name)页缺返回按钮\n\(hierarchy(app))")
-            back.tap()
+            XCTAssertTrue(tapFrontmostBackButton(in: app), "返回按钮缺失
+\(hierarchy(app))")
             assertAlive(app, "退出\(entry.name)后")
         }
         // M12 R07：Tools-Close 关闭 sheet → 回照片库
