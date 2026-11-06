@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # scripts/build-sim.sh —— 模拟器构建与运行（docs/06 §3）。在 macOS / CI 上执行（Windows 本机无 Xcode，不走此脚本）。
-# 用法：bash scripts/build-sim.sh [设备名] [运行时]
+# 用法：bash scripts/build-sim.sh [设备名] [运行时，如 iOS-16-4]
 set -euo pipefail
 SCHEME=PhotoDesk
 DEVICE_NAME="${1:-iPhone 13}"
-RUNTIME="${2:-iOS-15-5}"
+RUNTIME="${2:-iOS-16-4}"
+RUNTIME_OS="${RUNTIME#iOS-}"
+RUNTIME_OS="${RUNTIME_OS//-/.}"
 
-xcrun simctl list runtimes                       # 确认 iOS 15.5 runtime 已下载
+xcrun simctl list runtimes                       # 确认 iOS 16.4 runtime 已下载
 xcodebuild \
   -project PhotoDesk.xcodeproj \
   -scheme "$SCHEME" \
   -configuration Debug \
   -sdk iphonesimulator \
-  -destination "platform=iOS Simulator,name=$DEVICE_NAME,OS=15.5" \
+  -destination "platform=iOS Simulator,name=$DEVICE_NAME,OS=$RUNTIME_OS" \
   -derivedDataPath build/DerivedData \
   build
 
