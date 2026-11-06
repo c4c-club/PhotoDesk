@@ -1,3 +1,4 @@
+> M0 历史归档，当前约束以 AGENTS.md + project.yml + workflow + docs/19 + docs/20 为准。
 # 07 · Agent 提示词包（可直接复制执行）
 
 ---

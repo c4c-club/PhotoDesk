@@ -14,9 +14,9 @@
 
 | 约束 | 结论 |
 |---|---|
-| **最低系统 iOS 15.0** | `NavigationStack`、`PhotosPicker`、`ShareLink`、`Swift Charts`、`@Observable`、`ContentUnavailableView` **全部不可用**，必须有 UIKit / 手写回退方案 |
+| **最低系统 iOS 16.0** | iOS 16 新 API（`NavigationStack`、`PhotosPicker`、`ShareLink`、Swift Charts、`ImageRenderer` 等）可用但不强制；iOS 17+ API（`@Observable`、`ContentUnavailableView`、SwiftData 等）仍禁用；不得为新 API 重写 UIKit 网格/浏览器 |
 | **先出自签名测试版** | 免费 Apple ID 自签名 → **不能用 iCloud、App Groups、推送、Keychain 共享**等 Capability；证书 7 天过期 |
-| **构建方案（已锁定）** | **Windows 编辑 → Git 推送 → Actions(`macos-14`) 编译 → 手机验证**；本机无 Xcode 无法编译；本地测试走 Docker 容器、**不装 Ubuntu**（[06 §7](docs/06-构建签名与测试发布方案.md) / [08](docs/08-环境探测报告.md)） |
+| **构建方案（已锁定）** | **Windows 编辑 → Git 推送 → Actions(`macos-15` + Xcode 16.4) 编译 → 手机验证**；本机无 Xcode 无法编译；本地测试走 Docker `swift:6.0-noble`、**不装 Ubuntu**（[06 §7](docs/06-构建签名与测试发布方案.md) / [08](docs/08-环境探测报告.md)） |
 | **永不永久删除** | 应用内所有"删除"= 移入系统「最近删除」（30 天后由系统自动清除），App 不做任何永久擦除；另存沙盒副本用于撤销 |
 | **照片库是系统的** | 一切"整理"本质是写 PhotoKit；删除必然触发系统确认弹窗（无法绕过），隐藏用 `PHAssetChangeRequest.isHidden`（已确认公开 API，iOS 8+） |
 
@@ -34,7 +34,10 @@
 | [06-构建签名与测试发布方案](docs/06-构建签名与测试发布方案.md) | Xcode 工程、模拟器、自签名真机、AltStore 续签、CI、**§7 Windows 主机怎么开发（含 iOS 模拟器能不能用）** | 开发 / 发布 |
 | [07-Agent提示词包](docs/07-Agent提示词包.md) | **可直接喂给编码 Agent 的完整提示词**（环境准备 P-1 + 全局规则 + 阶段 P0–P9） | 编码 Agent |
 | [08-环境探测报告](docs/08-环境探测报告.md) | ✅ 已完成的环境探测结论：Windows 10 原生、无 Xcode、Docker/WSL 现状、插件调查 | 全体（开工前必读） |
-| [AGENTS.md](AGENTS.md) | 项目根目录编码规则（iOS 15 API 黑名单、代码规范、DoD） | 编码 Agent |
+| [AGENTS.md](AGENTS.md) | 项目根目录编码规则（iOS 16 基线、iOS 17+ API 黑名单、代码规范、DoD） | 编码 Agent |
+| [19-功能补充与缺陷修复规划](docs/19-功能补充与缺陷修复规划.md) | M13 权威规划（iOS 16 基线 + P1/P2/P3 根因重修） | 执行 Agent |
+| [20-一次性执行提示词](docs/20-一次性执行提示词.txt) | M13 一次性全流程提示词 Phase 0–9 | 执行 Agent |
+| [21-后续修复验收记录](docs/21-后续修复验收记录.md) | M13 验收记录：失败集核对、红绿证据、CI run、截图与 IPA SHA256 | 执行 Agent / 用户 |
 
 ---
 
@@ -61,4 +64,3 @@
 | 手势动作 (GestureAction) | 上滑/下滑所绑定的具体行为（收藏/删除/隐藏/…） |
 | 保险箱 (Vault) | 系统「已隐藏」相册 + App 内 Face ID 锁的总称 |
 | 撤销窗口 | 动作执行后允许一键回退的时间（默认 5 秒） |
-| 指纹 (Fingerprint) | dHash/pHash 感知哈希，用于重复与相似检测 |

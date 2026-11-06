@@ -1,0 +1,309 @@
+【M13 一次性全流程执行提示词 · PhotoDesk 功能补充与缺陷修复 / iOS 16 基线】
+
+适用仓库：C:/Users/RuiZh/Desktop/photo_manager（PhotoDesk）
+适用分支：fix/stability-20261104
+基线 HEAD：277dc5f（工作树干净）
+权威规划：docs/19-功能补充与缺陷修复规划.md
+本文件：docs/20-一次性执行提示词.txt
+生成日期：2026-11-06
+使用方式：整份文件即提示词正文。请全选复制，一次性粘贴给执行 Agent；不要分批投喂，不要删阶段，不要在中间插入「请提供下一段」。执行 Agent 从 Phase 0 连续执行到最终报告，不得询问「是否继续」「是否开始」「请确认」。
+阶段声明：本文件由「规划阶段」生成；规划阶段只新增 docs/19 与 docs/20，未改动任何代码 / 配置 / 测试 / 工程文件。以下正文全部面向「执行阶段 Agent」，执行阶段必须亲自修改代码、测试、配置并亲自验证。
+
+======================================================================
+最高优先级铁律（违反任何一条即判定本轮失败，必须回滚重做）
+======================================================================
+
+1. 一次投喂连续执行：整份提示词一次给到，Agent 必须连续跑完 Phase 0 → Phase 9 并给出最终报告；不得停在中间等用户投喂，不得问「是否继续」。遇硬阻塞按第十节「停止条件」如实报告失败原因，而不是停在半路。
+2. 亲自验证：本机 `pwsh -File scripts/test-core.ps1`、`git add/commit/push`、`gh run list / watch / view --log-failed / download`、逐张打开截图、`certutil -hashfile` 核对 IPA SHA256、红→绿测试，必须由主 Agent 亲自执行并贴出真实输出；不接受「只写代码就交付」，不接受「应该是绿的」。
+3. 中文：全部输出、commit 信息、文档新增内容用中文；commit 格式 `type(scope): 中文简述`。
+4. 子智能体硬限制：同一时刻最多 **1 个**子智能体；确需只读审计必须串行「启动 → 等待其最终报告 → 吸收 → 再决定是否启动下一个」；严禁嵌套（子智能体不得再建子智能体）；累计不超过 4 个，本轮建议 0–1 个。主路径的修改、测试、git push、CI 核对、截图查看、产物校验一律不得委派。
+5. 先红后绿：每个根因先写失败测试并看到红，再改实现看到绿；禁止删断言、跳测、`-skip-testing` 扩大化、弱化断言、把失败改成 ⚠️ 了事。
+6. 一条根因一个 commit：禁止一个大杂烩 commit 掩盖多项改动；建议序列见文末，可按实际红绿拆分，但每个 commit 必须能单独说明一条根因。
+7. 不掩盖症状：禁止用 `DispatchQueue.main.asyncAfter` 延迟、遮罩、`reloadData`、`try?`、关闭动画、放大容差、改测试坐标来「修好」；必须改根因。
+8. 冲突优先级：用户 2026-11-06 原文（三项问题 + 单指滑选 6 条硬约束 + 最低 iOS 16）> 本提示词铁律 > docs/19 规划 > 执行阶段已按 Phase 0 更新为 iOS16 版的 AGENTS.md > project.yml / .github/workflows/ios.yml > docs/16/17/18 历史归档 > 其余历史文档。历史归档里的「iOS 15 硬性」「macos-14」「macOS 配额耗尽」「13 条失败」不得覆盖 Phase 0 校正后的当前真值。
+9. 红线不破：零第三方依赖 / 零网络 / 零 `URLSession` / 零分析广告 SDK；PhotoDeskCore 仅 `import Foundation`、`Package.swift` 的 `platforms:` 留空、Linux `swift build && swift test` 可跑、禁止传 `CGSize/CGRect/UIImage/PHAsset` 进 Core；应用内删除只能 `PHAssetChangeRequest.deleteAssets` 移入系统「最近删除」，UI 统一说「移到最近删除」，禁止「彻底删除 / 永久删除 / 清空最近删除」；TrashBin 只是 5s 撤销保险副本（2GB 上限、可关闭）；Feature 层不直接引用 `PHAsset`，统一 `PhotoItem`；Service protocol 化构造器注入；网格与全屏浏览器必须 UIKit `UICollectionView` + Compositional Layout + Diffable DataSource + DataSourcePrefetching，不用 SwiftUI `LazyVGrid` 作万级网格；图片只走 `ImagePipeline`；分批 500 + Diffable 增量 + `PHPhotoLibraryChangeObserver`；async/await 不用 Combine；UI `@MainActor`；每文件顶部 `// MARK: - 职责说明`；魔法数字进 `DesignSystem` / `SwipeConfig` / `SlideSelectConfig`；颜色字体间距只用 `UI/DesignSystem` token；禁 `try!` / 强制解包；新增文件进 target（XcodeGen 自动包含，检查 `excludes`）；不新增 Xcode 警告。
+10. 真机不伪造：Agent 不执行真机签名 / AltServer / AltStore 装包；真机项一律写「未验证 / 待用户验证」，但必须交付未签名 IPA + SHA256 + docs/12 清单 + 5 项取证回传要求 + 可复现自动化用例。既不得把未真机验证写成 ✅，也不得因「做不了真机」而跳过本机 / CI / 截图验证。
+11. 截图逐张打开：CI 失败截图、UI 测试 XCTAttachment、大图像素非背景色、顶部栏 / 徽标 / 框选移除后的界面，必须逐张目视确认并写结论；不能只看 xcresult 日志。
+12. 历史归档只读：docs/09/10/11（M10）、docs/13/14/15（M11）、docs/16/17/18（M12）正文不回改、不篡改 run id / 测试数量 / 截图结论；仅允许在卷首加一行「Mxx 历史归档，当前约束以 AGENTS.md + project.yml + workflow + docs/19 + docs/20 为准」。禁止全仓批量把 `15.0` 替换成 `16.0`。
+
+======================================================================
+一、开始前必读（不读完不得动代码）
+======================================================================
+
+必须先只读加载以下文件，然后输出 **10–15 行「现状确认」**（含 HEAD / 分支 / 工作树、当前 deployment target、CI runner 与 runtime、docs/18 最终 run、失败集数字冲突、三项问题代码位置、多选当前是长按框选、位置保存取首可见 cell、捏合护栏已存在但真机仍崩），再进入 Phase 0。
+
+文档与配置：
+- AGENTS.md、README.md、已知问题.md、测试清单.md、发布说明.md、安装说明.md
+- project.yml、.github/workflows/ios.yml、scripts/test-core.ps1、scripts/build-sim.sh、PhotoDeskCore/Package.swift、PhotoDesk/Resources/Info.plist、.zcode/config.json
+- docs/03-技术设计文档.md、docs/04-UIUX设计文档.md、docs/05-开发进程与里程碑.md、docs/06-构建签名与测试发布方案.md、docs/08-环境探测报告.md、docs/12-真机签名与验收.md
+- docs/16-后续功能补充与缺陷修复规划.md、docs/17-一次性执行提示词.txt、docs/18-后续修复验收记录.md
+- **docs/19-功能补充与缺陷修复规划.md（本轮权威规划）**、本文件 docs/20
+
+源码：
+- PhotoDesk/Features/Viewer/ZoomableImageCell.swift、ViewerGesturePolicy.swift、ViewerViewController.swift
+- PhotoDesk/UI/DesignSystem/Motion.swift、PhotoDesk/Core/Support/（ViewerTrace / AppCrashLogger / DiagnosticsView）
+- PhotoDesk/Core/Support/LibraryPositionStore.swift、LibraryQuery.swift
+- PhotoDesk/Features/Library/LibraryViewController.swift、LibraryContainer.swift、LibraryViewModel.swift、PhotoGridCell.swift
+- PhotoDesk/App/AppContainer.swift、UITestHooks.swift
+- PhotoDeskCore/Sources/PhotoDeskCore/GestureConfig.swift、GridHitRegion.swift、SelectionPolicy.swift、ZoomGeometry.swift
+
+测试：
+- PhotoDeskTests/LibraryPositionRestoreTests.swift
+- PhotoDeskUITests/StabilityUITests.swift、PageRegressionUITests.swift、FlowUITests.swift、LaunchUITests.swift、GestureUITests.swift、PerformanceUITests.swift
+- PhotoDeskCoreTests/ 现有全部（基线 220/220）
+
+必读确认里必须明确写出：`gh run view 42119450518 --log-failed` 是 Phase 0 的硬性动作，docs/18 并没有逐项点名的「11 条失败清单」，13 / 11 / 7 三个数字冲突，任何精确名单只能来自 CI 日志，不得照抄推测。
+
+======================================================================
+二、项目事实与环境（不得建议替代方案）
+======================================================================
+
+- 项目：PhotoDesk（照片管家），iOS 原生照片管理 App；Bundle ID `com.example.PhotoDesk`；`DEVELOPMENT_TEAM` 从环境变量注入，禁止硬编码进仓库。
+- 本轮目标最低部署目标：**iOS 16.0**（用户明确要求，替换原 iOS 15.0 硬性约束）；Swift 5.9+；UI：SwiftUI 壳 + UIKit 核；零第三方依赖；零网络。
+- 构建方案已锁定：Windows 编辑 → Git 推送 → GitHub Actions `macos-15` + Xcode `16.4` 编译 → 用户用 AltServer 装 iPhone 验证。**禁止**建议 WSL2 Ubuntu、macOS 虚拟机 / Hackintosh、Windows 原生 Swift 工具链、Linux/Windows 交叉编译 iOS、ZCode「iOS 模拟器」插件（`platform === darwin` 硬检）。
+- 本机：Windows 10 原生，无 Xcode / 无 iOS 模拟器，永远不能本机编译 / 签名 / 运行 iOS App。唯一本地门禁 = Docker `swift:6.0-noble` + `scripts/test-core.ps1`（`.ps1` 必须 UTF-8 带 BOM，否则 Windows PowerShell 5.1 按 GBK 解码中文注释报错）。
+- CI 实况：`.github/workflows/ios.yml` 已是 `runs-on macos-15` / `setup-xcode 16.4`；迁移原因是 macos-14 runner 镜像 2026-11-02 退役（不是配额耗尽），macos-15 已移除 Xcode 15.4。最终完整验证轮 = 验证轮 25 / run `42119450518` / App 零崩溃 / core-linux 220/220。
+- 真机：CI 只出未签名 IPA；用户 Windows 用 AltServer + AltStore 免费账号本地签名（7 天续签）。Agent 不替用户签名。
+- 中文控制台：本机 GBK/cp936；若写 Python 辅助脚本，必须 `sys.stdout.reconfigure(encoding='utf-8', errors='replace')`。本轮不建议写 Python 脚本。
+
+======================================================================
+三、三条反馈 → 根因 → 修复 → 不变量 → 先写失败测试速查
+======================================================================
+
+【P1】现象：真机在查看器里「捏合缩小放大必崩溃」；M12 已加 `ViewerGesturePolicy` / `isFinite` 护栏仍复现，docs/18:92 只写「代码修复完成；真机 #4 待验」。
+根因：① 缩放事务活跃期（`isZooming || zoomScale > 1.01 || secondsSinceZoomActivity < DSMotion.zoomActivityGrace`）内，`configure` / `layoutSubviews` / `layoutImageContent()` / `updateCenteringInset()` / `scrollViewDidZoom` 仍可写 `zoomContentView.frame`、`scrollView.contentSize`、`contentInset`；② `ViewerViewController.performStaged` 的 `performBatchUpdates + deleteItems` 与 `scrollViewDidZoom` 可能同帧，`allowsRemovalTransaction` 只在入口 guard，缺排队语义；③ `viewForZooming(in:)` 在 `contentSize` 或 frame 为零时返回 nil 却无观测；④ Release 无关键面包屑，CI 合成 pinch 打在 `ViewerRoot` 未命中 cell 内 `UIScrollView`，`app.state` / DEBUG 横幅是假绿。
+必须做到：引入 `ZoomTransactionState = idle | active | settling`；`active` 期间 `layoutImageContent()` / `updateCenteringInset()` 只记 `pendingGeometry` 不写 UIKit 属性；`scrollViewDidZoom` 只刷时间戳 + 日志 + `onZoomChanged`；`settling` 用一次 `CATransaction` / `layoutIfNeeded` 批量提交 `frame/contentSize/inset`，提交前校验全部有限且 > 0，非有限则丢弃并写 `ViewerTrace`；删除 / 隐藏事务在 `allowsRemovalTransaction == false` 时进 `pendingRemovalActions` 队列，待 `idle` 串行执行，不得在 pinch 中 `performBatchUpdates`，不得用 `cancel()` 手势掩盖；`viewForZooming` 返回 nil 时写含 `contentSize / zoomContentView.frame / imageView.frame / zoomScale` 的面包屑；`ViewerTrace` / `AppCrashLogger` 在 **Release** 也写 `zoom=`、`img=`、`appear`、`pendingDeleteCount`、非有限值，只写本地、零上传、不含用户照片像素。
+边界：本项**不改** `ViewerViewController.setupPanGesture()` 的上滑 pan 语义（那是查看器上滑收藏 / 删除）；用户要求的 `cancelsTouchesInView = false` 只作用于【P3】网格新加的 `slideSelectPan`，避免误改 viewer 引入新崩。
+先写失败测试：命中 `ZoomableImageCell` 内层 `UIScrollView` 实际 frame 的合成 pinch（不打 `ViewerRoot`），30 次缩小→放大 + 10 次双击 + 旋转，断言 `pendingDeleteCount == 0`、`imageView.frame.width > 0`、像素非背景色、App 不崩溃、`viewer-trace.log` 无 non-finite；Core 增「活跃期几何提交合并为一次 / 非有限 pending 丢弃」用例；保留并不得弱化 `testPinchZoom20Times` / `testPinchDoesNotTriggerRemoval` / `testPinchKeepsCollectionViewScrollEnabled`。
+不变量：`zoomScale.isFinite`；`zoomContentView.frame` 与 `contentSize` 宽高恒 > 0；`contentInset` 由未变换 bounds 计算且不双倍；缩放事务与删除事务不同帧；Release 有崩溃前 5 条面包屑。
+验收：CI 该组全绿 + 取证 5 项回传后由用户确认；Agent 侧写「自动化零崩溃 / 真机待验」。
+
+【P2】现象：「上次浏览到的位置记不准，打开软件不能直接保持在上次的位置」。
+根因：`LibraryViewController.swift:1227-1244` `savePositionNow` 取 `collectionView.indexPathsForVisibleItems.sorted().first`（首可见 cell，不是视觉锚点）；`:1295-1306` `applyRestore` 用 `scrollToItem(at: .centeredVertically, animated:false)` 把同一 cell 强行居中 → 每次重启向上漂移；`finishPositionRestore()` 在 apply 后立刻解除 `isPositionRestoreInFlight`，恢复期中间态被 `scrollViewDidScroll` / 0.3s Timer / `didEndDecelerating` / `didEndDragging` / `viewWillDisappear` / `scenePhase` 写回覆盖；`LibraryRootView` 按 `viewModel.viewState` switch，`.ready` 才显示容器，`LibraryContainer.makeUIViewController` 每次新建 controller；`LibraryPositionStore.saveViewerAssetID` / `loadViewerAssetID` 全仓零调用点（悬空）；`AppContainer.makeViewerViewModel` 未注入 positionStore。
+必须做到：`LibraryPosition` 升 **v3**，新增 `anchorAssetID`、`anchorVisualY`（= 锚点 cell 的 `layoutAttributes.frame.minY - contentOffset.y`，视口内 y）、`anchorContentOffsetY`、`schemaVersion = 3`；v1/v2 解码补默认，旧字段仅作 fallback。保存用视觉锚点 cell（取 `contentOffset.y` 对应可见 cell 中 `frame.minY <= contentOffset.y + 安全区` 的最近者，或用户最后交互 cell），不再由 `sorted().first` 单独决定。恢复按 `anchorAssetID` 在新快照找新 `layoutAttributes`，`targetOffsetY = newAttributes.frame.minY - anchorVisualY`，用 `setContentOffset(_:animated:false)` **精确像素**落地；**禁止** `.centeredVertically` 作为主路径；找不到才依次退 `sectionID + itemIndexInSection` → `offsetRatio`，每级 fallback 写一条 `PositionTrace`。`isPositionRestoreInFlight` 仅在 `bounds > 0` + `numberOfSections > 0` + 快照 drain 完成 + 精确 offset 已应用 + 一次 `layoutIfNeeded` 之后才解除；解除前所有 `savePositionNow` 直接 return。`restoreMaskView` 只作视觉防跳，不作为正确性依据。宿主 controller 必须跨 `viewState` 切换复用（提升 controller / positionStore 到 `AppContainer` 注入，或稳定 `.id` + `updateUIViewController` 只 `wire` 不重建），禁止 `asyncAfter` 延迟重建掩盖。消除悬空：推荐把 positionStore 注入 `AppContainer.makeViewerViewModel(context:)`，打开 viewer 时 `saveViewerAssetID`、恢复上下文时 `loadViewerAssetID`；若不接线则删除这两个方法及注释，二选一但必须消除悬空。保留 M12 的锚点窗口首屏（`fetchFirstBatch` 以 `anchorIndex - batchSize/2` 为中心）、分批 500、`LibraryQuery` FNV-1a 稳定 key（禁 `hashValue`）、Diffable 布局门禁（0-section 不 apply、apply completion 内不嵌套 apply、前插 section 补偿）——不得因抬 iOS16 删除。
+先写失败测试：`PhotoDeskTests/LibraryPositionRestoreTests.swift` 增 `testSaveUsesVisualAnchorNotFirstVisibleCell`、`testRestoreUsesPixelOffsetNotCentered`、`testNoWritebackDuringRestoreInFlight`、`testHostReuseAcrossViewStateDoesNotResetOffset`、`testV3DecodeV2Fallback`、`testRotationKeepsSameVisualAnchor`（既有 5 条保留）；UI 把 `testPositionRestoredAfterRelaunch` / `testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump` / `testRotationKeepsAnchorWithinOneRow` 改为断言「同一 assetID 视口 y 偏差 ≤ 1 行且像素 offset 差 ≤ 1pt」；不得删 `docs/15 §3.2` 六条 🟨 中任何断言。
+不变量：queryKey 跨进程稳定；恢复期零回写；冷启动首屏一次到位无可见跳变；筛选态 / 旋转 / 查看器返回后锚点不漂移。
+验收：单测 + UI 逐项转绿；docs/18 §2.4 位置族 6 条在 iOS16 CI 上重新分类（真实缺陷必须修，平台限制才标 ⚠️ 并附复现步骤）。
+
+【P3】现象：多选动作不优雅；用户要求改为 **UIKit + UICollectionView** 类 iPhone 相册的「单指滑动连续多选」，最低 iOS 16。
+现状：`LibraryViewController.swift:20-23` 已是 `UICollectionView` + `UICollectionViewDiffableDataSource<MonthSection, PhotoItem>`，`:298-327` Cell/Supplementary Registration，`:1460-1484` `UICollectionViewCompositionalLayout` + 粘性月份头。技术栈已具备，真正要做的是**整条替换交互**：当前是 M12 R08 长按二维框选（`:656-662` `UILongPressGestureRecognizer` 0.15s、`:845-897` `onBoxLongPress`、`:899-921` `GridHitRegion.hitIDs` / `mergedSelection` 每帧重算、`:942-965` `boxAutoScrollLink` 固定 step 10）。框选语义是「矩形相交 + 基线重算」，与用户要的「经过即切换 + 滑回恢复快照」状态模型不同，禁止叠加、禁止保留为可达路径。
+
+-------------------- 用户原文 6 条硬约束（逐字，不得删减、不得改写）--------------------
+① 手势配置：添加一个 UIPanGestureRecognizer，设置 maximumNumberOfTouches = 1，并设置 cancelsTouchesInView = false，确保不会吞掉轻点事件。手势的 delegate 必须实现 gestureRecognizerShouldBegin 和 gestureRecognizer(_:shouldRecognizeSimultaneouslyWith:)，以便在非选择模式下让 CollectionView 正常滚动。
+② 方向锁定（关键）：在 .began 状态先记录起始点，在 .changed 状态比较累计位移。只有水平位移绝对值大于垂直位移绝对值时，才将 isDragSelecting 置为 true 并开始执行选择逻辑；如果垂直位移占优，手势应让位给 CollectionView 的纵向滚动，isDragSelecting 保持 false，直到手势结束都不再激活选择。不要在 .began 就贸然激活，否则纵向滚动会被打断。
+③ 状态快照（实现往返恢复的关键）：在 isDragSelecting 首次变为 true 的那一刻，对当前 CollectionView 的选中状态做一次快照。用一个 [IndexPath: Bool] 字典（或 Set<IndexPath> 记录「开始时已选中」的集合）保存每个 cell 在滑动开始前的原始选中状态。后续手指经过某个 cell 时：如果该 cell 在快照中，恢复为快照中的值；如果该 cell 不在快照中（滑动开始时未选中），则设为 true。这样就能天然支持「反向滑回时取消选中」，且不会错误地取消掉滑动开始前就已经选中的 cell。
+④ indexPath 追踪与去重：在 .changed 中通过 collectionView.indexPathForItem(at: location) 获取手指下的 indexPath。维护一个 lastProcessedIndexPath，只有当前 indexPath 与上一次不同时才执行状态更新，避免同一 cell 被重复处理导致状态闪烁。
+⑤ 滚动协同：isDragSelecting == true 期间，将 collectionView.isScrollEnabled 设为 false；手势进入 .ended / .cancelled 后立即恢复为 true，并清空快照和 isDragSelecting 标记。
+⑥ 边缘自动滚动（必须实现）：当手指的 y 坐标进入 CollectionView 可见区域的顶部或底部缓冲区（建议 60pt）时，启动一个 CADisplayLink，根据手指距边缘的距离计算滚动速度，逐帧修改 contentOffset，使屏幕外的 cell 也能被滑过选中。手指离开缓冲区或手势结束时，销毁 CADisplayLink。
+--------------------------------------------------------------------------------
+
+逐条落地与对应测试：
+- ① `setupSelection()` 移除 `UILongPressGestureRecognizer`，新增 `slideSelectPan`：`maximumNumberOfTouches = 1`、`cancelsTouchesInView = false`、`delegate = self`；`gestureRecognizerShouldBegin` 在非选择模式 / 双指 / 缩放事务期返回 false；`gestureRecognizer(_:shouldRecognizeSimultaneouslyWith:)` 对 CollectionView 自身 `panGestureRecognizer` 返回 true（非选择模式让位），对 `UIPinchGestureRecognizer` / `numberOfTouches >= 2` 返回 false。测试：`testTapNotSwallowedBySlidePan`、保留 `PageRegressionUITests.swift:228-240` `testScrollWorksInSelectionMode`、双指捏合列数仍可用。
+- ② `.began` 只记 `dragStartPoint` + `verticalScrollLocked = false`；`.changed` 用 `translation(in: collectionView)` 的累计 `dx/dy`，仅当 `abs(dx) > abs(dy)` 首次置 `isDragSelecting = true`；`abs(dy) >= abs(dx)` 则 `verticalScrollLocked = true`，本手势余生不再激活；**严禁 .began 激活**。测试：Core `SlideSelectPolicy.shouldActivate` 单测 + UI `testVerticalDragDoesNotSelectAndScrolls`。
+- ③ 激活那一帧用 `indexPathsForSelectedItems` + `selectionState` 构造 `[IndexPath: Bool]`（或 `Set<IndexPath>` originallySelected）；经过 cell 时 `target = snapshot[ip] ?? true`；同步 `selectionState`、`collectionView.selectItem/deselectItem`、`reloadSelectionBadges`、`updateSelectionCount`。测试：Core `resolvedSelection` 单测 + UI `testDragBackRestoresOriginal`、`testOriginallySelectedNotCleared`。
+- ④ `.changed` 用 `indexPathForItem(at: location)`（location 需 `convert` 到 collectionView 坐标）；`lastProcessedIndexPath` 去重；同一 ip 不重复写。测试：`testNoFlickerOnSameCell`（AX 值稳定）+ 去重计数单测。
+- ⑤ `isDragSelecting` 置 true 时 `collectionView.isScrollEnabled = false`；`.ended/.cancelled/.failed` 统一 `finishSlideSelection()`：恢复 `true`、`snapshot.removeAll()`、`isDragSelecting = false`、`lastProcessedIndexPath = nil`、`verticalScrollLocked = false`、销毁 displayLink。测试：`testScrollEnabledRestoredAfterDragEnd`。
+- ⑥ `SlideSelectConfig.edgeBuffer = 60`；`CADisplayLink` 加 `.common`；每帧按 `distanceToEdge / edgeBuffer` 映射带符号速度（`minStep...maxStep`，越靠边越快，顶/底决定方向），`contentOffset.y` 钳制在 `[-adjustedTop, maxBottom]`，逐帧 `setContentOffset(animated:false)`；滚动后**重新**用当前手指 location 求 `indexPathForItem` 并走 ③④，使屏幕外 cell 也被滑过选中；离开缓冲区或手势结束 `invalidate()` 并置 nil。测试：Core `edgeVelocity` / `clampedOffset` 单测 + UI `testEdgeAutoScrollSelectsOffscreenCells`（改写 `testBoxAutoScrollSelectsWhileScrolling`）。
+
+必须清理：`UILongPressGestureRecognizer`、`onBoxLongPress`、`updateBoxSelection`、`visibleCellRectsInViewCoordinates`、`selectionOverlay` 框选视图、`startBoxAutoScroll` / `boxAutoScrollTick` 的框选实现，不留不可达死代码。**保留**：`selectionBar`、`SelectionState`、`PhotoGridCell` 徽标 / 边框 / DEBUG `accessibilityValue`、批量动作（收藏 / 移到最近删除 / 隐藏）、单月 scope、点选切换、`allowsSelection`。`PhotoDeskCore` 的 `GridHitRegion` / `BoxSelectConfig` 若零调用点可保留为 Foundation 通用工具但不得再被多选引用，其既有 15 条单测**不得删除**。
+必须下沉 Core（零 Apple import）：新增 `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectConfig.swift`（`edgeBuffer = 60`、`minStep`、`maxStep`、`directionLockEpsilon` 等全部收口，禁止 VC 散落数字）与 `SlideSelectPolicy.swift`（`shouldActivate(dx:dy:wasLocked:)`、`resolvedSelection(originallySelected:visited:)`、`edgeVelocity(...)`、`clampedOffset(...)`，纯 `Double` / 自定义值类型，禁止 `CGPoint/CGRect/UIImage/PHAsset`，`IndexPath` 也统一用 `SlideSelectCell(section:Int, item:Int)` 值类型适配）；新增 `PhotoDeskCoreTests/SlideSelectPolicyTests.swift`。App 侧新增 `PhotoDesk/Features/Library/SlideSelectGestureController.swift`（`@MainActor`，顶部 `// MARK: - 职责说明`，由 XcodeGen 自动进 target），只做映射不重写判定。
+不变量：滑动前已选 cell 全程不被误取消；反向滑回精确恢复快照值；未滑过 cell 保持原状；垂直滑动 100% 让位且不锁 `isScrollEnabled`；点选 / 双指捏合列数 / 打开查看器不被吞；结束时 `isScrollEnabled == true`、快照空、displayLink 已 invalidate、无残留标记；cell 复用后徽标与 AX 一致。
+
+======================================================================
+四、跨项改造：最低版本抬到 iOS 16（平台基线切换，不是改一行）
+======================================================================
+
+必须改（当前生效约束 / 工程配置 / 用户可见说明）：
+1. `AGENTS.md`：§1「iOS 15.0 硬性」→「iOS 16.0 硬性」，构建方案 macos-14 → macos-15 + Xcode 16.4；§2 改写为「iOS 16 基线：以下 iOS 17+ API 仍禁用」+「iOS 16 新 API 可用但不强制」；§6 DoD destination `OS=15.5` → `OS=16.4`、`minos = 15.0` → `16.0`；§7 陷阱表同步。
+   - 变为可用但不强制迁移：`NavigationStack/NavigationPath`、`PhotosPicker`(SwiftUI)、`ShareLink`、Swift Charts、`ImageRenderer`、`.fontDesign()`、`.toolbarBackground`、`.scrollContentBackground`。
+   - 仍禁用（iOS 17+）：`@Observable/@Bindable`、`ContentUnavailableView`、`.scrollTargetBehavior/.scrollPosition`、SwiftData；本轮最低 16，**不要引入**，不要写 `if #available(iOS 17, *)` 双实现。
+   - 允许项不变：`LazyVGrid`、`async/await`、`.searchable`、`.refreshable`、`Material`、`PencilKit`、`Vision`、`MapKit`、Core Data、`UICollectionViewDiffableDataSource`、`UICollectionViewCompositionalLayout`、`PHPhotoLibrary.requestAuthorization(for:)`、`OSLogStore`。
+   - **不得为用新 API 而重写网格 / 浏览器**：仍必须 UIKit `UICollectionView` + Compositional + Diffable + Prefetching。
+2. `project.yml`：`deploymentTarget.iOS '15.0'` → `'16.0'`，`IPHONEOS_DEPLOYMENT_TARGET '15.0'` → `'16.0'`，`MARKETING_VERSION 1.1.1` → `1.3.0`，`CURRENT_PROJECT_VERSION 3` → `4`。
+3. `.github/workflows/ios.yml`：顶部 `env` 增加 `IOS_RUNTIME: '16.4'`、`IOS_DESTINATION_OS: '16.4'`、`MINOS_VERSION: '16.0'`；`xcodes runtimes install` / SimRuntime id / destination `OS=` / `Verify deployment target` 的 `otool minos` / `Verify unsigned ipa` 的 `plutil MinimumOSVersion` + `otool minos` 全部引用该变量并期望 **16.0**；保留 macos-15 + Xcode 16.4、`objectVersion = 63`、`sim-photos-dated.sh 2`、`-skip-testing:PhotoDeskUITests/PerformanceUITests`、失败截图 + `last-exception.log` + `signal-crash.log` + `viewer-trace.log` 上传、`.app.zip` / 未签名 ipa / `.sha256` 产物。若 macos-15 + Xcode16.4 镜像装不到 iOS 16.4 runtime，允许退到该 image 可用的最低 iOS 16.x，但**只改 env 三处**，并在 docs/21 记录实际 runtime 与原因；禁止版本号散落 8 个 step。
+4. `scripts/build-sim.sh`：`iOS 15.5` / `OS=15.5` → `iOS 16.4` / `OS=16.4`。`scripts/test-core.ps1` 逻辑不变、保留 UTF-8 BOM。
+5. `PhotoDeskCore/Package.swift`：`platforms:` **仍留空**，注释「Xcode 15.4」→「Xcode 16.4 / Swift 5.9+ / Docker swift:6.0-noble」。
+6. `PhotoDesk/Resources/Info.plist`：保持不硬编码 `MinimumOSVersion`，依赖构建设置注入。
+7. `README.md`（`:17/:19/:37`）、`安装说明.md`（`:11`，补「iOS 15 设备不再支持」）、`测试清单.md`（`:17/:21/:83`）、`发布说明.md`（`:3/:25/:33/:87`，改 1.3.0 Build 4 / iOS 16.0 并补 M13 三项说明）、`已知问题.md`（新增 #27 捏合崩溃 / #28 位置记忆 / #29 多选交互及状态与真机待验，#21/#23 口径同步）全部改。
+8. `docs/03-技术设计文档.md`：附录 A.4 旧「0.28s / 10pt / 只加不取消」改为单指滑选语义；附录 B 补 `SlideSelectPolicy` / `SlideSelectConfig` / App 适配层 / 边缘自动滚。
+9. `docs/04-UIUX设计文档.md`：§3.1 旧 ASCII 图（标题 / 五段 / TabBar）与 M12 修订并存 → 统一当前单顶部栏 IA；`:74` 多选改「单指滑动连续多选」；§7 中文文案校对新文案。
+10. `docs/05-开发进程与里程碑.md`：`:8-25` 过期进度表更新（补 M10 行）；`:373` 变更 21 的「轮20最终 / 13条🟨 / 配额耗尽」改为「macos-14 镜像退役 / 验证轮 25 / run 42119450518 / 失败集待日志核对」；新增**变更 22（M13）**，四列表格格式 `| 2026-11-06 | M13 | **变更 22（iOS 16 基线 + 三项根因重修）**：... | Agent |`。
+11. `docs/06` / `docs/08`：当前生效段同步 runner / Xcode / runtime，历史探测段落标注归档。
+12. `docs/12-真机签名与验收.md`：`:123` 悬空引用 `docs/18 §8` 改 `§6 / §7`；保留 M12 12 项（全 ⬜）；新增 M13 三项专项清单。
+13. `.zcode/config.json`：`ios-simulator@zcode-plugins-official` 改 `false` / 移除键（Windows darwin 硬检不可用，与 docs/08 冲突）。
+14. 版本单一真值：`1.3.0 (Build 4)`；`docs/18` 作为 M12 历史归档保留标题 `v1.2.2 / M12` 不改；`docs/21` 卷首注明「承接 M12 v1.2.2，本轮 1.3.0 Build 4 / iOS 16.0」；禁止再出现 1.1.1 Build 3 作为当前值。
+
+只读归档（**不回改正文**）：`docs/01`、`docs/02`、`docs/07`、`docs/09/10/11`、`docs/13/14/15`、`docs/16/17/18`。其中若 `docs/01` / `docs/02` 含「当前最低 iOS 15」硬约束句，允许只改那一句为「见 AGENTS.md 当前基线」；其余归档内容不动。允许在每份归档卷首加一行「Mxx 历史归档，当前约束以 AGENTS.md + project.yml + workflow + docs/19 + docs/20 为准」。**禁止全仓批量替换 15.0 → 16.0**（全仓有 149 个 md 与 35 个配置/脚本含 iOS15 字样，绝大多数是历史证据）。
+
+抬到 iOS16 后，原「11 条失败集」里属于 iOS15 模拟器合成 / AX 限制的条目可能转绿或变化：必须**逐项重跑并重新分类**，真实产品缺陷必须修，平台限制才标 ⚠️ 并保留复现步骤；**禁止直接删测试**。
+
+======================================================================
+五、执行步骤 Phase 0–9（连续执行，每 Phase 写清 输入/动作/产出/门禁）
+======================================================================
+
+Phase 0 · 基线校正与 iOS16 切换
+输入：docs/19、docs/20、第一节必读清单、`gh` CLI。
+动作：输出 10–15 行现状确认；执行 `gh run view 42119450518 --log-failed` 并下载 xcresult，导出**精确失败测试名清单**（docs/18 没有逐项点名的 11 条，13/11/7 冲突，任何名单只能来自日志，禁止照抄推测）；按第四节 1–14 改全部当前约束文件；按 §2.6 定 1.3.0 Build 4；确认历史归档只读。
+产出：commit `chore(platform): 抬到 iOS 16.0 并校正基线`、`docs(m13): 基线冲突校正`；精确失败集清单（先放临时笔记，Phase 7 写进 docs/21）。
+门禁：`git status --short --branch` 干净（除本 commit）；`xcodegen generate` 成功；当前约束文件 grep 无 iOS15 生效值；`xcodebuild -showBuildSettings` 里 `IPHONEOS_DEPLOYMENT_TARGET = 16.0`。
+
+Phase 1 · 滑选 Core 失败测试（红）
+动作：新增 `SlideSelectConfig` / `SlideSelectPolicy` 骨架 + `SlideSelectPolicyTests`，先写断言让方向锁 / 快照恢复 / 边缘速度 / 去重失败。
+门禁：`pwsh -File scripts/test-core.ps1` 明确报新增用例失败，贴出真实输出与数量。
+
+Phase 2 · 滑选 Core 实现（绿）
+动作：实现纯函数；补 `ZoomGeometryTransactionTests` / `PositionAnchorV3Tests` 并转绿。
+产出：commit `feat(core): SlideSelectPolicy 与位置/缩放纯逻辑`。
+门禁：本机 Docker 全绿，精确测试数 > 220（基线 220/220 只增不减）。
+
+Phase 3 · 捏合失败测试红→绿
+动作：先加命中 cell 内 `UIScrollView` 的 UI 强断言（红）；再实现【P1】事务状态机 + pending geometry + 删除排队 + Release 面包屑 + `viewForZooming` nil 观测。
+产出：commit `fix(viewer): 缩放事务期冻结几何写入并互斥删除`、`test(viewer): 真捏合强断言`。
+门禁：CI 该组绿；`viewer-trace.log` 无 non-finite；`pendingDeleteCount == 0`；`imageView.frame > 0`、像素非背景色。
+
+Phase 4 · 位置失败测试红→绿
+动作：先加 6 条单测 + 像素锚点 UI 断言（红）；再实现【P2】v3 锚点、精确 offset、恢复期禁回写、宿主复用、viewer 记忆接线。
+产出：commit `fix(library): 像素级位置锚点与宿主复用`、`test(library): 冷启动/旋转/恢复期不回写`。
+门禁：位置族逐项点名转绿；冷启动无可见跳变；`docs/15 §3.2` 六条断言仍在。
+
+Phase 5 · 多选整条替换红→绿
+动作：删除长按框选路径；新增 `slideSelectPan` + `SlideSelectGestureController`；逐条落地用户 6 条硬约束；改写 / 新增第三节全部 UI 用例（含 `testSlideToSelect`、`testDragBackRemovesPreviouslySelected`、`testEdgeAutoScrollSelectsOffscreenCells`、`testOriginallySelectedNotCleared`、`testVerticalDragDoesNotSelectAndScrolls`、`testTapNotSwallowedBySlidePan`、`testNoFlickerOnSameCell`、`testScrollEnabledRestoredAfterDragEnd`、`testReusedCellBadgeMatchesSelection`），保留 `testScrollWorksInSelectionMode`。
+产出：commit `feat(library): 单指滑动连续多选替换长按框选`、`test(library): 滑选八类强断言`。
+门禁：8 类断言全绿；垂直让位回归保留；零不可达死代码；`cancelsTouchesInView = false` / `maximumNumberOfTouches = 1` / delegate 两方法 / `.began` 不激活 / `[IndexPath: Bool]` 快照 / `lastProcessedIndexPath` / `isScrollEnabled` 协同 / 60pt CADisplayLink 逐项可在代码与测试中指认。
+
+Phase 6 · iOS16 CI 全绿
+动作：`git push` → `gh run list --limit 5` → `gh run watch <id> --exit-status` → `gh run view <id> --log-failed`；按第四节 3 修 runtime / minos / destination；把 Phase 0 的精确失败集逐项重跑并重新分类。
+产出：commit `ci(m13): iOS16 runtime 与 minos16.0 门禁`。
+门禁：至少一轮完整 CI：core-linux 全绿、iOS 单测全绿、UI 逐项点名（禁止只写「约 N/M 绿」）、`Verify deployment target` + `Verify unsigned ipa` 绿、`minos 16.0` / `plutil MinimumOSVersion 16.0` / 未签名校验通过。
+
+Phase 7 · 文档同步与红线 grep
+动作：新建 `docs/21-后续修复验收记录.md`（按 docs/19 附录 B 模板，含 Phase 0 精确失败集、11/13/7 差异表、run id、测试数量、截图路径、逐项证据、IPA SHA256、真机待验项）；`docs/05` 进度表 + 变更 22；`docs/12` M13 专项；根级 6 份说明与 `AGENTS.md` 复核；执行第七节全部 grep。
+产出：commit `docs(m13): docs/21 验收记录与变更22`。
+门禁：红线 grep 通过；无新增 Xcode 警告；中文文案按 `docs/04 §7`；`docs/21` 真机项全写「未验证 / 待用户验证」。
+
+Phase 8 · 产物与截图核验
+动作：`gh run download <id> -n PhotoDesk-unsigned-ipa -D artifacts` 及 simulator app / 失败截图 / 三份日志；**逐张打开截图**并写目视结论；Windows `certutil -hashfile artifacts/PhotoDesk-unsigned.ipa SHA256` 与 CI `.sha256` / `shasum -a 256` 双端核对；确认 `codesign` 未签名。
+门禁：SHA256 与 CI artifact 一致；截图目视确认；`last-exception.log` / `signal-crash.log` / `viewer-trace.log` 全文归档路径写入 docs/21。
+
+Phase 9 · 最终报告与真机交付
+动作：按第十节输出中文最终报告；交付 M13 真机 12+3 项清单与 5 项取证回传要求；逐条核对停止条件。
+门禁：真机项全部「未验证 / 待用户验证」；不得声称真机通过；不得提交 `.build/` / `.ips` / 用户照片 / 截图二进制。
+
+======================================================================
+六、测试清单与门禁命令（必须亲自执行并贴真实输出）
+======================================================================
+
+本机（Windows，仓库根）：
+```
+git status --short --branch
+pwsh -File scripts/test-core.ps1
+git grep -nE 'import (UIKit|SwiftUI|Photos|PhotosUI|Vision|CoreImage|Accelerate)' -- PhotoDeskCore/Sources
+```
+
+推送与 CI：
+```
+git add -A
+git commit -m "type(scope): 中文简述"
+git push
+gh run list --limit 5
+gh run watch <run-id> --exit-status
+gh run view <run-id> --log-failed
+gh run view 42119450518 --log-failed
+gh run download <run-id> -n PhotoDesk-unsigned-ipa -D artifacts
+certutil -hashfile artifacts/PhotoDesk-unsigned.ipa SHA256
+```
+
+红线 grep（Git Bash / `git grep`，当前约束文件应无命中或仅剩标注历史的行）：
+```
+git grep -nE 'URLSession|import (UIKit|SwiftUI|Photos|PhotosUI|Vision|CoreImage|Accelerate)' -- PhotoDeskCore/Sources
+git grep -nE '彻底删除|永久删除|清空最近删除' -- PhotoDesk
+git grep -nE 'try!|as!' -- 'PhotoDesk/*.swift' 'PhotoDesk/**/*.swift'
+git grep -nE 'iOS 15|15\.0|15\.5|minos 15|macos-14|Xcode 15\.4' -- AGENTS.md README.md 安装说明.md 测试清单.md 发布说明.md 已知问题.md project.yml .github/workflows/ios.yml scripts/build-sim.sh docs/03-技术设计文档.md docs/04-UIUX设计文档.md docs/05-开发进程与里程碑.md docs/06-构建签名与测试发布方案.md docs/08-环境探测报告.md docs/12-真机签名与验收.md
+git grep -nE '1\.1\.1|Build 3' -- project.yml 发布说明.md 安装说明.md 已知问题.md
+git grep -nE 'cancelsTouchesInView|maximumNumberOfTouches|indexPathForItem|CADisplayLink|isDragSelecting|lastProcessedIndexPath' -- PhotoDesk/Features/Library
+```
+
+测试数量口径：Core 基线 220/220 只增不减；iOS 单测既有 139+ 不减少；UI 逐项点名，不得只写「约 N/M 绿」；`PhotoDeskUITests/PerformanceUITests` 仍只在主测试跳过、性能步 `-only-testing` 单独跑。
+
+======================================================================
+七、文档同步、变更日志与红线复核
+======================================================================
+
+- `docs/05`：更新 `:8-25` 进度总表（补 M10 行、去掉「合计 0%」过期值）；把 `:373` 变更 21 旧结论改为「macos-14 镜像退役 / 验证轮 25 / run 42119450518 / 失败集待日志核对」；新增 `| 2026-11-06 | M13 | **变更 22（iOS 16 基线 + 三项根因重修）**：... | Agent |`。
+- `docs/21`：新建，卷首写执行分支 / 基线 HEAD / 权威规划 docs/19 / 提示词 docs/20 / 生成日期 / 承接 M12 v1.2.2，正文按 docs/19 附录 B 九节。
+- `docs/12`：M12 12 项保留（全 ⬜），新增 M13 三项专项（P1 捏合 Release 30 次 + 10 双击 + 旋转 + iCloud-only/HEIF/全景；P2 冷启动 / 旋转 / 筛选态 / 深月份 5000 张 / 查看器返回；P3 八类滑选 + ≥55FPS）。
+- 根级 `README.md` / `安装说明.md` / `测试清单.md` / `发布说明.md` / `已知问题.md` / `AGENTS.md` 与 `docs/03` / `docs/04` / `docs/06` / `docs/08` 按第四节复核。
+- 状态口径：✅ 已修 + 自动化验证；🟨 模拟器 / 单测通过、真机待验；⚠️ 平台限制（须附复现步骤）；❌ 未完成不得出现。
+
+======================================================================
+八、崩溃取证与真机验收（Agent 边界，不得伪造）
+======================================================================
+
+Agent 不执行真机签名 / AltServer / AltStore 装包；只产出未签名 IPA + SHA256 + docs/12 清单 + 可复现自动化用例。
+
+取证回传 5 项（写进 docs/21 与最终报告，交用户执行）：
+1. `last-exception.log` + `signal-crash.log` + `viewer-trace.log` 全文；
+2. 系统设置 → 隐私与安全性 → 分析与改进 → 分析数据的 `.ips`（查 `CALayer position contains NaN` / `SWIFT TASK CONTINUATION MISUSE`）；
+3. 打开查看器后 / 捏合前 / 崩溃后截图各一（含顶栏与胶片条）；
+4. 该图是否 iCloud-only / HEIF / 12000×1000 全景，此前是否 present 信息 / 编辑 / 分享或切 Tab；
+5. 设备型号 / iOS 版本 / build 号 / IPA SHA256。
+
+截图纪律：`simctl screenshot` + App 自写日志是可靠取证通道（workflow:106-118 已能拉取）；大图必须像素非背景色；顶部栏 / 徽标 / 移除框选后的界面逐张目视确认；未跑过的截图、CI、测试数量不得写成已验证。CI 失败截图不依赖 AX。
+
+======================================================================
+九、绝对禁止事项
+======================================================================
+
+- 禁止只改 `project.yml` 一行就宣称「已抬 iOS16」而不动 AGENTS.md / workflow / 文档。
+- 禁止回改 docs/09–18 历史归档正文，禁止全仓批量 `15.0 → 16.0` 替换，禁止篡改 run id / 测试数量 / 截图结论。
+- 禁止把 docs/18 的「11 条失败清单」按推测写成确定事实；必须以 `gh run view 42119450518 --log-failed` 为准。
+- 禁止用 M12 的矩形框选 / `GridHitRegion` 相交 / 基线每帧重算冒充用户指定的单指滑选快照语义。
+- 禁止在 `.began` 激活 `isDragSelecting`；禁止垂直占优后又在同手势里复活选择；禁止漏掉 `cancelsTouchesInView = false`、`maximumNumberOfTouches = 1`、delegate 两个方法、`lastProcessedIndexPath`、`isScrollEnabled` 恢复、60pt CADisplayLink 按距离算速度并在离开 / 结束时销毁。
+- 禁止误改 `ViewerViewController.setupPanGesture()` 的上滑 pan 来「满足」`cancelsTouchesInView = false`（该约束只作用于 Library 网格新 pan）。
+- 禁止删断言、跳测、扩大 `-skip-testing`、弱化断言、把失败改成 ⚠️、用 `asyncAfter` / 遮罩 / `reloadData` / `try?` / 关闭动画 / 放大容差掩盖症状。
+- 禁止删 `GridHitRegion` 既有 15 条单测、删 `docs/15 §3.2` 六条 🟨 断言、删 `testScrollWorksInSelectionMode`。
+- 禁止用 `.centeredVertically` 作为位置精确恢复主路径；禁止恢复期回写；禁止用延迟重建宿主掩盖位置漂移。
+- 禁止在缩放事务活跃期写 `zoomContentView.frame` / `contentSize` / `contentInset`；禁止 pinch 中 `performBatchUpdates`；禁止 Release 无面包屑。
+- 禁止引入任何第三方依赖、网络请求、`URLSession`、分析 / 广告 SDK；禁止 Core 出现 `import UIKit/SwiftUI/Photos/...` 或 `platforms:` 非空；禁止 `CGSize/CGRect/UIImage/PHAsset` 进 Core。
+- 禁止实现「彻底删除 / 永久删除 / 清空最近删除」入口；UI 文案必须「移到最近删除」。
+- 禁止 `try!` / 强制解包、散落魔法数字、硬编码颜色字体间距、硬编码 `DEVELOPMENT_TEAM`、新增 Xcode 警告。
+- 禁止同一时刻启动 2 个及以上子智能体、禁止嵌套子智能体、禁止把主路径验证委派出去。
+- 禁止把未真机验证写成 ✅；禁止伪造 CI run / 截图 / 测试数量 / IPA SHA256；禁止提交 `.build/` / `.ips` / 用户照片 / 截图二进制。
+- 禁止建议 WSL2 Ubuntu、macOS 虚拟机、Windows 原生 Swift 工具链、Linux/Windows 交叉编译 iOS、ZCode iOS 模拟器插件。
+
+======================================================================
+十、停止条件与最终报告格式
+======================================================================
+
+停止条件（全部满足才可收尾）：Phase 0–9 全部连续执行；本机 Docker 全绿且测试数 > 220；至少一轮完整 CI（core-linux / iOS 单测 / 关键 UI 逐项点名）绿；`minos 16.0` + `plutil MinimumOSVersion 16.0` + 未签名校验通过；`docs/21` 含精确失败集核对、11/13/7 差异表、run id、测试数量、截图路径、逐项证据、IPA SHA256、真机待验项；红线 grep 通过；工作树无禁止文件；真机项如实待验。遇硬阻塞按本条件逐条列出「已完成 / 未完成 / 阻塞原因」，不得静默停在半路。
+
+最终报告（中文，必须包含 10 项）：
+1. 改了什么（按 iOS16 基线 / P1 / P2 / P3 分节，列到文件）；
+2. 为什么（根因，对应第三节）；
+3. 红 → 绿证据（每类用例名 + 前后状态 + 精确测试数量）；
+4. CI run id / 轮次 / runner / runtime / Xcode；
+5. 产物路径 + SHA256（Windows `certutil` 与 CI `shasum` 双端核对结果）；
+6. 截图逐张查看结论；
+7. Phase 0 精确失败集核对结果 + iOS16 后逐项重新分类（真实缺陷已修 / 平台限制 ⚠️ 附复现步骤）；
+8. **未验证项**（M12 12 项 + M13 3 项真机、内存峰值 <250MB / 滚动 ≥55FPS 若未测）与 5 项取证回传清单；
+9. commit 列表（每条对应一条根因）；
+10. 红线 grep 结果与零新增警告结论。
+
+最终报告前自查（不要跳过）：用户 6 条硬约束是否逐条能在代码与测试里指认；`cancelsTouchesInView = false` 是否只加在网格新 pan；`.began` 是否未激活；快照是否用 `[IndexPath: Bool]` / `Set<IndexPath>` 且反向滑回恢复；`lastProcessedIndexPath` 是否去重；结束时 `isScrollEnabled == true` 且快照与 displayLink 清空；60pt 边缘自动滚是否按距离算速度并命中屏幕外 cell；位置是否精确像素且恢复期零回写；缩放活跃期是否零几何写入且删除排队；iOS16 是否全仓同步而非只改一行；docs/21 是否如实写真机未验证。
+
+======================================================================
+建议 commit 序列（可按实际红绿拆分，但禁止大杂烩）
+======================================================================
+1. `chore(platform): 抬到 iOS 16.0 并校正基线`
+2. `docs(m13): 基线冲突校正与失败集精确核对`
+3. `feat(core): SlideSelectPolicy 与位置/缩放纯逻辑 + 单测`
+4. `fix(viewer): 缩放事务期冻结几何写入并互斥删除`
+5. `test(viewer): 命中内层 scrollView 的捏合/双击/旋转强断言`
+6. `fix(library): 像素级位置锚点与宿主复用`
+7. `test(library): 冷启动/旋转/恢复期不回写`
+8. `feat(library): 单指滑动连续多选替换长按框选`
+9. `test(library): 滑选八类强断言`
+10. `ci(m13): iOS16 runtime 与 minos16.0 门禁`
+11. `docs(m13): docs/21 验收记录与变更22`
+
+（全文结束。整份复制粘贴给执行 Agent 即可，不需要分批投喂。）
