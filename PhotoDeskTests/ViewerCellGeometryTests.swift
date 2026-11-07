@@ -105,6 +105,9 @@ final class ViewerCellGeometryTests: XCTestCase {
         let baseHeight = cell.test_zoomContentView.bounds.height
         XCTAssertEqual(baseHeight, 156, accuracy: 1.0, "aspectFit 基准高度应为 156")
         cell.test_scrollView.setZoomScale(2, animated: false)
+        // M13 状态机：setZoomScale 触发 didZoom → 事务 active，inset 推迟到 settling 批量提交
+        //（生产由 0.4s 宽限定时器触发；单测无 runloop，显式驱动同一条 commitPendingGeometry 路径）。
+        cell.test_flushPendingGeometry()
         let inset = cell.test_scrollView.contentInset
         let expected = (844 - baseHeight * 2) / 2
         XCTAssertEqual(inset.top, expected, accuracy: 1.0,

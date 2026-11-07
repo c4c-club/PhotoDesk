@@ -352,6 +352,9 @@ final class ZoomableImageCell: UICollectionViewCell {
         }
         let content = DoubleSize(width: Double(zoomContentView.bounds.width),
                                  height: Double(zoomContentView.bounds.height))
+        // 绿7 实锤：无图/占位期内容为空是常态（每次查看器打开都有），静默跳过；
+        // 旧实现把它记成 "non-finite"（非正 ≠ 非有限），污染 traceNonFinite 取证口径。
+        guard content.width > 0, content.height > 0 else { return }
         let viewport = DoubleSize(width: Double(scrollView.bounds.width),
                                   height: Double(scrollView.bounds.height))
         let insets = ZoomGeometryTransaction.centeringInsets(content: content,
@@ -398,7 +401,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         pendingGeometry.removeAll()
 
         guard let commit = snapshots.first else {
-            ViewerTrace.log("geometry discard non-finite pending count=0 state=settling")
+            // 绿7 实锤：纯捏合路径（scrollViewDidZoom 只刷时间戳）结算时 pending 为空但缩放已变化，
+            // 此时只需按「未变换 bounds × 当前 zoomScale」重算居中 inset（B3）；frame/contentSize
+            // 归 UIScrollView 自管，绝不干预。空内容（无图/占位）静默结算，两者都不算 non-finite。
+            applyInsetOnlyAfterZoom()
             finishZoomTransaction()
             return
         }
@@ -410,6 +416,27 @@ final class ZoomableImageCell: UICollectionViewCell {
         CATransaction.commit()
         ViewerTrace.log("geometry commit once size=\(commit.contentSize.width)x\(commit.contentSize.height) scale=\(commit.zoomScale)")
         finishZoomTransaction()
+    }
+
+    /// 结算期 inset 兜底：zoomContentView.bounds 不受 transform 污染（B3 入参语义不变）。
+    private func applyInsetOnlyAfterZoom() {
+        let content = DoubleSize(width: Double(zoomContentView.bounds.width),
+                                 height: Double(zoomContentView.bounds.height))
+        guard content.width > 0, content.height > 0 else { return }
+        let viewport = DoubleSize(width: Double(scrollView.bounds.width),
+                                  height: Double(scrollView.bounds.height))
+        let insets = ZoomGeometryTransaction.centeringInsets(content: content,
+                                                             viewport: viewport,
+                                                             zoomScale: Double(scrollView.zoomScale))
+        let commit = ZoomGeometryCommit(contentSize: content, insets: insets,
+                                        zoomScale: Double(scrollView.zoomScale))
+        guard ZoomGeometryTransaction.sanitized(commit) != nil else {
+            ViewerTrace.log("geometry non-finite inset-only content=\(content.width)x\(content.height) scale=\(scrollView.zoomScale)")
+            return
+        }
+        scrollView.contentInset = UIEdgeInsets(top: insets.top, left: insets.left,
+                                               bottom: insets.bottom, right: insets.right)
+        ViewerTrace.log("geometry commit inset-only top=\(Int(insets.top)) scale=\(String(format: "%.2f", scrollView.zoomScale))")
     }
 
     private func apply(_ commit: ZoomGeometryCommit) {
@@ -530,5 +557,9 @@ extension ZoomableImageCell {
     var test_zoomContentView: UIView { zoomContentView }
     var test_imageView: UIImageView { imageView }
     var test_cloudBox: UIView { cloudBox }
+    /// 单测无 runloop：显式驱动缩放事务进入 settling（生产路径由 DSMotion.zoomActivityGrace 定时器触发）
+    func test_flushPendingGeometry() {
+        commitPendingGeometry()
+    }
 }
 #endif
