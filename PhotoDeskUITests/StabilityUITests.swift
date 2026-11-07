@@ -306,12 +306,14 @@ final class StabilityUITests: XCTestCase {
                                      fromY: CGFloat,
                                      toX: CGFloat,
                                      toY: CGFloat) {
-        let start = collection.coordinate(withNormalizedOffset: CGVector(dx: fromX, dy: fromY))
-        let middle = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: fromY))
-        let end = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: toY))
-        start.press(forDuration: 0.05, thenDragTo: middle)
-        slideSelectGesture(in: collection, fromX: toX, fromY: fromY, toX: toX, toY: toY)
-        _ = end
+        // 两段都必须横向占优：纵向拖动会触发方向锁（让位滚动、不选择），
+        // 导致第二行选不中、计数断言达不到。两段各自独立手势、网格不滚动。
+        // 第一段：fromY 行整行横向滑选
+        slideSelectGesture(in: collection, fromX: fromX, fromY: fromY,
+                           toX: toX, toY: fromY)
+        // 第二段：toY 行整行反向横向滑选（跨第二行继续加选）
+        slideSelectGesture(in: collection, fromX: toX, fromY: toY,
+                           toX: fromX, toY: toY)
     }
 
     private func slideHorizontal(in collection: XCUIElement,
