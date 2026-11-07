@@ -4,6 +4,7 @@
 // @MainActor：App/UI 侧组合发生在主线程。
 
 import Foundation
+import UIKit
 
 @MainActor
 final class AppContainer: ObservableObject {
