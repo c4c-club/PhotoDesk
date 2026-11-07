@@ -940,8 +940,8 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
-                           toX: 0.92, toY: 0.42)
+        slideAtLeastTwoRows(in: collection, fromX: 0.08, fromY: 0.22,
+                            toX: 0.92, toY: 0.42)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选应连续选中至少 6 格")
         app.swipeUp()
@@ -1097,16 +1097,14 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
-                           toX: 0.92, toY: 0.42)
+        slideAtLeastTwoRows(in: collection, fromX: 0.08, fromY: 0.22,
+                            toX: 0.92, toY: 0.42)
         let count = waitForSelectionCount(app, atLeast: 6)
         XCTAssertGreaterThanOrEqual(count, 6, "单指滑选后计数不足 6")
         XCTAssertGreaterThanOrEqual(visibleSelectedCount(in: collection), 6,
                                     "可见选中格不足 6")
         snap(app, "s07-slide-select")
-    }
-
-    // MARK: - S08 查看器连滑 30 张不闪退
+    }    // MARK: - S08 查看器连滑 30 张不闪退
 
     func testViewerSwipeThroughAllPhotos() throws {
         let app = XCUIApplication()
