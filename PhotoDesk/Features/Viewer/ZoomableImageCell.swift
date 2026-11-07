@@ -484,9 +484,12 @@ extension ZoomableImageCell: UIScrollViewDelegate {
         // M12 B2：零 contentSize 时返回 nil——旧版返回零尺寸 view 却允许捏合 →
         // UIScrollView 内部除零 → CALayer position contains NaN。
         // M13：nil 时写含 contentSize / frame / zoomScale 的 Release 面包屑，便于真机 .ips 还原时序。
+        // 注意：本方法内禁止读 scrollView.zoomScale——UIScrollView 在 delegate 回调内经
+        // _getDelegateZoomView 重入计算 zoomScale，读它会无限递归（绿5 SIGSEGV 实证）；
+        // 面包屑用 transform.a 等价取当前缩放。
         guard scrollView.contentSize.width > 0, scrollView.contentSize.height > 0,
               zoomContentView.frame.width > 0, zoomContentView.frame.height > 0 else {
-            ViewerTrace.log("viewForZooming nil contentSize=\(scrollView.contentSize) zoomContentView=\(zoomContentView.frame) imageView=\(imageView.frame) zoomScale=\(scrollView.zoomScale) state=\(zoomTransactionState)")
+            ViewerTrace.log("viewForZooming nil contentSize=\(scrollView.contentSize) zoomContentView=\(zoomContentView.frame) imageView=\(imageView.frame) zoomScale=\(zoomContentView.transform.a) state=\(zoomTransactionState)")
             return nil
         }
         return zoomContentView
