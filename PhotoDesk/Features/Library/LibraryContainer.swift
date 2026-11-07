@@ -63,6 +63,7 @@ struct LibraryRootView: View {
                 // 顶部栏由 LibraryContainer 的 UINavigationController 承载（无 App 标题）
                 ZStack {
                     LibraryContainer(viewModel: viewModel,
+                                     isViewerActive: viewerContext != nil,
                                      onOpenViewer: { item in
                                          viewerContext = ViewerContext(
                                              items: viewModel.filteredItems,
@@ -300,6 +301,8 @@ final class SelectionModeBridge: ObservableObject {
 /// LibraryViewController 作为导航根，顶部栏按钮由其 navigationItem 承载。
 struct LibraryContainer: UIViewControllerRepresentable {
     @ObservedObject var viewModel: LibraryViewModel
+    /// 全屏浏览器是否在展示（fullScreenCover item 非空）：M13 整理回顾钩子在关闭后的更新里触发
+    let isViewerActive: Bool
     /// 点击 cell → 打开全屏浏览器（assetID 上下文，docs/09 D01）
     let onOpenViewer: (PhotoItem) -> Void
     /// 「多选」按钮与 UIKit 控制器的桥
@@ -334,5 +337,12 @@ struct LibraryContainer: UIViewControllerRepresentable {
         controller.onOpenTools = onOpenTools
         controller.onShowVault = onShowVault
         selectionBridge.controller = controller
+        #if DEBUG
+        // M13 绿7 实锤：UIBarButtonItem 在 UIToolbar 上的 XCUITest 坐标点按不可靠（轮 9 同款），
+        // 整理回顾改由「查看器关闭后的容器更新」触发，走与徽标点按完全相同的 sessionBadgeTapped 路径。
+        if !isViewerActive {
+            controller.attemptDebugOpenSessionReviewIfNeeded()
+        }
+        #endif
     }
 }

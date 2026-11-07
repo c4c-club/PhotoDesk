@@ -158,10 +158,12 @@ final class PageRegressionUITests: XCTestCase {
     func testSessionCommitPromptsOnce() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
-        // mock 模式：BatchCommitCoordinator 对 mock writer 的批量提交次数 === 真实路径的 performChanges 次数
+        // mock 模式：BatchCommitCoordinator 对 mock writer 的批量提交次数 === 真实路径的 performChanges 次数；
+        // -uiTestingOpenSessionReview：查看器关闭后由容器触发整理回顾（绿7 实锤 UIToolbar 坐标点按不可靠）
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
                                 "-gesture.down", "moveToRecentlyDeleted",
+                                "-uiTestingOpenSessionReview",
                                 "-uiTestingKeepChrome"]
         launchToGrid(app)
 
@@ -172,14 +174,14 @@ final class PageRegressionUITests: XCTestCase {
             swipeDown(in: viewer)
         }
 
-        // 打开整理回顾（UIBarButtonItem 的 AX scroll-to-visible 在 UIToolbar 上不可靠——
-        // FlowUITests 同款问题：用坐标点击绕开）
+        // 待处理徽标计数先行断言（D16 入口语义：3 条滑动 → 徽标 3）
         let badge = anyElement(app, identifier: "SessionBadge")
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "待处理徽标未出现")
-        // UIToolbar 按钮受 scroll-to-visible 限制——按 frame 中心换算绝对坐标直击
-        let badgeFrame = badge.frame
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: badgeFrame.midX, dy: badgeFrame.midY)).tap()
+        XCTAssertTrue(badge.label.contains("3"), "待删除计数应为 3，实际「\(badge.label)」")
+        // 关闭查看器 → 容器更新触发整理回顾（与徽标点按同一条 sessionBadgeTapped 路径）
+        let close = anyElement(app, identifier: "Viewer-Close")
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "查看器关闭按钮未出现")
+        close.tap()
         // 整理回顾页：直接等「全部移到最近删除」按钮（NavigationView 本身不暴露 AX 元素）
         let commit = anyElement(app, identifier: "SessionReview-CommitDelete")
         XCTAssertTrue(commit.waitForExistence(timeout: 8), "整理回顾页未出现\n\(hierarchy(app))")

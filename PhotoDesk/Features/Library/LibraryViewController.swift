@@ -512,7 +512,8 @@ final class LibraryViewController: UIViewController {
     @objc private func monthJumpTapped() { onOpenMonthJump?() }
     @objc private func filterTapped() { onOpenFilter?() }
     @objc private func selectTapped() { toggleSelectionMode() }
-    @objc private func sessionBadgeTapped() {
+    /// 整理回顾入口（徽标点按 / M13 DEBUG 钩子共用同一条路径，internal 供容器钩子调用）
+    @objc func sessionBadgeTapped() {
         let review = SessionReviewView(session: AppContainer.shared.reviewSession,
                                        pipeline: pipeline,
                                        settings: settings) { [weak self] in
@@ -522,6 +523,20 @@ final class LibraryViewController: UIViewController {
         host.view.backgroundColor = DSColor.bgPrimary
         present(host, animated: true)
     }
+
+    #if DEBUG
+    /// -uiTestingOpenSessionReview：查看器关闭回到网格后打开整理回顾（D16 语义不变，
+    /// 只是绕开 XCUITest 对 UIToolbar 坐标点按的不可靠性；同一次会话只触发一次）。
+    private var debugSessionReviewHookDone = false
+    func attemptDebugOpenSessionReviewIfNeeded() {
+        guard !debugSessionReviewHookDone,
+              UITestHooks.enabled("-uiTestingOpenSessionReview"),
+              AppContainer.shared.reviewSession.pendingDeleteCount > 0 else { return }
+        debugSessionReviewHookDone = true
+        ViewerTrace.log("hook openSessionReview pending=\(AppContainer.shared.reviewSession.pendingDeleteCount)")
+        sessionBadgeTapped()
+    }
+    #endif
 
     #if DEBUG
     /// M12 UI 测试钩子接线（docs/16 §6.3）：网格就绪后触发（与 -uiTestingMonthJump 同位）。
