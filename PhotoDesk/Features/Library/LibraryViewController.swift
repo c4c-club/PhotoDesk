@@ -1116,10 +1116,16 @@ final class LibraryViewController: UIViewController {
     /// 同一条 scrollToSection 路径；成功即置位，快照未含目标月时随下一次 apply 重试）
     private func attemptDebugMonthJumpIfNeeded() {
         guard !debugMonthJumpDone,
-              let sectionID = pendingDebugMonthJumpSectionID,
-              let index = currentSections.firstIndex(where: { $0.id == sectionID }) else { return }
+              let sectionID = pendingDebugMonthJumpSectionID else { return }
+        guard let index = currentSections.firstIndex(where: { $0.id == sectionID }) else {
+            // 绿8 取证：目标月不在当前快照（如跨用例泄漏的筛选只剩 2026）——记一次等待痕迹
+            ViewerTrace.log("jump.wait target=\(sectionID) sections=\(currentSections.count)")
+            return
+        }
         if scrollToSection(index) {
             debugMonthJumpDone = true
+        } else {
+            ViewerTrace.log("jump.skip target=\(sectionID) cvSections=\(collectionView.numberOfSections)")
         }
     }
 
@@ -1311,11 +1317,24 @@ final class LibraryViewController: UIViewController {
               collectionView.numberOfItems(inSection: index) > 0 else { return false }
         isRestoringPosition = true
         collectionView.layoutIfNeeded()
-        collectionView.scrollToItem(at: IndexPath(item: 0, section: index),
-                                    at: .top,
-                                    animated: false)
-        // 抵消 48pt 粘性 header：scrollToItem(.top) 对齐的是第一个 cell，粘性头会盖住首行
-        let targetY = max(0, collectionView.contentOffset.y - 48)
+        // M13 绿8 实锤：scrollToItem(.top) 对齐的是第一个 cell，再减 48pt 的旧补偿在粘性头
+        // 与安全区叠加下会越过目标月落到上一段（2024-05 跳转实际落到 2024-06）。改为直接取
+        // 目标月 header 的布局 minY 精确对齐：offset = header.minY - adjustedContentInset.top，
+        // 粘性头钉在该边界必然显示目标月，同时消除 48pt 魔法数字。
+        let headerAttrs = collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
+            ofKind: UICollectionView.elementKindSectionHeader,
+            at: IndexPath(item: 0, section: index))
+        let maxOffsetY = max(0, collectionView.contentSize.height
+            - collectionView.bounds.height + collectionView.adjustedContentInset.bottom)
+        let alignedY: CGFloat
+        if let headerMinY = headerAttrs?.frame.minY {
+            alignedY = headerMinY - collectionView.adjustedContentInset.top
+        } else {
+            let cellAttrs = collectionView.collectionViewLayout.layoutAttributesForItem(
+                at: IndexPath(item: 0, section: index))
+            alignedY = (cellAttrs?.frame.minY ?? 0) - collectionView.adjustedContentInset.top
+        }
+        let targetY = min(max(0, alignedY), maxOffsetY)
         collectionView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
         isRestoringPosition = false
         indexBar.setHighlighted(index: index, notify: false)
