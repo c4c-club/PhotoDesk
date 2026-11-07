@@ -63,6 +63,14 @@ final class LibraryViewController: UIViewController {
     /// 月跳落地复核：待核对的目标月（viewDidLayoutSubviews 按真实钉住线核对，未钉住再校正）
     private var pendingJumpVerifySectionID: String?
     private var jumpVerifyAttempts = 0
+
+    /// R03 前插补偿 v2 的锚点保持任务（绿14 实锤：completion 期一次性补偿会过冲）
+    private struct AnchorKeep {
+        let item: PhotoItem
+        let visualY: CGFloat
+        var passes: Int
+    }
+    private var pendingAnchorKeep: AnchorKeep?
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
     var onOpenViewer: ((PhotoItem) -> Void)?
     /// 多选操作行「筛选」→ 打开筛选面板（docs/13 S06）
@@ -1013,17 +1021,19 @@ final class LibraryViewController: UIViewController {
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
 
-        // R03 前插补偿：记录「首可见 item」apply 前的布局 minY，apply 后同 item 的 minY 差值
-        // 精确补偿 contentOffset——锚点之前插入 section 时首可见 assetID 不得漂移（≤ 1 行不变量）
-        var compensationItem: PhotoItem?
-        var compensationMinYBefore: CGFloat?
-        if !collectionView.isTracking, !collectionView.isDecelerating {
-            if let firstVisible = collectionView.indexPathsForVisibleItems.sorted().first,
-               let item = dataSource.itemIdentifier(for: firstVisible) {
-                compensationItem = item
-                compensationMinYBefore = collectionView.collectionViewLayout
-                    .layoutAttributesForItem(at: firstVisible)?.frame.minY
-            }
+        // R03 前插补偿 v2（绿14 实锤：completion 期一次性补偿读到的 exactMinY 仍是过渡态布局，
+        // 过冲 ~2700pt → 视口漂到 15 个月之外）。改为登记「锚点保持」任务：只记录首可见 asset
+        // 及其视觉 y，viewDidLayoutSubviews 每个布局 pass 按该 asset 的真实 minY 重校
+        // contentOffset，直到视觉 y 复位（≤0.5pt）或用户接管。仅同 query 的纯前插启用
+        //（筛选变化是不同投影，不算漂移）。
+        var anchorKeepCandidate: (item: PhotoItem, visualY: CGFloat)?
+        if pending.queryKey == currentSnapshotQueryKey,
+           !collectionView.isTracking, !collectionView.isDecelerating,
+           let firstVisible = collectionView.indexPathsForVisibleItems.sorted().first,
+           let item = dataSource.itemIdentifier(for: firstVisible),
+           let minY = collectionView.collectionViewLayout
+               .layoutAttributesForItem(at: firstVisible)?.frame.minY {
+            anchorKeepCandidate = (item, minY - collectionView.contentOffset.y)
         }
 
         var diffable = NSDiffableDataSourceSnapshot<MonthSection, PhotoItem>()
@@ -1043,29 +1053,9 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
-            // R03：前插补偿（头部回填月份时首可见 assetID 不漂移）
-            if let item = compensationItem, let before = compensationMinYBefore,
-               let newPath = self.dataSource.indexPath(for: item) {
-                // M13 绿9 实锤：apply completion 时新前插行仍是估算高度，按估算 minY 补偿差
-                // ~178pt，漂移随即被 idle 存档写回并跨重启放大成跨月错位。先强制布局拿到
-                // 真实 minY 再做一次精确补偿，首可见 asset 的视觉 y 逐像素不动。
-                self.collectionView.layoutIfNeeded()
-                if let exactMinY = self.collectionView.collectionViewLayout
-                    .layoutAttributesForItem(at: newPath)?.frame.minY,
-                   abs(exactMinY - before) > 0.5 {
-                    self.collectionView.contentOffset.y += (exactMinY - before)
-                    ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(exactMinY - before))")
-                }
-                // M13 绿11 实锤：锚点在内容末段（visualY<0）时补偿会把视口推过内容末端，
-                // 落进未物化的估算区 → 滚动条虚增、AX 零 cell（「网格无 cell」级联）。
-                // 补偿后必须钳回真实内容范围（与恢复路径的 clampedTargetOffsetY 同一不变量）。
-                self.collectionView.layoutIfNeeded()
-                let realMaxOffsetY = max(0, self.collectionView.contentSize.height
-                    - self.collectionView.bounds.height + self.collectionView.adjustedContentInset.bottom)
-                if self.collectionView.contentOffset.y > realMaxOffsetY {
-                    self.collectionView.contentOffset.y = realMaxOffsetY
-                    ViewerTrace.log("snapshot.compensate-clamp max=\(Int(realMaxOffsetY))")
-                }
+            // R03：前插补偿 v2——登记锚点保持任务（enforceAnchorKeep 在布局 pass 里收敛）
+            if let keep = anchorKeepCandidate {
+                pendingAnchorKeep = AnchorKeep(item: keep.item, visualY: keep.visualY, passes: 0)
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
@@ -1414,6 +1404,41 @@ final class LibraryViewController: UIViewController {
         scrollToSection(targetIndex)
     }
 
+    /// R03 前插补偿 v2：按锚点保持任务的首可见 asset 真实位置收敛 contentOffset。
+    /// 布局过渡期（apply 后前几帧）属性仍是估算，逐 pass 校正直至视觉 y 复位（≤0.5pt）；
+    /// 用户接管（拖动/减速）或 asset 离开快照即放弃，绝不与用户抢滚动。
+    private func enforceAnchorKeep() {
+        guard let keep = pendingAnchorKeep else { return }
+        guard !isRestoringPosition, !isPositionRestoreInFlight, !isApplyingSnapshot,
+              collectionView.window != nil, collectionView.bounds.width > 0,
+              !collectionView.isTracking, !collectionView.isDecelerating else { return }
+        guard let path = dataSource.indexPath(for: keep.item),
+              let attrs = collectionView.collectionViewLayout.layoutAttributesForItem(at: path) else {
+            pendingAnchorKeep = nil
+            ViewerTrace.log("snapshot.anchor-keep dropped item=\(keep.item.id) 不在当前快照")
+            return
+        }
+        let maxY = max(0, collectionView.contentSize.height
+            - collectionView.bounds.height + collectionView.adjustedContentInset.bottom)
+        let targetY = min(max(0, attrs.frame.minY - keep.visualY), maxY)
+        if abs(collectionView.contentOffset.y - targetY) > 0.5 {
+            var updated = keep
+            updated.passes += 1
+            if updated.passes >= 5 {
+                pendingAnchorKeep = nil
+                ViewerTrace.log("snapshot.anchor-keep give-up item=\(keep.item.id) passes=5")
+                return
+            }
+            pendingAnchorKeep = updated
+            let dy = targetY - collectionView.contentOffset.y
+            collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
+            ViewerTrace.log("snapshot.anchor-keep dy=\(Int(dy)) item=\(keep.item.id) pass=\(updated.passes)")
+        } else {
+            pendingAnchorKeep = nil
+            ViewerTrace.log("snapshot.anchor-keep settled item=\(keep.item.id) visualY=\(Int(keep.visualY))")
+        }
+    }
+
     /// 月份面板「回到顶部」（docs/13 S09）
     func scrollToTop() {
         guard collectionView.numberOfSections > 0 else { return }
@@ -1551,6 +1576,8 @@ final class LibraryViewController: UIViewController {
         lastConfiguredPixelSize = pixel
         // M13：月跳落地复核——布局稳定后按真实钉住线核对目标月，未钉住再校正
         verifyJumpLanding()
+        // M13：前插补偿 v2——按首可见 asset 的真实布局位置收敛视觉 y
+        enforceAnchorKeep()
         // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
         if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
             drainPendingSnapshot()
