@@ -27,11 +27,19 @@ enum UITestDatedPhotoSeeder {
         guard !defaults.bool(forKey: didSeedKey) else { return }
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return }
         let dates = makeDates()
-        do {
-            try await performChanges(dates: dates)
-            defaults.set(true, forKey: didSeedKey)
-        } catch {
-            ViewerTrace.log("seed failed count=\(dates.count) error=\(error)")
+        // 绿8 实锤：首轮 performChanges 曾抛 PHPhotosError -1（瞬时失败，didSeedKey 未落盘，
+        // 后续启动重试才成功）。就地理由一次重试，保证首个测试的网格即有种子日期。
+        for attempt in 1...2 {
+            do {
+                try await performChanges(dates: dates)
+                defaults.set(true, forKey: didSeedKey)
+                return
+            } catch {
+                ViewerTrace.log("seed failed count=\(dates.count) attempt=\(attempt) error=\(error)")
+                if attempt == 1 {
+                    do { try await Task.sleep(nanoseconds: 500_000_000) } catch { /* 睡眠失败直接重试 */ }
+                }
+            }
         }
     }
 
