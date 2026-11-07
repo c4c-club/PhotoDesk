@@ -93,13 +93,19 @@ final class FlowUITests: XCTestCase {
             start.press(forDuration: 0.05, thenDragTo: end)
         }
 
-        // 第一次上滑 → 已收藏
-        swipeUp()
-        let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
-        guard toast.waitForExistence(timeout: 5) else {
-            XCTFail("收藏 Toast 未出现\n\(hierarchy(app))")
-            return
+        // 第一次上滑 → 已收藏（绿16 实锤：合成手势偶发被查看器入场动画吞掉——
+        // 同一动作重试至多 3 次，断言语义不变：上滑必须出现「已收藏」）
+        var favorited = false
+        for _ in 0..<3 {
+            swipeUp()
+            let toastProbe = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
+            if toastProbe.waitForExistence(timeout: 5) {
+                favorited = true
+                break
+            }
         }
+        let toast = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '已收藏'")).firstMatch
+        XCTAssertTrue(favorited && toast.exists, "收藏 Toast 未出现\n\(hierarchy(app))")
 
         // 点「撤销」：按钮固定在 Toast 右端——用 toast 坐标点击（100% 命中，绕开按钮 AX 查询差异）
         toast.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()

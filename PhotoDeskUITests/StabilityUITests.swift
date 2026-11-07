@@ -1285,7 +1285,9 @@ final class StabilityUITests: XCTestCase {
 
     func testAllPagesSmoke() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingKeepChrome"]
+        // 绿16 实锤：跨用例位置恢复会把首格停在视口边缘（y=-10.7 不可点）——烟测与位置
+        // 记忆无关，清掉持久化位置保证首格完整可见可点。
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingKeepChrome", "-uiTestingClearPosition"]
         app.launchArguments += ["-uiTestingFaceIDBypass", "-uiTestingStorageMock"]
         let collection = launchToGrid(app)
         assertAlive(app, "照片库")
