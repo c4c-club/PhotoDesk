@@ -33,9 +33,10 @@ final class StabilityUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication) -> XCUIElement {
         installPermissionMonitor()
-        // M13 绿7 实锤：顶栏 3s 自动隐藏后分类/筛选等导航按钮 AX 不可命中
-        //（kAXErrorCannotComplete scroll-to-visible）——UI 测试统一保持顶栏可见。
-        app.launchArguments += ["-uiTestingKeepChrome"]
+        // M13 绿7/绿8 实锤：顶栏 3s 自动隐藏后导航按钮 AX 不可命中，且跨用例泄漏的持久化
+        // 筛选（filterYear 卡死在 2026）会让月份族找不到目标 section——每次启动保持顶栏
+        // 可见并清掉泄漏筛选；筛选族自己的 flag 在调用方先入队，intValue 取首个仍是测试年。
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -82,12 +83,14 @@ final class StabilityUITests: XCTestCase {
     }
 
     private func tapLibraryCategory(in app: XCUIApplication) {
-        // M13 绿5 实锤：旧的 bar.maxX-246 坐标推算在 M13 顶栏布局下漂到「筛选」按钮上
-        //（Library-Filter 115.8–159.6 vs 分类按钮中心 92.4），菜单从未打开。
-        // 改为元素点按：UIBarButtonItem 带 identifier，iOS 16 合成点按可靠（红杠是 iOS 15 时代结论）。
+        // 绿7/绿8 实锤：顶栏按钮的合成点按会先做 AX scroll-to-visible（kAXErrorCannotComplete），
+        // 且 DEBUG 取证横幅与顶栏在 AX 树上重叠导致 isHittable 恒假；固定坐标又在两种顶栏
+        // 高度间漂移。改读元素 frame 后按绝对坐标点中心，绕开 scroll-to-visible 与遮挡判定。
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5), "分类按钮不存在")
-        category.tap()
+        let frame = category.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
     }
 
     /// sheet/push 页返回键：取最后一个导航栏（最前层）的第一个按钮并按 frame 直击。
@@ -206,6 +209,9 @@ final class StabilityUITests: XCTestCase {
 
     /// 年份筛选启动（就绪后应用年份筛选）
     private func launchWithYearFilter(_ app: XCUIApplication, year: Int) {
+        // 绿8 实锤：launchArguments += 跨轮累积同名 flag，intValue 取首个读到旧值 →
+        // 筛选卡死在上一轮年份并持久化泄漏。追加前先去掉旧 flag，保证本轮值生效。
+        app.launchArguments.removeAll { $0 == "-uiTestingFilterYear" }
         app.launchArguments += ["-uiTestingFilterYear", "\(year)"]
         _ = launchToGrid(app)
     }
