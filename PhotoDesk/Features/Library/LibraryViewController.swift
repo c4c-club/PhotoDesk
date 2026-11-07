@@ -1193,6 +1193,12 @@ final class LibraryViewController: UIViewController {
         guard collectionView.bounds.width > 0, collectionView.bounds.height > 0,
               collectionView.numberOfSections > 0 else { return }
         let assetMinY = layoutMinY(forAssetID: position.anchorAssetID)
+        // R03 / docs/19 §3.2：锚点 asset 尚未出现在快照且索引未补齐时，恢复必须保持 pending
+        //（遮罩不撤、零回写、不走 section/ratio 回退），等下一个快照带锚点后再精确定位。
+        if assetMinY == nil, !viewModel.isIndexComplete {
+            ViewerTrace.log("position.restore.v3 pending anchor=\(position.anchorAssetID) indexComplete=false")
+            return
+        }
         let sectionMinY = layoutMinY(sectionID: position.sectionID, itemIndex: position.itemIndexInSection)
         let contentHeight = Double(collectionView.contentSize.height)
         let viewportHeight = Double(collectionView.bounds.height)
