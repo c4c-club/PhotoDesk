@@ -59,6 +59,12 @@ public struct SelectionState: Equatable {
         }
     }
 
+    /// M13 P3：反向滑回时按快照取消单个 cell；不得误取消「滑动开始前已选中」的 cell。
+    public mutating func remove(id: String) {
+        guard let index = selected.firstIndex(of: id) else { return }
+        selected.remove(at: index)
+    }
+
     /// 范围替换（docs/13 S07 长按拖选）：选中集整体替换为给定 id 列表
     ///（调用方传入 base ∪ range），过滤 scope 外 id、去重保序。
     public mutating func replaceSelection(_ ids: [String]) {

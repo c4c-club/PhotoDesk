@@ -301,6 +301,19 @@ final class StabilityUITests: XCTestCase {
         }
     }
 
+    private func slideAtLeastTwoRows(in collection: XCUIElement,
+                                     fromX: CGFloat,
+                                     fromY: CGFloat,
+                                     toX: CGFloat,
+                                     toY: CGFloat) {
+        let start = collection.coordinate(withNormalizedOffset: CGVector(dx: fromX, dy: fromY))
+        let middle = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: fromY))
+        let end = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: toY))
+        start.press(forDuration: 0.05, thenDragTo: middle)
+        slideSelectGesture(in: collection, fromX: toX, fromY: fromY, toX: toX, toY: toY)
+        _ = end
+    }
+
     private func slideHorizontal(in collection: XCUIElement,
                                  fromX: CGFloat,
                                  toX: CGFloat,
@@ -329,8 +342,8 @@ final class StabilityUITests: XCTestCase {
         let raw = (banner.value as? String) ?? banner.label
         let off = Self.parseDoubleField(raw, "off")
         let visualY = Self.parseDoubleField(raw, "visualY")
-        guard off >= 0, visualY >= 0,
-              let anchor = Self.parseStringField(raw, "anchor") else { return nil }
+        guard off >= 0,
+              let anchor = Self.parseStringField(raw, "anchor"), !anchor.isEmpty else { return nil }
         return (off, anchor, visualY)
     }
 
@@ -795,8 +808,8 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
-                           toX: 0.92, toY: 0.42)
+        slideAtLeastTwoRows(in: collection, fromX: 0.08, fromY: 0.22,
+                            toX: 0.92, toY: 0.42)
         let before = waitForSelectionCount(app, atLeast: 6)
         XCTAssertGreaterThanOrEqual(before, 6, "单指横向滑选应连续选中至少 6 格")
         slideSelectGesture(in: collection, fromX: 0.92, fromY: 0.42,
@@ -815,12 +828,13 @@ final class StabilityUITests: XCTestCase {
         first.tap()
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
                                     "点选第一格应进入快照")
-        slideSelectGesture(in: collection, fromX: 0.10, fromY: 0.25,
-                           toX: 0.90, toY: 0.42)
+        // 从第二行开始拖，避免经过首格（否则首格会被快照规则切换）
+        slideAtLeastTwoRows(in: collection, fromX: 0.10, fromY: 0.35,
+                            toX: 0.90, toY: 0.55)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
                                     "滑出后应连续加选")
-        slideSelectGesture(in: collection, fromX: 0.90, fromY: 0.42,
-                           toX: 0.10, toY: 0.25)
+        slideAtLeastTwoRows(in: collection, fromX: 0.90, fromY: 0.55,
+                            toX: 0.10, toY: 0.35)
         XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
                        "滑回后必须精确恢复滑动开始前的选中快照")
         XCTAssertTrue((first.value as? String ?? "").contains("selected"),
@@ -850,8 +864,9 @@ final class StabilityUITests: XCTestCase {
         first.tap()
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
                                     "点选第一格应进入快照")
-        slideSelectGesture(in: collection, fromX: 0.10, fromY: 0.25,
-                           toX: 0.90, toY: 0.42)
+        // 从第二行开始拖，避免经过首格
+        slideAtLeastTwoRows(in: collection, fromX: 0.10, fromY: 0.35,
+                            toX: 0.90, toY: 0.55)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
                                     "滑选应继续加选")
         XCTAssertTrue((first.value as? String ?? "").contains("selected"),
@@ -888,20 +903,28 @@ final class StabilityUITests: XCTestCase {
         let collection = launchSelectableGrid(app)
         let first = collection.cells.firstMatch
         XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        // 第一次微拖（cell 自身坐标）：lastProcessedIndexPath 去重 → 只访问一次
+        let start = first.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+        let end = first.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
+                       "同一 cell 内单次经过必须恰好选中一次")
         let before = (first.value as? String) ?? ""
-        slideHorizontal(in: collection, fromX: 0.16, toX: 0.28, y: 0.35)
+        XCTAssertTrue(before.contains("selected"), "首次经过后 AX 必须为 selected")
+        // 第二次微拖：同一 cell 再次经过（快照恢复 → 不闪烁不重复切换）
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
+                       "同一 cell 二次经过必须按快照恢复，不得切换")
         let after = (first.value as? String) ?? ""
-        XCTAssertEqual(after, before, "同一 indexPath 去重后 AX 值必须稳定")
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 0), 0,
-                       "同一 cell 内不得重复切换选中态")
+        XCTAssertEqual(after, before, "同一 indexPath 去重 + 快照恢复后 AX 必须稳定")
     }
 
     func testScrollEnabledRestoredAfterDragEnd() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
-                           toX: 0.92, toY: 0.42)
+        slideAtLeastTwoRows(in: collection, fromX: 0.08, fromY: 0.22,
+                            toX: 0.92, toY: 0.42)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选结束前应有连续选中")
         let before = (collection.cells.firstMatch.value as? String) ?? ""

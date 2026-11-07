@@ -179,4 +179,17 @@ final class SelectionPolicyTests: XCTestCase {
         state.selectRange(in: ordered, from: "b", to: "d")
         XCTAssertEqual(state.selected, ["e", "b", "c", "d"])
     }
+
+    func testRemoveOnlyOneID() {
+        var state = SelectionState()
+        state.begin(scope: Set(["a", "b", "c"]), initial: "a")
+        state.select("b")
+        state.select("c")
+        XCTAssertEqual(state.selected, ["a", "b", "c"])
+        state.remove(id: "b")
+        XCTAssertEqual(state.selected, ["a", "c"],
+                       "M13 P3：反向滑回只能取消单个 id，不得清空快照或误删其他项")
+        state.remove(id: "unknown")
+        XCTAssertEqual(state.selected, ["a", "c"])
+    }
 }

@@ -45,31 +45,9 @@ final class LibraryViewController: UIViewController {
     /// 底部 Toast 约束（R04：约束引用切换——safeArea / selectionBar 顶部二选一）
     private var toastSafeAreaConstraint: NSLayoutConstraint?
     private var toastAboveSelectionConstraint: NSLayoutConstraint?
-    private let selectionOverlay: UIView = {
-        let view = UIView()
-        view.backgroundColor = DSColor.tint.withAlphaComponent(0.15)
-        view.layer.borderColor = DSColor.tint.cgColor
-        view.layer.borderWidth = 1
-        view.isHidden = true
-        view.isUserInteractionEnabled = false
-        return view
-    }()
-    /// 框选状态：长按起点（**view 坐标**；R08 单一坐标系——旧版混用 content 坐标画 view 坐标的 overlay）
-    private var boxStartPoint: CGPoint?
-    /// 框选进行中（移动超过 BoxSelectConfig.moveThreshold 后进入；此时滚动禁用、自动滚动接管）
-    private var isBoxSelecting = false
-    /// 当前手指位置（view 坐标；自动滚动后用同一坐标 + 新 contentOffset 重算命中）
-    private var lastBoxPoint: CGPoint = .zero
-    private var boxAutoScrollLink: CADisplayLink?
-    /// 范围选择锚点（docs/13 S07）：.began 时记录 anchor id 与基线选中集
-    private var boxAnchorID: String?
-    /// 基线选中集（进入拖选前；每帧从它重算——R08 往回拖可取消的根因修复）
-    private var boxBaseSelected: Set<String> = []
-    /// 合并语义（写死，docs/16 §2.8 修复 3）：锚点初态已选 → 反选（拖过即取消）；未选 → 加选
-    private var boxAnchorInitiallySelected = false
-    /// 差量刷新锚点（每帧只刷徽标变化的 cell，避免全量 reload 掉帧）
-    private var lastFrameSelected: Set<String> = []
-
+    /// M13 P3：单指滑选编排器（Core 纯策略 + UIKit 映射；长按二维框选整条移除）。
+    private var slideSelectController: SlideSelectGestureController?
+    private var slideSelectPan: UIPanGestureRecognizer?
     // MARK: - 快照缓存
 
     private var currentSections: [MonthSection] = []
@@ -107,7 +85,9 @@ final class LibraryViewController: UIViewController {
     private let restoreMaskView: UIView = {
         let view = UIView()
         view.backgroundColor = DSColor.bgPrimary
-        view.isHidden = true
+        view.isUserInteractionEnabled = false
+        view.alpha = 0
+        view.isAccessibilityElement = false
         view.translatesAutoresizingMaskIntoConstraints = false
         view.accessibilityIdentifier = "Library-RestoreMask"
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -159,6 +139,7 @@ final class LibraryViewController: UIViewController {
         //（单一事实来源），首屏/补齐的所有 rebuildDerived 都会尊重它；与用户面板应用同一条 setFilter 路径。
         // 放 UIKit 侧（-uiTestingSelectMode 同款位置）：SwiftUI onChange 钩子在 CI 实测不可靠（轮 13–15）
         applyDebugFilterHookIfNeeded()
+        applyDebugMonthJumpHookIfNeeded()
         #endif
 
         viewModel.onManageLimitedPhotos = { [weak self] in
@@ -458,10 +439,13 @@ final class LibraryViewController: UIViewController {
                                                      counts: categoryCounts,
                                                      currentCount: viewModel.filteredItems.count)
         let actions = items.map { item in
-            UIAction(title: item.displayTitle,
-                     state: item.isSelected ? .on : .off) { [weak self] _ in
+            let action = UIAction(title: item.displayTitle,
+                                  state: item.isSelected ? .on : .off) { [weak self] _ in
                 self?.handleCategorySelection(item)
             }
+            action.title = item.title
+            action.discoverabilityTitle = item.displayTitle
+            return action
         }
         return UIMenu(title: "", children: actions)
     }
@@ -575,7 +559,6 @@ final class LibraryViewController: UIViewController {
         selectionBar.backgroundColor = DSColor.bgSecondary.withAlphaComponent(0.98)
         selectionBar.isHidden = true
         view.addSubview(selectionBar)
-        view.addSubview(selectionOverlay)
 
         // 第一行：取消 | 已选择 N 项 | 完成
         let cancelButton = barButton(symbol: "xmark", label: "取消", identifier: "Batch-Cancel",
@@ -653,13 +636,19 @@ final class LibraryViewController: UIViewController {
             actionStack.heightAnchor.constraint(equalTo: actionRow.frameLayoutGuide.heightAnchor),
         ])
 
-        // S07：单个长按手势驱动「进入多选 + 拖拽范围选择」。
-        // 0.15s / 不限移动距离（旧版 0.28s + 10pt：自然拖动就失败 → 变滚动，用户感知「不能滑动选择」）
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(onBoxLongPress(_:)))
-        longPress.minimumPressDuration = BoxSelectConfig.minPressDuration
-        longPress.allowableMovement = .greatestFiniteMagnitude
-        longPress.delaysTouchesBegan = false
-        collectionView.addGestureRecognizer(longPress)
+        // M13 P3 ①：单指滑选 pan；delegate 两方法在 UIGestureRecognizerDelegate 扩展内实现。
+        let controller = SlideSelectGestureController(collectionView: collectionView)
+        controller.attachDelegate(self)
+        controller.isSelectionMode = { [weak self] in self?.isSelecting ?? false }
+        controller.initiallySelectedIndexPaths = { [weak self] in
+            guard let self else { return [] }
+            return self.collectionView.indexPathsForSelectedItems ?? []
+        }
+        controller.applyTarget = { [weak self] indexPath, selected in
+            self?.applySlideSelection(at: indexPath, selected: selected)
+        }
+        slideSelectController = controller
+        slideSelectPan = controller.pan
     }
 
     private func barButton(symbol: String, label: String, identifier: String,
@@ -702,7 +691,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "按住照片滑动可连续选择", duration: 2)
+        showTopBanner(text: "单指横向滑动可连续选择，滑回取消", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -733,6 +722,7 @@ final class LibraryViewController: UIViewController {
     }
 
     private func exitSelectionMode() {
+        slideSelectController?.finishSlideSelection()
         isSelecting = false
         selectionState = SelectionState()
         selectionScopeTitle = nil
@@ -836,134 +826,27 @@ final class LibraryViewController: UIViewController {
         }
     }
 
-    // MARK: - 范围选择（docs/16 M12 R08：iOS 原生相册式二维拖选）
+    // MARK: - M13 P3 单指滑动连续多选（VC 只做映射，判定全在 SlideSelectPolicy）
 
-    /// R08 坐标系契约（写死）：手势点统一取 `gesture.location(in: view)`（手指/屏幕坐标）；
-    /// selectionOverlay 挂在 view 上直接用该坐标画 rect；命中换算把可见 cell 的 layout frame
-    /// 逐个 convert 到 view 坐标后与拖曳矩形做二维相交（GridHitRegion 纯逻辑）——
-    /// 彻底避开旧版「content 坐标画 overlay / 混算 contentOffset」的错位。
-    @objc private func onBoxLongPress(_ gesture: UILongPressGestureRecognizer) {
-        switch gesture.state {
-        case .began:
-            let point = gesture.location(in: view)
-            guard let indexPath = collectionView.indexPathForItem(
-                at: collectionView.convert(point, to: collectionView)),
-                  let item = dataSource.itemIdentifier(for: indexPath) else { return }
-            // 合并语义二选一（docs/16 §2.8 修复 3，写死并在测试中锁定）：
-            // 已在多选中且锚点已选 → 反选（拖过即取消）；其余（含长按未选 cell 进入多选）→ 加选。
-            // iOS 原生相册行为：长按未选照片进入多选后拖动 = 扩选；长按已选照片拖动 = 取消路径。
-            let wasSelecting = isSelecting
-            let anchorWasSelected = selectionState.selectedSet.contains(item.id)
-            if !wasSelecting {
-                enterSelectionMode(selecting: item.id)   // 进入多选：锚点 cell 被选中
-            }
-            boxAnchorID = item.id
-            boxAnchorInitiallySelected = wasSelecting && anchorWasSelected
-            boxBaseSelected = selectionState.selectedSet
-            lastFrameSelected = boxBaseSelected
-            boxStartPoint = point
-            lastBoxPoint = point
-
-        case .changed:
-            guard let start = boxStartPoint else { return }
-            let location = gesture.location(in: view)
-            lastBoxPoint = location
-            if !isBoxSelecting {
-                let distance = hypot(location.x - start.x, location.y - start.y)
-                guard distance > BoxSelectConfig.moveThreshold else { return }   // 抖动阈值
-                isBoxSelecting = true
-                collectionView.isScrollEnabled = false   // 此刻才禁用滚动（自动滚动接管）
-                selectionOverlay.isHidden = false
-                startBoxAutoScroll()
-            }
-            updateBoxSelection(from: start, to: location)
-
-        case .ended, .cancelled, .failed:
-            boxStartPoint = nil
-            boxAnchorID = nil
-            boxBaseSelected = []
-            lastFrameSelected = []
-            if isBoxSelecting {
-                isBoxSelecting = false
-                selectionOverlay.isHidden = true
-                collectionView.isScrollEnabled = true   // 松手恢复滚动
-                boxAutoScrollLink?.invalidate()
-                boxAutoScrollLink = nil
-            }
-
-        default:
-            break
+    /// 把 Core 计算出的目标态落到 SelectionState / CollectionView / 徽标 / 计数。
+    private func applySlideSelection(at indexPath: IndexPath, selected: Bool) {
+        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+        if selected {
+            selectionState.select(item.id)
+        } else {
+            selectionState.remove(id: item.id)
         }
-    }
-
-    private func updateBoxSelection(from start: CGPoint, to location: CGPoint) {
-        // 视觉反馈矩形（view 坐标——overlay 就挂在 view 上，严丝合缝）
-        let rect = CGRect(x: min(start.x, location.x),
-                          y: min(start.y, location.y),
-                          width: abs(start.x - location.x),
-                          height: abs(start.y - location.y))
-        selectionOverlay.frame = rect
-        // R08：二维相交命中（可见 cell layout frame convert 到 view 坐标 → GridHitRegion 纯逻辑）
-        let cells = visibleCellRectsInViewCoordinates()
-        guard !cells.isEmpty else { return }
-        let dragRect = GridRect(from: GridPoint(x: Double(rect.minX), y: Double(rect.minY)),
-                                to: GridPoint(x: Double(rect.maxX), y: Double(rect.maxY)))
-        let hits = GridHitRegion.hitIDs(cells: cells, rect: dragRect,
-                                        threshold: BoxSelectConfig.hitThreshold)
-        // 基线重算（每帧从进入拖选前的基线出发，往回拖自然移除；禁止一维区间累加）
-        let merged = GridHitRegion.mergedSelection(base: boxBaseSelected,
-                                                   hits: hits,
-                                                   anchorInitiallySelected: boxAnchorInitiallySelected)
-        selectionState.replaceSelection(merged.sorted())
-        reloadSelectionBadges(previous: lastFrameSelected)
-        lastFrameSelected = selectionState.selectedSet
+        if selected {
+            collectionView.selectItem(at: indexPath, animated: false, scrollPosition: [])
+        } else {
+            collectionView.deselectItem(at: indexPath, animated: false)
+        }
+        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell {
+            cell.setSelectionVisible(isSelecting)
+            cell.setSelected(selected)
+        }
         updateSelectionCount()
     }
-
-    /// 可见 cell 的命中区域（layout frame convert 到 view 坐标；跨 section 天然支持）
-    private func visibleCellRectsInViewCoordinates() -> [GridCellRect] {
-        var result: [GridCellRect] = []
-        for indexPath in collectionView.indexPathsForVisibleItems {
-            guard let attributes = collectionView.collectionViewLayout
-                      .layoutAttributesForItem(at: indexPath),
-                  let id = dataSource.itemIdentifier(for: indexPath)?.id else { continue }
-            let frameInView = view.convert(attributes.frame, from: collectionView)
-            result.append(GridCellRect(id: id,
-                                       rect: GridRect(x: Double(frameInView.minX),
-                                                      y: Double(frameInView.minY),
-                                                      width: Double(frameInView.width),
-                                                      height: Double(frameInView.height))))
-        }
-        return result
-    }
-
-    /// 边缘自动滚动（CADisplayLink .common：手指进入上/下边缘区按步长滚动；
-    /// 滚动后用「同一手指 view 坐标 + 当前 contentOffset」重算命中——R08 命中随滚动正确的关键）
-    private func startBoxAutoScroll() {
-        boxAutoScrollLink?.invalidate()
-        let link = CADisplayLink(target: self, selector: #selector(boxAutoScrollTick))
-        link.add(to: .main, forMode: .common)
-        boxAutoScrollLink = link
-    }
-
-    @objc private func boxAutoScrollTick() {
-        guard isBoxSelecting, let start = boxStartPoint else { return }
-        let edge = CGFloat(BoxSelectConfig.autoScrollEdge)
-        let step = CGFloat(BoxSelectConfig.autoScrollStep)
-        var delta: CGFloat = 0
-        if lastBoxPoint.y < view.safeAreaInsets.top + edge {
-            delta = -step   // 手指进入上边缘区 → 向上滚
-        } else if lastBoxPoint.y > view.bounds.height - view.safeAreaInsets.bottom - edge {
-            delta = step    // 手指进入下边缘区 → 向下滚
-        }
-        guard delta != 0 else { return }
-        let maxY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
-        let targetY = min(max(0, collectionView.contentOffset.y + delta), maxY)
-        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
-        // 滚动后同手指 view 坐标重算（旧版混用 content 坐标 + 旧 start/lastBoxPoint → 命中错图）
-        updateBoxSelection(from: start, to: lastBoxPoint)
-    }
-
     // MARK: - 批量动作（docs/09 D12/D16：收藏即时写；隐藏/删除入队；无 App 内删除确认）
 
     private var selectedIDs: [String] { selectionState.selected }
@@ -1138,11 +1021,6 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
-            // M12 级联取证：滚动状态进 DEBUG 横幅（CI 失败时 AX 可读）
-            #if DEBUG
-            self.viewModel.debugScrollNote =
-                "off=\(Int(self.collectionView.contentOffset.y))/\(Int(max(0, self.collectionView.contentSize.height - self.collectionView.bounds.height))) sec=\(self.collectionView.numberOfSections) cells=\(self.collectionView.numberOfItems(inSection: 0))"
-            #endif
             // R03：前插补偿（头部回填月份时首可见 assetID 不漂移）
             if let item = compensationItem, let before = compensationMinYBefore,
                let newPath = self.dataSource.indexPath(for: item),
@@ -1163,6 +1041,7 @@ final class LibraryViewController: UIViewController {
                 self.updateSelectionCount()
             }
             #if DEBUG
+            refreshDebugScrollNote()
             self.attemptDebugMonthJumpIfNeeded()   // 快照已提交：此时跳转校验必然可过
             self.attemptDebugChromeHooksIfNeeded() // M12：工具/分类/选择 scope 钩子（走同一条路径）
             #endif
@@ -1182,9 +1061,8 @@ final class LibraryViewController: UIViewController {
     var test_restoreMask: UIView { restoreMaskView }
     var test_batchToast: DSToast { batchToast }
     var test_selectionBar: UIView { selectionBar }
+    var test_collectionView: UICollectionView { collectionView }
 
-    /// docs/13 M11：viewDidLoad 应用 -uiTestingFilterYear（0 = 清空）。
-    /// 等价用户在面板选年并应用（同一条 setFilter 路径）；每次 launch 只执行一次（viewDidLoad 语义）
     private func applyDebugFilterHookIfNeeded() {
         guard let year = UITestHooks.intValue("-uiTestingFilterYear") else { return }
         ViewerTrace.log("hook filterYear=\(year)")
@@ -1199,11 +1077,18 @@ final class LibraryViewController: UIViewController {
         }
     }
 
-    /// docs/13 M11：每次 apply completion 尝试 -uiTestingMonthJump（等价月份面板点卡片，
+    private func applyDebugMonthJumpHookIfNeeded() {
+        guard let sectionID = UITestHooks.stringValue("-uiTestingMonthJump"), !sectionID.isEmpty else { return }
+        pendingDebugMonthJumpSectionID = sectionID
+    }
+
+    private var pendingDebugMonthJumpSectionID: String?
+
+    /// docs/13 M11 / M13：每次 apply completion 尝试 -uiTestingMonthJump（等价月份面板点卡片，
     /// 同一条 scrollToSection 路径；成功即置位，快照未含目标月时随下一次 apply 重试）
     private func attemptDebugMonthJumpIfNeeded() {
         guard !debugMonthJumpDone,
-              let sectionID = UITestHooks.stringValue("-uiTestingMonthJump"),
+              let sectionID = pendingDebugMonthJumpSectionID,
               let index = currentSections.firstIndex(where: { $0.id == sectionID }) else { return }
         if scrollToSection(index) {
             debugMonthJumpDone = true
@@ -1213,51 +1098,86 @@ final class LibraryViewController: UIViewController {
     private var debugMonthJumpDone = false
     #endif
 
-    // MARK: - 位置记忆 v2（docs/13 §3.5 S04/S11）
-
-    /// 恢复中的位置（assetID 找不到且索引未完成时保持 pending，等下一批）
-    private var pendingRestorePosition: LibraryPosition?
-    /// 上次已尝试恢复的查询键（query 变化时重置恢复状态）
-    private var lastRestoredQueryKey: String?
-    private var resignActiveObserver: NSObjectProtocol?
-
-    /// 统一保存入口：所有触发点都走这里（滚动停止 / 拖拽结束 / 消失 / 后台 / 跳转完成）
-    /// 保存用 currentSnapshotQueryKey（快照时的 key），不用 viewModel.query.key（S04 根因 3）。
-    /// R03：锚点恢复流程进行中一律不写（恢复期间的中间位置绝不能覆盖锚点）
-    func savePositionNow(reason: String) {
-        guard positionStore.isEnabled, !isRestoringPosition, !isPositionRestoreInFlight,
-              let queryKey = currentSnapshotQueryKey,
-              !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
-        guard let indexPath = collectionView.indexPathsForVisibleItems.sorted().first,
-              indexPath.section < currentSections.count,
-              let section = currentSections[safe: indexPath.section],
-              let item = currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item] else { return }
-        let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
-        let ratio = min(1, max(0, collectionView.contentOffset.y / scrollable))
-        positionStore.save(LibraryPosition(assetID: item.id,
-                                           sectionID: section.id,
-                                           itemIndexInSection: indexPath.item,
-                                           offsetRatio: ratio,
-                                           savedAt: Date()),
-                           queryKey: queryKey)
-        ViewerTrace.log("position.save \(reason) section=\(section.id) idx=\(indexPath.item)")
+    /// M13 P2：把精确 contentOffset 写进 DEBUG 汇总（UI 像素锚点取证入口；Release 空实现）。
+    private func refreshDebugScrollNote() {
+        #if DEBUG
+        let saved = currentSnapshotQueryKey.flatMap { positionStore.load(queryKey: $0) }
+        let anchor = saved?.anchorAssetID ?? "-"
+        let visualY = Int(saved?.anchorVisualY ?? 0)
+        let off = String(Int(Double(collectionView.contentOffset.y)))
+        let maxOffset = String(Int(Double(max(0, collectionView.contentSize.height - collectionView.bounds.height))))
+        let sections = String(collectionView.numberOfSections)
+        let cells = String(collectionView.numberOfItems(inSection: 0))
+        viewModel.debugScrollNote = "off=" + off + "/" + maxOffset +
+            " anchor=" + anchor + " visualY=" + String(visualY) +
+            " sec=" + sections + " cells=" + cells
+        #endif
     }
 
-    /// 每次 apply completion 后尝试恢复；策略：assetID → sectionID + itemIndexInSection → offsetRatio。
-    /// 索引未完成且 assetID 找不到 → 保持 pending 等下一批（不提前放弃，S04 根因 1）。
-    /// R03：锚点存在期间显示遮罩 + 禁回写，定位完成（或回退完成）才移除。
+    // MARK: - 位置记忆 v3（docs/19 §3.2：视觉锚点像素恢复；恢复期零回写）
+
+    private var pendingRestorePosition: LibraryPosition?
+    private var lastRestoredQueryKey: String?
+    private var resignActiveObserver: NSObjectProtocol?
+    /// v3：精确 offset 是否已落地（与 bounds/section/snapshot drain 共同构成 finish 门禁）。
+    private var didApplyRestoreOffset = false
+
+    func savePositionNow(reason: String) {
+        guard PositionAnchorPolicy.allowsWriteback(isRestoreInFlight: isPositionRestoreInFlight),
+              positionStore.isEnabled,
+              !isRestoringPosition,
+              let queryKey = currentSnapshotQueryKey,
+              !currentSections.isEmpty, !currentItemsBySection.isEmpty,
+              let (indexPath, item, section) = visualAnchorCandidate() else { return }
+        let offsetY = Double(collectionView.contentOffset.y)
+        guard let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath) else { return }
+        let visualY = PositionAnchorPolicy.visualY(cellMinY: Double(attributes.frame.minY),
+                                                   contentOffsetY: offsetY)
+        let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
+        let ratio = min(1, max(0, collectionView.contentOffset.y / scrollable))
+        positionStore.save(LibraryPosition(anchorAssetID: item.id,
+                                           anchorVisualY: visualY,
+                                           anchorContentOffsetY: offsetY,
+                                           assetID: item.id,
+                                           sectionID: section.id,
+                                           itemIndexInSection: indexPath.item,
+                                           offsetRatio: Double(ratio),
+                                           savedAt: Date()),
+                           queryKey: queryKey)
+        ViewerTrace.log("position.save.v3 \(reason) section=\(section.id) idx=\(indexPath.item) visualY=\(Int(visualY)) off=\(Int(offsetY))")
+        refreshDebugScrollNote()
+    }
+
+    /// 视觉锚点：contentOffset.y 对应视口安全区附近、frame.minY 不大于安全区下沿的最近 cell；
+    /// 不再用 indexPathsForVisibleItems.sorted().first 决定位置。
+    private func visualAnchorCandidate() -> (IndexPath, PhotoItem, MonthSection)? {
+        let contentTop = collectionView.contentOffset.y
+        let safeTop = contentTop + collectionView.adjustedContentInset.top
+        let candidates = collectionView.indexPathsForVisibleItems.compactMap { ip -> (IndexPath, CGFloat, PhotoItem, MonthSection)? in
+            guard let item = dataSource.itemIdentifier(for: ip),
+                  let section = currentSections[safe: ip.section],
+                  let minY = collectionView.collectionViewLayout.layoutAttributesForItem(at: ip)?.frame.minY else { return nil }
+            return (ip, minY, item, section)
+        }
+        let anchor = candidates.filter { $0.1 <= safeTop + DSSpacing.screenPadding }
+            .max { $0.1 < $1.1 }
+            ?? candidates.min { abs($0.1 - safeTop) < abs($1.1 - safeTop) }
+        guard let anchor else { return nil }
+        return (anchor.0, anchor.2, anchor.3)
+    }
+
     private func restorePositionIfNeeded() {
-        // query 变化 → 重新加载该查询键的位置
         if lastRestoredQueryKey != currentSnapshotQueryKey {
             lastRestoredQueryKey = currentSnapshotQueryKey
             pendingRestorePosition = nil
             didRestorePosition = false
+            didApplyRestoreOffset = false
             isPositionRestoreInFlight = false
             hideRestoreMask()
         }
         if !didRestorePosition {
             guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
-            didRestorePosition = true   // load 已尝试；找不到 asset 时由 pending 续等
+            didRestorePosition = true
             pendingRestorePosition = positionStore.load(queryKey: currentSnapshotQueryKey ?? viewModel.query.key)
             if pendingRestorePosition != nil {
                 isPositionRestoreInFlight = true
@@ -1265,72 +1185,80 @@ final class LibraryViewController: UIViewController {
             }
         }
         guard let position = pendingRestorePosition else { return }
-        guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
-
-        // 策略 1：assetID 精确定位（R03 锚点窗口首屏即含锚点 → 首帧即位、零可见跳转）
-        for (sectionIndex, items) in currentItemsBySection.enumerated() {
-            if let itemIndex = items.firstIndex(where: { $0.id == position.assetID }) {
-                applyRestore(sectionIndex: sectionIndex, itemIndex: itemIndex, position: position, by: "asset")
-                return
-            }
-        }
-        // 索引未完成 → 等下一批快照再试（不标记完成；遮罩保持，禁回写）
-        guard viewModel.isIndexComplete else {
-            viewModel.debugRestoreNote = "restore=pending"
+        guard collectionView.bounds.width > 0, collectionView.bounds.height > 0,
+              collectionView.numberOfSections > 0 else { return }
+        let assetMinY = layoutMinY(forAssetID: position.anchorAssetID)
+        let sectionMinY = layoutMinY(sectionID: position.sectionID, itemIndex: position.itemIndexInSection)
+        let contentHeight = Double(collectionView.contentSize.height)
+        let viewportHeight = Double(collectionView.bounds.height)
+        let adjustedTop = Double(collectionView.adjustedContentInset.top)
+        let bottomInset = Double(collectionView.adjustedContentInset.bottom)
+        let resolved = PositionAnchorPolicy.resolve(anchor: position.toCoreAnchor,
+                                                    assetCellMinY: assetMinY,
+                                                    sectionCellMinY: sectionMinY,
+                                                    contentHeight: contentHeight,
+                                                    viewportHeight: viewportHeight,
+                                                    adjustedTop: adjustedTop,
+                                                    bottomInset: bottomInset)
+        guard resolved.strategy != .none else {
+            finishPositionRestore(reason: "no-anchor")
             return
         }
-        // 策略 2：sectionID + itemIndexInSection（钳制）
-        if let sectionIndex = currentSections.firstIndex(where: { $0.id == position.sectionID }) {
-            let itemCount = currentItemsBySection[safe: sectionIndex]?.count ?? 0
-            if itemCount > 0 {
-                let itemIndex = min(max(0, position.itemIndexInSection), itemCount - 1)
-                applyRestore(sectionIndex: sectionIndex, itemIndex: itemIndex, position: position, by: "section")
-                return
-            }
+        isRestoringPosition = true
+        collectionView.layoutIfNeeded()
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: resolved.offsetY),
+                                        animated: false)
+        collectionView.layoutIfNeeded()
+        isRestoringPosition = false
+        didApplyRestoreOffset = true
+        pendingRestorePosition = nil
+        refreshDebugScrollNote()
+        ViewerTrace.log("position.restore.v3 strategy=\(resolved.strategy.rawValue) section=\(position.sectionID) off=\(Int(resolved.offsetY)) visualY=\(Int(position.anchorVisualY))")
+        finishPositionRestore(reason: resolved.strategy.rawValue)
+    }
+
+    private func layoutMinY(forAssetID id: String) -> Double? {
+        guard !id.isEmpty else { return nil }
+        for sectionIndex in 0..<currentItemsBySection.count {
+            guard let itemIndex = currentItemsBySection[sectionIndex].firstIndex(where: { $0.id == id }) else { continue }
+            return layoutMinY(at: IndexPath(item: itemIndex, section: sectionIndex))
         }
-        // 策略 3：offsetRatio（此时 contentSize 已完整）
-        applyRatioRestore(position)
+        return nil
     }
 
-    private func applyRestore(sectionIndex: Int, itemIndex: Int, position: LibraryPosition, by strategy: String) {
-        pendingRestorePosition = nil
-        isRestoringPosition = true
-        collectionView.layoutIfNeeded()
-        collectionView.scrollToItem(at: IndexPath(item: itemIndex, section: sectionIndex),
-                                    at: .centeredVertically, animated: false)
-        isRestoringPosition = false
-        // R03：恢复完成 → 移除遮罩、解除回写禁令（此后才能 savePositionNow）
-        finishPositionRestore()
-        viewModel.debugRestoreNote = "restore=ok section=\(position.sectionID) by=\(strategy)"
-        ViewerTrace.log("position.restore ok section=\(position.sectionID) idx=\(itemIndex) by=\(strategy)")
+    private func layoutMinY(sectionID: String, itemIndex: Int) -> Double? {
+        guard let sectionIndex = currentSections.firstIndex(where: { $0.id == sectionID }) else { return nil }
+        let count = currentItemsBySection[safe: sectionIndex]?.count ?? 0
+        guard count > 0 else { return nil }
+        let item = min(max(0, itemIndex), count - 1)
+        return layoutMinY(at: IndexPath(item: item, section: sectionIndex))
     }
 
-    private func applyRatioRestore(_ position: LibraryPosition) {
-        pendingRestorePosition = nil
-        isRestoringPosition = true
-        collectionView.layoutIfNeeded()
-        let scrollable = max(0, collectionView.contentSize.height - collectionView.bounds.height)
-        collectionView.setContentOffset(CGPoint(x: 0, y: position.offsetRatio * scrollable), animated: false)
-        isRestoringPosition = false
-        finishPositionRestore()
-        viewModel.debugRestoreNote = "restore=ratio section=\(position.sectionID)"
-        ViewerTrace.log("position.restore ratio section=\(position.sectionID)")
-        // R03 回退路径：锚点已失效 → 立即写一次新锚点（此后正常滚动回写接管）
-        savePositionNow(reason: "restore-fallback")
+    private func layoutMinY(at indexPath: IndexPath) -> Double? {
+        guard let frame = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath)?.frame else { return nil }
+        return Double(frame.minY)
     }
 
-    private func finishPositionRestore() {
+    private func finishPositionRestore(reason: String) {
+        let canFinish = PositionAnchorPolicy.canFinish(
+            boundsWidth: Double(collectionView.bounds.width),
+            boundsHeight: Double(collectionView.bounds.height),
+            numberOfSections: collectionView.numberOfSections,
+            snapshotDrained: !isApplyingSnapshot && pendingSnapshot == nil,
+            offsetApplied: didApplyRestoreOffset || reason == "no-anchor"
+        )
+        guard canFinish else { return }
         isPositionRestoreInFlight = false
         hideRestoreMask()
+        viewModel.debugRestoreNote = "restore=ok by=\(reason)"
     }
-
     private func showRestoreMask() {
-        restoreMaskView.isHidden = false
+        restoreMaskView.alpha = 1
         view.bringSubviewToFront(restoreMaskView)
     }
 
     private func hideRestoreMask() {
-        restoreMaskView.isHidden = true
+        restoreMaskView.alpha = 0
     }
 
     /// 月份/索引条跳转（docs/13 S09/S11）：校验 → 滚动 → 抵消粘性 header → 同步保存 → 顶部细横幅
@@ -1351,17 +1279,24 @@ final class LibraryViewController: UIViewController {
         collectionView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
         isRestoringPosition = false
         indexBar.setHighlighted(index: index, notify: false)
-        // S11：跳转后立即同步保存（不依赖滚动回调/Timer——跳完立刻杀进程也要记住）
+        // M13 P2：月份跳转后保存 v3 视觉锚点（与用户滚动保存同一语义）。
         if let section = currentSections[safe: index],
-           let item = currentItemsBySection[safe: index]?.first, let queryKey = currentSnapshotQueryKey {
-            positionStore.save(LibraryPosition(assetID: item.id,
+           let item = currentItemsBySection[safe: index]?.first, let queryKey = currentSnapshotQueryKey,
+           let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: IndexPath(item: 0, section: index)) {
+            let offsetY = Double(collectionView.contentOffset.y)
+            let visualY = PositionAnchorPolicy.visualY(cellMinY: Double(attributes.frame.minY),
+                                                       contentOffsetY: offsetY)
+            let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
+            positionStore.save(LibraryPosition(anchorAssetID: item.id,
+                                               anchorVisualY: visualY,
+                                               anchorContentOffsetY: offsetY,
+                                               assetID: item.id,
                                                sectionID: section.id,
                                                itemIndexInSection: 0,
-                                               offsetRatio: min(1, max(0, collectionView.contentOffset.y /
-                                                                            max(1, collectionView.contentSize.height - collectionView.bounds.height))),
+                                               offsetRatio: Double(min(1, max(0, collectionView.contentOffset.y / scrollable))),
                                                savedAt: Date()),
                                queryKey: queryKey)
-            ViewerTrace.log("position.save monthJump section=\(section.id)")
+            ViewerTrace.log("position.save.v3 monthJump section=\(section.id) visualY=\(Int(visualY))")
         }
         showJumpBanner(section: currentSections[index])
         return true
@@ -1603,10 +1538,23 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 // MARK: - 手势代理（捏合与滚动同时识别，docs/09 D14）
 
 extension LibraryViewController: UIGestureRecognizerDelegate {
+    /// M13 P3 ①：非选择模式 / 多指 / 缩放事务期滑选手势让位，CollectionView 正常滚动与捏合列数。
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === slideSelectPan else { return true }
+        guard isSelecting else { return false }
+        guard gestureRecognizer.numberOfTouches <= 1 else { return false }
+        return gestureRecognizer is UIPanGestureRecognizer
+    }
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        // 双指捏合（2 touches）与单指滚动 pan 互不阻塞
-        true
+        if gestureRecognizer === slideSelectPan, other === collectionView.panGestureRecognizer { return true }
+        // 双指捏合列数与滑选绝不互认；捏合自身仍可与滚动同时识别（docs/09 D14）。
+        if gestureRecognizer === slideSelectPan || other === slideSelectPan {
+            if gestureRecognizer is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer { return false }
+            return gestureRecognizer.numberOfTouches < 2 && other.numberOfTouches < 2
+        }
+        return true
     }
 }
 
