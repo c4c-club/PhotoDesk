@@ -60,6 +60,9 @@ final class LibraryViewController: UIViewController {
     private var currentSnapshotQueryKey: String?
     /// 上一次布局时配置 cell 所用的像素尺寸（变化时重配可视 cell）
     private var lastConfiguredPixelSize: CGSize = .zero
+    /// 月跳落地复核：待核对的目标月（viewDidLayoutSubviews 按真实钉住线核对，未钉住再校正）
+    private var pendingJumpVerifySectionID: String?
+    private var jumpVerifyAttempts = 0
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
     var onOpenViewer: ((PhotoItem) -> Void)?
     /// 多选操作行「筛选」→ 打开筛选面板（docs/13 S06）
@@ -1327,25 +1330,25 @@ final class LibraryViewController: UIViewController {
               collectionView.numberOfItems(inSection: index) > 0 else { return false }
         isRestoringPosition = true
         collectionView.layoutIfNeeded()
-        // M13 绿8 实锤：scrollToItem(.top) 对齐的是第一个 cell，再减 48pt 的旧补偿在粘性头
-        // 与安全区叠加下会越过目标月落到上一段（2024-05 跳转实际落到 2024-06）。改为直接取
-        // 目标月 header 的布局 minY 精确对齐：offset = header.minY - adjustedContentInset.top，
-        // 粘性头钉在该边界必然显示目标月，同时消除 48pt 魔法数字。
+        // M13 绿12 实锤：远距离目标（2024-05 距顶部约 60 个月）的 header 布局属性是估算高度，
+        // 一次性按估算 minY 跳转累计误差数千 pt（落到 2022-09）。改两段式：先 scrollToItem
+        // 落到目标 cell（UIKit 内部对估算高度自校正），物化后按真实 header minY 二次校正，
+        // 粘性头钉在月份边界（同时消除旧 -48pt 魔法数字）。
+        let indexPath = IndexPath(item: 0, section: index)
+        collectionView.scrollToItem(at: indexPath, at: .top, animated: false)
+        collectionView.layoutIfNeeded()
         let headerAttrs = collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
             ofKind: UICollectionView.elementKindSectionHeader,
-            at: IndexPath(item: 0, section: index))
+            at: indexPath)
         let maxOffsetY = max(0, collectionView.contentSize.height
             - collectionView.bounds.height + collectionView.adjustedContentInset.bottom)
-        let alignedY: CGFloat
         if let headerMinY = headerAttrs?.frame.minY {
-            alignedY = headerMinY - collectionView.adjustedContentInset.top
-        } else {
-            let cellAttrs = collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: 0, section: index))
-            alignedY = (cellAttrs?.frame.minY ?? 0) - collectionView.adjustedContentInset.top
+            let targetY = min(max(0, headerMinY - collectionView.adjustedContentInset.top), maxOffsetY)
+            if abs(collectionView.contentOffset.y - targetY) > 0.5 {
+                collectionView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
+                collectionView.layoutIfNeeded()
+            }
         }
-        let targetY = min(max(0, alignedY), maxOffsetY)
-        collectionView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
         isRestoringPosition = false
         indexBar.setHighlighted(index: index, notify: false)
         // M13 P2：月份跳转后保存 v3 视觉锚点（与用户滚动保存同一语义）。
@@ -1367,6 +1370,47 @@ final class LibraryViewController: UIViewController {
                                queryKey: queryKey)
             ViewerTrace.log("position.save.v3 monthJump section=\(section.id) visualY=\(Int(visualY))")
         }
+        // M13 绿12 实锤：跳转存档正确后视口仍会被 UIKit 内部调整（pinned header 重排 /
+        // 快照 apply 期间的位置保持）推离目标月（AX 与 idle 存档均显示漂移到别的月份）。
+        // 月跳语义必须落在目标月：登记复核目标，viewDidLayoutSubviews 里按真实钉住线核对，
+        // 未钉住就再校正（事件驱动、最多 5 次防打转，与 restore pending 门禁同一严格语义）。
+        pendingJumpVerifySectionID = section.id
+        jumpVerifyAttempts = 0
+    }
+
+    /// 月跳落地复核：钉住线上的 section 必须是目标月，否则按当前真实布局再校正
+    private func verifyJumpLanding() {
+        guard let targetID = pendingJumpVerifySectionID else { return }
+        guard !isRestoringPosition, !isApplyingSnapshot,
+              collectionView.window != nil, collectionView.bounds.width > 0 else { return }
+        guard let targetIndex = currentSections.firstIndex(where: { $0.id == targetID }) else {
+            pendingJumpVerifySectionID = nil
+            return
+        }
+        if jumpVerifyAttempts >= 5 {
+            pendingJumpVerifySectionID = nil
+            ViewerTrace.log("position.jump-verify give-up target=\(targetID) attempts=5")
+            return
+        }
+        let pinY = collectionView.contentOffset.y + collectionView.adjustedContentInset.top
+        var pinnedIndex: Int?
+        for s in 0..<collectionView.numberOfSections {
+            guard let attrs = collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
+                ofKind: UICollectionView.elementKindSectionHeader,
+                at: IndexPath(item: 0, section: s)),
+                attrs.frame.minY <= pinY + 1 else { break }
+            pinnedIndex = s
+        }
+        if pinnedIndex == targetIndex {
+            pendingJumpVerifySectionID = nil
+            jumpVerifyAttempts = 0
+            ViewerTrace.log("position.jump-verified section=\(targetID)")
+            return
+        }
+        jumpVerifyAttempts += 1
+        ViewerTrace.log("position.jump-reassert pinned=\(pinnedIndex.map(String.init) ?? "nil") target=\(targetIndex) attempt=\(jumpVerifyAttempts)")
+        scrollToSection(targetIndex)
+    }
         showJumpBanner(section: currentSections[index])
         return true
     }
@@ -1506,6 +1550,8 @@ final class LibraryViewController: UIViewController {
             }
         }
         lastConfiguredPixelSize = pixel
+        // M13：月跳落地复核——布局稳定后按真实钉住线核对目标月，未钉住再校正
+        verifyJumpLanding()
         // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
         if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
             drainPendingSnapshot()
