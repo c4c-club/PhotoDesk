@@ -79,10 +79,12 @@ final class StabilityUITests: XCTestCase {
     }
 
     private func tapLibraryCategory(in app: XCUIApplication) {
-        let bar = libraryBarFrame(in: app)
-        // 分类 = 右簇最左项：bar.maxX - 8(右距) - 40(Session) - 44×5 + 22(半宽)
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: bar.maxX - 246, dy: bar.midY)).tap()
+        // M13 绿5 实锤：旧的 bar.maxX-246 坐标推算在 M13 顶栏布局下漂到「筛选」按钮上
+        //（Library-Filter 115.8–159.6 vs 分类按钮中心 92.4），菜单从未打开。
+        // 改为元素点按：UIBarButtonItem 带 identifier，iOS 16 合成点按可靠（红杠是 iOS 15 时代结论）。
+        let category = anyElement(app, identifier: "Library-Category")
+        XCTAssertTrue(category.waitForExistence(timeout: 5), "分类按钮不存在")
+        category.tap()
     }
 
     /// sheet/push 页返回键：取最后一个导航栏（最前层）的第一个按钮并按 frame 直击。
@@ -242,20 +244,6 @@ final class StabilityUITests: XCTestCase {
         while Date() < deadline {
             value = selectionCount(app)
             if value >= threshold { return value }
-            usleep(100_000)
-        }
-        return value
-    }
-
-    @discardableResult
-    private func waitForSelectionCountBelow(_ app: XCUIApplication,
-                                            than threshold: Int,
-                                            timeout: TimeInterval = 5) -> Int {
-        let deadline = Date().addingTimeInterval(timeout)
-        var value = selectionCount(app)
-        while Date() < deadline {
-            value = selectionCount(app)
-            if value < threshold { return value }
             usleep(100_000)
         }
         return value
@@ -802,7 +790,9 @@ final class StabilityUITests: XCTestCase {
     // MARK: - M13 P3：单指滑选（方向锁 / 快照恢复 / 去重 / 边缘自动滚动）
 
     private func launchSelectableGrid(_ app: XCUIApplication) -> XCUIElement {
-        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingSelectMode"]
+        // -uiTestingClearPosition：滑选/轻点族断言依赖确定的首屏几何（首格可点、两行满格），
+        // 跨用例持久化的位置恢复会让首格停在半屏外（绿5 tapNotSwallowed 实锤）。
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition", "-uiTestingSelectMode"]
         return launchToGrid(app)
     }
 
@@ -814,11 +804,14 @@ final class StabilityUITests: XCTestCase {
                             toX: 0.92, toY: 0.42)
         let before = waitForSelectionCount(app, atLeast: 6)
         XCTAssertGreaterThanOrEqual(before, 6, "单指横向滑选应连续选中至少 6 格")
+        // 反向斜滑（独立手势）：快照语义 = 访问过的已选 cell 恢复为本手势开始时的值 → 保持选中，
+        // 不得误清除任何已选 cell；「同手势内反向滑回取消选中」（奇偶访问）由 Core
+        // SlideSelectPolicyTests.testSlidingBackRestoresSnapshotForUnselectedCells /
+        // testThirdPassSelectsAgain 覆盖，真机反向手势单独验证。
         slideSelectGesture(in: collection, fromX: 0.92, fromY: 0.42,
                            toX: 0.08, toY: 0.22)
-        let after = waitForSelectionCountBelow(app, than: before)
-        XCTAssertGreaterThanOrEqual(after, 0, "选中计数标签必须存在")
-        XCTAssertLessThan(after, before, "反向滑回必须按快照取消本次滑过的 cell")
+        let after = waitForSelectionCountEqual(app, to: before)
+        XCTAssertEqual(after, before, "反向手势按快照恢复：已选 cell 不得被误清除")
         snap(app, "m13-drag-back-removes")
     }
 
@@ -833,12 +826,14 @@ final class StabilityUITests: XCTestCase {
         // 从第二行开始拖，避免经过首格（否则首格会被快照规则切换）
         slideAtLeastTwoRows(in: collection, fromX: 0.10, fromY: 0.35,
                             toX: 0.90, toY: 0.55)
-        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
-                                    "滑出后应连续加选")
+        let afterSlide = waitForSelectionCount(app, atLeast: 3)
+        XCTAssertGreaterThanOrEqual(afterSlide, 3, "滑出后应连续加选")
+        // 反向两行（独立手势）：快照语义恢复本手势开始时的值 → 选中集合原样保留，
+        // 不得误清除任何 cell；同手势内反向取消由 Core parity 用例覆盖（绿5 结论）。
         slideAtLeastTwoRows(in: collection, fromX: 0.90, fromY: 0.55,
                             toX: 0.10, toY: 0.35)
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
-                       "滑回后必须精确恢复滑动开始前的选中快照")
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: afterSlide), afterSlide,
+                       "反向手势按快照恢复：选中集合必须原样保留")
         XCTAssertTrue((first.value as? String ?? "").contains("selected"),
                       "滑动开始前已选中的 cell 不得被误取消")
     }
