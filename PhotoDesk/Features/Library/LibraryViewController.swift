@@ -1053,6 +1053,16 @@ final class LibraryViewController: UIViewController {
                     self.collectionView.contentOffset.y += (exactMinY - before)
                     ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(exactMinY - before))")
                 }
+                // M13 绿11 实锤：锚点在内容末段（visualY<0）时补偿会把视口推过内容末端，
+                // 落进未物化的估算区 → 滚动条虚增、AX 零 cell（「网格无 cell」级联）。
+                // 补偿后必须钳回真实内容范围（与恢复路径的 clampedTargetOffsetY 同一不变量）。
+                self.collectionView.layoutIfNeeded()
+                let realMaxOffsetY = max(0, self.collectionView.contentSize.height
+                    - self.collectionView.bounds.height + self.collectionView.adjustedContentInset.bottom)
+                if self.collectionView.contentOffset.y > realMaxOffsetY {
+                    self.collectionView.contentOffset.y = realMaxOffsetY
+                    ViewerTrace.log("snapshot.compensate-clamp max=\(Int(realMaxOffsetY))")
+                }
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
@@ -1217,12 +1227,7 @@ final class LibraryViewController: UIViewController {
         if !didRestorePosition {
             guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
             didRestorePosition = true
-            // M13：UI 测试钩子（P3 计数族需要确定的首屏几何）——清掉跨用例持久化的位置
-            #if DEBUG
-            if UITestHooks.enabled("-uiTestingClearPosition"), let queryKey = currentSnapshotQueryKey {
-                positionStore.clear(queryKey: queryKey)
-            }
-            #endif
+            // （清位置钩子已前移到 LibraryViewModel.loadIfNeeded 的锚点窗口计算之前）
             pendingRestorePosition = positionStore.load(queryKey: currentSnapshotQueryKey ?? viewModel.query.key)
             if pendingRestorePosition != nil {
                 isPositionRestoreInFlight = true
