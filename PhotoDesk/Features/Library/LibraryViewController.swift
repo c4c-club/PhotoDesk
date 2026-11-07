@@ -1061,7 +1061,12 @@ final class LibraryViewController: UIViewController {
     var test_restoreMask: UIView { restoreMaskView }
     var test_batchToast: DSToast { batchToast }
     var test_selectionBar: UIView { selectionBar }
-    var test_collectionView: UICollectionView { collectionView }
+    /// collectionView 是 view 加载后才赋值的 IUO：宿主导航栈路径下 view 可能未加载，
+    /// 访问前先 loadViewIfNeeded，避免单测进程 Implicitly unwrapped nil 崩溃。
+    var test_collectionView: UICollectionView {
+        loadViewIfNeeded()
+        return collectionView
+    }
 
     private func applyDebugFilterHookIfNeeded() {
         guard let year = UITestHooks.intValue("-uiTestingFilterYear") else { return }
