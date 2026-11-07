@@ -526,6 +526,9 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        // 同一 app 实例启动参数跨轮累积（绿8 filterYear 同源问题）——冷启动重启前摘掉
+        // 月份跳转 flag，冷启动验证的是纯位置恢复，不得被跳转重放掩盖。
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         app.terminate()
         let collection = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
@@ -1019,6 +1022,9 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        // M13：同一 app 实例的启动参数跨轮累积（绿8 filterYear 同源问题）——重启前摘掉
+        // 月份跳转 flag，重启走纯位置恢复路径，不得被跳转重放掩盖。
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         let collection = app.collectionViews.firstMatch
         let rowHeight = oneRowHeight(in: collection)
         let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
@@ -1204,6 +1210,9 @@ final class StabilityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        // 同一 app 实例启动参数跨轮累积（绿8 filterYear 同源问题）——重启前摘掉月份跳转
+        // flag，验证的是位置记忆把用户带回目标月，不得被跳转重放掩盖。
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         app.terminate()
         _ = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
