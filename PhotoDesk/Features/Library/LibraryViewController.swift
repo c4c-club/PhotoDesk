@@ -287,7 +287,11 @@ final class LibraryViewController: UIViewController {
         let headerRegistration = UICollectionView.SupplementaryRegistration<MonthHeaderView>(
             elementKind: UICollectionView.elementKindSectionHeader
         ) { [weak self] header, _, indexPath in
-            guard let section = self?.currentSections[safe: indexPath.section] else { return }
+            // M13 绿5 实锤：首屏粘性头 AX 恒空的历史根因——本 provider 在 apply 期间被调，
+            // 旧实现读 completion 才赋值的 currentSections → 首次配置时数组仍为空 → 标题空。
+            // 改读 dataSource 已提交快照的 sectionIdentifier：任何时刻都拿到正确分组。
+            guard let self,
+                  let section = self.dataSource.sectionIdentifier(for: indexPath.section) else { return }
             header.configure(title: section.headerTitle, sectionID: section.id, count: section.count)
             // docs/13 S10：标题点击 = 跳到本月；⋯ 菜单 =「选择本月全部」/「跳到本月」
             header.onJumpToMonth = { [weak self] in
@@ -1042,7 +1046,6 @@ final class LibraryViewController: UIViewController {
             }
             #if DEBUG
             refreshDebugScrollNote()
-            self.attemptDebugMonthJumpIfNeeded()   // 快照已提交：此时跳转校验必然可过
             self.attemptDebugChromeHooksIfNeeded() // M12：工具/分类/选择 scope 钩子（走同一条路径）
             #endif
             // M12（验证轮 10 .ips 实锤）：apply completion 内不得嵌套再次 apply / 触发布局——
@@ -1051,6 +1054,11 @@ final class LibraryViewController: UIViewController {
                 guard let self, self.isViewLoaded else { return }
                 // 位置记忆恢复（docs/09 D08；docs/16 M12 R03 v2 策略）
                 self.restorePositionIfNeeded()
+                #if DEBUG
+                // M13 绿5 实锤：月份跳转钩子必须晚于恢复——恢复会覆盖跳转落点（等价用户点卡片
+                // 的语义优先于跨进程位置恢复）；retry 语义不变（每次 apply completion 都尝试）。
+                self.attemptDebugMonthJumpIfNeeded()
+                #endif
                 self.drainPendingSnapshot()   // apply 期间又来了新快照 → 下一轮排空
             }
         }
