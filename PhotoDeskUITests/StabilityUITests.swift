@@ -226,6 +226,10 @@ final class StabilityUITests: XCTestCase {
             snap(app, "s09-month-jump-sheet")
         }
         app.terminate()
+        // 绿10 实锤：同一实例启动参数跨轮累积——跳转轮仍带着首轮的 -uiTestingOpenMonthJump，
+        // 面板晚于头部断言弹出后盖住网格月份头 AX（MonthHeader-Menu 永远查不到）。
+        // 跳转轮只留跳转钩子；面板渲染验证由第一轮单独完成。
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         // 跳转（等价面板点卡片）
         app.launchArguments += ["-uiTestingMonthJump", sectionID]
         _ = launchToGrid(app)
@@ -529,6 +533,7 @@ final class StabilityUITests: XCTestCase {
         // 同一 app 实例启动参数跨轮累积（绿8 filterYear 同源问题）——冷启动重启前摘掉
         // 月份跳转 flag，冷启动验证的是纯位置恢复，不得被跳转重放掩盖。
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         app.terminate()
         let collection = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
@@ -1025,6 +1030,7 @@ final class StabilityUITests: XCTestCase {
         // M13：同一 app 实例的启动参数跨轮累积（绿8 filterYear 同源问题）——重启前摘掉
         // 月份跳转 flag，重启走纯位置恢复路径，不得被跳转重放掩盖。
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         let collection = app.collectionViews.firstMatch
         let rowHeight = oneRowHeight(in: collection)
         let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
@@ -1213,6 +1219,7 @@ final class StabilityUITests: XCTestCase {
         // 同一 app 实例启动参数跨轮累积（绿8 filterYear 同源问题）——重启前摘掉月份跳转
         // flag，验证的是位置记忆把用户带回目标月，不得被跳转重放掩盖。
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         app.terminate()
         _ = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
