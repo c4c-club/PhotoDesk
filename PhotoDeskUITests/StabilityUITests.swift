@@ -33,6 +33,9 @@ final class StabilityUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication) -> XCUIElement {
         installPermissionMonitor()
+        // M13 绿7 实锤：顶栏 3s 自动隐藏后分类/筛选等导航按钮 AX 不可命中
+        //（kAXErrorCannotComplete scroll-to-visible）——UI 测试统一保持顶栏可见。
+        app.launchArguments += ["-uiTestingKeepChrome"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
