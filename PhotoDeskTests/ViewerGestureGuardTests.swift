@@ -9,11 +9,14 @@ import UIKit
 final class ViewerGestureGuardTests: XCTestCase {
     private func state(isZooming: Bool,
                        zoomScale: CGFloat,
-                       sinceActivity: TimeInterval) -> ViewerGesturePolicy.CellState {
+                       sinceActivity: TimeInterval,
+                       geometryState: ZoomTransactionState = .idle) -> ViewerGesturePolicy.CellState {
         .init(isZooming: isZooming,
               zoomScale: zoomScale,
-              secondsSinceZoomActivity: sinceActivity)
+              secondsSinceZoomActivity: sinceActivity,
+              geometryState: geometryState)
     }
+
     // MARK: - pan 是否允许开始
 
     func testPanDisabledWhileCellZoomed() {
@@ -75,36 +78,47 @@ final class ViewerGestureGuardTests: XCTestCase {
                       "无 cell（空态）：事务正常执行")
     }
 
-    // MARK: - M13 P1：缩放几何事务与删除队列（红：几何状态机和删除队列未落地）
+    // MARK: - M13 P1：缩放几何事务与删除队列
 
     func testQueuedRemovalDrainRequiresGeometryIdle() {
-        let state = ViewerGesturePolicy.CellState(isZooming: false,
-                                                  zoomScale: 1.8,
-                                                  secondsSinceZoomActivity: 0.1)
-        let mirror = Mirror(reflecting: state)
-        XCTAssertTrue(mirror.children.contains { $0.label == "geometryState" },
-                      "M13 P1：CellState 必须带 geometryState（HEAD 无缩放几何事务状态机）")
+        XCTAssertTrue(ViewerGesturePolicy.allowsQueuedRemovalDrain(
+            cell: state(isZooming: false, zoomScale: 1.8, sinceActivity: 0.1, geometryState: .idle)),
+            "几何已 idle、未捏合：放大静止态的排队动作可以 drain，不能永久挂起")
+        XCTAssertTrue(ViewerGesturePolicy.allowsQueuedRemovalDrain(cell: nil),
+                      "无 cell：队列可 drain")
+        XCTAssertFalse(ViewerGesturePolicy.allowsQueuedRemovalDrain(
+            cell: state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .active)),
+            "active 几何事务期禁止 drain（不得与 CATransaction 提交同帧）")
+        XCTAssertFalse(ViewerGesturePolicy.allowsQueuedRemovalDrain(
+            cell: state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .settling)),
+            "settling 批量提交期禁止 drain")
+        XCTAssertFalse(ViewerGesturePolicy.allowsQueuedRemovalDrain(
+            cell: state(isZooming: true, zoomScale: 1, sinceActivity: 0, geometryState: .idle)),
+            "捏合进行中禁止 drain")
     }
 
     func testShouldQueueRemovalDuringZoomTransaction() {
-        let zooming = ViewerGesturePolicy.CellState(isZooming: true,
-                                                    zoomScale: 1.3,
-                                                    secondsSinceZoomActivity: 0)
-        XCTAssertFalse(ViewerGesturePolicy.allowsRemovalTransaction(cell: zooming),
-                       "捏合中禁止立即删除事务（M12 不变量）")
-        let mirror = Mirror(reflecting: zooming)
-        XCTAssertTrue(mirror.children.contains { $0.label == "geometryState" },
-                      "M13 P1：删除动作应进 pendingRemovalActions 队列，依赖几何状态机（HEAD 未实现）")
+        XCTAssertTrue(ViewerGesturePolicy.shouldQueueRemoval(
+            cell: state(isZooming: true, zoomScale: 1.3, sinceActivity: 0)),
+            "捏合中删除动作必须入队而不是丢弃")
+        XCTAssertTrue(ViewerGesturePolicy.shouldQueueRemoval(
+            cell: state(isZooming: false, zoomScale: 1, sinceActivity: 0.2)),
+            "回弹宽限窗口内删除动作必须入队")
+        XCTAssertTrue(ViewerGesturePolicy.shouldQueueRemoval(
+            cell: state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .active)),
+            "active 几何事务期删除动作必须入队")
+        XCTAssertFalse(ViewerGesturePolicy.shouldQueueRemoval(
+            cell: state(isZooming: false, zoomScale: 1, sinceActivity: 10)),
+            "静止 idle 时删除动作立即执行")
+        XCTAssertFalse(ViewerGesturePolicy.shouldQueueRemoval(cell: nil),
+                       "无 cell：删除动作立即执行")
     }
 
     func testGeometryStateAloneBlocksPanAndImmediateRemoval() {
-        let atRest = ViewerGesturePolicy.CellState(isZooming: false,
-                                                   zoomScale: 1,
-                                                   secondsSinceZoomActivity: 10)
-        XCTAssertTrue(ViewerGesturePolicy.allowsRemovalTransaction(cell: atRest),
-                      "静止态允许立即删除（baseline 不变量）")
-        let mirror = Mirror(reflecting: atRest)
-        XCTAssertTrue(mirror.children.contains { $0.label == "geometryState" },
-                      "M13 P1：active/settling 几何事务必须独立拦截 pan 与删除（HEAD 无该字段）")
+        let active = state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .active)
+        XCTAssertFalse(ViewerGesturePolicy.shouldPanBegin(gesturesEnabled: true, numberOfTouches: 1, cell: active))
+        XCTAssertFalse(ViewerGesturePolicy.allowsRemovalTransaction(cell: active))
+        let settling = state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .settling)
+        XCTAssertFalse(ViewerGesturePolicy.allowsRemovalTransaction(cell: settling))
     }
 }

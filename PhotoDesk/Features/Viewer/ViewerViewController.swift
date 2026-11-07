@@ -44,6 +44,9 @@ final class ViewerViewController: UIViewController {
     private var isRemovalInFlight = false
     /// commitRemoval 结果（batch block 内赋值，completion 消费）
     private var pendingRemovalResult: ViewerViewModel.RemovalResult?
+    /// M13 P1：缩放事务活跃期收到的删除/隐藏动作——按 FIFO 排队，待几何事务 idle 后串行 drain。
+    /// 绝不在 pinch 中 performBatchUpdates，也绝不把用户动作直接丢弃。
+    private var pendingRemovalActions: [(SwipeAction, PhotoDeskCore.VerticalEdge?)] = []
     /// 在途大图加载数（DEBUG 横幅 load= 字段；S08 验收 ≤3）
     private var inflightLoadCount = 0
     /// 预取防抖任务（docs/13 S02：100ms 内多次翻页只预取最后一次）
@@ -77,6 +80,7 @@ final class ViewerViewController: UIViewController {
         setupToast()
         setupPanGesture()
         scheduleChromeHide()
+        logPendingDeleteCount("open items=\(viewModel.items.count) idx=\(viewModel.currentIndex)")
         ViewerTrace.log("open items=\(viewModel.items.count) idx=\(viewModel.currentIndex)")
 
         undoCenter.onExpire = { [weak self] _ in
@@ -98,6 +102,8 @@ final class ViewerViewController: UIViewController {
         ViewerTrace.log("appear idx=\(viewModel.currentIndex) count=\(viewModel.items.count)")
         // M12 A3：appear 时当前 cell 必有 image 或在途任务（present 信息/编辑/分享、切 Tab 返回的恢复路径）
         remountCurrentLoadIfNeeded()
+        // M13 P1：appear 后若当前 cell 已 idle，排空之前因缩放事务暂存的删除/隐藏动作。
+        schedulePendingRemovalDrain()
     }
 
     override func viewDidLayoutSubviews() {
@@ -241,6 +247,10 @@ final class ViewerViewController: UIViewController {
 
     /// 当前 zoom 字段（cell 缩放回调写入；NaN 时 %.2f 会渲染成 "nan" 被 UI 测试捕获）
     private var debugZoomScale: Double = 1
+    /// M13 P1 强断言取证字段：zoomContentView 宽度 / 待删除数 / viewer-trace 是否出现非有限值。
+    private var debugFrameWidth: CGFloat = -1
+    private var debugPendingDeleteCount = 0
+    private var debugTraceNonFinite = false
 
     /// 带全部状态字段的横幅（items/idx/id/zoom/load/img，docs/13 §3.9 + docs/16 M12 R02）
     private func refreshDebugBanner() {
@@ -250,7 +260,9 @@ final class ViewerViewController: UIViewController {
         let imgPart = (collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell)
             .map { "img=\($0.hasImage ? "ok" : "nil")" } ?? "img=-"
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount) \(imgPart)")
+                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount) \(imgPart) " +
+                         "frameW=\(String(format: "%.1f", debugFrameWidth)) " +
+                         "pendingDeleteCount=\(debugPendingDeleteCount) traceNonFinite=\(debugTraceNonFinite ? 1 : 0)")
     }
 
     /// 单元测试布局断言锚点（A4：itemSize 刷新；Release 不编译）
@@ -275,6 +287,7 @@ final class ViewerViewController: UIViewController {
                                            action: #selector(sessionBadgeTapped))
         sessionBadge.accessibilityIdentifier = "SessionBadge"
         sessionBadge.isEnabled = true
+        sessionBadge.width = DSTouch.minimum
         favoriteButton = UIBarButtonItem(image: UIImage(systemName: favoriteIconName),
                                          style: .plain, target: self,
                                          action: #selector(favoriteTapped))
@@ -480,14 +493,34 @@ final class ViewerViewController: UIViewController {
 
         switch action {
         case .moveToRecentlyDeleted, .hide:
-            // M12 B1：缩放事务与删除事务互斥——pinchActive 期间一律 guard 早退
-            guard ViewerGesturePolicy.allowsRemovalTransaction(cell: currentCellZoomState()) else {
-                ViewerTrace.log("action-blocked-zooming \(action) idx=\(viewModel.currentIndex)")
+            // M13 P1：缩放事务与删除事务互斥。活跃期入队（不是丢弃），idle 后由 cell 回调串行 drain。
+            guard !ViewerGesturePolicy.shouldQueueRemoval(cell: currentCellZoomState()) else {
+                pendingRemovalActions.append((action, exitEdge))
+                logPendingDeleteCount("queue \(action) idx=\(viewModel.currentIndex)")
+                ViewerTrace.log("action-queued-zooming \(action) idx=\(viewModel.currentIndex) pending=\(pendingRemovalActions.count)")
                 return
             }
             performStaged(action: action, exitEdge: exitEdge)
         default:
             perform(action: action, direction: direction)
+        }
+    }
+
+    /// cell 在缩放几何批量提交完成后回调；这里只做 @MainActor 串行排空，不在 cell 内执行 batchUpdates。
+    private func wireZoomTransactionIdleIfNeeded(_ cell: ZoomableImageCell) {
+        cell.setZoomTransactionIdleHandler { [weak self] in
+            Task { @MainActor in
+                self?.schedulePendingRemovalDrain()
+            }
+        }
+    }
+
+    /// 把 drain 排到下一个 MainActor 执行片：与当帧 CATransaction / scrollViewDidZoom 严格错开。
+    @MainActor
+    private func schedulePendingRemovalDrain() {
+        guard !pendingRemovalActions.isEmpty else { return }
+        Task { @MainActor [weak self] in
+            self?.drainPendingRemovalActions()
         }
     }
 
@@ -497,15 +530,39 @@ final class ViewerViewController: UIViewController {
             as? ZoomableImageCell)?.zoomState
     }
 
+    /// M13 P1：cell 几何事务回 idle 时串行 drain 删除/隐藏队列。
+    /// drain 只在 geometryState==idle 且非 isZooming 时执行，绝不和 CATransaction 几何提交 /
+    /// scrollViewDidZoom / performBatchUpdates 同帧；每个 batch completion 后再消费下一个动作。
+    @MainActor
+    private func drainPendingRemovalActions() {
+        guard !isRemovalInFlight,
+              ViewerGesturePolicy.allowsQueuedRemovalDrain(cell: currentCellZoomState()),
+              let next = pendingRemovalActions.first else { return }
+        // 事务真正启动后才出队：避免 performStaged 的二次门禁拒绝时把用户动作永久丢弃。
+        guard performStaged(action: next.0, exitEdge: next.1, fromQueue: true) else { return }
+        pendingRemovalActions.removeFirst()
+        logPendingDeleteCount("drain \(next.0) idx=\(viewModel.currentIndex)")
+    }
+
+    /// Release 面包屑：pendingDeleteCount / pendingHideCount / 队列长度；只写本地，不含照片像素。
+    private func logPendingDeleteCount(_ event: String) {
+        let session = AppContainer.shared.reviewSession
+        ViewerTrace.log("\(event) pendingDeleteCount=\(session.pendingDeleteCount) pendingHideCount=\(session.pendingHideCount) queue=\(pendingRemovalActions.count)")
+    }
+
     /// 删除事务（docs/13 S12）：plan → snapshot 飞出（并行）→ 同一 runloop 内
     /// performBatchUpdates { commitRemoval + deleteItems } → completion 定位/关闭。
     /// isRemovalInFlight 串行化：事务期间忽略新动作（最多丢一次滑动，好过崩溃）。
-    /// M12 B1：缩放事务中一律 guard 早退（performBatchUpdates 与 UIScrollView 缩放事务互斥）。
-    private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?) {
+    /// M13 P1：缩放事务活跃期的动作已由 executeAction 入队，本方法只在 idle 后按队列调用。
+    @discardableResult
+    private func performStaged(action: SwipeAction, exitEdge: PhotoDeskCore.VerticalEdge?, fromQueue: Bool = false) -> Bool {
+        let removalAllowed = fromQueue
+            ? ViewerGesturePolicy.allowsQueuedRemovalDrain(cell: currentCellZoomState())
+            : ViewerGesturePolicy.allowsRemovalTransaction(cell: currentCellZoomState())
         guard !isRemovalInFlight,
-              ViewerGesturePolicy.allowsRemovalTransaction(cell: currentCellZoomState()),
+              removalAllowed,
               let item = viewModel.current,
-              let staged = viewModel.planRemoval(action: action, forItemID: item.id, exitEdge: exitEdge) else { return }
+              let staged = viewModel.planRemoval(action: action, forItemID: item.id, exitEdge: exitEdge) else { return false }
         isRemovalInFlight = true
         ViewerTrace.log("stage \(action) idx=\(staged.removedIndex) count=\(viewModel.items.count)")
 
@@ -555,12 +612,15 @@ final class ViewerViewController: UIViewController {
             self.applyEntryAnimation(edge: staged.plan.entryEdge, index: next)
             self.refreshFilmStrip(current: next)
             self.refreshChrome()   // 顶部待处理计数 +1（docs/09 D16）
+            self.logPendingDeleteCount("settle idx=\(next)")
             self.prefetchAround(index: next)
             self.refreshDebugBanner()
+            self.schedulePendingRemovalDrain()   // 队列仍有动作时，等下一个 batch completion 再消费
         }
         #if DEBUG
         updateDebugLabel("staged:\(action) idx=\(staged.removedIndex)")
         #endif
+        return true
     }
 
     /// 补位进入动画：下一张从 entryEdge 以 0.96→1.0 缩放 / 16pt 位移进入（Reduce Motion 降级）
@@ -749,6 +809,7 @@ final class ViewerViewController: UIViewController {
         let hides = session.pendingHideCount
         let item = topBarItems.first { $0.accessibilityIdentifier == "SessionBadge" }
         guard let item else { return }
+        item.width = DSTouch.minimum
         if deletes == 0 && hides == 0 {
             item.title = nil
             item.accessibilityLabel = "没有待处理内容"
@@ -901,14 +962,37 @@ final class ViewerViewController: UIViewController {
             if abs(value - lastLoggedZoom) > 0.1 {
                 lastLoggedZoom = value
                 ViewerTrace.log("zoom=\(String(format: "%.2f", value)) idx=\(viewModel.currentIndex)")
+                logPendingDeleteCount("zoom idx=\(viewModel.currentIndex)")
+                logGeometryBreadcrumb()
             }
         } else if !didLogNonFiniteZoom {
             didLogNonFiniteZoom = true
             ViewerTrace.log("zoom=\(scale) idx=\(viewModel.currentIndex)（非有限值）")
+            logPendingDeleteCount("zoom non-finite idx=\(viewModel.currentIndex)")
+            logGeometryBreadcrumb()
         }
     }
     private var lastLoggedZoom: Double = -1
     private var didLogNonFiniteZoom = false
+
+    /// Release 几何面包屑：当前 zoomContentView / imageView / contentSize / zoomScale / pending 队列。
+    /// 只写有限几何数字，不含照片像素，不上传；DEBUG 横幅同步暴露 frameW / pendingDeleteCount / traceNonFinite。
+    private func logGeometryBreadcrumb() {
+        let cell = collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell
+        let frameWidth = Double(cell?.zoomContentViewFrameWidth ?? -1)
+        let imageViewWidth = Double(cell?.imageViewFrameWidth ?? -1)
+        let contentSize = cell?.innerContentSize ?? "unknown"
+        let state = cell?.zoomTransactionState.rawValue ?? "none"
+        let trace = ViewerTrace.recentLines()
+        let nonFinite = trace.contains { $0.localizedCaseInsensitiveContains("nan") || $0.localizedCaseInsensitiveContains("non-finite") || $0.localizedCaseInsensitiveContains("非有限") }
+        ViewerTrace.log("geometry zoomContentView=\(frameWidth) imageView=\(imageViewWidth) contentSize=\(contentSize) state=\(state) pendingDeleteCount=\(AppContainer.shared.reviewSession.pendingDeleteCount) queue=\(pendingRemovalActions.count) traceNonFinite=\(nonFinite ? 1 : 0)")
+        #if DEBUG
+        debugFrameWidth = CGFloat(frameWidth)
+        debugPendingDeleteCount = AppContainer.shared.reviewSession.pendingDeleteCount
+        debugTraceNonFinite = nonFinite
+        refreshDebugBanner()
+        #endif
+    }
 
     private func scrollTo(index: Int, animated: Bool = true) {
         guard index >= 0, index < viewModel.items.count else { return }
@@ -1013,6 +1097,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                                                           for: indexPath)
             if let imageCell = cell as? ZoomableImageCell {
                 imageCell.configure(item: Self.emptyItem, image: nil)
+                wireZoomTransactionIdleIfNeeded(imageCell)
             }
             return cell
         }
@@ -1027,6 +1112,8 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                                                       for: indexPath)
         guard let imageCell = cell as? ZoomableImageCell else { return cell }
         imageCell.configure(item: item, image: nil)
+        wireZoomTransactionIdleIfNeeded(imageCell)
+        schedulePendingRemovalDrain()
         imageCell.setDownloadHandler { [weak self, weak imageCell] id in
             guard let self, let imageCell else { return }
             self.downloadFromCloud(id: id, cell: imageCell)

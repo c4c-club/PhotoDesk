@@ -25,3 +25,8 @@ enum DSSpacing {
     /// 撤销条倒计时环直径（docs/16 M12 R04：独立环视图尺寸 token）
     static let toastRingSize: CGFloat = 24
 }
+
+/// M13 P2：可点击区域最小宽度 token（顶部待处理徽标在无标题时仍保持可命中）
+enum DSTouch {
+    static let minimum: CGFloat = 44
+}
