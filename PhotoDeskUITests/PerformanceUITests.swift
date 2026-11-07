@@ -30,6 +30,7 @@ final class PerformanceUITests: XCTestCase {
     /// 冷启动到首屏（docs/03 §7 预算 < 2.0s）
     func testLaunchPerformance() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let options = XCTMeasureOptions()
         options.iterationCount = 3
         measure(metrics: [XCTApplicationLaunchMetric()], options: options) {
@@ -40,6 +41,7 @@ final class PerformanceUITests: XCTestCase {
     /// 滚动内存峰值（5,000+ 张库；XCTMemoryMetric 记录驻留内存）
     func testScrollMemoryPerformance() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         installPermissionMonitor(for: app)
         app.launch()
 
@@ -71,6 +73,7 @@ final class PerformanceUITests: XCTestCase {
 
     func testViewerMemoryUnderFastSwipe() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingViewerStartIndex", "0"]
         installPermissionMonitor(for: app)
         app.launch()
@@ -102,6 +105,7 @@ final class PerformanceUITests: XCTestCase {
         // UI 侧用「就绪即应用年份」钩子走同一条 setFilter 路径，以 启动→网格→年份月头渲染 全链路时钟度量
         //（含 CI 冷启动开销，作为上界参考；iOS 15 XCUITest 对面板内 SwiftUI Button 合成点击不可靠，docs/13 M11）。
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         installPermissionMonitor(for: app)
         app.launchArguments += ["-uiTestingFilterYear", "2024"]
         let options = XCTMeasureOptions()

@@ -7,6 +7,7 @@ import XCTest
 import Photos
 import UIKit
 @testable import PhotoDesk
+import PhotoDeskCore
 
 /// 锚点窗口测试仓库：数组即「creationDate 降序的完整结果」（与 PHFetchResult 切片语义一致）
 private final class FakeAnchorRepository: AssetRepositoryProtocol {
@@ -221,7 +222,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
                                          itemsBySection: [stage1Items],
                                          queryKey: queryKey,
                                          indexComplete: false)
-        let maskShown = await waitUntil { !controller.test_restoreMask.isHidden }
+        let maskShown = await waitUntil { controller.test_restoreMask.alpha > 0 }
         XCTAssertTrue(maskShown, "R03：恢复期间必须显示遮罩（用户不可见中间位置）")
 
         // 模拟恢复期间的回写触发点（0.3s Timer / didEndDragging 都汇聚到 savePositionNow）
@@ -238,7 +239,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
                                          indexComplete: true)
         let restored = await waitUntil { viewModel.debugRestoreNote.contains("by=asset") }
         XCTAssertTrue(restored, "锚点可见后必须立即按 assetID 定位：\(viewModel.debugRestoreNote)")
-        let maskHidden = await waitUntil { controller.test_restoreMask.isHidden }
+        let maskHidden = await waitUntil { controller.test_restoreMask.alpha == 0 }
         XCTAssertTrue(maskHidden, "定位完成后遮罩必须移除")
         XCTAssertEqual(store.load(queryKey: queryKey)?.assetID, "a-target",
                        "恢复后锚点不被覆盖")
@@ -267,7 +268,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let restored = await waitUntil { viewModel.debugRestoreNote.contains("by=section") }
         XCTAssertTrue(restored,
                       "锚点缺失时应回退 sectionID + itemIndexInSection：\(viewModel.debugRestoreNote)")
-        let maskHidden = await waitUntil { controller.test_restoreMask.isHidden }
+        let maskHidden = await waitUntil { controller.test_restoreMask.alpha == 0 }
         XCTAssertTrue(maskHidden)
     }
 
@@ -292,8 +293,87 @@ final class LibraryPositionRestoreTests: XCTestCase {
         XCTAssertEqual(store.load(queryKey: keyAll)?.assetID, "pos-all")
         XCTAssertEqual(store.load(queryKey: keyFav)?.assetID, "pos-fav")
     }
-}
+    // MARK: - M13 P2：v3 视觉锚点与精确恢复（红：v3 模型/像素恢复/宿主复用未落地）
 
+    func testSaveUsesVisualAnchorNotFirstVisibleCell() {
+        let store = LibraryPositionStore(defaults: testDefaults)
+        let viewModel = makeViewModel(repository: FakeAnchorRepository([]), store: store)
+        let controller = makeViewController(viewModel: viewModel, store: store)
+        controller.loadViewIfNeeded()
+        let items = (0..<40).map { makeItem($0, idPrefix: "m13") }
+        viewModel.pushSnapshotForTesting(sections: [section("2024-05", title: "2024年5月", count: items.count)],
+                                         itemsBySection: [items],
+                                         queryKey: viewModel.query.key,
+                                         indexComplete: true)
+        guard let grid = findCollectionView(in: controller.view) else {
+            return XCTFail("网格未挂载")
+        }
+        grid.contentOffset = CGPoint(x: 0, y: 240)
+        grid.layoutIfNeeded()
+        controller.savePositionNow(reason: "M13-P2-red")
+        guard let data = testDefaults.data(forKey: "library.lastPosition.v2.\(viewModel.query.key)"),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let json = object as? [String: Any] else {
+            return XCTFail("位置 JSON 未写入")
+        }
+        XCTAssertNotNil(json["anchorAssetID"], "M13 P2：必须写视觉锚点 assetID（HEAD 仍取 sorted().first）")
+        XCTAssertNotNil(json["anchorVisualY"], "M13 P2：必须写锚点视口 y")
+        XCTAssertNotNil(json["anchorContentOffsetY"], "M13 P2：必须写精确 contentOffset.y")
+    }
+
+    private func findCollectionView(in view: UIView) -> UICollectionView? {
+        if let grid = view as? UICollectionView { return grid }
+        for subview in view.subviews {
+            if let grid = findCollectionView(in: subview) { return grid }
+        }
+        return nil
+    }
+
+    func testRestoreUsesPixelOffsetNotCentered() {
+        let (strategy, offsetY) = PositionAnchorPolicy.resolve(
+            anchor: PositionAnchorV3(anchorAssetID: "a", anchorVisualY: 32,
+                                     anchorContentOffsetY: 1200, assetID: "a", sectionID: "s",
+                                     itemIndexInSection: 0, offsetRatio: 0.5, savedAt: Date(), schemaVersion: 3),
+            assetCellMinY: 1232, sectionCellMinY: nil,
+            contentHeight: 5000, viewportHeight: 800, adjustedTop: 44, bottomInset: 0)
+        XCTAssertEqual(strategy, .asset)
+        XCTAssertEqual(offsetY, 1200, "targetOffsetY = newMinY - anchorVisualY，禁止居中")
+    }
+
+    func testNoWritebackDuringRestoreInFlight() {
+        XCTAssertFalse(PositionAnchorPolicy.allowsWriteback(isRestoreInFlight: true))
+        XCTAssertTrue(PositionAnchorPolicy.allowsWriteback(isRestoreInFlight: false))
+    }
+
+    func testHostReuseAcrossViewStateDoesNotResetOffset() {
+        let mirror = Mirror(reflecting: AppContainer.shared)
+        XCTAssertTrue(mirror.children.contains { $0.label?.contains("libraryHostController") == true },
+                      "M13 P2：AppContainer 必须持有稳定复用的 libraryHostController（HEAD 每次重建归零）")
+    }
+
+    func testV3DecodeV2Fallback() throws {
+        let json = """
+        {"assetID":"legacy","sectionID":"2024-05","itemIndexInSection":2,"offsetRatio":0.25,"savedAt":700000000,"schemaVersion":2}
+        """
+        let decoded = try JSONDecoder().decode(LibraryPosition.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.schemaVersion, 2)
+        XCTAssertEqual(decoded.itemIndexInSection, 2)
+        let mirror = Mirror(reflecting: decoded)
+        let anchor = mirror.children.first { $0.label == "anchorAssetID" }?.value as? String
+        let visualY = mirror.children.first { $0.label == "anchorVisualY" }?.value as? Double
+        XCTAssertEqual(anchor ?? "", "legacy",
+                       "M13 P2：v2 解码必须补 anchorAssetID=旧 assetID（HEAD 无该字段）")
+        XCTAssertEqual(visualY ?? -1, 0,
+                       "M13 P2：v2 解码必须补 anchorVisualY=0（HEAD 无该字段）")
+    }
+
+    func testRotationKeepsSameVisualAnchor() {
+        let visualY = PositionAnchorPolicy.visualY(cellMinY: 1500, contentOffsetY: 1380)
+        let newMinY = 1250.0
+        XCTAssertEqual(PositionAnchorPolicy.targetOffsetY(cellMinY: newMinY, anchorVisualY: visualY),
+                       1130, "旋转后用相同锚点视觉 y 重算像素 offset")
+    }
+}
 private extension PhotoItem {
     func withID(_ newID: String) -> PhotoItem {
         PhotoItem(id: newID,

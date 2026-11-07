@@ -57,6 +57,7 @@ final class FlowUITests: XCTestCase {
 
     func testBatchSelectionFlow() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         // -uiTestingSelectMode：App 侧测试钩子（启动即进入多选）——长按与 SwiftUI 工具栏按钮的
         // XCUITest 触发均不可靠（AX scroll-to-visible 失败），测试钩子是标准做法
         app.launchArguments += ["-uiTestingSelectMode"]
@@ -79,6 +80,7 @@ final class FlowUITests: XCTestCase {
 
     func testSwipeFavoriteThenUndoRoundTrip() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchToGrid(app)
 
         app.collectionViews.cells.firstMatch.tap()
@@ -112,6 +114,7 @@ final class FlowUITests: XCTestCase {
 
     func testCleanupScanStartAndCancel() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         // -CleanupAutoStart：App 侧测试钩子（清理页 onAppear 自动开始扫描）——
         // Form 内 Button 的 AX/coordinate 点击均不可靠（Library-Select 同款问题），测试钩子是标准做法
         app.launchArguments += ["-CleanupAutoStart"]

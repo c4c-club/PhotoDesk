@@ -10,6 +10,7 @@ final class LaunchUITests: XCTestCase {
 
     func testLaunchShowsGridWithoutTabBarOrTitle() {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launch()
 
         // 网格可达（授权引导 → 网格；无授权时网格也会在授权后出现）

@@ -61,6 +61,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testViewerOpensTappedPhoto() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchToGrid(app)
 
         let collection = app.collectionViews.firstMatch
@@ -85,6 +86,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testDeleteKeepsDisplayedPhotoInSync() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         // 会话 mock：滑动只入队，不真实删除；下滑动作改为移到最近删除（默认 hide）
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
@@ -119,6 +121,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testSessionSwipeDoesNotPrompt() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
                                 "-gesture.down", "moveToRecentlyDeleted",
@@ -154,6 +157,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testSessionCommitPromptsOnce() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         // mock 模式：BatchCommitCoordinator 对 mock writer 的批量提交次数 === 真实路径的 performChanges 次数
         app.launchArguments += ["-uiTestingSessionMock",
                                 "-uiTestingViewerStartIndex", "7",
@@ -192,6 +196,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testSelectionBadgesAppearAfterSelectAll() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
         launchToGrid(app)
 
@@ -227,6 +232,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testScrollWorksInSelectionMode() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
         launchToGrid(app)
 
@@ -244,6 +250,7 @@ final class PageRegressionUITests: XCTestCase {
 
     func testStorageStatsCompletes() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingStorageMock"]
         installPermissionMonitor(for: app)
         app.launch()

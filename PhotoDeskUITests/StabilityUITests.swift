@@ -195,20 +195,20 @@ final class StabilityUITests: XCTestCase {
     /// 注意必须整体赋值：+= 会累积多个同名参数，intValue 取第一个导致钩子失效（CI 轮 14 实测）
     @discardableResult
     private func launchWithFilterCleared(_ app: XCUIApplication) -> XCUIElement {
-        app.launchArguments = ["-uiTestingFilterYear", "0"]
+        app.launchArguments += ["-uiTestingFilterYear", "0"]
         return launchToGrid(app)
     }
 
     /// 年份筛选启动（就绪后应用年份筛选）
     private func launchWithYearFilter(_ app: XCUIApplication, year: Int) {
-        app.launchArguments = ["-uiTestingFilterYear", "\(year)"]
+        app.launchArguments += ["-uiTestingFilterYear", "\(year)"]
         _ = launchToGrid(app)
     }
 
     /// 月份跳转启动（快照包含目标月后经 scrollToSection 跳转）+ 面板渲染验证（s09 截图）
     private func launchWithMonthJump(_ app: XCUIApplication, sectionID: String, headerText: String) {
         // 面板渲染验证（存在性，不点击）
-        app.launchArguments = ["-uiTestingOpenMonthJump"]
+        app.launchArguments += ["-uiTestingOpenMonthJump"]
         _ = launchToGrid(app)
         let card = anyElement(app, identifier: "MonthJump-Month-\(sectionID)")
         if card.waitForExistence(timeout: 8) {
@@ -216,7 +216,7 @@ final class StabilityUITests: XCTestCase {
         }
         app.terminate()
         // 跳转（等价面板点卡片）
-        app.launchArguments = ["-uiTestingMonthJump", sectionID]
+        app.launchArguments += ["-uiTestingMonthJump", sectionID]
         _ = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, headerText, timeout: 15),
                       "月份跳转后顶部应为 \(headerText)（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
@@ -225,6 +225,117 @@ final class StabilityUITests: XCTestCase {
 
     private func selectionCountLabel(_ app: XCUIApplication) -> XCUIElement {
         anyElement(app, identifier: "Selection-Count")
+    }
+
+    private func selectionCount(_ app: XCUIApplication) -> Int {
+        let label = selectionCountLabel(app)
+        guard label.waitForExistence(timeout: 5) else { return -1 }
+        return Self.parseCount(label.label)
+    }
+
+    @discardableResult
+    private func waitForSelectionCount(_ app: XCUIApplication,
+                                       atLeast threshold: Int,
+                                       timeout: TimeInterval = 5) -> Int {
+        let deadline = Date().addingTimeInterval(timeout)
+        var value = selectionCount(app)
+        while Date() < deadline {
+            value = selectionCount(app)
+            if value >= threshold { return value }
+            usleep(100_000)
+        }
+        return value
+    }
+
+    @discardableResult
+    private func waitForSelectionCountBelow(_ app: XCUIApplication,
+                                            than threshold: Int,
+                                            timeout: TimeInterval = 5) -> Int {
+        let deadline = Date().addingTimeInterval(timeout)
+        var value = selectionCount(app)
+        while Date() < deadline {
+            value = selectionCount(app)
+            if value < threshold { return value }
+            usleep(100_000)
+        }
+        return value
+    }
+
+    @discardableResult
+    private func waitForSelectionCountEqual(_ app: XCUIApplication,
+                                            to expected: Int,
+                                            timeout: TimeInterval = 5) -> Int {
+        let deadline = Date().addingTimeInterval(timeout)
+        var value = selectionCount(app)
+        while Date() < deadline {
+            value = selectionCount(app)
+            if value == expected { return value }
+            usleep(100_000)
+        }
+        return value
+    }
+
+    private func visibleSelectedCount(in collection: XCUIElement, limit: Int = 12) -> Int {
+        var count = 0
+        for index in 0..<limit {
+            let cell = collection.cells.element(boundBy: index)
+            guard cell.exists else { continue }
+            if (cell.value as? String ?? "").contains("selected") { count += 1 }
+        }
+        return count
+    }
+
+    private func slideSelectGesture(in collection: XCUIElement,
+                                    fromX: CGFloat,
+                                    fromY: CGFloat,
+                                    toX: CGFloat,
+                                    toY: CGFloat,
+                                    hold: TimeInterval? = nil) {
+        let start = collection.coordinate(withNormalizedOffset: CGVector(dx: fromX, dy: fromY))
+        let end = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: toY))
+        if let hold {
+            start.press(forDuration: 0.05, thenDragTo: end,
+                        withVelocity: .slow, thenHoldForDuration: hold)
+        } else {
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+    }
+
+    private func slideHorizontal(in collection: XCUIElement,
+                                 fromX: CGFloat,
+                                 toX: CGFloat,
+                                 y: CGFloat) {
+        slideSelectGesture(in: collection, fromX: fromX, fromY: y,
+                           toX: toX, toY: y)
+    }
+
+    private static func parseStringField(_ label: String, _ key: String) -> String? {
+        let escaped = NSRegularExpression.escapedPattern(for: key)
+        let pattern = escaped + "=([^[:space:]]+)"
+        do {
+            let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+            guard let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
+                  match.numberOfRanges >= 2,
+                  let range = Range(match.range(at: 1), in: label) else { return nil }
+            return String(label[range])
+        } catch {
+            return nil
+        }
+    }
+
+    private func debugSnapshot(_ app: XCUIApplication) -> (off: Double, anchor: String, visualY: Double)? {
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        guard banner.waitForExistence(timeout: 5) else { return nil }
+        let raw = (banner.value as? String) ?? banner.label
+        let off = Self.parseDoubleField(raw, "off")
+        let visualY = Self.parseDoubleField(raw, "visualY")
+        guard off >= 0, visualY >= 0,
+              let anchor = Self.parseStringField(raw, "anchor") else { return nil }
+        return (off, anchor, visualY)
+    }
+
+    private func oneRowHeight(in collection: XCUIElement) -> Double {
+        max(1, Double(collection.cells.firstMatch.frame.height))
     }
 
     // MARK: 文本解析
@@ -296,19 +407,81 @@ final class StabilityUITests: XCTestCase {
         return Int(label[range]) ?? -1
     }
 
-    /// 横幅字段：parseField("id=abc idx=7 load=2", "idx") == 7；缺失返回 -1
+    /// 横幅字段：parseField("id=abc idx=7 load=2", "idx") == 7；缺失返回 -1（大小写不敏感）
     private static func parseField(_ label: String, _ key: String) -> Int {
-        guard let regex = try? NSRegularExpression(pattern: "\(key)=(-?[0-9]+)"),
+        let escaped = NSRegularExpression.escapedPattern(for: key)
+        guard let regex = try? NSRegularExpression(pattern: "\(escaped)=(-?[0-9]+)", options: .caseInsensitive),
               let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
               match.numberOfRanges >= 2,
               let range = Range(match.range(at: 1), in: label) else { return -1 }
         return Int(label[range]) ?? -1
     }
 
+    /// 横幅浮点字段：parseDoubleField("frameW=390.0", "frameW") == 390；缺失返回 -1
+    private static func parseDoubleField(_ label: String, _ key: String) -> Double {
+        let escaped = NSRegularExpression.escapedPattern(for: key)
+        guard let regex = try? NSRegularExpression(pattern: "\(escaped)=(-?[0-9]+(?:\\.[0-9]+)?)", options: .caseInsensitive),
+              let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
+              match.numberOfRanges >= 2,
+              let range = Range(match.range(at: 1), in: label) else { return -1 }
+        return Double(label[range]) ?? -1
+    }
+
+    /// M13 P1：真捏合必须打在 cell 内 UIScrollView（不打 ViewerRoot 假绿）。
+    /// 30 轮缩小→放大 + 10 次双击 + 旋转；断言几何宽度、非背景像素、无待删除事务、
+    /// viewer-trace 无 non-finite / NaN、App 未崩溃、查看器顶栏仍可达。
+    func testPinchHitsInnerScrollView() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        _ = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        let inner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(inner.waitForExistence(timeout: 8),
+                      "cell 内 UIScrollView 未以 Viewer-ZoomScrollView 暴露\n\(hierarchy(app))")
+        XCTAssertGreaterThan(inner.frame.width, 0, "内层 scrollView 实际宽度必须 > 0")
+        XCTAssertGreaterThan(inner.frame.height, 0, "内层 scrollView 实际高度必须 > 0")
+        for round in 0..<30 {
+            inner.pinch(withScale: 0.45, velocity: -1.4)
+            inner.pinch(withScale: 2.2, velocity: 1.4)
+            if round % 10 == 9 {
+                assertAlive(app, "内层 scrollView 捏合第 \(round + 1) 轮后")
+            }
+        }
+        for _ in 0..<10 {
+            inner.doubleTap()
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 0.6)
+        XCUIDevice.shared.orientation = .portrait
+        Thread.sleep(forTimeInterval: 0.6)
+        assertAlive(app, "30 轮捏合 + 10 次双击 + 旋转后")
+        let label = banner.label.lowercased()
+        let rawLabel = banner.label
+        XCTAssertFalse(label.contains("nan"), "横幅出现 NaN：\(banner.label)")
+        XCTAssertFalse(label.contains("inf"), "横幅出现 inf：\(banner.label)")
+        XCTAssertTrue(label.contains("img=ok"), "大图未成功加载：\(banner.label)")
+        XCTAssertGreaterThan(Self.parseDoubleField(rawLabel, "frameW"), 0,
+                             "zoomContentView.frame.width 必须 > 0：\(banner.label)")
+        XCTAssertEqual(Self.parseField(label, "pendingDeleteCount"), 0,
+                       "捏合全过程 pendingDeleteCount 必须为 0：\(banner.label)")
+        XCTAssertEqual(Self.parseField(label, "traceNonFinite"), 0,
+                       "viewer-trace 不得出现 non-finite / NaN：\(banner.label)")
+        assertViewerImageVisible(app, "真捏合后大图像素必须非背景色")
+        let badge = anyElement(app, identifier: "SessionBadge")
+        let badgeLabel = badge.exists ? badge.label : ""
+        XCTAssertFalse(badgeLabel.contains("待删除"),
+                       "捏合全过程不得进入待删除事务（badge=\(badgeLabel)）")
+        let close = anyElement(app, identifier: "Viewer-Close")
+        XCTAssertTrue(close.exists, "查看器顶部关闭按钮仍应可达\n\(hierarchy(app))")
+        snap(app, "m13-inner-scrollview-pinch")
+    }
+
     // MARK: - S01 捏合缩放 20 轮不卡死不闪退
 
     func testPinchZoom20Times() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 7)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
@@ -335,17 +508,29 @@ final class StabilityUITests: XCTestCase {
         snap(app, "s01-zoom")
     }
 
-    // MARK: - M12 R03：真冷启动锚点恢复（无可见跳转）
+    // MARK: - M13 P2：冷启动 / 旋转像素级锚点（同 assetID 视口 y ≤ 1 行，offset 差 ≤ 1pt）
 
-    /// 杀进程冷启动 → 首帧即锚点月份；恢复不弹「已跳到」横幅（那是用户主动跳转专用）
     func testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
         app.terminate()
-        _ = launchToGrid(app)
+        let collection = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "冷启动后应直达锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+                      "冷启动后应直达锚点月份")
         Thread.sleep(forTimeInterval: 0.5)
+        guard let first = debugSnapshot(app) else {
+            return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
+        }
+        Thread.sleep(forTimeInterval: 0.5)
+        guard let second = debugSnapshot(app) else {
+            return XCTFail("Library-DebugSummary 必须持续暴露 off/anchor/visualY")
+        }
+        XCTAssertEqual(first.anchor, second.anchor, "冷启动不得漂移 assetID 视觉锚点")
+        XCTAssertLessThanOrEqual(abs(first.off - second.off), 1.0,
+                                 "冷启动后 0.5 秒内像素 offset 差必须 ≤ 1pt")
+        XCTAssertLessThanOrEqual(abs(first.visualY - second.visualY), oneRowHeight(in: collection),
+                                 "同一 assetID 视口 y 偏差必须 ≤ 1 行")
         let banner = anyElement(app, identifier: "Library-JumpBanner")
         XCTAssertFalse(banner.exists && banner.isHittable,
                        "冷启动恢复不得显示跳转横幅（R03 不变量）")
@@ -353,18 +538,38 @@ final class StabilityUITests: XCTestCase {
         snap(app, "m12-cold-launch-anchor")
     }
 
-    /// 旋转后锚点保持（不跳回最新月份，误差 ≤ 1 行 ≈ 同月）
     func testRotationKeepsAnchorWithinOneRow() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        let collection = app.collectionViews.firstMatch
+        let rowHeight = oneRowHeight(in: collection)
+        Thread.sleep(forTimeInterval: 0.5)
+        guard let before = debugSnapshot(app) else {
+            return XCTFail("旋转前必须读到 off/anchor/visualY")
+        }
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "横屏后应保持锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+                      "横屏后应保持锚点月份")
+        guard let landscape = debugSnapshot(app) else {
+            return XCTFail("横屏后必须读到 off/anchor/visualY")
+        }
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "回竖屏后应保持锚点月份（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+                      "回竖屏后应保持锚点月份")
+        guard let after = debugSnapshot(app) else {
+            return XCTFail("回竖屏后必须读到 off/anchor/visualY")
+        }
+        XCTAssertEqual(before.anchor, landscape.anchor, "横屏不得漂移 assetID 视觉锚点")
+        XCTAssertEqual(before.anchor, after.anchor, "回竖屏不得漂移 assetID 视觉锚点")
+        XCTAssertLessThanOrEqual(abs(before.off - after.off), 1.0,
+                                 "回竖屏后像素 offset 差必须 ≤ 1pt")
+        XCTAssertLessThanOrEqual(abs(before.visualY - landscape.visualY), rowHeight,
+                                 "横屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
+        XCTAssertLessThanOrEqual(abs(before.visualY - after.visualY), rowHeight,
+                                 "回竖屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
         assertAlive(app, "旋转锚点保持后")
         XCUIDevice.shared.orientation = .portrait
         snap(app, "m12-rotation-anchor")
@@ -375,6 +580,7 @@ final class StabilityUITests: XCTestCase {
     /// 打开查看器即见大图（R01 硬指标：截图像素非背景色）
     func testViewerShowsImageOnOpen() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         _ = openViewer(app, startIndex: 7)
         Thread.sleep(forTimeInterval: 1.5)   // 大图解码
         assertViewerImageVisible(app, "R01：查看器打开 1.5s 后中心区域近乎全黑（A1 imageView 恒零尺寸）")
@@ -384,6 +590,7 @@ final class StabilityUITests: XCTestCase {
     /// present 信息页 → 返回后大图必须恢复（R01/A3：viewDidDisappear 无条件 cancelAll 且不重挂）
     func testPresentInfoThenDismissRestoresImage() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         _ = openViewer(app, startIndex: 3)
         Thread.sleep(forTimeInterval: 1.0)
         // 顶部栏为 UIToolbar（KeepChrome 已开）；UIBarButtonItem label 定位
@@ -408,6 +615,7 @@ final class StabilityUITests: XCTestCase {
     /// 捏合全程零删除事务（R02/B1）：配 moveToRecentlyDeleted 下滑动作，捏合后待删除计数必须为 0
     func testPinchDoesNotTriggerRemoval() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 5, downAction: "moveToRecentlyDeleted")
         Thread.sleep(forTimeInterval: 1.0)
         // 捏合目标尽量命中网格内 scrollView（cell 覆盖全屏；collectionViews 为查看器分页器）
@@ -444,6 +652,7 @@ final class StabilityUITests: XCTestCase {
     /// 捏合后翻页仍生效（R02：collectionView.isScrollEnabled 不被误关）
     func testPinchKeepsCollectionViewScrollEnabled() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 0)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现")
@@ -468,6 +677,7 @@ final class StabilityUITests: XCTestCase {
 
     func testTopChromeHasNoTitleAndNoTabBar() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         _ = launchToGrid(app)
         XCTAssertFalse(app.tabBars.firstMatch.exists, "R07：不得再有底部分页 TabBar")
         XCTAssertFalse(app.navigationBars.staticTexts["照片管家"].exists, "R05：顶部不得有 App 标题")
@@ -488,6 +698,7 @@ final class StabilityUITests: XCTestCase {
 
     func testCategoryMenuPreservesAllScopesAndHiddenVault() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingFaceIDBypass"]
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
@@ -517,6 +728,7 @@ final class StabilityUITests: XCTestCase {
 
     func testToolsButtonOpensToolsSheetAndReturns() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingFaceIDBypass"]
         _ = launchToGrid(app)
         let tools = anyElement(app, identifier: "Library-Tools")
@@ -544,6 +756,7 @@ final class StabilityUITests: XCTestCase {
         // CI 模拟器授权 = full，无法注入 .limited：断言 full 授权下菜单不出现管理入口（Builder 语义）；
         // .limited 语义由 LibraryCategoryMenuBuilderTests 覆盖，真机 .limited 场景回填 docs/12
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         _ = launchToGrid(app)
         let category = anyElement(app, identifier: "Library-Category")
         XCTAssertTrue(category.waitForExistence(timeout: 5))
@@ -556,6 +769,7 @@ final class StabilityUITests: XCTestCase {
 
     func testDynamicTypeTopBarDoesNotClip() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-UIPreferredContentSizeCategoryName",
                                 "UICTContentSizeCategoryAccessibilityXXXL"]
         _ = launchToGrid(app)
@@ -570,83 +784,154 @@ final class StabilityUITests: XCTestCase {
         snap(app, "m12-top-chrome-xxxl")
     }
 
-    // MARK: - M12 R08：原生相册式拖选（回拖取消 / 边缘自动滚动命中重算）
+    // MARK: - M13 P3：单指滑选（方向锁 / 快照恢复 / 去重 / 边缘自动滚动）
 
-    /// 拖过再拖回：选中数必须下降（旧版 base ∪ 一维区间只加不减 → 断言红）
-    func testDragBackRemovesPreviouslySelected() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSelectMode"]
-        let collection = launchToGrid(app)
-        let firstCell = collection.cells.firstMatch
-        XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
-        // 第一段：长按第 1 格（未选 → 加选路径）拖到右侧 → 计数 >=6
-        let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let target = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
-        start.press(forDuration: 0.2, thenDragTo: target)
-        let count = selectionCountLabel(app)
-        XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
-        let deadline = Date().addingTimeInterval(5)
-        var n = 0
-        while Date() < deadline {
-            n = Self.parseCount(count.label)
-            if n >= 6 { break }
-            usleep(300_000)
-        }
-        XCTAssertGreaterThanOrEqual(n, 6, "加选路径计数不足 6：\(count.label)\n\(hierarchy(app))")
-
-        // 第二段：长按已选的第 1 格（反选路径）拖过相邻格 → 计数必须下降
-        //（合成重复长按的可靠性校准：加压 0.3s + 拖动跨两格）
-        let dragTarget = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
-        collection.cells.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo: dragTarget)
-        let backDeadline = Date().addingTimeInterval(5)
-        var after = n
-        while Date() < backDeadline {
-            after = Self.parseCount(count.label)
-            if after < n { break }
-            usleep(300_000)
-        }
-        XCTAssertLessThan(after, n,
-                          "R08：反选路径（长按已选格拖动）必须能取消选中（before=\(n) after=\(after)）")
-        snap(app, "m12-drag-back-removes")
+    private func launchSelectableGrid(_ app: XCUIApplication) -> XCUIElement {
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingSelectMode"]
+        return launchToGrid(app)
     }
 
-    /// 长按拖到下边缘并保持：自动滚动持续加选（命中随 contentOffset 重算）
-    func testBoxAutoScrollSelectsWhileScrolling() throws {
+    func testDragBackRemovesPreviouslySelected() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSelectMode"]
-        let collection = launchToGrid(app)
-        let firstCell = collection.cells.firstMatch
-        XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
-        // 多段拖拽：第一段长按起手进入框选拖到底边缘，后续 3 段每段从屏中拖回底边缘
-        //（拖拽进行中 CADisplayLink 正常 tick；合成「按住不动」反而被节流——验证轮 20 实测）
-        let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.96))
-        start.press(forDuration: 0.2, thenDragTo: bottomEdge,
-                    withVelocity: .slow, thenHoldForDuration: 2.0)
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
+                           toX: 0.92, toY: 0.42)
+        let before = waitForSelectionCount(app, atLeast: 6)
+        XCTAssertGreaterThanOrEqual(before, 6, "单指横向滑选应连续选中至少 6 格")
+        slideSelectGesture(in: collection, fromX: 0.92, fromY: 0.42,
+                           toX: 0.08, toY: 0.22)
+        let after = waitForSelectionCountBelow(app, than: before)
+        XCTAssertGreaterThanOrEqual(after, 0, "选中计数标签必须存在")
+        XCTAssertLessThan(after, before, "反向滑回必须按快照取消本次滑过的 cell")
+        snap(app, "m13-drag-back-removes")
+    }
+
+    func testDragBackRestoresOriginal() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.tap()
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
+                                    "点选第一格应进入快照")
+        slideSelectGesture(in: collection, fromX: 0.10, fromY: 0.25,
+                           toX: 0.90, toY: 0.42)
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
+                                    "滑出后应连续加选")
+        slideSelectGesture(in: collection, fromX: 0.90, fromY: 0.42,
+                           toX: 0.10, toY: 0.25)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
+                       "滑回后必须精确恢复滑动开始前的选中快照")
+        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
+                      "滑动开始前已选中的 cell 不得被误取消")
+    }
+
+    func testEdgeAutoScrollSelectsOffscreenCells() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
         for _ in 0..<3 {
-            let anchor = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            anchor.press(forDuration: 0.1, thenDragTo: bottomEdge,
-                         withVelocity: .slow, thenHoldForDuration: 1.5)
+            slideSelectGesture(in: collection, fromX: 0.05, fromY: 0.78,
+                               toX: 0.95, toY: 0.96, hold: 1.2)
+            Thread.sleep(forTimeInterval: 0.2)
         }
-        let count = selectionCountLabel(app)
-        XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
-        let deadline = Date().addingTimeInterval(5)
-        var n = 0
-        while Date() < deadline {
-            n = Self.parseCount(count.label)
-            if n >= 15 { break }
-            usleep(300_000)
-        }
-        XCTAssertGreaterThanOrEqual(n, 11,
-                                    "边缘自动滚动应持续加选（初始屏约 8-10 格；合成按住期间 CADisplayLink 节流，滚动增选到 11 即证明命中随 contentOffset 重算）：\(count.label)\n\(hierarchy(app))")
-        snap(app, "m12-box-autoscroll")
+        let count = waitForSelectionCount(app, atLeast: 11, timeout: 8)
+        XCTAssertGreaterThanOrEqual(count, 11,
+                                    "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")
+        snap(app, "m13-edge-autoscroll")
+    }
+
+    func testOriginallySelectedNotCleared() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.tap()
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
+                                    "点选第一格应进入快照")
+        slideSelectGesture(in: collection, fromX: 0.10, fromY: 0.25,
+                           toX: 0.90, toY: 0.42)
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
+                                    "滑选应继续加选")
+        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
+                      "滑动开始前已选中的 cell 全程保持选中")
+    }
+
+    func testVerticalDragDoesNotSelectAndScrolls() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        let before = (collection.cells.firstMatch.value as? String) ?? ""
+        app.swipeUp()
+        app.swipeUp()
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 0), 0,
+                       "纵向占优必须让位给 CollectionView 滚动，不得激活滑选")
+        let after = (collection.cells.firstMatch.value as? String) ?? ""
+        XCTAssertNotEqual(after, before, "纵向手势必须真实滚动网格")
+    }
+
+    func testTapNotSwallowedBySlidePan() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.tap()
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
+                                    "cancelsTouchesInView=false 时轻点不得被 pan 吞掉")
+        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
+                      "轻点后徽标与 AX 必须同步为 selected")
+    }
+
+    func testNoFlickerOnSameCell() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        let before = (first.value as? String) ?? ""
+        slideHorizontal(in: collection, fromX: 0.16, toX: 0.28, y: 0.35)
+        let after = (first.value as? String) ?? ""
+        XCTAssertEqual(after, before, "同一 indexPath 去重后 AX 值必须稳定")
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 0), 0,
+                       "同一 cell 内不得重复切换选中态")
+    }
+
+    func testScrollEnabledRestoredAfterDragEnd() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
+                           toX: 0.92, toY: 0.42)
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
+                                    "滑选结束前应有连续选中")
+        let before = (collection.cells.firstMatch.value as? String) ?? ""
+        app.swipeUp()
+        app.swipeUp()
+        let after = (collection.cells.firstMatch.value as? String) ?? ""
+        XCTAssertNotEqual(after, before, "滑选结束后 isScrollEnabled 必须恢复为 true")
+    }
+
+    func testReusedCellBadgeMatchesSelection() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
+                           toX: 0.92, toY: 0.42)
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
+                                    "滑选应连续选中至少 6 格")
+        app.swipeUp()
+        app.swipeDown()
+        XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
+                                    "复用后选中集合不得丢失")
+        XCTAssertGreaterThanOrEqual(visibleSelectedCount(in: collection), 3,
+                                    "复用后的可见徽标/AX 必须与选中状态一致")
     }
 
     // MARK: - S02 快滑 50 + 回滑 50 不卡死不闪退
 
     func testFastSwipe50Times() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 0)
         for round in 0..<50 {
             swipeLeftFast(in: viewer)
@@ -668,6 +953,7 @@ final class StabilityUITests: XCTestCase {
 
     func testFilterYearsRepeatedly() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let years = [2026, 2024, 2020]
         for round in 1...5 {
             for year in years {
@@ -685,6 +971,7 @@ final class StabilityUITests: XCTestCase {
 
     func testFilterPersistedAfterRelaunch() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithFilterCleared(app)   // 隔离跨用例持久化
         launchWithYearFilter(app, year: 2024)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年", timeout: 10),
@@ -697,24 +984,38 @@ final class StabilityUITests: XCTestCase {
         snap(app, "s04-restore")
     }
 
-    // MARK: - S04 深处月份位置保存 + 杀进程重启回到原位置
+    // MARK: - S04 深处月份位置保存 + 杀进程重启回到原位置（M13：像素锚点）
 
     func testPositionRestoredAfterRelaunch() throws {
         let app = XCUIApplication()
-        // 深处月份定位（跳转即同步保存，docs/13 S11）；滚动采样在 iOS 15 模拟器 AX 下不可靠（轮 14/15 实测），
-        // 改为「跳转 + 小幅滚动离开锚点」双路径：覆盖 scrollToSection 保存与滚动停止 0.3s 兜底保存
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        let collection = app.collectionViews.firstMatch
+        let rowHeight = oneRowHeight(in: collection)
         let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
         let dragEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.70))
-        dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)   // 手指向下 = 看更新的月份（小幅滚动）
-        Thread.sleep(forTimeInterval: 1.5)   // 滚动停止 0.3s 兜底保存 + 余量
+        dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)
+        Thread.sleep(forTimeInterval: 1.5)
         let savedMonth = topHeaderText(app).components(separatedBy: " ").first ?? ""
         XCTAssertTrue(savedMonth.contains("2024年"),
-                      "滚动后停在非 2024 年月份：\(savedMonth)\n\(hierarchy(app))")
+                      "滚动后停在非 2024 年月份")
+        guard let before = debugSnapshot(app) else {
+            return XCTFail("重启前必须读到 off/anchor/visualY")
+        }
         app.terminate()
-        _ = launchToGrid(app)
+        let relaunched = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, savedMonth, timeout: 10),
-                      "重启后未回到 \(savedMonth)（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
+                      "重启后未回到 savedMonth")
+        Thread.sleep(forTimeInterval: 0.5)
+        guard let after = debugSnapshot(app) else {
+            return XCTFail("重启后必须读到 off/anchor/visualY")
+        }
+        XCTAssertEqual(before.anchor, after.anchor, "重启后必须保持同一 assetID 锚点")
+        XCTAssertLessThanOrEqual(abs(before.off - after.off), 1.0,
+                                 "重启前后像素 offset 差必须 ≤ 1pt")
+        XCTAssertLessThanOrEqual(abs(before.visualY - after.visualY), rowHeight,
+                                 "重启后同一 assetID 视口 y 偏差必须 ≤ 1 行")
+        XCTAssertGreaterThan(oneRowHeight(in: relaunched), 0, "恢复后网格必须已布局")
         assertAlive(app, "位置恢复重启后")
         snap(app, "s04-restore")
     }
@@ -723,6 +1024,7 @@ final class StabilityUITests: XCTestCase {
 
     func testToastDoesNotBlockGrid() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let collection = launchToGrid(app)
         Thread.sleep(forTimeInterval: 5)   // 等任何恢复/提示 Toast 结束
         let toast = anyElement(app, identifier: "DSToast")
@@ -746,6 +1048,7 @@ final class StabilityUITests: XCTestCase {
 
     func testFilterBarRemovedAndFilterButtonPlacement() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
         _ = launchToGrid(app)
         let filterBar = anyElement(app, identifier: "Library-FilterBar")
@@ -763,37 +1066,18 @@ final class StabilityUITests: XCTestCase {
         snap(app, "s06-filter-entry")
     }
 
-    // MARK: - S07 多选长按拖选连续选中
+    // MARK: - S07 多选单指滑选连续选中（M13：整条替换长按框选）
 
     func testSlideToSelect() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSelectMode"]
-        let collection = launchToGrid(app)
-        let firstCell = collection.cells.firstMatch
-        XCTAssertTrue(firstCell.waitForExistence(timeout: 10), "网格无 cell")
-        // 长按第 1 格 0.2s 后拖到第 2 行右列（3 列网格的第 6 格附近）
-        let start = firstCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let target = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
-        start.press(forDuration: 0.2, thenDragTo: target)
-        let count = selectionCountLabel(app)
-        XCTAssertTrue(count.waitForExistence(timeout: 5), "选中计数标签未出现\n\(hierarchy(app))")
-        let deadline = Date().addingTimeInterval(5)
-        var n = 0
-        while Date() < deadline {
-            n = Self.parseCount(count.label)
-            if n >= 6 { break }
-            usleep(300_000)
-        }
-        XCTAssertGreaterThanOrEqual(n, 6, "长按拖选后计数不足 6：\(count.label)\n\(hierarchy(app))")
-        // 可见格选中核验（≥6；boundBy 顺序不保证网格序，不做逐格位次断言——计数标签是权威信号）
-        var selectedVisible = 0
-        for index in 0..<12 {
-            let cell = collection.cells.element(boundBy: index)
-            guard cell.exists else { continue }
-            if (cell.value as? String ?? "").contains("selected") { selectedVisible += 1 }
-        }
-        XCTAssertGreaterThanOrEqual(selectedVisible, 6,
-                                    "可见选中格不足 6（\(selectedVisible)/12）\n\(hierarchy(app))")
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        slideSelectGesture(in: collection, fromX: 0.08, fromY: 0.22,
+                           toX: 0.92, toY: 0.42)
+        let count = waitForSelectionCount(app, atLeast: 6)
+        XCTAssertGreaterThanOrEqual(count, 6, "单指滑选后计数不足 6")
+        XCTAssertGreaterThanOrEqual(visibleSelectedCount(in: collection), 6,
+                                    "可见选中格不足 6")
         snap(app, "s07-slide-select")
     }
 
@@ -801,6 +1085,7 @@ final class StabilityUITests: XCTestCase {
 
     func testViewerSwipeThroughAllPhotos() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 0)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
@@ -828,6 +1113,7 @@ final class StabilityUITests: XCTestCase {
 
     func testMonthJump() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
         snap(app, "s09-month-jump")
         assertAlive(app, "月份跳转后")
@@ -837,6 +1123,7 @@ final class StabilityUITests: XCTestCase {
 
     func testSelectWholeMonth() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
 
         // 月份头菜单为 UIKit UIButton + UIMenu（宿主可靠）
@@ -888,6 +1175,7 @@ final class StabilityUITests: XCTestCase {
 
     func testMonthJumpPersistsAfterRelaunch() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
         app.terminate()
         _ = launchToGrid(app)
@@ -902,6 +1190,7 @@ final class StabilityUITests: XCTestCase {
     func testDeleteFirstMiddleLastNoCrash() throws {
         for index in [0, 9, 19] {
             let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
             let viewer = openViewer(app, startIndex: index, downAction: "moveToRecentlyDeleted")
             let banner = viewerBanner(app)
             XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器横幅未出现\n\(hierarchy(app))")
@@ -918,6 +1207,7 @@ final class StabilityUITests: XCTestCase {
     func testHideFirstMiddleLastNoCrash() throws {
         for index in [0, 9, 19] {
             let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
             let viewer = openViewer(app, startIndex: index)   // 默认 gesture.down = hide
             let banner = viewerBanner(app)
             XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器横幅未出现\n\(hierarchy(app))")
@@ -933,6 +1223,7 @@ final class StabilityUITests: XCTestCase {
 
     func testDelete20InARowNoCrash() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         let viewer = openViewer(app, startIndex: 0, downAction: "moveToRecentlyDeleted")
         for i in 0..<20 {
             swipeDown(in: viewer)
@@ -951,6 +1242,7 @@ final class StabilityUITests: XCTestCase {
 
     func testAllPagesSmoke() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingKeepChrome"]
         app.launchArguments += ["-uiTestingFaceIDBypass", "-uiTestingStorageMock"]
         let collection = launchToGrid(app)
         assertAlive(app, "照片库")

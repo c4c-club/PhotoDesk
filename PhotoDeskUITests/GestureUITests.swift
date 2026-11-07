@@ -11,6 +11,7 @@ final class GestureUITests: XCTestCase {
 
     func testSwipeUpFavoritesShowsToast() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         addUIInterruptionMonitor(withDescription: "Photos permission") { alert in
             for index in 0..<alert.buttons.count {
                 let button = alert.buttons.element(boundBy: index)
