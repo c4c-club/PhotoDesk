@@ -1369,13 +1369,15 @@ final class LibraryViewController: UIViewController {
                                                savedAt: Date()),
                                queryKey: queryKey)
             ViewerTrace.log("position.save.v3 monthJump section=\(section.id) visualY=\(Int(visualY))")
+            // M13 绿12 实锤：跳转存档正确后视口仍会被 UIKit 内部调整（pinned header 重排 /
+            // 快照 apply 期间的位置保持）推离目标月（AX 与 idle 存档均显示漂移到别的月份）。
+            // 月跳语义必须落在目标月：登记复核目标，viewDidLayoutSubviews 里按真实钉住线核对，
+            // 未钉住就再校正（事件驱动、最多 5 次防打转，与 restore pending 门禁同一严格语义）。
+            pendingJumpVerifySectionID = section.id
+            jumpVerifyAttempts = 0
         }
-        // M13 绿12 实锤：跳转存档正确后视口仍会被 UIKit 内部调整（pinned header 重排 /
-        // 快照 apply 期间的位置保持）推离目标月（AX 与 idle 存档均显示漂移到别的月份）。
-        // 月跳语义必须落在目标月：登记复核目标，viewDidLayoutSubviews 里按真实钉住线核对，
-        // 未钉住就再校正（事件驱动、最多 5 次防打转，与 restore pending 门禁同一严格语义）。
-        pendingJumpVerifySectionID = section.id
-        jumpVerifyAttempts = 0
+        showJumpBanner(section: currentSections[index])
+        return true
     }
 
     /// 月跳落地复核：钉住线上的 section 必须是目标月，否则按当前真实布局再校正
@@ -1410,9 +1412,6 @@ final class LibraryViewController: UIViewController {
         jumpVerifyAttempts += 1
         ViewerTrace.log("position.jump-reassert pinned=\(pinnedIndex.map(String.init) ?? "nil") target=\(targetIndex) attempt=\(jumpVerifyAttempts)")
         scrollToSection(targetIndex)
-    }
-        showJumpBanner(section: currentSections[index])
-        return true
     }
 
     /// 月份面板「回到顶部」（docs/13 S09）
