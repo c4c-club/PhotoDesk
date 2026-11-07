@@ -26,21 +26,42 @@ enum UITestDatedPhotoSeeder {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: didSeedKey) else { return }
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return }
-        let dates = makeDates()
-        // 绿8 实锤：首轮 performChanges 曾抛 PHPhotosError -1（瞬时失败，didSeedKey 未落盘，
-        // 后续启动重试才成功）。就地理由一次重试，保证首个测试的网格即有种子日期。
+        let wanted = Set(makeDates())
+        // 绿9 实锤：performChanges 可能部分成功（库内已插入部分种子）后整体抛错——
+        // didSeedKey 未落盘会让下次启动整批重插，库从 341 涨到 468/500（重复月份 4 张）。
+        // 改为「缺什么补什么」的幂等补种：每次先枚举现有 creationDate，只创建缺失日期；
+        // 补齐才落盘标记。部分成功的事务不会因为重试而产生重复。
         for attempt in 1...2 {
-            do {
-                try await performChanges(dates: dates)
+            let missing = missingSeedDates(wanted: wanted)
+            if missing.isEmpty {
                 defaults.set(true, forKey: didSeedKey)
                 return
+            }
+            do {
+                try await performChanges(dates: missing)
+                if missingSeedDates(wanted: wanted).isEmpty {
+                    defaults.set(true, forKey: didSeedKey)
+                }
+                return
             } catch {
-                ViewerTrace.log("seed failed count=\(dates.count) attempt=\(attempt) error=\(error)")
+                ViewerTrace.log("seed failed count=\(missing.count) attempt=\(attempt) error=\(error)")
                 if attempt == 1 {
                     do { try await Task.sleep(nanoseconds: 500_000_000) } catch { /* 睡眠失败直接重试 */ }
                 }
             }
         }
+    }
+
+    /// 幂等去重：枚举现有图片资产的 creationDate（元数据级查询，几百张毫秒级），
+    /// 返回 wanted 里尚不存在的日期。creationDate 与写入值逐字节相等（同一 Date 往返）。
+    @MainActor
+    private static func missingSeedDates(wanted: Set<Date>) -> [Date] {
+        let fetch = PHAsset.fetchAssets(with: .image, options: nil)
+        var existing = Set<Date>()
+        fetch.enumerateObjects { asset, _, _ in
+            if let date = asset.creationDate { existing.insert(date) }
+        }
+        return wanted.subtracting(existing).sorted()
     }
 
     private static func makeDates() -> [Date] {
