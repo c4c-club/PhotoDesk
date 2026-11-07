@@ -1730,6 +1730,11 @@ final class MonthHeaderView: UICollectionReusableView {
         backgroundColor = DSColor.bgPrimary
         addSubview(titleLabel)
         addSubview(menuButton)
+        // M13 绿15 实锤（Auto Layout 冲突日志）：两个子视图都没关 autoresizing mask 约束，
+        // AMAS 的 width/height == 0 与显式约束打架，UIKit 随机折衷——菜单按钮被压成 0×0，
+        // AX 剔除零尺寸元素 →「月份头缺菜单按钮」（M12 历史 #12 条总根源）。
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        menuButton.translatesAutoresizingMaskIntoConstraints = false
         // 标题点击 → 跳到本月（docs/13 S09）
         let titleTap = UITapGestureRecognizer(target: self, action: #selector(titleTapped))
         titleLabel.addGestureRecognizer(titleTap)
