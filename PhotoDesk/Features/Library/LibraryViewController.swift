@@ -1191,6 +1191,12 @@ final class LibraryViewController: UIViewController {
         if !didRestorePosition {
             guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
             didRestorePosition = true
+            // M13：UI 测试钩子（P3 计数族需要确定的首屏几何）——清掉跨用例持久化的位置
+            #if DEBUG
+            if UITestHooks.enabled("-uiTestingClearPosition"), let queryKey = currentSnapshotQueryKey {
+                positionStore.clear(queryKey: queryKey)
+            }
+            #endif
             pendingRestorePosition = positionStore.load(queryKey: currentSnapshotQueryKey ?? viewModel.query.key)
             if pendingRestorePosition != nil {
                 isPositionRestoreInFlight = true
