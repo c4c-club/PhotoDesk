@@ -1042,12 +1042,17 @@ final class LibraryViewController: UIViewController {
             self.syncIndexBar()
             // R03：前插补偿（头部回填月份时首可见 assetID 不漂移）
             if let item = compensationItem, let before = compensationMinYBefore,
-               let newPath = self.dataSource.indexPath(for: item),
-               let after = self.collectionView.collectionViewLayout
-                   .layoutAttributesForItem(at: newPath)?.frame.minY,
-               abs(after - before) > 0.5 {
-                self.collectionView.contentOffset.y += (after - before)
-                ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(after - before))")
+               let newPath = self.dataSource.indexPath(for: item) {
+                // M13 绿9 实锤：apply completion 时新前插行仍是估算高度，按估算 minY 补偿差
+                // ~178pt，漂移随即被 idle 存档写回并跨重启放大成跨月错位。先强制布局拿到
+                // 真实 minY 再做一次精确补偿，首可见 asset 的视觉 y 逐像素不动。
+                self.collectionView.layoutIfNeeded()
+                if let exactMinY = self.collectionView.collectionViewLayout
+                    .layoutAttributesForItem(at: newPath)?.frame.minY,
+                   abs(exactMinY - before) > 0.5 {
+                    self.collectionView.contentOffset.y += (exactMinY - before)
+                    ViewerTrace.log("snapshot.prepend-compensate dy=\(Int(exactMinY - before))")
+                }
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
