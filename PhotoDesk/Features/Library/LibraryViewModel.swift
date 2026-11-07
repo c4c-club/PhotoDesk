@@ -291,6 +291,13 @@ final class LibraryViewModel: ObservableObject {
         }
         // docs/16 M12 R03：锚点窗口优先——首批以锚点为中心（前后各半批），锚点页首帧即位、零可见跳转；
         // 锚点已删除/不在结果中 → 回退「最新 500」（windowStart = 0）
+        // M13 绿11 实锤：清位置钩子必须在锚点窗口计算之前执行——VC 恢复期才清的话，
+        // 窗口已按旧锚点起步，全量前插补偿后首格不在屏上（AX 零 cell 级联）。
+        #if DEBUG
+        if UITestHooks.enabled("-uiTestingClearPosition") {
+            positionStore?.clear(queryKey: query.key)
+        }
+        #endif
         allItems = await fetchFirstBatch()
         indexProgress = (allItems.count, totalCount)
         isIndexComplete = allItems.count >= totalCount
