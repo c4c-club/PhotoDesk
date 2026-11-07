@@ -66,6 +66,13 @@ enum UITestDatedPhotoSeeder {
         guard let data = image.jpegData(compressionQuality: 0.85) else { return nil }
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("uitest-dated-seed", isDirectory: true)
+        // 绿7 实锤：子目录不存在时 Data.write(.atomic) 不建父目录 → 首个文件即失败 →
+        // seedImageUnavailable 每次启动重试失败，全库无 2020–2026 种子（月份/筛选族 8 条红的总根源）。
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return nil
+        }
         var urls: [URL] = []
         for index in 0..<count {
             let url = directory.appendingPathComponent("seed-\(index).jpg")
