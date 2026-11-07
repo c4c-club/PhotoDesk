@@ -85,8 +85,9 @@ struct LibraryRootView: View {
                                      onShowVault: {
                                          showVault = true
                                      })
-                    if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive {
+                    if viewModel.filteredItems.isEmpty && viewModel.query.filter.isActive && viewModel.isIndexComplete {
                         filterEmptyState
+                            .allowsHitTesting(false)
                     }
                 }
             }
@@ -210,6 +211,9 @@ struct LibraryRootView: View {
                 .cornerRadius(4)
                 .padding(.top, 2)
                 .allowsHitTesting(false)
+                .accessibilityIdentifier("Library-DebugSummary")
+                .accessibilityLabel("调试汇总")
+                .accessibilityValue(viewModel.debugSummary)
         }
         #endif
     }
@@ -311,26 +315,17 @@ struct LibraryContainer: UIViewControllerRepresentable {
     @AppStorage("grid.sortAsc") private var sortAscending = false
 
     func makeUIViewController(context: Context) -> UINavigationController {
-        let controller = LibraryViewController(viewModel: viewModel,
-                                               pipeline: AppContainer.shared.imagePipeline,
-                                               settings: AppContainer.shared.settings,
-                                               positionStore: AppContainer.shared.positionStore)
-        controller.setColumns(gridColumns)
-        controller.onOpenViewer = onOpenViewer
-        controller.onOpenFilter = onOpenFilter
-        controller.onOpenSearch = onOpenSearch
-        controller.onOpenMonthJump = onOpenMonthJump
-        controller.onOpenTools = onOpenTools
-        controller.onShowVault = onShowVault
-        selectionBridge.controller = controller
-        let navigationController = UINavigationController(rootViewController: controller)
-        navigationController.setNavigationBarHidden(false, animated: false)
+        let navigationController = AppContainer.shared.libraryHostController
+        updateHostController(navigationController)
         return navigationController
     }
 
     func updateUIViewController(_ navigationController: UINavigationController, context: Context) {
-        guard let controller = navigationController.viewControllers.first as? LibraryViewController
-        else { return }
+        updateHostController(navigationController)
+    }
+
+    private func updateHostController(_ navigationController: UINavigationController) {
+        guard let controller = navigationController.viewControllers.first as? LibraryViewController else { return }
         controller.setColumns(gridColumns)
         controller.onOpenViewer = onOpenViewer
         controller.onOpenFilter = onOpenFilter

@@ -148,9 +148,9 @@ final class LibraryDataTests: XCTestCase {
         let store = makeStore()
         let position = LibraryPosition(assetID: "a", sectionID: "s", offsetRatio: 0, savedAt: Date())
         store.save(position, queryKey: "k1")
-        store.saveViewerAssetID("v1", queryKey: "k1")
+        store.save(position, queryKey: "k2")
         store.clearAll()
         XCTAssertNil(store.load(queryKey: "k1"))
-        XCTAssertNil(store.loadViewerAssetID(queryKey: "k1"))
+        XCTAssertNil(store.load(queryKey: "k2"))
     }
 }

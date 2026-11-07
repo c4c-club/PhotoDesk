@@ -75,6 +75,18 @@ final class AppContainer: ObservableObject {
                                                  reviewSession: reviewSession,
                                                  positionStore: positionStore)
 
+    /// M13 P2：宿主控制器跨 viewState 稳定复用（禁止 SwiftUI switch 每次重建导致 offset 归零）。
+    lazy var libraryHostController: UINavigationController = {
+        let controller = LibraryViewController(viewModel: libraryViewModel,
+                                               pipeline: imagePipeline,
+                                               settings: settings,
+                                               positionStore: positionStore)
+        controller.setColumns(settings.gridColumns)
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.setNavigationBarHidden(false, animated: false)
+        return navigationController
+    }()
+
     /// 浏览页每次打开新建：按 assetID 定位（docs/09 D01）
     func makeViewerViewModel(context: ViewerContext) -> ViewerViewModel {
         ViewerViewModel(context: context,

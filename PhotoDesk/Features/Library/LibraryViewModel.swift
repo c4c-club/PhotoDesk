@@ -141,9 +141,9 @@ final class LibraryViewModel: ObservableObject {
 
     /// DEBUG 诊断摘要（DEBUG 构建的屏幕横幅用；Release 无引用）
     /// debugRestoreNote：位置恢复状态（restore=ok/pending/ratio，docs/13 S04；VC 写入）
-    var debugRestoreNote = ""
+    @Published var debugRestoreNote = ""
     /// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）
-    var debugScrollNote = ""
+    @Published var debugScrollNote = ""
     var debugSummary: String {
         "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
             "sections=\(sections.count) indexing=\(isIndexing) done=\(isIndexComplete) " +
@@ -185,6 +185,9 @@ final class LibraryViewModel: ObservableObject {
         guard filter != query.filter else { return }
         query.filter = filter
         Self.persistFilter(filter, for: query.scope)
+        // M13：首载前（viewDidLoad 的 -uiTestingFilterYear 钩子）只记录筛选；
+        // 此时 allItems 仍为空，推空快照会让 .ready 永久停在无结果覆盖层。
+        guard hasLoadedOnce else { return }
         rebuildDerivedInBackground(animated: false)
     }
 
@@ -268,6 +271,9 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - 加载与完整索引
 
     private func loadIfNeeded() async {
+        #if DEBUG
+        await UITestDatedPhotoSeeder.seedIfNeeded()
+        #endif
         guard !hasLoadedOnce else {
             viewState = allItems.isEmpty ? .empty : .ready
             return
@@ -297,7 +303,7 @@ final class LibraryViewModel: ObservableObject {
     private func fetchFirstBatch() async -> [PhotoItem] {
         var windowStart = 0
         if let anchor = positionStore?.load(queryKey: query.key) {
-            if let anchorIndex = await repository.globalIndex(of: anchor.assetID, scope: query.scope) {
+            if let anchorIndex = await repository.globalIndex(of: anchor.anchorAssetID, scope: query.scope) {
                 windowStart = max(0, anchorIndex - batchSize / 2)
                 ViewerTrace.log("anchor-window key=\(query.key.prefix(8)) anchorIdx=\(anchorIndex) start=\(windowStart)")
             }

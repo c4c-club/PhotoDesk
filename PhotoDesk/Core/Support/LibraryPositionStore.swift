@@ -1,29 +1,40 @@
-// MARK: - 职责说明：上次整理位置存取 v2（docs/13 §3.5 S04/S11）——
-// v2 结构：assetID + sectionID + itemIndexInSection + offsetRatio + savedAt + schemaVersion；
-// 键空间 library.lastPosition.v2.<queryKey>；读取兼容 v1（decodeIfPresent 补默认值，损坏 JSON 不崩）。
-// 恢复策略由 LibraryViewController 执行：assetID → sectionID + itemIndex → offsetRatio。
-// 查看器记忆 lastAssetID 一并管理；「清除位置记忆」清空全部键。
+// MARK: - 职责说明：上次整理位置存取 v3（docs/19 §3.2 / docs/20 M13 P2）——
+// v3 = 视觉锚点 assetID + 视口内视觉 y + 保存时 contentOffset.y + 旧字段 fallback + schemaVersion=3。
+// 键空间仍沿用 library.lastPosition.v2.*（兼容 v1/v2 数据；新字段通过 decodeIfPresent 补默认），
+// 不新增第三套键；读取损坏 JSON 返回 nil，不崩溃。查看器记忆接口无调用点，按 docs/20 二选一删除。
 
 import Foundation
+import PhotoDeskCore
 
-/// 一条位置记忆（v2）
+/// 一条位置记忆（v3；旧构造参数保留默认值，旧字段只作 fallback）
 struct LibraryPosition: Codable, Equatable {
+    /// 视觉锚点 assetID（v1/v2 解码时回退 assetID）
+    let anchorAssetID: String
+    /// 锚点 cell 的未变换 frame.minY - 保存时 contentOffset.y（视口内 y）
+    let anchorVisualY: Double
+    /// 保存时的 contentOffset.y（取证与旧数据兜底）
+    let anchorContentOffsetY: Double
     let assetID: String
     let sectionID: String
-    /// 该 section 内的 item 序号（sectionID 恢复时钳制）
+    /// 该 section 内的 item 序号（sectionID fallback 时钳制）
     let itemIndexInSection: Int
-    /// contentOffset.y / contentSize.height（恢复兜底）
+    /// contentOffset.y / 可滚动高度（最后一级 fallback）
     let offsetRatio: Double
     let savedAt: Date
-    /// 结构版本（v1 遗留数据按 1 解）
     let schemaVersion: Int
 
-    init(assetID: String,
+    init(anchorAssetID: String? = nil,
+         anchorVisualY: Double = 0,
+         anchorContentOffsetY: Double = 0,
+         assetID: String,
          sectionID: String,
          itemIndexInSection: Int = 0,
-         offsetRatio: Double,
-         savedAt: Date,
-         schemaVersion: Int = 2) {
+         offsetRatio: Double = 0,
+         savedAt: Date = Date(),
+         schemaVersion: Int = PositionAnchorPolicy.schemaVersion) {
+        self.anchorAssetID = anchorAssetID ?? assetID
+        self.anchorVisualY = anchorVisualY
+        self.anchorContentOffsetY = anchorContentOffsetY
         self.assetID = assetID
         self.sectionID = sectionID
         self.itemIndexInSection = itemIndexInSection
@@ -32,25 +43,60 @@ struct LibraryPosition: Codable, Equatable {
         self.schemaVersion = schemaVersion
     }
 
-    /// v1 兼容解码：缺字段补默认值（v1 只有 assetID/sectionID/offsetRatio/savedAt）
+    private enum CodingKeys: String, CodingKey {
+        case anchorAssetID, anchorVisualY, anchorContentOffsetY
+        case assetID, sectionID, itemIndexInSection, offsetRatio, savedAt, schemaVersion
+    }
+
+    /// v1/v2 兼容解码：新增字段缺失时补默认值，anchorAssetID 回退 assetID。
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        assetID = try container.decode(String.self, forKey: .assetID)
-        sectionID = try container.decode(String.self, forKey: .sectionID)
-        itemIndexInSection = try container.decodeIfPresent(Int.self, forKey: .itemIndexInSection) ?? 0
-        offsetRatio = try container.decodeIfPresent(Double.self, forKey: .offsetRatio) ?? 0
-        savedAt = try container.decode(Date.self, forKey: .savedAt)
-        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let oldAssetID = try c.decodeIfPresent(String.self, forKey: .assetID) ?? ""
+        let anchor = try c.decodeIfPresent(String.self, forKey: .anchorAssetID)
+        anchorAssetID = anchor ?? oldAssetID
+        anchorVisualY = try c.decodeIfPresent(Double.self, forKey: .anchorVisualY) ?? 0
+        anchorContentOffsetY = try c.decodeIfPresent(Double.self, forKey: .anchorContentOffsetY) ?? 0
+        assetID = oldAssetID
+        sectionID = try c.decodeIfPresent(String.self, forKey: .sectionID) ?? ""
+        itemIndexInSection = try c.decodeIfPresent(Int.self, forKey: .itemIndexInSection) ?? 0
+        offsetRatio = try c.decodeIfPresent(Double.self, forKey: .offsetRatio) ?? 0
+        savedAt = try c.decodeIfPresent(Date.self, forKey: .savedAt) ?? Date(timeIntervalSince1970: 0)
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(anchorAssetID, forKey: .anchorAssetID)
+        try c.encode(anchorVisualY, forKey: .anchorVisualY)
+        try c.encode(anchorContentOffsetY, forKey: .anchorContentOffsetY)
+        try c.encode(assetID, forKey: .assetID)
+        try c.encode(sectionID, forKey: .sectionID)
+        try c.encode(itemIndexInSection, forKey: .itemIndexInSection)
+        try c.encode(offsetRatio, forKey: .offsetRatio)
+        try c.encode(savedAt, forKey: .savedAt)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+    }
+
+    /// App 侧 UIKit 值 → Core 纯模型（恢复策略只吃 Foundation / Double）。
+    var toCoreAnchor: PositionAnchorV3 {
+        PositionAnchorV3(anchorAssetID: anchorAssetID,
+                         anchorVisualY: anchorVisualY,
+                         anchorContentOffsetY: anchorContentOffsetY,
+                         assetID: assetID,
+                         sectionID: sectionID,
+                         itemIndexInSection: itemIndexInSection,
+                         offsetRatio: offsetRatio,
+                         savedAt: savedAt,
+                         schemaVersion: schemaVersion)
     }
 }
 
 final class LibraryPositionStore {
     private let defaults: UserDefaults
-    /// v2 键空间（写入只走这里）
+    /// v3 仍写 v2 键空间（结构向后兼容，避免遗留键失效）
     private static let positionPrefixV2 = "library.lastPosition.v2."
     /// v1 遗留键空间（只读兼容，docs/13 S04）
     private static let positionPrefixV1 = "library.lastPosition."
-    private static let viewerPrefix = "library.viewer.lastAssetID."
 
     /// 位置记忆总开关（设置页「记住上次整理位置」，默认开）
     var isEnabled: Bool {
@@ -65,20 +111,31 @@ final class LibraryPositionStore {
     // MARK: - 网格位置
 
     func save(_ position: LibraryPosition, queryKey: String) {
-        guard isEnabled, let data = try? JSONEncoder().encode(position) else { return }
-        defaults.set(data, forKey: Self.positionPrefixV2 + queryKey)
+        guard isEnabled else { return }
+        do {
+            let data = try JSONEncoder().encode(position)
+            defaults.set(data, forKey: Self.positionPrefixV2 + queryKey)
+        } catch {
+            return
+        }
     }
 
-    /// 读取：v2 优先；v1 遗留键兼容（decodeIfPresent 补默认）；损坏 JSON → nil（不崩）
+    /// 读取：v3/v2 键优先；v1 遗留键兼容（decodeIfPresent 补默认）；损坏 JSON → nil（不崩）
     func load(queryKey: String) -> LibraryPosition? {
         guard isEnabled else { return nil }
-        if let data = defaults.data(forKey: Self.positionPrefixV2 + queryKey),
-           let position = try? JSONDecoder().decode(LibraryPosition.self, from: data) {
-            return position
+        if let data = defaults.data(forKey: Self.positionPrefixV2 + queryKey) {
+            do {
+                return try JSONDecoder().decode(LibraryPosition.self, from: data)
+            } catch {
+                return nil
+            }
         }
-        if let data = defaults.data(forKey: Self.positionPrefixV1 + queryKey),
-           let position = try? JSONDecoder().decode(LibraryPosition.self, from: data) {
-            return position
+        if let data = defaults.data(forKey: Self.positionPrefixV1 + queryKey) {
+            do {
+                return try JSONDecoder().decode(LibraryPosition.self, from: data)
+            } catch {
+                return nil
+            }
         }
         return nil
     }
@@ -88,21 +145,11 @@ final class LibraryPositionStore {
         defaults.removeObject(forKey: Self.positionPrefixV1 + queryKey)
     }
 
-    /// 设置页「清除位置记忆」：网格位置（v1+v2）+ 查看器记忆全部清空
+    /// 设置页「清除位置记忆」：网格位置（v1+v2/v3 共用键）清空
     func clearAll() {
         for key in defaults.dictionaryRepresentation().keys
-        where key.hasPrefix(Self.positionPrefixV1) || key.hasPrefix(Self.positionPrefixV2) || key.hasPrefix(Self.viewerPrefix) {
+        where key.hasPrefix(Self.positionPrefixV1) || key.hasPrefix(Self.positionPrefixV2) {
             defaults.removeObject(forKey: key)
         }
-    }
-
-    // MARK: - 查看器记忆
-
-    func saveViewerAssetID(_ id: String, queryKey: String) {
-        defaults.set(id, forKey: Self.viewerPrefix + queryKey)
-    }
-
-    func loadViewerAssetID(queryKey: String) -> String? {
-        defaults.string(forKey: Self.viewerPrefix + queryKey)
     }
 }

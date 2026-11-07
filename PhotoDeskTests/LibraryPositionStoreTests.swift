@@ -100,17 +100,24 @@ final class LibraryPositionStoreTests: XCTestCase {
 
     func testSchemaVersionAlwaysWrittenAsThree() {
         let (store, defaults) = makeStore()
-        store.save(makePosition(), queryKey: "q1")
+        let position = LibraryPosition(anchorAssetID: "asset-1",
+                                       anchorVisualY: 42,
+                                       anchorContentOffsetY: 1000,
+                                       assetID: "asset-1",
+                                       sectionID: "2024-05",
+                                       itemIndexInSection: 3,
+                                       offsetRatio: 0.42,
+                                       savedAt: Date())
+        store.save(position, queryKey: "q1")
         guard let data = defaults.data(forKey: "library.lastPosition.v2.q1"),
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let json = object as? [String: Any] else {
-            return XCTFail("位置 JSON 应可解码")
+              let decoded = try? JSONDecoder().decode(LibraryPosition.self, from: data) else {
+            return XCTFail("v3 数据应可解码")
         }
-        XCTAssertEqual(json["schemaVersion"] as? Int ?? -1, 3,
-                       "M13 P2：默认 schemaVersion 必须抬到 3（HEAD 仍写 2）")
-        XCTAssertNotNil(json["anchorAssetID"], "M13 P2：v3 必须写视觉锚点 anchorAssetID")
-        XCTAssertNotNil(json["anchorVisualY"], "M13 P2：v3 必须写 anchorVisualY")
-        XCTAssertNotNil(json["anchorContentOffsetY"], "M13 P2：v3 必须写 anchorContentOffsetY")
+        XCTAssertEqual(decoded.schemaVersion, 3)
+        XCTAssertEqual(decoded.anchorAssetID, "asset-1")
+        XCTAssertEqual(decoded.anchorVisualY, 42)
+        XCTAssertEqual(decoded.anchorContentOffsetY, 1000)
+        XCTAssertEqual(decoded.itemIndexInSection, 3)
     }
 
     func testV2LegacyDecodeFallsBackToLegacyAssetFields() throws {
@@ -119,17 +126,11 @@ final class LibraryPositionStoreTests: XCTestCase {
         {"assetID":"legacy-1","sectionID":"2023-08","itemIndexInSection":4,"offsetRatio":0.5,"savedAt":700000000.0,"schemaVersion":2}
         """
         defaults.set(Data(v2JSON.utf8), forKey: "library.lastPosition.v2.q1")
-        guard let position = store.load(queryKey: "q1") else {
-            return XCTFail("v2 数据应可读取")
-        }
-        XCTAssertEqual(position.schemaVersion, 2)
-        XCTAssertEqual(position.itemIndexInSection, 4)
-        let mirror = Mirror(reflecting: position)
-        let anchor = mirror.children.first { $0.label == "anchorAssetID" }?.value as? String
-        let visualY = mirror.children.first { $0.label == "anchorVisualY" }?.value as? Double
-        XCTAssertEqual(anchor ?? "", "legacy-1",
-                       "M13 P2：v2 缺 anchorAssetID 时必须回退旧 assetID（HEAD 无该字段）")
-        XCTAssertEqual(visualY ?? -1, 0,
-                       "M13 P2：v2 缺 anchorVisualY 时必须补 0（HEAD 无该字段）")
+        let position = store.load(queryKey: "q1")
+        XCTAssertEqual(position?.schemaVersion, 2)
+        XCTAssertEqual(position?.anchorAssetID, "legacy-1", "v2 无 anchorAssetID 时回退旧 assetID")
+        XCTAssertEqual(position?.anchorVisualY, 0)
+        XCTAssertEqual(position?.anchorContentOffsetY, 0)
+        XCTAssertEqual(position?.itemIndexInSection, 4)
     }
 }
