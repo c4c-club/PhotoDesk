@@ -97,6 +97,10 @@ final class SlideSelectGestureController: NSObject {
         guard let collectionView, isSelectionMode() else { return }
         isDragSelecting = true
         collectionView.isScrollEnabled = false                     // ⑤
+        // M13 绿5 实锤：cancelsTouchesInView=false 时 touch-up 会穿透为 didSelectItem 反选，
+        // 破坏滑选计数（NoFlicker 0≠1 / DragBack 计数偏差）。拖选期间关闭点选通道，
+        // 选择完全由控制器驱动；结束在下一轮主循环恢复（拦截晚于 .ended 派发的 touch-up）。
+        collectionView.allowsSelection = false
         let initial = initiallySelectedIndexPaths()
         originallySelected = Dictionary(initial.map { ($0, true) }, uniquingKeysWith: { first, _ in first })
         originallySelectedCore = Set(initial.map { SlideSelectCell(section: $0.section, item: $0.item) })
@@ -182,5 +186,10 @@ final class SlideSelectGestureController: NSObject {
         visitedCore.removeAll()
         lastProcessedIndexPath = nil
         invalidateAutoScroll()
+        if let collectionView {
+            DispatchQueue.main.async { [weak collectionView] in
+                collectionView?.allowsSelection = true
+            }
+        }
     }
 }

@@ -1488,7 +1488,8 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         // docs/13 §3.7：一律经 dataSource 取 item（apply 窗口内数组下标不可信）
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
         if isSelecting {
-            // 多选模式：点选 = 勾选/取消
+            // M13：拖选进行中的 touch-up 穿透不得再触发点选切换（allowsSelection 已关，双保险）
+            if slideSelectController?.isDragSelecting == true { return }
             toggleSelection(id: item.id)
             return
         }
