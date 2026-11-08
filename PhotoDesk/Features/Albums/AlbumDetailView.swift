@@ -11,6 +11,11 @@ struct AlbumDetailView: View {
     @State private var viewerContext: ViewerContext?
     @State private var message: String?
     @State private var isLoading = true
+    /// 分页加载：每页 200，触底续拉（docs/25 §7 #4：禁一次性 limit: total）
+    @State private var total = 0
+    @State private var isLoadingMore = false
+
+    private static let pageSize = 200
 
     var body: some View {
         Group {
@@ -50,9 +55,21 @@ struct AlbumDetailView: View {
                                     Label("移出相簿", systemImage: "rectangle.stack.badge.minus")
                                 }
                             }
+                            .onAppear {
+                                if item.id == items.last?.id { loadMore() }
+                            }
                         }
                     }
                     .padding(DSSpacing.gridSpacing)
+                    if items.count < total || isLoadingMore {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("正在加载… \(items.count)/\(total)")
+                                .font(.caption)
+                                .foregroundColor(Color(ds: DSColor.textSecondary))
+                        }
+                        .padding(.bottom, 24)
+                    }
                 }
             }
         }
@@ -63,11 +80,11 @@ struct AlbumDetailView: View {
             isLoading = true
             defer { isLoading = false }
             let repository = AppContainer.shared.assetRepository
-            let total = await repository.prepare(scope: .album(localIdentifier: album.id))
+            total = await repository.prepare(scope: .album(localIdentifier: album.id))
             guard total > 0 else { return }
             items = await repository.fetch(scope: .album(localIdentifier: album.id),
                                            offset: 0,
-                                           limit: total)
+                                           limit: Self.pageSize)
         }
         .fullScreenCover(item: $viewerContext) { context in
             ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))
@@ -86,6 +103,21 @@ struct AlbumDetailView: View {
                         self.message = nil
                     }
             }
+        }
+    }
+
+    /// 触底续拉下一页；去重防重复插入
+    private func loadMore() {
+        guard !isLoadingMore, !isLoading, items.count < total else { return }
+        isLoadingMore = true
+        Task { @MainActor in
+            defer { isLoadingMore = false }
+            let repository = AppContainer.shared.assetRepository
+            let next = await repository.fetch(scope: .album(localIdentifier: album.id),
+                                              offset: items.count,
+                                              limit: Self.pageSize)
+            let existing = Set(items.map(\.id))
+            items.append(contentsOf: next.filter { !existing.contains($0.id) })
         }
     }
 

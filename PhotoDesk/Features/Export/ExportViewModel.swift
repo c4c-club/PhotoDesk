@@ -21,6 +21,8 @@ final class ExportViewModel: ObservableObject {
     private let pipeline: ImagePipelineProtocol
     private let writer: PhotoWriterProtocol
     private let settings: SettingsStore
+    /// 当前导出任务句柄（cancelExport 用；取消 → Task cancellation + 删临时文件）
+    private var activeTask: Task<Void, Never>?
 
     init(item: PhotoItem, pipeline: ImagePipelineProtocol,
          writer: PhotoWriterProtocol, settings: SettingsStore) {
@@ -65,17 +67,50 @@ final class ExportViewModel: ObservableObject {
         return url
     }
 
-    /// 渲染导出文件（保存与分享共用）
+    /// 渲染导出文件（保存与分享共用；协作式取消：await 点后与文件落盘后各检查一次）
     func renderExportFile() async throws -> URL {
         isExporting = true
         defer { isExporting = false }
+        try Task.checkCancellation()
         let sourceURL = try await requestSourceURL()
+        try Task.checkCancellation()
         let url = try ExportRenderer.export(from: sourceURL,
                                             options: options,
                                             transform: nil,
                                             adjustments: nil)
+        if Task.isCancelled {
+            try? FileManager.default.removeItem(at: url)
+            throw CancellationError()
+        }
         exportedFileURL = url
         return url
+    }
+
+    /// 以可取消任务执行导出动作（保存/分享共用）。取消/失败统一在此收口：
+    /// CancellationError → 清理临时文件不报错；其余错误 → errorMessage。
+    func runExport(_ body: @escaping () async throws -> Void) {
+        activeTask = Task { @MainActor [weak self] in
+            do {
+                try await body()
+            } catch is CancellationError {
+                self?.cleanupCancelledExport()
+            } catch {
+                self?.errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// 用户取消导出
+    func cancelExport() {
+        activeTask?.cancel()
+    }
+
+    private func cleanupCancelledExport() {
+        if let url = exportedFileURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        exportedFileURL = nil
+        downloadProgress = nil
     }
 
     /// 保存到相册（PHAssetCreationRequest；creationDate 沿用原件）

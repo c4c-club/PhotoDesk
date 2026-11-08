@@ -1,5 +1,5 @@
 ﻿{
-    "timestamp":  "2026-11-09 01:27:38+08:00",
+    "timestamp":  "2026-11-09 01:40:05+08:00",
     "requiredFiles":  [
                           {
                               "path":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
@@ -87,17 +87,17 @@
     "pages":  [
                   {
                       "path":  "PhotoDesk/Features/Albums/AlbumDetailView.swift",
-                      "lines":  123,
-                      "hasAccessibilityId":  false
-                  },
-                  {
-                      "path":  "PhotoDesk/Features/Albums/AlbumsView.swift",
                       "lines":  151,
                       "hasAccessibilityId":  false
                   },
                   {
+                      "path":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                      "lines":  189,
+                      "hasAccessibilityId":  false
+                  },
+                  {
                       "path":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
-                      "lines":  293,
+                      "lines":  308,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -107,12 +107,12 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Editor/EditorViewController.swift",
-                      "lines":  277,
+                      "lines":  294,
                       "hasAccessibilityId":  false
                   },
                   {
                       "path":  "PhotoDesk/Features/Export/ExportView.swift",
-                      "lines":  157,
+                      "lines":  162,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -132,27 +132,27 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
-                      "lines":  52,
+                      "lines":  83,
                       "hasAccessibilityId":  false
                   },
                   {
                       "path":  "PhotoDesk/Features/Metadata/MetadataView.swift",
-                      "lines":  214,
+                      "lines":  237,
                       "hasAccessibilityId":  true
                   },
                   {
                       "path":  "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
-                      "lines":  73,
-                      "hasAccessibilityId":  false
+                      "lines":  131,
+                      "hasAccessibilityId":  true
                   },
                   {
                       "path":  "PhotoDesk/Features/Onboarding/PermissionIntroView.swift",
-                      "lines":  67,
-                      "hasAccessibilityId":  false
+                      "lines":  84,
+                      "hasAccessibilityId":  true
                   },
                   {
                       "path":  "PhotoDesk/Features/Search/SearchView.swift",
-                      "lines":  262,
+                      "lines":  272,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -162,7 +162,7 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Session/SessionReviewView.swift",
-                      "lines":  204,
+                      "lines":  225,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -172,7 +172,7 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Settings/AppearanceSettingsView.swift",
-                      "lines":  68,
+                      "lines":  94,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -182,18 +182,18 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
-                      "lines":  70,
-                      "hasAccessibilityId":  false
-                  },
-                  {
-                      "path":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
                       "lines":  105,
                       "hasAccessibilityId":  true
                   },
                   {
+                      "path":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                      "lines":  131,
+                      "hasAccessibilityId":  true
+                  },
+                  {
                       "path":  "PhotoDesk/Features/Settings/PrivacyView.swift",
-                      "lines":  54,
-                      "hasAccessibilityId":  false
+                      "lines":  88,
+                      "hasAccessibilityId":  true
                   },
                   {
                       "path":  "PhotoDesk/Features/Settings/SecuritySettingsView.swift",
@@ -202,7 +202,7 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Settings/SettingsView.swift",
-                      "lines":  84,
+                      "lines":  92,
                       "hasAccessibilityId":  true
                   },
                   {
@@ -212,7 +212,7 @@
                   },
                   {
                       "path":  "PhotoDesk/Features/Vault/VaultView.swift",
-                      "lines":  225,
+                      "lines":  241,
                       "hasAccessibilityId":  true
                   },
                   {

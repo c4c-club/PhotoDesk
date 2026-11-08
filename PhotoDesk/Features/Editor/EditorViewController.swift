@@ -20,6 +20,8 @@ final class EditorViewController: UIViewController {
     private var observers: [AnyCancellable] = []
     /// 保存门禁：另存/覆盖共享，防连点重复写入（docs/22 Phase 4 编辑器）
     private var isSaving = false
+    /// 保存成功后的自动关闭跳过「放弃编辑」确认
+    private var suppressCloseConfirm = false
     private var saveCopyItem: UIBarButtonItem?
     private var overwriteItem: UIBarButtonItem?
 
@@ -250,6 +252,22 @@ final class EditorViewController: UIViewController {
     // MARK: - 保存动作
 
     @objc private func closeTapped() {
+        // 未保存离开二次确认（保存成功后的自动关闭经 suppressCloseConfirm 跳过）
+        if !suppressCloseConfirm, viewModel.hasEdits {
+            let alert = UIAlertController(title: "放弃未保存的编辑？",
+                                          message: "关闭后本次调整（裁剪、旋转、滤镜）将丢失。",
+                                          preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+            alert.addAction(UIAlertAction(title: "放弃并关闭", style: .destructive) { [weak self] _ in
+                self?.performClose()
+            })
+            present(alert, animated: true)
+            return
+        }
+        performClose()
+    }
+
+    private func performClose() {
         onClose?()
         dismiss(animated: true)
     }
@@ -261,6 +279,7 @@ final class EditorViewController: UIViewController {
             defer { setSaving(false) }
             do {
                 try await viewModel.saveCopy()
+                suppressCloseConfirm = true
                 let alert = UIAlertController(title: "已另存为新照片", message: nil, preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "好", style: .default) { _ in self.closeTapped() })
                 present(alert, animated: true)
@@ -283,6 +302,7 @@ final class EditorViewController: UIViewController {
                 defer { self.setSaving(false) }
                 do {
                     try await self.viewModel.saveOverwrite()
+                    self.suppressCloseConfirm = true
                     self.closeTapped()
                 } catch {
                     self.presentError(error)

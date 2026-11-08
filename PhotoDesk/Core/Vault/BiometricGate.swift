@@ -145,6 +145,25 @@ final class BiometricGate: ObservableObject {
         return false
     }
 
+    /// 设备密码直通解锁（Vault failed 态「使用设备密码解锁」入口；跳过生物识别）。
+    /// - Returns: 是否已解锁；失败/取消/不可用经 status 带原因。
+    @discardableResult
+    func evaluatePasswordOnly(reason: String) async -> Bool {
+        status = .unlocking
+        guard evaluator.canEvaluatePassword() else {
+            status = .unavailable("此设备没有设置设备密码，无法验证身份")
+            return false
+        }
+        do {
+            try await evaluator.evaluatePassword(reason: reason)
+            markUnlocked()
+            return true
+        } catch {
+            status = .failed(Self.message(for: error))
+            return false
+        }
+    }
+
     func lock() {
         lastUnlockAt = .distantPast
         status = .idle

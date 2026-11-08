@@ -3,6 +3,7 @@
 // 「全部隐藏」、继续整理（关闭）。提交成功清空队列并回显结果；失败/取消队列保留。
 
 import SwiftUI
+import UIKit
 import PhotoDeskCore
 
 struct SessionReviewView: View {
@@ -13,6 +14,7 @@ struct SessionReviewView: View {
     var onClose: () -> Void
 
     @State private var resultMessage: String?
+    @State private var showRestoreAllConfirmation = false
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -62,9 +64,16 @@ struct SessionReviewView: View {
                 }
                 if !session.isEmpty {
                     Button("全部恢复（零系统写入）") {
-                        session.restoreAll()
+                        showRestoreAllConfirmation = true
                     }
                     .accessibilityIdentifier("Session-RestoreAll")
+                    .confirmationDialog("全部恢复？", isPresented: $showRestoreAllConfirmation,
+                                        titleVisibility: .visible) {
+                        Button("全部恢复", role: .destructive) { session.restoreAll() }
+                        Button("取消", role: .cancel) {}
+                    } message: {
+                        Text("将把待删除 \(session.pendingDeleteCount) 张、待隐藏 \(session.pendingHideCount) 张全部放回原处，不产生任何系统写入。")
+                    }
                 }
             }
 
@@ -127,9 +136,21 @@ struct SessionReviewView: View {
                 }
 
                 if let resultMessage {
-                    Text(resultMessage)
-                        .font(.caption)
-                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(resultMessage)
+                            .font(.caption)
+                            .foregroundColor(Color(ds: DSColor.textSecondary))
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = resultMessage
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.caption)
+                                .foregroundColor(Color(ds: DSColor.tint))
+                        }
+                        .accessibilityLabel("复制结果信息（含失败原因）")
+                        .accessibilityIdentifier("SessionReview-Copy-Result")
+                    }
                 }
             } footer: {
                 Text("「全部移到最近删除」会触发一次 iOS 系统确认（每批一次，不是每张一次）。取消后内容仍在待删除，不会丢失。")

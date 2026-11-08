@@ -3,6 +3,7 @@
 // 子页各自持有 @AppStorage（改动即存即生效），本页只做导航。
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @AppStorage("gesture.enabled") private var gesturesEnabled = true
@@ -66,8 +67,16 @@ struct SettingsView: View {
                 } label: {
                     Label("诊断日志", systemImage: "doc.text.magnifyingglass")
                 }
-                LabeledRow(title: "版本", value: AppVersion.display)
+                LabeledRow(title: "版本", value: AppVersion.marketingVersion.isEmpty ? "未知" : AppVersion.marketingVersion)
+                LabeledRow(title: "构建号", value: AppVersion.build.isEmpty ? "未知" : AppVersion.build)
+                LabeledRow(title: "系统版本", value: "iOS \(UIDevice.current.systemVersion)")
                 LabeledRow(title: "构建通道", value: "纯本地 · 零上传")
+            }
+
+            Section("开源许可") {
+                Text("本应用仅使用 Apple 系统框架（Photos、PhotosUI、UIKit、SwiftUI、Vision、CoreImage、MapKit、LocalAuthentication、CoreData、PencilKit 等），不包含任何第三方组件，无需附带第三方许可声明。")
+                    .font(.caption)
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
             }
         }
         .listStyle(.insetGrouped)

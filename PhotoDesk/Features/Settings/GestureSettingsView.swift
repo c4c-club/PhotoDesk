@@ -26,6 +26,35 @@ struct GestureSettingsView: View {
                     LabeledRow(title: "下滑", value: settings.swipeDownAction.displayName)
                 }
                 .accessibilityIdentifier("Gesture-Down")
+
+                // 冲突提示（docs/25 §7 #13）：两方向动作相同会造成误触发困扰
+                if settings.swipeUpAction == settings.swipeDownAction {
+                    Label("上滑与下滑动作相同：两个方向会执行同一动作，建议改为不同动作。",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(Color(ds: DSColor.accentDelete))
+                        .accessibilityIdentifier("Gesture-Conflict-Hint")
+                }
+            }
+
+            Section("动作预览") {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.up")
+                        .foregroundColor(Color(ds: DSColor.accentFavorite))
+                    Text("上滑 → \(settings.swipeUpAction.displayName)")
+                    Spacer()
+                }
+                .font(.subheadline)
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.down")
+                        .foregroundColor(Color(ds: DSColor.accentHide))
+                    Text("下滑 → \(settings.swipeDownAction.displayName)")
+                    Spacer()
+                }
+                .font(.subheadline)
+                Text("改动即时生效：回到照片库上下滑动即可按新动作执行。")
+                    .font(.caption)
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
             }
 
             Section("灵敏度") {

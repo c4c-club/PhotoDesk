@@ -87,7 +87,6 @@ struct ToolsView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("工具")
-            .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -99,6 +98,7 @@ struct ToolsView: View {
                     .accessibilityLabel("关闭工具")
                 }
             }
+            .navigationViewStyle(.stack)   // iOS 15 双层导航陷阱（AGENTS.md §7）：必须挂在 NavigationView 上
         }
     }
 }

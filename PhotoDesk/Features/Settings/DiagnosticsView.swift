@@ -3,6 +3,7 @@
 // 读取近 N 小时日志 → 临时文件 → 系统分享面板（保存到「文件」/隔空投送等，仍在本机，不联网）。
 
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct DiagnosticsView: View {
@@ -18,6 +19,8 @@ struct DiagnosticsView: View {
     @State private var showShare = false
     @State private var errorMessage: String?
     @State private var logBytes: Int64 = 0
+    @State private var statusMessage: String?
+    @State private var showClearConfirmation = false
 
     var body: some View {
         List {
@@ -51,11 +54,46 @@ struct DiagnosticsView: View {
                     .font(.caption)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
             }
+
+            Section("诊断摘要") {
+                Button {
+                    UIPasteboard.general.string = DiagnosticsExporter.summaryText()
+                    statusMessage = "诊断摘要已复制"
+                } label: {
+                    Label("复制诊断摘要", systemImage: "doc.on.doc")
+                }
+                .accessibilityIdentifier("Diagnostics-Copy-Summary")
+
+                Button(role: .destructive) {
+                    showClearConfirmation = true
+                } label: {
+                    Label("清空日志", systemImage: "trash")
+                }
+                .accessibilityIdentifier("Diagnostics-Clear")
+            }
+
+            if let statusMessage {
+                Section {
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("诊断日志")
         .navigationBarTitleDisplayMode(.inline)
         .task { logBytes = DiagnosticsExporter.currentLogBytes() }
+        .confirmationDialog("清空本机日志？", isPresented: $showClearConfirmation, titleVisibility: .visible) {
+            Button("清空日志", role: .destructive) {
+                DiagnosticsExporter.clearLogs()
+                logBytes = DiagnosticsExporter.currentLogBytes()
+                statusMessage = "日志已清空"
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将删除本机诊断日志文件，不影响照片与设置。")
+        }
         .sheet(isPresented: $showShare) {
             if let exportURL {
                 ActivityViewWrapper(items: [exportURL], isPresented: $showShare)

@@ -12,4 +12,14 @@ enum AppVersion {
         guard !short.isEmpty else { return "未知版本" }
         return build.isEmpty ? short : "\(short) (\(build))"
     }
+
+    /// 市场版本（CFBundleShortVersionString，如 "1.4.0"）
+    static var marketingVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    }
+
+    /// 构建号（CFBundleVersion，如 "5"）
+    static var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+    }
 }

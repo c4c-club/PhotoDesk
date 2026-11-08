@@ -89,6 +89,13 @@ final class SearchViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Self.historyKey)
     }
 
+    /// 删除单条历史（docs/25 §7 #5：历史 chip 上的 × 按钮）
+    func removeHistory(at index: Int) {
+        guard history.indices.contains(index) else { return }
+        history.remove(at: index)
+        saveHistory()
+    }
+
     private func loadHistory() {
         guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
               let decoded = try? JSONDecoder().decode([SearchPredicate].self, from: data) else { return }

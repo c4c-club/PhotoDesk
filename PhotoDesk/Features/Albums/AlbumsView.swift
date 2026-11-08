@@ -19,6 +19,8 @@ struct AlbumsView: View {
         let id: String       // localIdentifier
         let title: String
         let count: Int
+        /// 相簿首张照片的 assetID（封面缩略图；空相簿为 nil）
+        var coverAssetID: String?
     }
 
     var body: some View {
@@ -64,6 +66,7 @@ struct AlbumsView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("相簿")
+        .refreshable { reload() }
         .toolbar {
             Button {
                 renamingAlbum = nil
@@ -97,15 +100,16 @@ struct AlbumsView: View {
     }
 
     private func albumRow(_ album: AlbumSummary) -> some View {
-        HStack {
-            Image(systemName: "rectangle.stack")
-                .foregroundColor(Color(ds: DSColor.tint))
-            Text(album.title)
-                .foregroundColor(Color(ds: DSColor.textPrimary))
+        HStack(spacing: 12) {
+            AlbumCoverThumb(assetID: album.coverAssetID)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(album.title)
+                    .foregroundColor(Color(ds: DSColor.textPrimary))
+                Text("\(album.count) 张")
+                    .font(.caption)
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
+            }
             Spacer()
-            Text("\(album.count) 张")
-                .font(.caption)
-                .foregroundColor(Color(ds: DSColor.textSecondary))
         }
     }
 
@@ -122,10 +126,16 @@ struct AlbumsView: View {
         var summaries: [AlbumSummary] = []
         result.enumerateObjects { collection, _, _ in
             // 系统空智能相簿（如「个人收藏」空时）PhotoKit 仍返回——count 为 0 的过滤掉
-            let count = PHAsset.fetchAssets(in: collection, options: nil).count
+            let assets = PHAsset.fetchAssets(in: collection, options: nil)
+            // 封面取首张；fetchLimit 1 避免大相簿全量枚举
+            let firstOptions = PHFetchOptions()
+            firstOptions.fetchLimit = 1
+            firstOptions.wantsIncrementalChangeDetails = false
+            let cover = PHAsset.fetchAssets(in: collection, options: firstOptions).firstObject
             summaries.append(AlbumSummary(id: collection.localIdentifier,
                                           title: collection.localizedTitle ?? "未命名",
-                                          count: count))
+                                          count: assets.count,
+                                          coverAssetID: cover?.localIdentifier))
         }
         return summaries
     }
@@ -159,6 +169,39 @@ struct AlbumsView: View {
             } catch {
                 errorMessage = "删除相簿失败：\(error.localizedDescription)"
             }
+        }
+    }
+}
+
+/// 相簿封面缩略图（首张照片，走 ImagePipeline；空相簿显示占位图标）
+private struct AlbumCoverThumb: View {
+    let assetID: String?
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Rectangle()
+                    .fill(Color(ds: DSColor.bgSecondary))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundColor(Color(ds: DSColor.textSecondary))
+                    }
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: DSSpacing.gridCornerRadius))
+        .task(id: assetID) {
+            image = nil
+            guard let assetID else { return }
+            image = await AppContainer.shared.imagePipeline.thumbnail(
+                for: assetID,
+                size: CGSize(width: 56, height: 56),
+                scale: UIScreen.main.scale)
         }
     }
 }

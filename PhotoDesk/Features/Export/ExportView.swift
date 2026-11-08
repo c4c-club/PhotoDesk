@@ -65,11 +65,7 @@ struct ExportView: View {
                         if viewModel.isExporting {
                             HStack(spacing: 8) {
                                 ProgressView()
-                                if let progress = viewModel.downloadProgress {
-                                    Text("下载原件 \(Int(progress * 100))%")
-                                } else {
-                                    Text("导出中…")
-                                }
+                                Text("导出中…")
                             }
                             .frame(maxWidth: .infinity)
                         } else {
@@ -79,15 +75,30 @@ struct ExportView: View {
                     }
                     .disabled(viewModel.isExporting)
 
-                    Button {
-                        Task {
-                            await exportAndShare()
+                    if viewModel.isExporting {
+                        if let progress = viewModel.downloadProgress {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ProgressView(value: progress)
+                                Text("下载原件 \(Int(progress * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(Color(ds: DSColor.textSecondary))
+                            }
                         }
-                    } label: {
-                        Label("分享…", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
+                        Button(role: .destructive) {
+                            viewModel.cancelExport()
+                        } label: {
+                            Label("取消导出", systemImage: "xmark.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .accessibilityIdentifier("Export-Cancel")
+                    } else {
+                        Button {
+                            exportAndShare()
+                        } label: {
+                            Label("分享…", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                        }
                     }
-                    .disabled(viewModel.isExporting)
                 }
 
                 if let error = viewModel.errorMessage {
@@ -127,11 +138,11 @@ struct ExportView: View {
         .confirmationDialog("包含位置信息", isPresented: $showGPSAsk, titleVisibility: .visible) {
             Button("去除位置信息并导出") {
                 viewModel.options.stripLocation = true
-                Task { await saveToLibrary() }
+                viewModel.runExport { try await self.saveToLibrary() }
             }
             Button("保留位置导出") {
                 viewModel.options.stripLocation = false
-                Task { await saveToLibrary() }
+                viewModel.runExport { try await self.saveToLibrary() }
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -145,29 +156,23 @@ struct ExportView: View {
         if viewModel.itemLikelyHasGPS && !viewModel.options.stripLocation {
             showGPSAsk = true
         } else {
-            Task { await saveToLibrary() }
+            viewModel.runExport { try await self.saveToLibrary() }
         }
     }
 
-    private func saveToLibrary() async {
-        do {
-            try await viewModel.saveToLibrary()
-            savedToast = true
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
-        }
+    private func saveToLibrary() async throws {
+        try await viewModel.saveToLibrary()
+        savedToast = true
     }
 
-    private func exportAndShare() async {
-        do {
-            if viewModel.itemLikelyHasGPS && !viewModel.options.stripLocation {
-                showGPSAsk = true
-                return
-            }
+    private func exportAndShare() {
+        if viewModel.itemLikelyHasGPS && !viewModel.options.stripLocation {
+            showGPSAsk = true
+            return
+        }
+        viewModel.runExport {
             _ = try await viewModel.shareFile()
             showShareSheet = true
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
         }
     }
 }

@@ -19,6 +19,14 @@ final class VaultService: ObservableObject {
         return ok
     }
 
+    /// 设备密码直通解锁（生物识别失败后的兜底入口，不弹生物识别）
+    @discardableResult
+    func unlockWithPassword() async -> Bool {
+        let ok = await gate.evaluatePasswordOnly(reason: "解锁「已隐藏」相册，保护你的隐私照片")
+        isUnlocked = ok
+        return ok
+    }
+
     func lock() {
         isUnlocked = false
         gate.lock()

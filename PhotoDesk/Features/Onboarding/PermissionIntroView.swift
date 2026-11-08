@@ -44,8 +44,26 @@ struct PermissionIntroView: View {
                 }
                 .padding(.horizontal, DSSpacing.screenPadding)
             }
+            if mode == .denied {
+                Button {
+                    openSystemSettings()
+                } label: {
+                    Label("去系统设置", systemImage: "gearshape")
+                        .font(.subheadline)
+                        .foregroundColor(Color(ds: DSColor.tint))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .accessibilityIdentifier("Permission-Open-Settings")
+                .padding(.horizontal, DSSpacing.screenPadding)
+            }
         }
         .background(Color(ds: DSColor.bgPrimary))
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     private var title: String {

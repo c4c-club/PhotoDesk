@@ -87,6 +87,24 @@ final class VaultViewModel: ObservableObject {
         await onAppear()
     }
 
+    /// failed 态「使用设备密码解锁」：跳过生物识别，直接走 .deviceOwnerAuthentication
+    func unlockWithPassword() async {
+        phase = .unlocking
+        let ok = await vault.unlockWithPassword()
+        if ok {
+            await load()
+        } else {
+            switch vault.gate.status {
+            case .failed(let message):
+                phase = .failed(message)
+            case .unavailable(let message):
+                phase = .unavailable(message)
+            default:
+                phase = .failed("验证未通过")
+            }
+        }
+    }
+
     /// 离开页面 / 进后台：立即锁（docs/09 D06）
     func lock() {
         vault.lock()

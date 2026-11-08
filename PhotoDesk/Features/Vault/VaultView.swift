@@ -11,6 +11,7 @@ struct VaultView: View {
     @ObservedObject var viewModel: VaultViewModel
     /// fullScreenCover 打开时的关闭入口（ToolsView 推入时为 nil）
     var onClose: (() -> Void)?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewerContext: ViewerContext?
     @State private var actionMessage: String?
     @State private var hasAttemptedUnlock = false
@@ -58,6 +59,12 @@ struct VaultView: View {
         }
         .onDisappear {
             viewModel.lock()
+        }
+        .onChange(of: scenePhase) { phase in
+            // 后台立即锁（docs/25 §7 #8）；.inactive 是 Face ID 系统弹窗常态，不触发
+            if phase == .background {
+                viewModel.lock()
+            }
         }
         .fullScreenCover(item: $viewerContext) { context in
             ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))
@@ -191,12 +198,22 @@ struct VaultView: View {
             }
             .accessibilityIdentifier("Vault-Retry")
             Button {
-                openSystemSettings()
+                Task { await viewModel.unlockWithPassword() }
             } label: {
                 Text("使用设备密码解锁")
                     .font(.subheadline)
                     .foregroundColor(Color(ds: DSColor.tint))
             }
+            .accessibilityIdentifier("Vault-Unlock-Password")
+            Button {
+                UIPasteboard.general.string = message
+                actionMessage = "失败原因已复制"
+            } label: {
+                Label("复制失败原因", systemImage: "doc.on.doc")
+                    .font(.subheadline)
+                    .foregroundColor(Color(ds: DSColor.tint))
+            }
+            .accessibilityIdentifier("Vault-Copy-Failure")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

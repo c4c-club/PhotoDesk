@@ -82,17 +82,27 @@ struct SearchView: View {
                     HStack(spacing: 8) {
                         ForEach(viewModel.history.indices, id: \.self) { index in
                             let item = viewModel.history[index]
-                            Button {
-                                viewModel.applyHistory(item)
-                            } label: {
-                                Text(summary(of: item))
-                                    .font(.caption)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color(ds: DSColor.bgSecondary))
-                                    .foregroundColor(Color(ds: DSColor.textPrimary))
-                                    .cornerRadius(14)
+                            HStack(spacing: 4) {
+                                Button {
+                                    viewModel.applyHistory(item)
+                                } label: {
+                                    Text(summary(of: item))
+                                        .font(.caption)
+                                        .padding(.vertical, 6)
+                                        .foregroundColor(Color(ds: DSColor.textPrimary))
+                                }
+                                Button {
+                                    viewModel.removeHistory(at: index)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                                }
+                                .accessibilityLabel("删除筛选历史：\(summary(of: item))")
                             }
+                            .padding(.horizontal, 10)
+                            .background(Color(ds: DSColor.bgSecondary))
+                            .cornerRadius(14)
                         }
                     }
                 }

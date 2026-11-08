@@ -16,6 +16,8 @@ struct MetadataView: View {
     @State private var fields = MetadataFields()
     @State private var byteSize: Int64 = 0
     @State private var formatText = "—"
+    @State private var filename: String?
+    @State private var isLoadingEXIF = true
     @State private var showCopiedToast = false
 
     private static let byteFormatter: ByteCountFormatter = {
@@ -27,6 +29,7 @@ struct MetadataView: View {
     var body: some View {
         List {
             Section("基本信息") {
+                row("文件名", filename ?? "—")
                 row("尺寸", "\(item.pixelWidth) × \(item.pixelHeight)")
                 row("大小", byteSize > 0 ? Self.byteFormatter.string(fromByteCount: byteSize) : "未知")
                 row("格式", formatText)
@@ -39,14 +42,22 @@ struct MetadataView: View {
             }
 
             Section("相机") {
-                if let model = fields.deviceModel { row("设备", model) }
-                if let lens = fields.lensModel { row("镜头", lens) }
-                if let aperture = MetadataParser.apertureText(fields.fNumber) { row("光圈", aperture) }
-                if let shutter = MetadataParser.shutterText(fields.exposureTime) { row("快门", shutter) }
-                if let iso = fields.iso { row("ISO", "\(iso)") }
-                if let focal = fields.focalLength { row("焦距", String(format: "%.0f mm", focal)) }
-                if let flash = fields.didFireFlash { row("闪光灯", flash ? "已开启" : "未开启") }
-                if fields.deviceModel == nil && fields.lensModel == nil {
+                if isLoadingEXIF {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("正在读取 EXIF…")
+                            .font(.subheadline)
+                            .foregroundColor(Color(ds: DSColor.textSecondary))
+                    }
+                } else if let model = fields.deviceModel {
+                    row("设备", model)
+                    if let lens = fields.lensModel { row("镜头", lens) }
+                    if let aperture = MetadataParser.apertureText(fields.fNumber) { row("光圈", aperture) }
+                    if let shutter = MetadataParser.shutterText(fields.exposureTime) { row("快门", shutter) }
+                    if let iso = fields.iso { row("ISO", "\(iso)") }
+                    if let focal = fields.focalLength { row("焦距", String(format: "%.0f mm", focal)) }
+                    if let flash = fields.didFireFlash { row("闪光灯", flash ? "已开启" : "未开启") }
+                } else {
                     Text("无 EXIF 信息（截图或已剥离元数据的图片）")
                         .font(.caption)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
@@ -79,9 +90,14 @@ struct MetadataView: View {
         .navigationTitle("信息")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button("复制全部") { copyAll() }
                     .accessibilityIdentifier("Metadata-CopyAll")
+                ShareLink(item: allInfoText) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("Metadata-Share")
+                .accessibilityLabel("分享信息")
             }
         }
         .overlay(alignment: .bottom) {
@@ -99,8 +115,10 @@ struct MetadataView: View {
         .task { await load() }
     }
 
-    private func copyAll() {
+    /// 复制/分享共用文本
+    private var allInfoText: String {
         var lines = [
+            "文件名：\(filename ?? "—")",
             "尺寸：\(item.pixelWidth) × \(item.pixelHeight)",
             "大小：\(byteSize > 0 ? Self.byteFormatter.string(fromByteCount: byteSize) : "未知")",
             "格式：\(formatText)",
@@ -113,7 +131,11 @@ struct MetadataView: View {
         if let latitude = fields.gpsLatitude, let longitude = fields.gpsLongitude {
             lines.append(String(format: "坐标：%.5f, %.5f", latitude, longitude))
         }
-        UIPasteboard.general.string = lines.joined(separator: "\n")
+        return lines.joined(separator: "\n")
+    }
+
+    private func copyAll() {
+        UIPasteboard.general.string = allInfoText
         withAnimation { showCopiedToast = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
             withAnimation { showCopiedToast = false }
@@ -184,6 +206,7 @@ struct MetadataView: View {
             ?? resources.first
         guard let resource else { return }
         byteSize = (try? resource.value(forKey: "fileSize") as? Int64) ?? 0
+        filename = resource.originalFilename
         let filename = resource.originalFilename
         let ext = (filename as NSString).pathExtension
         let uti = resource.uniformTypeIdentifier
@@ -197,6 +220,7 @@ struct MetadataView: View {
 
     /// EXIF：requestContentEditingInput（禁网络）→ CGImageSource 属性 → MetadataParser
     private func loadEXIF() async {
+        defer { isLoadingEXIF = false }
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
         guard let asset = assets.firstObject else { return }
         let options = PHContentEditingInputRequestOptions()

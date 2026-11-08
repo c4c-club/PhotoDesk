@@ -29,7 +29,14 @@ struct AppearanceSettingsView: View {
                     .onChange(of: gridColumns) { _ in
                         UISelectionFeedbackGenerator().selectionChanged()
                     }
+                GridColumnsPreview(columns: gridColumns)
                 Toggle("按时间正序排列", isOn: $sortAscending)
+                Button("恢复默认网格") {
+                    gridColumns = 3
+                    sortAscending = false
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                .accessibilityIdentifier("Settings-Grid-Reset")
             }
 
             Section {
@@ -73,5 +80,27 @@ struct AppearanceSettingsView: View {
         } message: {
             Text("所有视图的「上次整理位置」都会被清除，下次回到照片库从顶部开始。")
         }
+    }
+}
+
+/// 列数即时预览：3 行 × N 列示意块（docs/25 §7 #12）
+private struct GridColumnsPreview: View {
+    let columns: Int
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: 4) {
+                    ForEach(0..<columns, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color(ds: DSColor.tint).opacity(0.35))
+                            .frame(height: 18)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("网格列数预览：\(columns) 列")
     }
 }

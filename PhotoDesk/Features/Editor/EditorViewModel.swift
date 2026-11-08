@@ -22,6 +22,11 @@ final class EditorViewModel: ObservableObject {
     /// 原件是否含本 App 的历史编辑（「还原」按钮可用性）
     @Published private(set) var canRevert = false
 
+    /// 是否有未保存的编辑（transform 非默认 或 adjustments 非中性；关闭确认依据）
+    var hasEdits: Bool {
+        transform != PhotoDeskCore.EditorTransform() || adjustments != RenderAdjustments.neutral
+    }
+
     var transformWithoutCrop: PhotoDeskCore.EditorTransform {
         var t = transform
         t.cropX = 0; t.cropY = 0; t.cropWidth = 1; t.cropHeight = 1

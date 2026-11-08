@@ -41,6 +41,35 @@ enum DiagnosticsExporter {
         }
     }
 
+    /// 诊断摘要（复制用）：日志占用 + 崩溃记录尾部 + 查看器面包屑尾部，不写临时文件
+    static func summaryText(now: Date = Date()) -> String {
+        ViewerTrace.flush()
+        var lines: [String] = ["PhotoDesk 诊断摘要 — \(now)"]
+        lines.append("本机日志占用 \(currentLogBytes()) 字节")
+        lines.append("")
+        lines.append("===== last-exception.log（尾部 60 行）=====")
+        lines.append(contentsOf: tailLines(AppCrashLogger.readLastException() ?? "(无崩溃记录)", 60))
+        lines.append("")
+        lines.append("===== viewer-trace.log（尾部 100 行）=====")
+        lines.append(contentsOf: tailLines(readFile(ViewerTrace.logFileURL) ?? "(无查看器面包屑)", 100))
+        return lines.joined(separator: "\n")
+    }
+
+    /// 清空本机日志文件（用户在诊断页显式触发；文件在下次写入时按需重建）
+    static func clearLogs() {
+        ViewerTrace.flush()
+        for url in [ViewerTrace.logFileURL,
+                    AppCrashLogger.logFileURL,
+                    AppCrashLogger.signalLogFileURL].compactMap({ $0 }) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private static func tailLines(_ text: String, _ maxLines: Int) -> [String] {
+        guard !text.isEmpty else { return [] }
+        return text.components(separatedBy: .newlines).suffix(maxLines)
+    }
+
     private static func readFile(_ url: URL?) -> String? {
         guard let url, let text = try? String(contentsOf: url, encoding: .utf8),
               !text.isEmpty else { return nil }

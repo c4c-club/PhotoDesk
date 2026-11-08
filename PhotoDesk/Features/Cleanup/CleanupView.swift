@@ -12,6 +12,7 @@ struct CleanupView: View {
     @State private var showGroupSheet = false
     /// 执行结果内联展示（docs/09 D03：移除 App 内删除确认）
     @State private var resultMessage: String?
+    @State private var showCancelConfirmation = false
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -49,6 +50,13 @@ struct CleanupView: View {
                     Button("重试") { viewModel.startScan() }
                         .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("Cleanup-Retry")
+                    Button {
+                        UIPasteboard.general.string = "扫描失败：\(message)"
+                    } label: {
+                        Label("复制失败原因", systemImage: "doc.on.doc")
+                            .font(.subheadline)
+                    }
+                    .accessibilityIdentifier("Cleanup-Copy-Failure")
                 }
                 .padding(DSSpacing.screenPadding)
             }
@@ -109,12 +117,19 @@ struct CleanupView: View {
                 .accessibilityIdentifier("Cleanup-Progress")
 
             Button("取消") {
-                viewModel.cancelScan()
+                showCancelConfirmation = true
             }
             .accessibilityIdentifier("Cleanup-Cancel")
             .foregroundColor(Color(ds: DSColor.accentDelete))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .confirmationDialog("取消本次扫描？", isPresented: $showCancelConfirmation,
+                            titleVisibility: .visible) {
+            Button("取消扫描", role: .destructive) { viewModel.cancelScan() }
+            Button("继续扫描", role: .cancel) {}
+        } message: {
+            Text("已扫描的 \(scanned) 张结果不会保留。")
+        }
     }
 
     // MARK: - 结果卡片
