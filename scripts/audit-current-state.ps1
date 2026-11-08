@@ -1,3 +1,4 @@
+# EXPIRED 2026-11-09: M15 uses scripts/audit-m15.ps1 instead (docs/25 Phase 0). Do not use.
 # scripts/audit-current-state.ps1
 # 职责说明：PhotoDesk 1.4.0 P0 审查（docs/22 §1.3 / §2）——只读扫描仓库真实基线，
 # 输出 artifacts/audit/<date>/audit.md + audit.json；任何被引用文件缺失即非 0 退出，
