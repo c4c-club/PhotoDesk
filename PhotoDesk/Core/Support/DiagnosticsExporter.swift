@@ -8,6 +8,18 @@ import Foundation
 import OSLog
 
 enum DiagnosticsExporter {
+    /// 本机诊断日志当前占用（viewer-trace + last-exception + signal-crash；OSLog 由系统管理不计入）
+    static func currentLogBytes() -> Int64 {
+        let urls = [ViewerTrace.logFileURL,
+                    AppCrashLogger.logFileURL,
+                    AppCrashLogger.signalLogFileURL].compactMap { $0 }
+        return urls.reduce(0) { total, url in
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let size = attrs[.size] as? NSNumber else { return total }
+            return total + size.int64Value
+        }
+    }
+
     /// 导出诊断日志到临时文件；返回文件 URL（失败返回 nil，调用方展示错误）
     static func export(hours: Int, now: Date = Date()) -> URL? {
         var lines: [String] = ["PhotoDesk 诊断日志 — \(now)"]

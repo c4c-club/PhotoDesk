@@ -75,10 +75,14 @@ struct ToolsView: View {
                     }
                     .accessibilityIdentifier("Tools-Close")
                 }
-                Section {
-                    Text("搜索历史与智能视图已列入后续版本规划")
-                        .font(.caption)
-                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                Section("关于") {
+                    LabeledRow(title: "版本", value: AppVersion.display)
+                    NavigationLink {
+                        DiagnosticsView()
+                    } label: {
+                        Label("诊断日志", systemImage: "doc.text.magnifyingglass")
+                    }
+                    .accessibilityIdentifier("Tools-Diagnostics")
                 }
             }
             .listStyle(.insetGrouped)

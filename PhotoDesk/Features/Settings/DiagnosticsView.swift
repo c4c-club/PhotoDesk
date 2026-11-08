@@ -17,10 +17,13 @@ struct DiagnosticsView: View {
     @State private var exportURL: URL?
     @State private var showShare = false
     @State private var errorMessage: String?
+    @State private var logBytes: Int64 = 0
 
     var body: some View {
         List {
             Section("导出诊断日志") {
+                LabeledRow(title: "本机日志占用",
+                           value: ByteCountFormatter.string(fromByteCount: logBytes, countStyle: .file))
                 Picker("时间范围", selection: $hours) {
                     ForEach(Hours.allCases) { range in
                         Text(range.label).tag(range)
@@ -52,6 +55,7 @@ struct DiagnosticsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("诊断日志")
         .navigationBarTitleDisplayMode(.inline)
+        .task { logBytes = DiagnosticsExporter.currentLogBytes() }
         .sheet(isPresented: $showShare) {
             if let exportURL {
                 ActivityViewWrapper(items: [exportURL], isPresented: $showShare)

@@ -66,7 +66,7 @@ struct SettingsView: View {
                 } label: {
                     Label("诊断日志", systemImage: "doc.text.magnifyingglass")
                 }
-                LabeledRow(title: "版本", value: "1.0.0 (1)")
+                LabeledRow(title: "版本", value: AppVersion.display)
                 LabeledRow(title: "构建通道", value: "纯本地 · 零上传")
             }
         }
