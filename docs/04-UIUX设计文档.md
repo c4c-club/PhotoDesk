@@ -50,6 +50,7 @@
 - 网格间距：2pt；列数 2–5；缩略图 `contentMode = .aspectFill`，`clipsToBounds`。
 - 角标：视频（右下时长 `0:12`）、Live（左上 ◯）、截图（右下小图标）。
 - 分组头：`2026年10月` + 副标题张数；点右侧「选择」进入该月多选。
+- 粘性月份头高度固定 **48pt**（`DSSpacing.monthHeaderHeight`），位置锚点计算 `effectiveTop` 时必须加上该值，避免选中被头部遮挡的 cell。
 
 ### 3.2 全屏浏览（Viewer）★核心
 
