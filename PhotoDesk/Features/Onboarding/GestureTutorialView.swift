@@ -50,7 +50,7 @@ struct GestureTutorialView: View {
                     .frame(height: 110)
                 if let practiceFeedback {
                     Label(practiceFeedback,
-                          systemName: practiceFeedback.hasPrefix("上滑") ? "heart.fill" : "eye.slash.fill")
+                          systemImage: practiceFeedback.hasPrefix("上滑") ? "heart.fill" : "eye.slash.fill")
                         .font(.title3)
                         .foregroundColor(Color(ds: DSColor.tint))
                         .transition(.opacity)
@@ -87,7 +87,7 @@ struct GestureTutorialView: View {
     private var settingsButton: some View {
         if let presentSettings {
             Button {
-                presentSettings?()
+                presentSettings()
             } label: {
                 settingsButtonLabel(tinted: true)
             }

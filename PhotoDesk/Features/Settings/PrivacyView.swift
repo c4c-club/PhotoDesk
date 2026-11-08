@@ -7,7 +7,7 @@ import Photos
 
 struct PrivacyView: View {
     @AppStorage("vault.lockEnabled") private var vaultLockEnabled = true
-    @State private var permissionStatus: PHPhotoLibrary.AuthorizationStatus = .notDetermined
+    @State private var permissionStatus: PHAuthorizationStatus = .notDetermined
 
     private var permissionText: String {
         switch permissionStatus {
