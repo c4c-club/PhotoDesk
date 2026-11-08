@@ -1021,6 +1021,13 @@ final class ViewerViewController: UIViewController {
             } else if result.isInCloud {
                 // 禁网 + iCloud-only：占位 + 下载入口（A2 自救路径）
                 cell.showCloudPlaceholder()
+            } else {
+                // 坏图/资源已不可用：中文占位 + 重试（不再纯黑）
+                cell.showFailurePlaceholder { [weak self, weak cell] in
+                    guard let self, let cell else { return }
+                    self.loadImage(for: item, at: index, cell: cell)
+                }
+                ViewerTrace.log("loadFail idx=\(index) id=\(item.id.prefix(8))")
             }
         }
     }

@@ -60,6 +60,7 @@ final class ZoomableImageCell: UICollectionViewCell {
     /// 复用/离屏竞态防护
     private var configureToken = 0
     private var onDownloadRequested: ((String) -> Void)?
+    private var onRetryRequested: (() -> Void)?
     /// 缩放结束（或几何收敛）后通知 VC 串行 drain 删除/隐藏队列；不在此处执行 performBatchUpdates。
     var onZoomTransactionDidBecomeIdle: (() -> Void)?
     private(set) var itemID: String?
@@ -140,6 +141,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         scrollView.addGestureRecognizer(zoomTapGesture)
 
         downloadButton.addAction(UIAction { [weak self] _ in
+            if let retry = self?.onRetryRequested {
+                retry()
+                return
+            }
             guard let id = self?.itemID else { return }
             self?.onDownloadRequested?(id)
         }, for: .touchUpInside)
@@ -254,6 +259,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         itemID = item.id
         configureToken += 1
         loadToken += 1
+        onRetryRequested = nil
+        cloudIcon.image = UIImage(systemName: "icloud")
+        cloudLabel.text = "这张照片存储在 iCloud，需要下载后才能操作"
+        downloadButton.setTitle("下载", for: .normal)
         let isPlaceholder = (image == nil && item.isCloudOnly)
         cloudBox.isHidden = !isPlaceholder
         imageView.image = image
@@ -272,6 +281,21 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     /// VC 收到 fullImage 的 inCloud 回传后调用（上游 isCloudOnly 判定缺失时的自救占位）
     func showCloudPlaceholder() {
+        onRetryRequested = nil
+        cloudIcon.image = UIImage(systemName: "icloud")
+        cloudLabel.text = "这张照片存储在 iCloud，需要下载后才能操作"
+        downloadButton.setTitle("下载", for: .normal)
+        cloudBox.isHidden = false
+        progressLayer.isHidden = true
+        refreshInteraction()
+    }
+
+    /// 大图加载失败（非 iCloud）：占位 + 中文重试（docs/22 Phase 4 查看器）
+    func showFailurePlaceholder(onRetry: @escaping () -> Void) {
+        onRetryRequested = onRetry
+        cloudIcon.image = UIImage(systemName: "exclamationmark.triangle")
+        cloudLabel.text = "加载失败，请检查照片是否仍在本机"
+        downloadButton.setTitle("重试", for: .normal)
         cloudBox.isHidden = false
         progressLayer.isHidden = true
         refreshInteraction()
