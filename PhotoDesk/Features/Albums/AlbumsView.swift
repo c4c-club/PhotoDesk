@@ -12,6 +12,8 @@ struct AlbumsView: View {
     @State private var editorTitle = ""
     /// 非 nil = 重命名该相簿；nil = 新建
     @State private var renamingAlbum: AlbumSummary?
+    /// 新建/重命名/删除失败的中文提示（禁止 try? 静默吞掉写操作错误）
+    @State private var errorMessage: String?
 
     struct AlbumSummary: Identifiable {
         let id: String       // localIdentifier
@@ -22,6 +24,11 @@ struct AlbumsView: View {
     var body: some View {
         List {
             Section("我的相簿") {
+                if userAlbums.isEmpty {
+                    Text("暂无相簿，点右上角 + 新建")
+                        .font(.subheadline)
+                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                }
                 ForEach(userAlbums) { album in
                     NavigationLink {
                         AlbumDetailView(album: album)
@@ -78,6 +85,15 @@ struct AlbumsView: View {
             }
         )
         .onAppear(perform: reload)
+        .alert("操作失败", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("重试", role: .cancel) { reload() }
+            Button("好", role: .destructive) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 
     private func albumRow(_ album: AlbumSummary) -> some View {
@@ -121,20 +137,28 @@ struct AlbumsView: View {
         guard !title.isEmpty else { return }
         Task { @MainActor in
             let writer = AppContainer.shared.photoWriter
-            if let target = renamingAlbum {
-                try? await writer.renameAlbum(localID: target.id, to: title)
-            } else {
-                _ = try? await writer.createAlbum(title: title)
+            do {
+                if let target = renamingAlbum {
+                    try await writer.renameAlbum(localID: target.id, to: title)
+                } else {
+                    _ = try await writer.createAlbum(title: title)
+                }
+                renamingAlbum = nil
+                reload()
+            } catch {
+                errorMessage = "保存相簿失败：\(error.localizedDescription)"
             }
-            renamingAlbum = nil
-            reload()
         }
     }
 
     private func deleteAlbum(_ album: AlbumSummary) {
         Task { @MainActor in
-            try? await AppContainer.shared.photoWriter.deleteAlbum(localID: album.id)
-            reload()
+            do {
+                try await AppContainer.shared.photoWriter.deleteAlbum(localID: album.id)
+                reload()
+            } catch {
+                errorMessage = "删除相簿失败：\(error.localizedDescription)"
+            }
         }
     }
 }

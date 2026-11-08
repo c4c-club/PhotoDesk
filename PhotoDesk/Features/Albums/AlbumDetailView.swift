@@ -10,34 +10,58 @@ struct AlbumDetailView: View {
     @State private var items: [PhotoItem] = []
     @State private var viewerContext: ViewerContext?
     @State private var message: String?
+    @State private var isLoading = true
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: DSSpacing.gridSpacing)],
-                      spacing: DSSpacing.gridSpacing) {
-                ForEach(items) { item in
-                    Button {
-                        viewerContext = ViewerContext(items: items,
-                                                      startItemID: item.id,
-                                                      queryKey: "album:\(album.id)")
-                    } label: {
-                        AlbumThumb(item: item)
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            removeFromAlbum(item)
-                        } label: {
-                            Label("移出相簿", systemImage: "rectangle.stack.badge.minus")
+        Group {
+            if isLoading {
+                ProgressView("正在加载相簿…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if items.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 48))
+                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                    Text("这个相簿还没有照片")
+                        .font(.headline)
+                        .foregroundColor(Color(ds: DSColor.textPrimary))
+                    Text("在照片库中长按选择照片，用「加入相簿」添加")
+                        .font(.subheadline)
+                        .foregroundColor(Color(ds: DSColor.textSecondary))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(DSSpacing.screenPadding)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: DSSpacing.gridSpacing)],
+                              spacing: DSSpacing.gridSpacing) {
+                        ForEach(items) { item in
+                            Button {
+                                viewerContext = ViewerContext(items: items,
+                                                              startItemID: item.id,
+                                                              queryKey: "album:\(album.id)")
+                            } label: {
+                                AlbumThumb(item: item)
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    removeFromAlbum(item)
+                                } label: {
+                                    Label("移出相簿", systemImage: "rectangle.stack.badge.minus")
+                                }
+                            }
                         }
                     }
+                    .padding(DSSpacing.gridSpacing)
                 }
             }
-            .padding(DSSpacing.gridSpacing)
         }
         .background(Color(ds: DSColor.bgPrimary))
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            isLoading = true
+            defer { isLoading = false }
             let repository = AppContainer.shared.assetRepository
             let total = await repository.prepare(scope: .album(localIdentifier: album.id))
             guard total > 0 else { return }
