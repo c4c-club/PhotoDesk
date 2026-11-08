@@ -1225,6 +1225,8 @@ final class LibraryViewController: UIViewController {
 
     private func attemptPositionRestore() {
         guard positionCoordinator.isRestoreInFlight else { return }
+        // 确保 anchorMinY / contentSize 取自本次真实布局，而不是上一次的估算值。
+        collectionView.layoutIfNeeded()
         let context = LibraryPositionRestoreContext(
             bounds: collectionView.bounds.size,
             numberOfSections: collectionView.numberOfSections,
@@ -1300,6 +1302,10 @@ final class LibraryViewController: UIViewController {
     }
 
     private func layoutMinY(at indexPath: IndexPath) -> Double? {
+        // 已物化 cell 的 frame 是当前布局的真实值；layoutAttributes 在远距离/估算高度下可能是旧估计。
+        if let cell = collectionView.cellForItem(at: indexPath) {
+            return Double(cell.frame.minY)
+        }
         guard let frame = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath)?.frame else { return nil }
         return Double(frame.minY)
     }

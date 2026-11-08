@@ -225,6 +225,9 @@ final class LibraryPositionCoordinator {
             visualOK = abs((minY - actual) - anchor.anchorVisualY) <= 1
         }
         let ok = offsetOK && visualOK
+        ViewerTrace.log("position.restore.v4 verify actual=\(Int(actual)) target=\(Int(targetOffsetY)) " +
+                        "minY=\(context.anchorMinY(anchor.anchorAssetID).map { Int($0) } ?? -1) " +
+                        "visualY=\(Int(anchor.anchorVisualY)) ok=\(ok)")
         let phase = state.verified(ok: ok)
         onPhaseChange?(phase)
         switch phase {

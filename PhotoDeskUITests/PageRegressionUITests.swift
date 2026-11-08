@@ -230,22 +230,30 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(value.contains("selected"), "可见 cell 缺选中态标记：\(value)")
     }
 
-    // MARK: - D13 多选模式下可滚动
-
-    func testScrollWorksInSelectionMode() throws {
+    /// P0-4：多选模式单指滑选、双指滚动（单指滚动语义已被滑选取代；真机双指见 M14-8）。
+    func testSelectionModeUsesSlidePanAndTwoFingerScrollConfig() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
-        launchToGrid(app)
+        let collection = launchToGrid(app)
 
-        let collection = app.collectionViews.firstMatch
-        let before = collection.cells.firstMatch.value as? String ?? ""
+        let count = app.staticTexts["Selection-Count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "多选计数未出现")
+        let cell = collection.cells.firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "网格无 cell")
+        cell.press(forDuration: 0.05, thenDragTo: cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)))
+        let deadline = Date().addingTimeInterval(5)
+        var selected = count.label
+        while Date() < deadline, selected.contains("0") {
+            usleep(200_000)
+            selected = count.label
+        }
+        XCTAssertFalse(selected.contains("已选择 0"), "单指下滑未进入滑选：\(selected)")
 
-        app.swipeUp()
-        app.swipeUp()
-
-        let after = collection.cells.firstMatch.value as? String ?? ""
-        XCTAssertNotEqual(before, after, "多选模式下两次上滑后首 cell 未变化——滚动被框选手势吃掉")
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "缺少 Library-DebugSummary")
+        XCTAssertTrue(((banner.value as? String) ?? "").contains("panMin=2"),
+                      "多选模式 collectionView pan 必须至少两指")
     }
 
     // MARK: - D07 存储统计（mock 数据 5 秒内出结果）
