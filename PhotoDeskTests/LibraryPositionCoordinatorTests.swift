@@ -83,19 +83,21 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
                 adjustedTop: 0,
                 bottomInset: 0,
                 anchorInData: { _ in anchorInData },
-                anchorMinY: { [unowned self] _ in anchorMinYValue },
-                sectionMinY: { [unowned self] _, _ in sectionMinYValue },
+                anchorMinY: { [unowned self] _ in anchorInData ? anchorMinYValue : nil },
+                sectionMinY: { [unowned self] _, _ in anchorInData ? sectionMinYValue : nil },
                 scrollToAnchorTop: { [unowned self] id in
                     scrollCalls.append(id)
                     return true
                 },
                 applyOffset: { [unowned self] y in
                     appliedOffsets.append(y)
-                    if failFirstVerify { failFirstVerify = false }
                 },
                 actualOffsetY: { [unowned self] in
                     // 首次校验故意偏 10pt（模拟 UIKit 拒绝），之后返回最后写入值
-                    if failFirstVerify { return (appliedOffsets.last ?? 0) + 10 }
+                    if failFirstVerify {
+                        failFirstVerify = false
+                        return (appliedOffsets.last ?? 0) + 10
+                    }
                     return appliedOffsets.last ?? 0
                 },
                 layoutNow: { }
@@ -118,6 +120,8 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
     func testStaleSaveTimerDoesNotOverwriteNewAnchor() {
         let store = makeStore()
         let coordinator = LibraryPositionCoordinator(store: store)
+        // 无锚点启动 → settled（可保存门禁 I1）
+        coordinator.beginRestore(queryKey: "scope.all")
         coordinator.scheduleSave(reason: "old", snapshot: snapshot("old-anchor"), debounce: 0.2)
         coordinator.saveNow(reason: "new", snapshot: snapshot("new-anchor"))
         XCTAssertEqual(store.load(queryKey: "scope.all")?.anchorAssetID, "new-anchor")
@@ -157,6 +161,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
     func testSaveNowFlushesSynchronously() {
         let store = makeStore()
         let coordinator = LibraryPositionCoordinator(store: store)
+        coordinator.beginRestore(queryKey: "scope.all")   // 无锚点 → settled（I1 门禁）
         coordinator.saveNow(reason: "flush", snapshot: snapshot("flush-anchor"))
         // saveNow 内部 flush：无需 runloop 即可读到
         XCTAssertEqual(store.load(queryKey: "scope.all")?.anchorAssetID, "flush-anchor",

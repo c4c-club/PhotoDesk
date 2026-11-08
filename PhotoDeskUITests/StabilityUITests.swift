@@ -704,10 +704,23 @@ final class StabilityUITests: XCTestCase {
                             toX: 0.92, toY: 0.42)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选应连续选中至少 6 格")
-        app.swipeUp()
-        app.swipeDown()
+        // 选择模式下单指属于框选手势：用月份索引条跳月制造复用（触点在索引条 UIControl 上，
+        // 不触发框选 pan；跳月是一次大跨度 scrollToItem，离屏 cell 全部走复用路径）
+        let indexBar = anyElement(app, identifier: "MonthIndexBar")
+        XCTAssertTrue(indexBar.waitForExistence(timeout: 5), "缺少月份索引条\n\(hierarchy(app))")
+        let barTop = indexBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
+        let barBottom = indexBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92))
+        barTop.press(forDuration: 0.1, thenDragTo: barBottom, withVelocity: .slow,
+                     thenHoldForDuration: 0.5)
+        Thread.sleep(forTimeInterval: 0.8)
         XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
-                                    "复用后选中集合不得丢失")
+                                    "索引条跳月（复用）后选中集合不得丢失")
+        // 拖回最新月份：原选中 cell 重新可见，徽标/AX 必须与选中状态一致
+        barBottom.press(forDuration: 0.1, thenDragTo: barTop, withVelocity: .slow,
+                        thenHoldForDuration: 0.5)
+        Thread.sleep(forTimeInterval: 0.8)
+        XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
+                                    "拖回顶部后选中集合不得丢失")
         XCTAssertGreaterThanOrEqual(visibleSelectedCount(in: collection), 3,
                                     "复用后的可见徽标/AX 必须与选中状态一致")
     }

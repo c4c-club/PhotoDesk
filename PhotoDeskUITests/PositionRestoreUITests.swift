@@ -123,14 +123,38 @@ final class PositionRestoreUITests: XCTestCase {
 
     /// Library-DebugSummary → (off, anchor, visualY)
     private func debugSnapshot(_ app: XCUIApplication) -> (off: Double, anchor: String, visualY: Double)? {
-        let banner = anyElement(app, identifier: "Library-DebugSummary")
-        guard banner.waitForExistence(timeout: 5) else { return nil }
-        let raw = (banner.value as? String) ?? banner.label
+        let raw = rawSummary(app)
+        guard !raw.isEmpty else { return nil }
         let off = Self.parseDoubleField(raw, "off")
         let visualY = Self.parseDoubleField(raw, "visualY")
         guard off >= 0,
               let anchor = Self.parseStringField(raw, "anchor"), !anchor.isEmpty else { return nil }
         return (off, anchor, visualY)
+    }
+
+    private func rawSummary(_ app: XCUIApplication) -> String {
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        guard banner.exists else { return "" }
+        return ((banner.value as? String) ?? banner.label)
+    }
+
+    /// 重启/回前台后的读取必须等恢复收敛：轮询直到摘要带 restore= 且连续两次一致，
+    /// 避免在 restoring/applying 中途读到回顶落点（M15 CI 轮 1 mismatch 根因）。
+    private func debugSnapshotAfterRestore(_ app: XCUIApplication,
+                                           timeout: TimeInterval = 20) -> (off: Double, anchor: String, visualY: Double)? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var stable: (off: Double, anchor: String, visualY: Double)?
+        while Date() < deadline {
+            let raw = rawSummary(app)
+            if raw.contains("restore="), let snap = debugSnapshot(app) {
+                if let prev = stable, prev.anchor == snap.anchor, abs(prev.off - snap.off) <= 1.0 {
+                    return snap
+                }
+                stable = snap
+            }
+            usleep(300_000)
+        }
+        return debugSnapshot(app)
     }
 
     private func snap(_ app: XCUIApplication, _ name: String) {
@@ -170,13 +194,12 @@ final class PositionRestoreUITests: XCTestCase {
                 }
             }
             Thread.sleep(forTimeInterval: 0.5)
-            guard let before = debugSnapshot(app) else {
+            guard let before = debugSnapshotAfterRestore(app) else {
                 return XCTFail("轮 \(round + 1)：Library-DebugSummary 必须暴露 off/anchor/visualY")
             }
             app.terminate()
             _ = launchToGrid(app)
-            Thread.sleep(forTimeInterval: 0.8)
-            guard let after = debugSnapshot(app) else {
+            guard let after = debugSnapshotAfterRestore(app) else {
                 return XCTFail("轮 \(round + 1)：重启后必须能读取位置快照")
             }
             XCTAssertEqual(after.anchor, before.anchor,
@@ -200,13 +223,12 @@ final class PositionRestoreUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         swipeUpOnce(in: collection)
         Thread.sleep(forTimeInterval: 0.8)
-        guard let before = debugSnapshot(app) else {
+        guard let before = debugSnapshotAfterRestore(app) else {
             return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
         }
         app.terminate()
         _ = launchToGrid(app)
-        Thread.sleep(forTimeInterval: 0.8)
-        guard let after = debugSnapshot(app) else {
+        guard let after = debugSnapshotAfterRestore(app) else {
             return XCTFail("重启后必须能读取位置快照")
         }
         XCTAssertEqual(after.anchor, before.anchor, "强杀后锚点必须一致")
@@ -225,15 +247,14 @@ final class PositionRestoreUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         swipeUpOnce(in: collection)
         Thread.sleep(forTimeInterval: 0.8)
-        guard let before = debugSnapshot(app) else {
+        guard let before = debugSnapshotAfterRestore(app) else {
             return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
         }
         XCUIDevice.shared.press(XCUIDevice.Button.home)
         Thread.sleep(forTimeInterval: 1.0)
         app.activate()
         XCTAssertTrue(collection.waitForExistence(timeout: 10), "回前台后网格必须就绪")
-        Thread.sleep(forTimeInterval: 0.8)
-        guard let after = debugSnapshot(app) else {
+        guard let after = debugSnapshotAfterRestore(app) else {
             return XCTFail("回前台后必须能读取位置快照")
         }
         XCTAssertEqual(after.anchor, before.anchor, "后台/前台往返锚点必须一致")
@@ -250,19 +271,19 @@ final class PositionRestoreUITests: XCTestCase {
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
         let collection = app.collectionViews.firstMatch
         Thread.sleep(forTimeInterval: 0.5)
-        guard let before = debugSnapshot(app) else {
+        guard let before = debugSnapshotAfterRestore(app) else {
             return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
         }
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10), "横屏后应保持锚点月份")
-        guard let landscape = debugSnapshot(app) else {
+        guard let landscape = debugSnapshotAfterRestore(app) else {
             return XCTFail("横屏后必须能读取位置快照")
         }
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10), "回竖屏后应保持锚点月份")
-        guard let restored = debugSnapshot(app) else {
+        guard let restored = debugSnapshotAfterRestore(app) else {
             return XCTFail("回竖屏后必须能读取位置快照")
         }
         // 旋转是不同投影（列宽变化）：断言锚点 asset 一致，offset 允许布局重排误差（≤1 行由 AX 侧守门）
@@ -278,7 +299,7 @@ final class PositionRestoreUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
-        guard let anchor2024 = debugSnapshot(app) else {
+        guard let anchor2024 = debugSnapshotAfterRestore(app) else {
             return XCTFail("2024 视图必须能读取位置快照")
         }
         XCTAssertFalse(anchor2024.anchor.isEmpty)
@@ -291,7 +312,7 @@ final class PositionRestoreUITests: XCTestCase {
         _ = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, "2023", timeout: 10),
                       "筛选 2023 后顶部应为 2023（顶部：\(topHeaderText(app))）")
-        guard let snapshot2023 = debugSnapshot(app) else {
+        guard let snapshot2023 = debugSnapshotAfterRestore(app) else {
             return XCTFail("2023 视图必须能读取位置快照")
         }
         // 2023 scope 首次打开从未保存过位置 → 必须从顶部开始；绝不能带进 2024 的锚点/offset

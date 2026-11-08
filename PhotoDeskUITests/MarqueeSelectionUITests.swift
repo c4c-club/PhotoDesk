@@ -172,8 +172,8 @@ final class MarqueeSelectionUITests: XCTestCase {
         }
         let selected = waitForSelectionCount(app, atLeast: 6)
         XCTAssertEqual(selected, 6, "预点选 6 格")
-        // 从已选的首列第二行 cell 下拉 2 行（矩形覆盖左列 ~3 格，全部已选）
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.55, toX: 0.12, toY: 0.85)
+        // 从已选的首列第二行 cell（点选覆盖前两行）下拉（矩形覆盖左列 ~3 格，含已选锚点）
+        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.35, toX: 0.12, toY: 0.85)
         let deadline = Date().addingTimeInterval(6)
         var after = selectionCount(app)
         while Date() < deadline, after >= selected {
