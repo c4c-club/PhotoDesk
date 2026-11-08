@@ -336,9 +336,13 @@ final class ZoomStabilityUITests: XCTestCase {
         XCTAssertFalse(badgeLabel.contains("待删除"),
                        "捏合过程不得触发删除事务（badge=\(badgeLabel)）")
         var zoomSeen = -1
+        let inner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(inner.waitForExistence(timeout: 5), "内层 viewport 未出现\n\(hierarchy(app))")
         let zoomDeadline = Date().addingTimeInterval(3)
         while Date() < zoomDeadline {
-            viewer.doubleTap()
+            // 双击必须打在内层 viewport（真实 UIView，center 即图心）；
+            // ViewerRoot 是 otherElement，其 center 不可靠（双击从未命中的实锤根因）
+            inner.doubleTap()
             Thread.sleep(forTimeInterval: 0.5)
             let bannerNow = viewerBanner(app)
             if bannerNow.exists {

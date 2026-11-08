@@ -617,7 +617,7 @@ final class StabilityUITests: XCTestCase {
         // 矩形语义：单次长按拖动顶住下缘 → 自动滚动逐帧重算，startPoint 固定在 content 坐标，
         // 矩形随之拉长，屏幕外 cell 持续入集（反复起手会因锚点已选触发取消模式，故只拖一次）。
         slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.40,
-                           toX: 0.12, toY: 0.96, hold: 2.0)
+                           toX: 0.12, toY: 0.995, hold: 2.0)
         let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
         XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")
@@ -704,23 +704,16 @@ final class StabilityUITests: XCTestCase {
                             toX: 0.92, toY: 0.42)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选应连续选中至少 6 格")
-        // 选择模式下单指属于框选手势：用月份索引条跳月制造复用（触点在索引条 UIControl 上，
-        // 不触发框选 pan；跳月是一次大跨度 scrollToItem，离屏 cell 全部走复用路径）
-        let indexBar = anyElement(app, identifier: "MonthIndexBar")
-        XCTAssertTrue(indexBar.waitForExistence(timeout: 5), "缺少月份索引条\n\(hierarchy(app))")
-        let barTop = indexBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-        let barBottom = indexBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92))
-        barTop.press(forDuration: 0.1, thenDragTo: barBottom, withVelocity: .slow,
-                     thenHoldForDuration: 0.5)
+        // 选择模式下的复用驱动器是框选自动滚动本身（MonthIndexBar 在多选态 isHidden，
+        // 单指 swipe 是框选手势）：左列长拖顶住下缘 → 自动滚动把离屏 cell 成批推入复用路径，
+        // 新流入 cell 的徽标/AX 必须实时匹配选中集合（count 与可见选中数一致）。
+        slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.30,
+                           toX: 0.12, toY: 0.995, hold: 2.0)
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 10, timeout: 8), 10,
+                                    "自动滚动复用路径上选中集合必须持续增长")
         Thread.sleep(forTimeInterval: 0.8)
-        XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
-                                    "索引条跳月（复用）后选中集合不得丢失")
-        // 拖回最新月份：原选中 cell 重新可见，徽标/AX 必须与选中状态一致
-        barBottom.press(forDuration: 0.1, thenDragTo: barTop, withVelocity: .slow,
-                        thenHoldForDuration: 0.5)
-        Thread.sleep(forTimeInterval: 0.8)
-        XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
-                                    "拖回顶部后选中集合不得丢失")
+        XCTAssertGreaterThanOrEqual(selectionCount(app), 10,
+                                    "复用稳定后选中集合不得丢失")
         XCTAssertGreaterThanOrEqual(visibleSelectedCount(in: collection), 3,
                                     "复用后的可见徽标/AX 必须与选中状态一致")
     }

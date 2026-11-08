@@ -121,7 +121,10 @@ final class LibraryDataTests: XCTestCase {
                                        offsetRatio: 0.42,
                                        savedAt: Date())
         store.save(position, queryKey: "abc123")
-        XCTAssertEqual(store.load(queryKey: "abc123"), position)
+        // I5：load 出的条目 queryKey 必须等于存储键（save 负责盖章，与传入对象无关）
+        var expected = position
+        expected.queryKey = "abc123"
+        XCTAssertEqual(store.load(queryKey: "abc123"), expected)
     }
 
     func testPositionStorePerQueryKeys() {
@@ -130,10 +133,14 @@ final class LibraryDataTests: XCTestCase {
         let p2 = LibraryPosition(assetID: "b", sectionID: "s", offsetRatio: 0.2, savedAt: Date())
         store.save(p1, queryKey: "key1")
         store.save(p2, queryKey: "key2")
-        XCTAssertEqual(store.load(queryKey: "key1"), p1, "不同筛选各自记住位置")
+        var e1 = p1
+        e1.queryKey = "key1"
+        var e2 = p2
+        e2.queryKey = "key2"
+        XCTAssertEqual(store.load(queryKey: "key1"), e1, "不同筛选各自记住位置")
         store.clear(queryKey: "key1")
         XCTAssertNil(store.load(queryKey: "key1"))
-        XCTAssertEqual(store.load(queryKey: "key2"), p2)
+        XCTAssertEqual(store.load(queryKey: "key2"), e2)
     }
 
     func testPositionStoreDisabledBySwitch() {

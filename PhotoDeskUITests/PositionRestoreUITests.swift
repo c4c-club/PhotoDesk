@@ -138,15 +138,14 @@ final class PositionRestoreUITests: XCTestCase {
         return ((banner.value as? String) ?? banner.label)
     }
 
-    /// 重启/回前台后的读取必须等恢复收敛：轮询直到摘要带 restore= 且连续两次一致，
-    /// 避免在 restoring/applying 中途读到回顶落点（M15 CI 轮 1 mismatch 根因）。
+    /// 重启/回前台后的读取必须等恢复收敛：轮询直到连续两次读取一致（20s 上限）。
+    /// 不硬性要求 raw 含 restore=（2023 视图等首启场景没有恢复，只有稳定快照）。
     private func debugSnapshotAfterRestore(_ app: XCUIApplication,
                                            timeout: TimeInterval = 20) -> (off: Double, anchor: String, visualY: Double)? {
         let deadline = Date().addingTimeInterval(timeout)
         var stable: (off: Double, anchor: String, visualY: Double)?
         while Date() < deadline {
-            let raw = rawSummary(app)
-            if raw.contains("restore="), let snap = debugSnapshot(app) {
+            if let snap = debugSnapshot(app) {
                 if let prev = stable, prev.anchor == snap.anchor, abs(prev.off - snap.off) <= 1.0 {
                     return snap
                 }
@@ -184,6 +183,9 @@ final class PositionRestoreUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
 
         for round in 0..<10 {
+            // 先等本轮启动的恢复收敛：套件内先前用例可能留有旧锚点，I1 门禁要求 settled
+            // 才接受保存；不收敛就滑动会让 saveNow 被拒、存盘仍是旧锚点（轮 1 实锤）。
+            _ = debugSnapshotAfterRestore(app)
             if round > 0 {
                 // 每轮向下滚动 1-2 屏产生新锚点（拖动结束即 saveNow 落盘）
                 swipeUpOnce(in: collection)
@@ -203,7 +205,7 @@ final class PositionRestoreUITests: XCTestCase {
                 return XCTFail("轮 \(round + 1)：重启后必须能读取位置快照")
             }
             XCTAssertEqual(after.anchor, before.anchor,
-                           "轮 \(round + 1)：冷启动锚点 assetID 必须一致（before=\(before.anchor) after=\(after.anchor)）")
+                           "轮 \(round + 1)：冷启动锚点 assetID 必须一致（before=\(before.anchor) off=\(before.off) visualY=\(before.visualY) after=\(after.anchor) off=\(after.off) visualY=\(after.visualY)）")
             XCTAssertLessThanOrEqual(abs(after.off - before.off), 2.0,
                                      "轮 \(round + 1)：冷启动像素 offset 差必须 ≤ 2pt（before=\(before.off) after=\(after.off)）")
             assertAlive(app, "轮 \(round + 1) 冷启动恢复后")

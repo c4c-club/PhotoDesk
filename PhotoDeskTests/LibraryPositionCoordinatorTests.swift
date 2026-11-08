@@ -84,7 +84,8 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
                 bottomInset: 0,
                 anchorInData: { _ in anchorInData },
                 anchorMinY: { [unowned self] _ in anchorInData ? anchorMinYValue : nil },
-                sectionMinY: { [unowned self] _, _ in anchorInData ? sectionMinYValue : nil },
+                // section 头 minY 与锚点是否在数据无关：索引完成即可用（section fallback 路径依赖）
+                sectionMinY: { [unowned self] _, _ in sectionMinYValue },
                 scrollToAnchorTop: { [unowned self] id in
                     scrollCalls.append(id)
                     return true

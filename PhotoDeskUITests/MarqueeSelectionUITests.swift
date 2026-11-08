@@ -174,11 +174,15 @@ final class MarqueeSelectionUITests: XCTestCase {
         XCTAssertEqual(selected, 6, "预点选 6 格")
         // 从已选的首列第二行 cell（点选覆盖前两行）下拉（矩形覆盖左列 ~3 格，含已选锚点）
         marqueeDrag(in: collection, fromX: 0.12, fromY: 0.35, toX: 0.12, toY: 0.85)
+        // 激活帧会先命中锚点 1 格（中间态），拖动结束后必须等目标集合稳定再断言
+        Thread.sleep(forTimeInterval: 1.0)
         let deadline = Date().addingTimeInterval(6)
         var after = selectionCount(app)
-        while Date() < deadline, after >= selected {
-            usleep(150_000)
-            after = selectionCount(app)
+        while Date() < deadline {
+            usleep(300_000)
+            let next = selectionCount(app)
+            if next == after { break }
+            after = next
         }
         XCTAssertLessThan(after, selected,
                           "从已选格起拖必须进入取消模式（before=\(selected) after=\(after)）")
@@ -198,11 +202,14 @@ final class MarqueeSelectionUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(peak, 3)
         // 第二次：同一列更短的矩形（0.25 → 0.45）——锚点已选 → deselect → 集合收缩
         marqueeDrag(in: collection, fromX: 0.12, fromY: 0.25, toX: 0.12, toY: 0.45)
+        Thread.sleep(forTimeInterval: 1.0)
         let deadline = Date().addingTimeInterval(6)
         var shrunk = selectionCount(app)
-        while Date() < deadline, shrunk >= peak {
-            usleep(150_000)
-            shrunk = selectionCount(app)
+        while Date() < deadline {
+            usleep(300_000)
+            let next = selectionCount(app)
+            if next == shrunk { break }
+            shrunk = next
         }
         XCTAssertLessThan(shrunk, peak,
                           "回拖必须收缩（peak=\(peak) after=\(shrunk)），不得保留 insert-only 累积")
@@ -227,7 +234,7 @@ final class MarqueeSelectionUITests: XCTestCase {
     func testAutoScrollMarquee() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.30, toX: 0.12, toY: 0.95, hold: 2.0)
+        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.30, toX: 0.12, toY: 0.995, hold: 2.0)
         let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
         XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须让屏幕外 cell 入集（count=\(count)）")

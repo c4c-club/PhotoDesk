@@ -50,7 +50,10 @@ final class LibraryPositionStoreTests: XCTestCase {
         let store = makeStore()
         let position = makePosition()
         store.save(position, queryKey: "q1")
-        XCTAssertEqual(store.load(queryKey: "q1"), position)
+        // I5：存储键盖进结构体，load 回来的条目 queryKey=="q1"
+        var expected = position
+        expected.queryKey = "q1"
+        XCTAssertEqual(store.load(queryKey: "q1"), expected)
         XCTAssertEqual(store.load(queryKey: "q1")?.queryKey, "q1", "v5 条目必须自带 queryKey")
     }
 
@@ -83,6 +86,7 @@ final class LibraryPositionStoreTests: XCTestCase {
         XCTAssertEqual(migrated?.anchorVisualY, 55)
         XCTAssertEqual(migrated?.itemIndexInSection, 7)
         XCTAssertEqual(migrated?.queryKey, "q1")
+        store.flush()   // 迁移写盘走串行队列：先等落盘再断言文件存在
         XCTAssertNotNil(FileManager.default.contents(atPath: dir.appendingPathComponent("anchors-v5.json").path),
                         "迁移结果必须落 v5 文件")
         XCTAssertNotNil(defaults.data(forKey: "library.lastPosition.v2.q1"),
@@ -114,13 +118,17 @@ final class LibraryPositionStoreTests: XCTestCase {
         let p2 = makePosition(assetID: "b")
         store.save(p1, queryKey: "key1")
         store.save(p2, queryKey: "key2")
-        XCTAssertEqual(store.load(queryKey: "key1"), p1)
+        var e1 = p1
+        e1.queryKey = "key1"
+        var e2 = p2
+        e2.queryKey = "key2"
+        XCTAssertEqual(store.load(queryKey: "key1"), e1)
         defaults.set(Data("{}".utf8), forKey: "library.lastPosition.key1")
         store.clear(queryKey: "key1")
         XCTAssertNil(store.load(queryKey: "key1"))
         XCTAssertNil(defaults.data(forKey: "library.lastPosition.key1"),
                      "clear 必须同时清 v5 文件与遗留键")
-        XCTAssertEqual(store.load(queryKey: "key2"), p2)
+        XCTAssertEqual(store.load(queryKey: "key2"), e2)
     }
 
     func testClearAllRemovesFileEntriesAndLegacyKeys() {
