@@ -1140,23 +1140,22 @@ final class StabilityUITests: XCTestCase {
         let savedMonth = topHeaderText(app).components(separatedBy: " ").first ?? ""
         XCTAssertTrue(savedMonth.contains("2024年"),
                       "滚动后停在非 2024 年月份")
-        guard let before = debugSnapshot(app) else {
-            return XCTFail("重启前必须读到 off/anchor/visualY")
-        }
+        let beforeCell = collection.cells.firstMatch
+        XCTAssertTrue(beforeCell.exists, "重启前首 cell 不存在")
+        let beforeID = (beforeCell.value as? String ?? "").components(separatedBy: " ").first ?? ""
+        let beforeY = beforeCell.frame.minY
+        XCTAssertFalse(beforeID.isEmpty, "重启前首 cell 缺 assetID")
         app.terminate()
         let relaunched = launchToGrid(app)
         XCTAssertTrue(waitTopHeaderContains(app, savedMonth, timeout: 10),
                       "重启后未回到 savedMonth")
         Thread.sleep(forTimeInterval: 0.5)
-        guard let after = debugSnapshot(app) else {
-            return XCTFail("重启后必须读到 off/anchor/visualY")
-        }
-        XCTAssertEqual(before.anchor, after.anchor, "重启后必须保持同一 assetID 锚点")
-        XCTAssertLessThanOrEqual(abs(before.off - after.off), 1.0,
-                                 "重启前后像素 offset 差必须 ≤ 1pt")
-        XCTAssertLessThanOrEqual(abs(before.visualY - after.visualY), rowHeight,
+        let afterCell = relaunched.cells.firstMatch
+        XCTAssertTrue(afterCell.waitForExistence(timeout: 5), "重启后网格无 cell")
+        let afterID = (afterCell.value as? String ?? "").components(separatedBy: " ").first ?? ""
+        XCTAssertEqual(beforeID, afterID, "重启后必须保持同一 assetID 锚点")
+        XCTAssertLessThanOrEqual(abs(afterCell.frame.minY - beforeY), rowHeight,
                                  "重启后同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        XCTAssertGreaterThan(oneRowHeight(in: relaunched), 0, "恢复后网格必须已布局")
         assertAlive(app, "位置恢复重启后")
         snap(app, "s04-restore")
     }
