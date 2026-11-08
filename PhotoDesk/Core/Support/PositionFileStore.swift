@@ -50,11 +50,14 @@ final class PositionFileStore {
 
     // MARK: - 写
 
-    /// 内存即时生效，落盘走串行队列（原子写）。
+    /// 内存即时生效，落盘走串行队列（原子写）。queryKey 盖进结构体：I5 往返不变量要求
+    /// load 出的 position.queryKey 与存储键一致（防御调用方未填充）。
     func save(_ position: LibraryPosition, queryKey: String) {
         guard !queryKey.isEmpty else { return }
+        var stamped = position
+        stamped.queryKey = queryKey
         let snapshot: [String: LibraryPosition] = withLockedState { entries in
-            entries[queryKey] = position
+            entries[queryKey] = stamped
             evictIfNeeded(&entries)
             return entries
         }

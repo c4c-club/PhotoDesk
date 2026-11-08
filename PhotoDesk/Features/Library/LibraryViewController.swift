@@ -1717,11 +1717,17 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         positionCoordinator.saveNow(reason: "decelerating", snapshot: makePositionSnapshot())
+        #if DEBUG
+        refreshDebugScrollNote()   // 取证摘要跟随真实滚动位置（UI 测试读 off/anchor）
+        #endif
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         // docs/22 §4.4.3：无论是否继续减速都保存一次（旧实现只在 !decelerate 保存，是漏洞）。
         positionCoordinator.saveNow(reason: "dragging", snapshot: makePositionSnapshot())
+        #if DEBUG
+        refreshDebugScrollNote()
+        #endif
     }
 
     func collectionView(_ collectionView: UICollectionView,

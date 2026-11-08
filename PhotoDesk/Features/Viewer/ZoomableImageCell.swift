@@ -222,11 +222,13 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     var isZoomed: Bool { diagnostics.currentScale > 1.01 }
 
-    /// 当前缩放状态快照（B1 互斥判定信号源：纯值，不读任何 UIScrollView 几何）
+    /// 当前缩放状态快照（B1 互斥判定信号源：纯值，不读任何 UIScrollView 几何）。
+    /// 宽限窗口计时来自控制器的用户活动时间戳——程序性 reset/布局不算"活动"，
+    /// 否则翻页/复用/旋转后翻页会被宽限窗口卡住 1 秒。
     var zoomState: ViewerGesturePolicy.CellState {
         ViewerGesturePolicy.CellState(isZooming: zoomController.isInteracting,
                                       zoomScale: diagnostics.currentScale,
-                                      secondsSinceZoomActivity: CACurrentMediaTime() - diagnostics.lastActivity,
+                                      secondsSinceZoomActivity: zoomController.secondsSinceActivity,
                                       geometryState: .idle)
     }
 

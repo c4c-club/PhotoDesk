@@ -95,7 +95,6 @@ final class SlideSelectGestureController: NSObject {
             }
             guard isDragSelecting else { return }
             processFinger(atWindowPoint: lastFingerWindowPoint)
-            updateEdgeAutoScroll()
         case .ended, .cancelled, .failed:
             finishSlideSelection()
         default:
@@ -107,6 +106,10 @@ final class SlideSelectGestureController: NSObject {
         guard let collectionView else { return }
         state = .selecting
         collectionView.allowsSelection = false
+        // 边缘自动滚动的 tick 从激活起就常驻（60fps 空转开销可忽略）：
+        // hold 阶段不再有 .changed 事件，若等"最后一个采样点进边缘区"才建 link，
+        // XCUI 慢速拖动的尾采样可能停在边缘区外 → hold 全程不滚动（M15 CI 实锤）。
+        ensureAutoScrollLink()
         // 激活帧即按矩形语义落一次目标（零尺寸矩形扩展 1pt 命中起手 cell）
         processFinger(atWindowPoint: lastFingerWindowPoint)
     }
@@ -146,17 +149,12 @@ final class SlideSelectGestureController: NSObject {
 
     // MARK: - 边缘自动滚动
 
-    private func updateEdgeAutoScroll() {
-        guard isDragSelecting, edgeVelocity() != 0 else {
-            invalidateAutoScroll()
-            return
-        }
+    private func ensureAutoScrollLink() {
         guard autoScrollLink == nil else { return }
         let link = CADisplayLink(target: self, selector: #selector(autoScrollTick(_:)))
         link.preferredFramesPerSecond = 60
         link.add(to: .main, forMode: .common)
         autoScrollLink = link
-        state = .autoScrolling
     }
 
     @objc private func autoScrollTick(_ link: CADisplayLink) {
@@ -165,11 +163,8 @@ final class SlideSelectGestureController: NSObject {
             return
         }
         let velocity = edgeVelocity()
-        guard velocity != 0 else {
-            invalidateAutoScroll()
-            if state == .autoScrolling { state = .selecting }
-            return
-        }
+        // 指尖不在边缘区：保持 tick 空转（不重建），hold 停进边缘区的下一帧即开始滚动
+        guard velocity != 0 else { return }
         let minY = -Double(collectionView.adjustedContentInset.top)
         let maxY = max(minY,
                        Double(collectionView.contentSize.height
@@ -181,6 +176,7 @@ final class SlideSelectGestureController: NSObject {
                                                      max: maxY)
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: CGFloat(target)),
                                         animated: false)
+        if state == .selecting { state = .autoScrolling }
         // startPoint 保持 content 坐标不变：滚动后矩形按内容坐标重算，新流入的 cell 自然入集
         processFinger(atWindowPoint: lastFingerWindowPoint)
     }

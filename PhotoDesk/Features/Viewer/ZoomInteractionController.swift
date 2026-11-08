@@ -86,6 +86,10 @@ final class ZoomInteractionController: NSObject {
 
     func setGesturesEnabled(_ enabled: Bool) {
         gesturesEnabled = enabled
+        // 门禁变化必须立即重估手势可用性：图片晚于首次布局到达（configure 时无图），
+        // 若只等下一次布局回调，捏合/双击会永远停用（docs/26 §5.4 门禁不变量）
+        updateLayout(contentFitSize: contentFitSize,
+                     viewportSize: viewportView?.bounds.size ?? .zero)
         if !enabled, isInteracting, phase != .animating, phase != .settling {
             endInteraction()
         }
@@ -97,13 +101,15 @@ final class ZoomInteractionController: NSObject {
     }
 
     /// 复用/翻页/删除/旋转：直接回 1× 居中（无动画时立即生效）。
+    /// 程序性复位属于一次"事务结束"：必须发 didEnd（VC 串行 drain 依赖该信号），
+    /// 且不得刷新 lastActivity（宽限窗口只应挂在真实用户手势之后，否则翻页/复用后被宽限卡 1s）。
     func reset(animated: Bool) {
         guard transform != .identity else { return }
         if animated && !UIAccessibility.isReduceMotionEnabled {
             animate(to: .identity)
         } else {
             setTransform(.identity)
-            if isInteracting { endInteraction() }
+            endInteraction(forceNotify: true)
         }
     }
 
@@ -206,14 +212,18 @@ final class ZoomInteractionController: NSObject {
 
     private func setTransform(_ t: ZoomTransform) {
         transform = t
-        lastActivity = CACurrentMediaTime()
         onTransformChanged?(t)
     }
 
-    private func endInteraction() {
-        guard phase != .idle else { return }
+    /// 手势/动画结束统一收敛；forceNotify 供程序性 reset 使用（phase 本已 idle 也要发 didEnd）。
+    private func endInteraction(forceNotify: Bool = false) {
+        let wasInteracting = phase != .idle
+        guard forceNotify || wasInteracting else { return }
         phase = .idle
-        onInteractionStateChanged?(false)
+        if wasInteracting {
+            onInteractionStateChanged?(false)
+            lastActivity = CACurrentMediaTime()
+        }
         onInteractionDidEnd?()
     }
 }
