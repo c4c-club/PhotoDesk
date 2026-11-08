@@ -56,7 +56,9 @@ jobs:
   build:
     runs-on: macos-15
     needs: core-linux
-    timeout-minutes: 90
+    # M15：全量 UI 套件（缩放 500 轮压力 + 10 次冷启动位置验证）在模拟器上超出 90min，
+    # 上调到 240min；仅为基础设施上限，不改变任何测试语义。
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
