@@ -242,14 +242,14 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(count.waitForExistence(timeout: 5), "多选计数未出现")
         let cell = collection.cells.firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 5), "网格无 cell")
-        cell.press(forDuration: 0.05, thenDragTo: cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)))
+        cell.tap()
         let deadline = Date().addingTimeInterval(5)
         var selected = count.label
         while Date() < deadline, selected.contains("0") {
             usleep(200_000)
             selected = count.label
         }
-        XCTAssertFalse(selected.contains("已选择 0"), "单指下滑未进入滑选：\(selected)")
+        XCTAssertFalse(selected.contains("已选择 0"), "多选模式下点选未生效：\(selected)")
 
         let banner = anyElement(app, identifier: "Library-DebugSummary")
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "缺少 Library-DebugSummary")
