@@ -1595,9 +1595,6 @@ final class LibraryViewController: UIViewController {
         enforceHeadInsertAnchor()
         // v4：viewDidLayoutSubviews 是 bounds=0 竞态的唯一重试入口（不再只依赖 apply completion）
         attemptPositionRestore()
-        #if DEBUG
-        refreshDebugScrollNote()
-        #endif
         // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
         if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
             drainPendingSnapshot()
