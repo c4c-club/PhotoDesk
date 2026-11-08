@@ -8,6 +8,9 @@ struct CacheManagerView: View {
     @State private var trashBytes: Int64 = 0
     @State private var trashCount = 0
     @State private var isClearing = false
+    @State private var showClearConfirmation = false
+    @State private var clearTrashInstead = false
+    @State private var releasedMessage: String?
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -31,10 +34,11 @@ struct CacheManagerView: View {
                     .font(.caption)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
                 Button("清理磁盘缓存") {
-                    isClearing = true
-                    Task { await reload() }
+                    clearTrashInstead = false
+                    showClearConfirmation = true
                 }
                 .disabled(isClearing)
+                .accessibilityIdentifier("Cache-Clear-Disk")
             }
 
             Section("撤销保险副本") {
@@ -45,16 +49,50 @@ struct CacheManagerView: View {
                     .font(.caption)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
                 Button("清空撤销副本") {
-                    isClearing = true
-                    Task { await purgeTrash() }
+                    clearTrashInstead = true
+                    showClearConfirmation = true
                 }
                 .disabled(isClearing)
+                .accessibilityIdentifier("Cache-Purge-Trash")
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("缓存与存储")
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
+        .confirmationDialog(clearTrashInstead ? "清空撤销副本？" : "清理磁盘缓存？",
+                            isPresented: $showClearConfirmation,
+                            titleVisibility: .visible) {
+            if clearTrashInstead {
+                Button("清空撤销副本", role: .destructive) { Task { await purgeTrash() } }
+            } else {
+                Button("清理磁盘缓存", role: .destructive) { clearDiskCache() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(clearTrashInstead
+                 ? "清理后只能通过系统「最近删除」找回照片，确定继续？"
+                 : "将删除本机缩略图缓存，不影响照片原件。")
+        }
+        .alert("清理完成", isPresented: Binding(
+            get: { releasedMessage != nil },
+            set: { if !$0 { releasedMessage = nil } }
+        )) {
+            Button("好", role: .cancel) { releasedMessage = nil }
+        } message: {
+            Text(releasedMessage ?? "")
+        }
+    }
+
+    private func clearDiskCache() {
+        let before = diskBytes
+        isClearing = true
+        AppContainer.shared.imagePipeline.clearCaches()
+        Task {
+            await reload()
+            let freed = max(0, before - diskBytes)
+            releasedMessage = "已释放 \(Self.byteFormatter.string(fromByteCount: freed))"
+        }
     }
 
     private func reload() async {

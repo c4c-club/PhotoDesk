@@ -8,6 +8,7 @@ import PhotoDeskCore
 
 struct GestureSettingsView: View {
     @ObservedObject private var settings = AppContainer.shared.settings
+    @State private var showResetConfirmation = false
 
     var body: some View {
         List {
@@ -81,11 +82,31 @@ struct GestureSettingsView: View {
                 } label: {
                     Label("重新观看手势教学", systemImage: "play.rectangle")
                 }
+                Button("恢复默认手势") {
+                    showResetConfirmation = true
+                }
+                .accessibilityIdentifier("Gesture-Reset")
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("手势设置")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("恢复默认手势？", isPresented: $showResetConfirmation) {
+            Button("恢复", role: .destructive) { resetToDefaults() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("上滑恢复为「收藏」，下滑恢复为「隐藏」，灵敏度与反馈恢复默认。")
+        }
+    }
+
+    private func resetToDefaults() {
+        settings.swipeUpAction = .favorite
+        settings.swipeDownAction = .hide
+        settings.sensitivityRaw = Sensitivity.standard.rawValue
+        settings.hapticsEnabled = true
+        settings.undoWindow = 5.0
+        settings.autoAdvance = true
+        settings.respectReduceMotion = true
     }
 
     private func sensitivityName(_ level: Sensitivity) -> String {
