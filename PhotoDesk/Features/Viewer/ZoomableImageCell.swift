@@ -167,6 +167,28 @@ final class ZoomableImageCell: UICollectionViewCell {
         loadTask?.cancel()
     }
 
+    // MARK: - 加载 token（docs/09 D02：回填前校验 cell 未被复用给另一张照片）
+
+    /// 开始一次在途加载：token 递增，旧 token 立即失配。
+    @discardableResult
+    func beginLoad() -> Int {
+        loadToken += 1
+        return loadToken
+    }
+
+    /// 回填前校验：token 未被后续 beginLoad / cancelLoad / configure 递增。
+    func matches(token: Int) -> Bool {
+        loadToken == token
+    }
+
+    /// 离屏/复用取消：在途任务取消 + token 失配（回填即使到达也被丢弃）。
+    func cancelLoad() {
+        loadTask?.cancel()
+        loadTask = nil
+        loadToken += 1
+        progressLayer.isHidden = true
+    }
+
     override func prepareForReuse() {
         super.prepareForReuse()
         onZoomTransactionDidBecomeIdle = nil
