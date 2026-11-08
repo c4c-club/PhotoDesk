@@ -91,9 +91,18 @@ struct ExportView: View {
                 }
 
                 if let error = viewModel.errorMessage {
-                    Text(error)
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(Color(ds: DSColor.accentDelete))
+                        Spacer()
+                        Button("重试") {
+                            viewModel.errorMessage = nil
+                            handleSave()
+                        }
                         .font(.caption)
-                        .foregroundColor(Color(ds: DSColor.accentDelete))
+                        .accessibilityIdentifier("Export-Retry")
+                    }
                 }
                 if viewModel.savedToLibrary {
                     Label("已保存到相册", systemImage: "checkmark.circle")

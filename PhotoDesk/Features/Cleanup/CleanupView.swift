@@ -186,6 +186,11 @@ struct CleanupView: View {
                     }
                 }
             }
+            Section {
+                Button("重新扫描") { viewModel.startScan() }
+                    .disabled(coordinator.isRunning || viewModel.isExecuting)
+                    .accessibilityIdentifier("Cleanup-Rescan")
+            }
         }
         .refreshable { viewModel.startScan() }
         .sheet(isPresented: $showGroupSheet) {

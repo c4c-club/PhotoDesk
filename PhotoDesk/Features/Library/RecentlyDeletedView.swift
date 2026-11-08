@@ -4,8 +4,11 @@
 // 本页只做说明与跳转（photos-redirect://），**不提供任何删除/清空操作**（红线 1）。
 
 import SwiftUI
+import UIKit
 
 struct RecentlyDeletedView: View {
+    @State private var showJumpFailure = false
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -25,9 +28,12 @@ struct RecentlyDeletedView: View {
             Spacer()
             Button {
                 // 跳转系统相册（恢复操作只能在系统相册完成）
-                if let url = URL(string: "photos-redirect://") {
-                    UIApplication.shared.open(url)
+                guard let url = URL(string: "photos-redirect://"),
+                      UIApplication.shared.canOpenURL(url) else {
+                    showJumpFailure = true
+                    return
                 }
+                UIApplication.shared.open(url)
             } label: {
                 Label("去系统相册恢复", systemImage: "photo.on.rectangle.angled")
                     .font(.body)
@@ -43,5 +49,10 @@ struct RecentlyDeletedView: View {
         .background(Color(ds: DSColor.bgPrimary))
         .navigationTitle("最近删除")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("无法打开系统相册", isPresented: $showJumpFailure) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("请手动打开「照片」App，在「相簿 → 最近删除」中恢复照片。")
+        }
     }
 }
