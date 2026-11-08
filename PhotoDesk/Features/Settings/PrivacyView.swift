@@ -30,6 +30,8 @@ struct PrivacyView: View {
                             .foregroundColor(Color(ds: DSColor.textSecondary))
                     }
                 }
+            } footer: {
+                Text("若 Face ID / 密码不可用，请到系统「设置 → 面容 ID 与密码」（或「触控 ID 与密码」）开启设备验证后返回重试。")
             }
         }
         .listStyle(.insetGrouped)
