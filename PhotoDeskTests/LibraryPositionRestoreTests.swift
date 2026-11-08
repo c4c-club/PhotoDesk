@@ -207,7 +207,8 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let store = LibraryPositionStore(defaults: testDefaults)
         let viewModel = makeViewModel(repository: FakeAnchorRepository([]), store: store)
         let queryKey = viewModel.query.key
-        store.save(LibraryPosition(assetID: "a-target",
+        store.save(LibraryPosition(anchorVisualY: 54,
+                                   assetID: "a-target",
                                    sectionID: "2026-11",
                                    itemIndexInSection: 5,
                                    offsetRatio: 0,

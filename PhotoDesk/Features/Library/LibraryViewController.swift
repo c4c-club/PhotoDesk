@@ -1165,8 +1165,9 @@ final class LibraryViewController: UIViewController {
     private func refreshDebugScrollNote() {
         #if DEBUG
         let saved = currentSnapshotQueryKey.flatMap { positionStore.load(queryKey: $0) }
-        let anchor = saved?.anchorAssetID ?? "-"
-        let visualY = Int(saved?.anchorVisualY ?? 0)
+        let current = makePositionSnapshot()
+        let anchor = current?.anchorAssetID ?? saved?.anchorAssetID ?? "-"
+        let visualY = Int(current?.anchorVisualY ?? saved?.anchorVisualY ?? 0)
         let off = String(Int(Double(collectionView.contentOffset.y)))
         let maxOffset = String(Int(Double(max(0, collectionView.contentSize.height - collectionView.bounds.height))))
         let sectionCount = collectionView.numberOfSections
