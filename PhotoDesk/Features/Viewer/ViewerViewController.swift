@@ -245,24 +245,28 @@ final class ViewerViewController: UIViewController {
         debugLabel.text = text
     }
 
-    /// 当前 zoom 字段（cell 缩放回调写入；NaN 时 %.2f 会渲染成 "nan" 被 UI 测试捕获）
-    private var debugZoomScale: Double = 1
-    /// M13 P1 强断言取证字段：zoomContentView 宽度 / 待删除数 / viewer-trace 是否出现非有限值。
-    private var debugFrameWidth: CGFloat = -1
-    private var debugPendingDeleteCount = 0
-    private var debugTraceNonFinite = false
-
-    /// 带全部状态字段的横幅（items/idx/id/zoom/load/img，docs/13 §3.9 + docs/16 M12 R02）
+    /// 带全部状态字段的横幅（items/idx/id/zoom/load/img，docs/13 §3.9 + docs/16 M12 R02）。
+    /// zoom / frameW 只在翻页/定时器/用户操作时从 cell.diagnostics 读取；缩放 delegate 不刷新本横幅。
     private func refreshDebugBanner() {
         guard isViewLoaded else { return }
         let index = viewModel.currentIndex
         let idPart = viewModel.items[safe: index].map { "id=\($0.id)" } ?? "id=-"
-        let imgPart = (collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell)
-            .map { "img=\($0.hasImage ? "ok" : "nil")" } ?? "img=-"
+        let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell
+        let imgPart = cell.map { "img=\($0.hasImage ? "ok" : "nil")" } ?? "img=-"
+        let zoom = Double(cell?.diagnostics.currentScale ?? ZoomableImageCell.minZoomScale)
+        let frameWidth = Double(cell?.zoomContentViewFrameWidth ?? -1)
+        let trace = ViewerTrace.recentLines()
+        let nonFinite = trace.contains {
+            $0.localizedCaseInsensitiveContains("nan")
+                || $0.localizedCaseInsensitiveContains("non-finite")
+                || $0.localizedCaseInsensitiveContains("非有限")
+        }
+        let pending = AppContainer.shared.reviewSession.pendingDeleteCount
+        let vfz = trace.filter { $0.contains("viewForZooming") }.count
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", debugZoomScale)) load=\(inflightLoadCount) \(imgPart) " +
-                         "frameW=\(String(format: "%.1f", debugFrameWidth)) " +
-                         "pendingDeleteCount=\(debugPendingDeleteCount) traceNonFinite=\(debugTraceNonFinite ? 1 : 0)")
+                         "zoom=\(String(format: "%.2f", zoom)) load=\(inflightLoadCount) \(imgPart) " +
+                         "frameW=\(String(format: "%.1f", frameWidth)) " +
+                         "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0) vfz=\(vfz)")
     }
 
     /// 单元测试布局断言锚点（A4：itemSize 刷新；Release 不编译）
@@ -950,50 +954,6 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - 翻页与图片加载
 
-    /// zoom 回调统一入口（M12 Phase 1）：DEBUG 横幅 + ViewerTrace 面包屑（限流：60fps 回调不能逐帧落盘，
-    /// 变化 >0.1 才记一条；非有限值只记一次取证标记——捏合崩溃时序还原的关键证据）
-    private func handleZoomCallback(_ scale: CGFloat) {
-        #if DEBUG
-        debugZoomScale = Double(scale)
-        refreshDebugBanner()
-        #endif
-        if scale.isFinite {
-            let value = Double(scale)
-            if abs(value - lastLoggedZoom) > 0.1 {
-                lastLoggedZoom = value
-                ViewerTrace.log("zoom=\(String(format: "%.2f", value)) idx=\(viewModel.currentIndex)")
-                logPendingDeleteCount("zoom idx=\(viewModel.currentIndex)")
-                logGeometryBreadcrumb()
-            }
-        } else if !didLogNonFiniteZoom {
-            didLogNonFiniteZoom = true
-            ViewerTrace.log("zoom=\(scale) idx=\(viewModel.currentIndex)（非有限值）")
-            logPendingDeleteCount("zoom non-finite idx=\(viewModel.currentIndex)")
-            logGeometryBreadcrumb()
-        }
-    }
-    private var lastLoggedZoom: Double = -1
-    private var didLogNonFiniteZoom = false
-
-    /// Release 几何面包屑：当前 zoomContentView / imageView / contentSize / zoomScale / pending 队列。
-    /// 只写有限几何数字，不含照片像素，不上传；DEBUG 横幅同步暴露 frameW / pendingDeleteCount / traceNonFinite。
-    private func logGeometryBreadcrumb() {
-        let cell = collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell
-        let frameWidth = Double(cell?.zoomContentViewFrameWidth ?? -1)
-        let imageViewWidth = Double(cell?.imageViewFrameWidth ?? -1)
-        let contentSize = cell?.innerContentSize ?? "unknown"
-        let state = cell?.zoomTransactionState.rawValue ?? "none"
-        let trace = ViewerTrace.recentLines()
-        let nonFinite = trace.contains { $0.localizedCaseInsensitiveContains("nan") || $0.localizedCaseInsensitiveContains("non-finite") || $0.localizedCaseInsensitiveContains("非有限") }
-        ViewerTrace.log("geometry zoomContentView=\(frameWidth) imageView=\(imageViewWidth) contentSize=\(contentSize) state=\(state) pendingDeleteCount=\(AppContainer.shared.reviewSession.pendingDeleteCount) queue=\(pendingRemovalActions.count) traceNonFinite=\(nonFinite ? 1 : 0)")
-        #if DEBUG
-        debugFrameWidth = CGFloat(frameWidth)
-        debugPendingDeleteCount = AppContainer.shared.reviewSession.pendingDeleteCount
-        debugTraceNonFinite = nonFinite
-        refreshDebugBanner()
-        #endif
-    }
-
     private func scrollTo(index: Int, animated: Bool = true) {
         guard index >= 0, index < viewModel.items.count else { return }
         isProgrammaticScroll = true
@@ -1117,11 +1077,6 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
         imageCell.setDownloadHandler { [weak self, weak imageCell] id in
             guard let self, let imageCell else { return }
             self.downloadFromCloud(id: id, cell: imageCell)
-        }
-        // M12 Phase 1：zoom 回调不再过滤 NaN/inf（旧 guard scale.isFinite 让「横幅无 nan」恒真——
-        // docs/16 §0.2 假绿 1）。横幅原样渲染（DEBUG），ViewerTrace 面包屑 Release 同样生效。
-        imageCell.setZoomCallback { [weak self] scale in
-            self?.handleZoomCallback(scale)
         }
         loadImage(for: item, at: indexPath.item, cell: imageCell)
         return imageCell
