@@ -1,0 +1,526 @@
+【PhotoDesk M15 一次性执行提示词】
+生成日期：2026-11-09
+适用仓库：C:\Users\RuiZh\Desktop\photo_manager
+适用基线：fix/p0-20261108 @ 430cc59
+目标版本：1.5.0 (Build 6)，最低 iOS 16.0
+配套规划：docs/25-页面功能补齐与四项P0结构性重做规划.md（本提示词的唯一详细方案来源）
+
+====================================================================
+0. 角色与总任务
+====================================================================
+
+你是 PhotoDesk 的执行 Agent。本轮必须一次性完成以下全部工作，不要中途询问用户、不要分阶段等确认、不要把任务拆成多次投喂：
+
+A. 对四项 P0 做“结构性重做”，不是在旧实现上打补丁：
+   1) 捏合缩小/放大必崩溃；
+   2) 上次浏览位置记不准（概率事件）；
+   3) 滑动多选在左侧向下滑会选中整行；
+   4) 多选后无法滑动取消。
+B. 对 24 个页面做功能补齐与 bug 修复（矩阵见 docs/25 §7）。
+C. 每个阶段在合适位置提交本地 git；最后打包 1.5.0 (6) release，报告 IPA 完整绝对路径。
+D. 做验证：本地 Core 测试、CI iOS 单测/UI 测试/性能测试；物理 iPhone 若接入则做实机测试，未接入则输出 BLOCKED + 用户自测清单，绝不伪造真机 ✅。
+
+本提示词与 docs/25 冲突时，以 docs/25 为准；docs/25 与用户 2026-11-09 原话冲突时，以用户原话为准。
+
+====================================================================
+1. 开工前必读（按顺序）
+====================================================================
+
+1.1 读仓库根目录 AGENTS.md，逐条遵守：
+   - iOS 16.0 硬基线；禁止 iOS 17+ API（@Observable、ContentUnavailableView、SwiftData、.scrollTargetBehavior、.scrollPosition）；
+   - PhotoDeskCore 只能 import Foundation；禁止 UIKit/SwiftUI/Photos/Vision/CoreImage/Accelerate；
+   - 0 第三方依赖；禁止 URLSession 外发；禁止任何分析/广告 SDK；
+   - 删除只能 PHAssetChangeRequest.deleteAssets → 系统「最近删除」；禁止永久删除入口；
+   - 网格/查看器必须 UIKit UICollectionView + Compositional Layout + Diffable DataSource + Prefetching；
+   - 图片必须走 ImagePipeline；线程/队列规则按 AGENTS.md §3。
+1.2 读 docs/25 全文，重点 §2（全新审查）、§4（缩放）、§5（位置）、§6（框选）、§7（页面矩阵）、§8（阶段）。
+1.3 读 docs/03（技术设计）、docs/04（UIUX）、docs/01（FR 条目）、docs/06（构建/签名/发布）、docs/12（真机清单）。
+1.4 只把 docs/21 / docs/22 / docs/24 当“历史记录”，不要当结论。尤其：
+   - docs/22 §5.4 的“整行带”语义已作废；
+   - docs/24 的“四项 P0 已修”“位置误差 ≤1 行”不成立；
+   - 旧测试里任何“整行 ≥12 格”“vfz==0”“数量≥N”的断言不得作为验收主证据。
+1.5 读现有代码（不要先改）：
+   - PhotoDesk/Features/Viewer/ZoomableImageCell.swift
+   - PhotoDesk/Features/Viewer/ViewerViewController.swift
+   - PhotoDesk/Features/Viewer/ViewerGesturePolicy.swift
+   - PhotoDesk/Features/Library/LibraryViewController.swift
+   - PhotoDesk/Features/Library/LibraryPositionCoordinator.swift
+   - PhotoDesk/Features/Library/SlideSelectGestureController.swift
+   - PhotoDesk/Features/Library/LibraryViewModel.swift
+   - PhotoDesk/Core/Support/LibraryPositionStore.swift
+   - PhotoDeskCore/Sources/PhotoDeskCore/ 下所有 Position/Slide/Zoom/Selection 相关文件
+   - PhotoDeskUITests/StabilityUITests.swift 中与四项 P0 相关的用例
+1.6 解析 .m13-notes/crash5/DiagnosticReports/ 的 25 份 .ips，确认 P0-1 的栈是 UIScrollView _zoomScaleFromPresentationLayer → _getDelegateZoomView → viewForZooming 递归；把结论写进 artifacts/audit/2026-11-09/root-cause.md。
+
+====================================================================
+2. 环境、分支、红线
+====================================================================
+
+2.1 环境（2026-11-09 已探测）：
+   - Windows 10 原生 + Git Bash/MINGW64；PowerShell 7.6.7；
+   - Docker 29.8.2 可用；本地 Core 测试唯一镜像 swift:6.0-noble；
+   - gh 已登录 c4c-club；CI 为 .github/workflows/ios.yml（macos-15 + Xcode 16.4，iOS 16.4 模拟器）；
+   - 本机无 Xcode、无 iPhone、无 AltServer、无 idevice/pymobiledevice3；
+   - 因此“真机”必须按 Phase 7 的探测结果处理，不得把模拟器写成真机。
+2.2 分支：
+   cd /c/Users/RuiZh/Desktop/photo_manager
+   git status --porcelain          # 必须干净（docs/25、docs/26 未跟踪除外）
+   git checkout -b fix/m15-20261109
+   git rev-parse --short HEAD      # 记录基线
+2.3 红线（违反即打回）：
+   - 不得永久删除；不得提供“彻底删除/永久删除/清空最近删除”入口；
+   - 不得让 PhotoDeskCore 依赖 Apple 框架；
+   - 不得引入第三方依赖；
+   - 不得使用 URLSession 外发；
+   - 不得为通过 CI 而削弱/删除断言（除本提示词明确要求删除的旧错误语义断言）；
+   - 不得伪造真机 ✅；
+   - 不得在 `viewForZooming` 上继续打补丁；本轮必须让该符号在仓库中 0 命中（注释也不保留旧方案描述）；
+   - 不得保留 `SlideSelectRangePolicy` 整行带实现或测试。
+
+====================================================================
+3. 总体执行顺序（必须按序，全部执行完）
+====================================================================
+
+Phase 0  基线 + 全新审查 + 重写审查脚本
+Phase 1  P0-1 缩放重做（自管变换，移除 UIScrollView 缩放）
+Phase 2  P0-2 位置记忆 v5（原子文件 + 单一状态机）
+Phase 3  P0-3/4 矩形框选（select/deselect 双模式）
+Phase 4  24 页功能补齐
+Phase 5  全量回归
+Phase 6  Release 1.5.0 (6)
+Phase 7  实机/物理设备（接入则测；未接入则 BLOCKED）
+Phase 8  文档回填
+Phase 9  终检与最终报告
+
+每个 Phase 完成后：
+   - 跑对应测试；
+   - git add + git commit（消息见各 Phase）；
+   - push 到 origin/fix/m15-20261109；
+   - 用 gh run list / gh run watch 确认 CI，失败必须修，不得跳过。
+
+====================================================================
+4. Phase 0 — 基线、全新审查、重写审查脚本
+====================================================================
+
+4.1 记录基线到 artifacts/audit/2026-11-09/baseline.md：
+   - git branch --show-current、git rev-parse HEAD、git status --porcelain；
+   - project.yml 的 MARKETING_VERSION / CURRENT_PROJECT_VERSION / IPHONEOS_DEPLOYMENT_TARGET；
+   - gh run list --limit 5；
+   - 代码规模：find PhotoDesk -name "*.swift" | wc -l 等。
+4.2 跑本地 Core 基线：
+   powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+   期望 270/270；记录耗时与日志到 artifacts/audit/2026-11-09/core-baseline.log。
+4.3 重写审查脚本（不要修补旧脚本）：
+   - 新文件 scripts/audit-m15.ps1；
+   - 旧 scripts/audit-current-state.ps1 保留但不再使用（可在文件头标注“已过期，M15 用 audit-m15.ps1”）；
+   - 检查项：
+     a) 必需文件清单存在，缺失 exit 2；
+     b) 红线：URLSession、Core 的 UIKit/SwiftUI/Photos 等 import、try!、as!、@Observable、ContentUnavailableView、SwiftData、.scrollTargetBehavior、.scrollPosition；
+     c) P0-1：PhotoDesk/Features/Viewer 下 viewForZooming / UIScrollViewDelegate / setZoomScale / contentInset / zoomScale 的命中行；
+     d) P0-2：positionStore.save( 调用点、UserDefaults 位置键、beginRestore 调用点、viewWillDisappear 保存、3s/3 次上限；
+     e) P0-3/4：SlideSelectRangePolicy 引用、target = baseIDs、insert-only、整行提示文案、旧测试名；
+     f) 页面清单：PhotoDesk/Features 下每个 *View.swift / *ViewController.swift 的路径、行数、入口标识；
+     g) 测试清单：PhotoDeskTests / PhotoDeskUITests / PhotoDeskCore/Tests 的用例数；
+   - 输出 artifacts/audit/2026-11-09/audit.md + audit.json；
+   - 脚本必须可重复运行、任何异常非 0 退出。
+4.4 写 artifacts/audit/2026-11-09/root-cause.md：
+   - 以 docs/25 §2 为骨架；
+   - 附实际 grep 结果与行号；
+   - 明确 P0-1 旧 .ips 栈、P0-2 八个缺陷、P0-3/4 整行带与只加不减；
+   - 列出“必须删除/重写的旧测试”清单（至少包含 SlideSelectRangePolicyTests、testVerticalSlideSelectLeftColumns 等）。
+4.5 提交：
+   git add docs/25-*.md docs/26-*.txt scripts/audit-m15.ps1 artifacts/audit/2026-11-09
+   git commit -m "docs(m15): 新增 M15 规划与一次性执行提示词"
+   git commit -m "chore(audit): 重写 M15 审查脚本与基线取证"   # 可分两次
+
+门禁：审查脚本可运行；红线 0 命中；旧测试冲突清单完整；Core 270/270。
+
+====================================================================
+5. Phase 1 — P0-1 缩放重做
+====================================================================
+
+5.1 先写红测试（Core）：
+   新增 PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomTransformPolicyTests.swift，至少 18 条：
+   - pinch 锚点不变（多个 anchor：中心、左上、右下、边缘）；
+   - scale 钳制 1...5，NaN/∞/0/负数安全；
+   - translation 钳制：内容小于 viewport 时居中；内容大于 viewport 时不露白；
+   - doubleTap 1→2.5→1；
+   - relayout 旋转后仍满足钳制；
+   - 0/负 content/viewport 返回安全值。
+   先跑 scripts/test-core.ps1 确认红。
+
+5.2 实现 Core：
+   新增 PhotoDeskCore/Sources/PhotoDeskCore/ZoomTransform.swift
+   - 只 import Foundation；
+   - 类型/函数签名见 docs/25 §4.3；
+   - 所有函数对非有限输入返回安全值；
+   - 禁止使用 CGFloat/CGPoint/CGRect。
+   跑 Core 测试转绿。
+
+5.3 新增 PhotoDesk/Features/Viewer/ZoomInteractionController.swift：
+   - 持有 pinch/pan/double-tap 手势；
+   - 状态机 idle/pinching/panning/settling；
+   - 回调 onTransformChanged、onInteractionStateChanged；
+   - pan 只在 scale > 1.01 时开始；
+   - reset(animated:)；
+   - 所有几何只调 ZoomTransformPolicy；
+   - 不使用 UIScrollView 的 zoom API。
+
+5.4 重写 PhotoDesk/Features/Viewer/ZoomableImageCell.swift：
+   - 视图层级：contentView → viewportScrollView（UIScrollView，仅容器；isScrollEnabled=false，delegate=nil，永不调用 zoom API）→ imageView；
+   - 删除 UIScrollViewDelegate 扩展、viewForZooming、scrollViewDidZoom、scrollViewDidEndZooming、scrollViewWillBeginZooming、setZoomScale、contentInset、contentSize、zoomContentView；
+   - layoutSubviews 只算 aspectFit 的 imageView.bounds；transform/center 由 ZoomInteractionController 回调写；
+   - prepareForReuse/configure 调 zoomController.reset(animated:false)；
+   - 旋转/尺寸变化调 ZoomTransformPolicy.relayout；
+   - 保留 beginLoad/matches/cancelLoad/configureToken/cloudBox/下载进度；
+   - 保留 accessibilityIdentifier "Viewer-ZoomScrollView" 在 viewportScrollView 上（UI 测试锚点）。
+
+5.5 改 PhotoDesk/Features/Viewer/ViewerViewController.swift：
+   - currentCellZoomState 改读 cell 的纯值 zoomState（isInteracting/scale）；
+   - 缩放交互期间 collectionView.isScrollEnabled=false；结束且 scale<=1.01 恢复；
+   - onPan(.changed) 的 shouldPanBegin：cell.isInteracting || cell.zoomScale>1.01 时取消上下滑动作；
+   - 翻页/scrollTo 后对旧 cell resetZoom；新 cell configure 自带 reset；
+   - pendingRemovalActions 保留，但只按 cell.isInteracting 排队；删除任何 CATransaction 几何提交/zoom idle handler 里的几何读取；
+   - 删除 wireZoomTransactionIdleIfNeeded 中 refreshDebugBanner 的几何读取，改名 wireZoomIdleIfNeeded。
+
+5.6 测试：
+   - 新增 PhotoDeskTests/ZoomableImageCellTests.swift（≥8 条）；
+   - 重写 PhotoDeskUITests/ZoomStabilityUITests.swift：
+     * testPinch500Cycles：100 轮 × 5 组（pinch 0.45/2.2 交替），每 10 轮 assertAlive；
+     * testPinchAfterPageChange；testPinchAfterReuse（快速翻 10 页）；
+     * testPinchAfterRotation；
+     * testDoubleTap50；
+     * testPinchDoesNotTriggerRemoval；
+     * testZoomedPanDoesNotPage；testOneXPanPages；
+   - 删除所有 vfz / viewForZooming / contentSize 断言；
+   - 旧 testPinchHitsInnerScrollView 保留名字但只断言 viewport 存在、frameW>0、100 轮后 app 存活、img=ok。
+
+5.7 门禁：
+   - scripts/test-core.ps1 全绿（Core ≥ 288 条）；
+   - grep -rn "viewForZooming\|UIScrollViewDelegate\|setZoomScale\|contentInset\|zoomContentView" PhotoDesk/Features/Viewer 必须 0 命中；
+   - CI 定向：gh workflow run ios.yml --ref fix/m15-20261109 -f test_filter='-only-testing:PhotoDeskTests/ZoomableImageCellTests -only-testing:PhotoDeskUITests/ZoomStabilityUITests'
+   - 500 轮捏合 0 崩溃、0 .ips。
+
+5.8 提交：
+   git commit -m "test(core): 新增缩放变换红测试"
+   git commit -m "feat(core): 新增缩放变换纯策略"
+   git commit -m "refactor(viewer): 移除 UIScrollView 缩放改为自管变换"
+   git commit -m "fix(viewer): 缩放与翻页/复用/删除互斥"
+
+====================================================================
+6. Phase 2 — P0-2 位置记忆 v5
+====================================================================
+
+6.1 红测试：
+   - PhotoDeskCore/Tests/.../PositionRestoreMachineV5Tests.swift（≥10 条）；
+   - PhotoDeskTests/PositionFileStoreTests.swift（≥8 条）；
+   - PhotoDeskTests/LibraryPositionCoordinatorTests.swift 重写（≥12 条）。
+6.2 Core：
+   新增 PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift
+   - 见 docs/25 §5.4；
+   - 不设 3s 失败；canSave 只在 settled；
+   - 删除/替换 PositionRestoreStateMachine.swift 及其旧测试（如仍被引用则保留类型但标记 deprecated，最终 0 引用）。
+6.3 存储：
+   新增 PhotoDesk/Core/Support/PositionFileStore.swift
+   - 路径 Application Support/LibraryPosition/anchors-v5.json；
+   - 原子写 Data.write(options:.atomic)；
+   - 串行队列；损坏 JSON 备份 .corrupt-<timestamp>；最多 64 个 queryKey，按 savedAt 淘汰；
+   - 迁移 v1–v4 UserDefaults 键；迁移失败保留旧键。
+   重写 PhotoDesk/Core/Support/LibraryPositionStore.swift 内部为文件存储；对外 load/save/isEnabled/clear/clearAll 接口保持不变。
+6.4 协调器：
+   重写 PhotoDesk/Features/Library/LibraryPositionCoordinator.swift
+   - 状态：idle/restoring/applying/verifying/settled/fallback；
+   - 恢复完成前 canSave=false；
+   - beginRestore 每 queryKey 一次；
+   - 恢复算法见 docs/25 §5.5：scrollToItem(.top) + layoutIfNeeded + target=minY-anchorVisualY + setContentOffset + verify ±0.5pt；失败重试一次；
+   - 不在恢复中触发保存；
+   - 删除 3s/3 次上限。
+6.5 VC/VM：
+   - LibraryViewController：
+     * viewWillDisappear 只在 isMovingFromParent||isBeingDismissed 时保存；
+     * 删除 3-pass pendingHeadInsertAnchor 逻辑，改为 apply completion 一次补偿 + 下一布局校验一次；
+     * save 触发：scrollViewDidEndDragging/DidEndDecelerating/willResignActive/scenePhase != active/月份跳转/回到顶部；
+     * attemptPositionRestore 按 §5.5；
+   - LibraryViewModel.fetchFirstBatch 使用 v5 store；锚点窗口逻辑保留；
+   - AppearanceSettingsView 文案“UserDefaults”→“本机文件（Application Support）”。
+6.6 测试：
+   - 重写 PhotoDeskUITests/PositionRestoreUITests.swift：
+     * testColdLaunchRestoresSamePixelPosition10Times：循环 10 次，每次滚到深月、记录首可见 cell assetID + frame.minY、app.terminate()、relaunch、断言同 assetID、y ±2pt；
+     * testForceKillRestores；
+     * testBackgroundForegroundRestores；
+     * testRotationKeepsAnchor；
+     * testFilterSwitchDoesNotLeakAnchor；
+     * testHeadInsertKeepsAnchor；
+   - 删除“≤1 行”容差断言。
+6.7 门禁：
+   - Core 全绿；恢复前 save 0 次；10/10 冷启动 ±2pt；
+   - CI 定向：-only-testing:PhotoDeskTests/PositionFileStoreTests -only-testing:PhotoDeskTests/LibraryPositionCoordinatorTests -only-testing:PhotoDeskUITests/PositionRestoreUITests。
+6.8 提交：
+   git commit -m "test(position): 新增位置 v5 红测试"
+   git commit -m "feat(position): 位置记忆 v5 原子文件存储"
+   git commit -m "fix(position): 单一恢复状态机与首启保存门禁"
+
+====================================================================
+7. Phase 3 — P0-3/4 矩形框选
+====================================================================
+
+7.1 红测试：
+   新增 PhotoDeskCore/Tests/.../MarqueeSelectionPolicyTests.swift（≥14 条）：
+   - 3 列/5 列左列竖直下拉只选左列；
+   - 右列同理；
+   - 斜向矩形；
+   - 跨 section；
+   - 末行不满；
+   - 间距/边界；
+   - 0/NaN/负值；
+   - 回拖收缩；
+   - deselect 模式；
+   - base 混合。
+7.2 Core：
+   新增 PhotoDeskCore/Sources/PhotoDeskCore/MarqueeSelectionPolicy.swift
+   - 见 docs/25 §6.2；
+   - 纯 Foundation/Int/Double/Set；
+   - 矩形相交；宽/高为 0 时扩展 1pt；非有限返回空。
+   删除 PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectRangePolicy.swift 及其 7 条测试。
+7.3 控制器：
+   重写 PhotoDesk/Features/Library/SlideSelectGestureController.swift：
+   - 起手记录 startPoint（content 坐标）、anchorCell、baseIDs、mode=baseIDs.contains(anchorID)?.deselect:.select；
+   - 移动 ≥3pt 激活；
+   - 每帧构造 MarqueeRect，hitIDs=cells(in:)，target=resolved(base:hitIDs:mode:)；
+   - 集合变化才 apply/haptic；
+   - 删除 lastCurrentCell/visited/parity/insert-only；
+   - 边缘自动滚动：滚动后重算 startPoint 的 content 坐标；
+   - 轻点仍走 didSelectItemAt（cancelsTouchesInView=false）。
+7.4 VC/cell：
+   - 提示文案：“在照片上拖动可框选；从已选照片起拖可取消；双指滚动”；
+   - applySlideSelection 保持整体替换；
+   - PhotoGridCell.prepareForReuse 复位 isSelectedCell=false、isSelectingVisible=false、borderWidth=0、selectionBadge.isHidden=true；
+   - 选择模式 collectionView.panGestureRecognizer.minimumNumberOfTouches=2 保留。
+7.5 测试：
+   - 新增 PhotoDeskUITests/MarqueeSelectionUITests.swift（≥8 条）：
+     * testVerticalDragOnLeftColumnSelectsOnlyLeftColumn：3 列，左列下拉 4 行，断言 count==4（±1），右侧两列 cell 的 AX 不含 selected；
+     * testVerticalDragOnRightColumnSelectsOnlyRightColumn；
+     * testDragFromSelectedCellDeselects：先选 6， 从已选格下拉覆盖 3，count 减少 3；
+     * testDragBackShrinksWithinSameGesture；
+     * testDiagonalMarqueeSelectsRectangle；
+     * testAutoScrollMarquee；
+     * testTapNotSwallowed；
+     * testSelectAllThenMarquee；
+   - 删除/重写 StabilityUITests 中 testVerticalSlideSelectSelectsLeftColumns、testSlideSelectDragBackRestores、testDragBackRemovesPreviouslySelected、testDragBackRestoresOriginal 的整行/只加不减断言。
+7.6 门禁：
+   - grep -rn "SlideSelectRangePolicy" 仓库 0 命中；
+   - 左列下拉只选左列；取消模式正确；回拖收缩；
+   - CI 定向：-only-testing:PhotoDeskUITests/MarqueeSelectionUITests。
+7.7 提交：
+   git commit -m "test(core): 新增矩形框选红测试"
+   git commit -m "refactor(selection): 矩形框选替换整行带"
+   git commit -m "fix(selection): 支持起手已选取消与回拖收缩"
+   git commit -m "fix(grid): 复用 cell 选中态复位"
+
+====================================================================
+8. Phase 4 — 24 页功能补齐
+====================================================================
+
+按 docs/25 §7 矩阵逐页执行。每页先写 artifacts/pages/2026-11-09/<page>.md（现状/缺口/改动/验收），再改代码。
+
+优先顺序与要点：
+8.1 工具页 ToolsView：把 .navigationViewStyle(.stack) 从 List 移到 NavigationView 上；加存储统计/相簿快捷入口；关闭按钮保留。
+8.2 相簿列表 AlbumsView：加封面缩略图（首张，ImagePipeline）+ 数量；计数/封面异步；空态/失败重试。
+8.3 相簿详情 AlbumDetailView：200/页 + 触底加载；空相簿文案；移出失败原因。
+8.4 导出 ExportView/ExportViewModel：导出中取消（Task cancellation + 删除临时文件）；进度条；重试保留选项。
+8.5 已隐藏 VaultView：修复“使用设备密码解锁”按钮（调用 BiometricGate 的 deviceOwnerAuthentication 路径，或改文案为“去系统设置”并说明；优先实现前者）；失败原因复制；后台立即锁定。
+8.6 设置 SettingsView：关于页补 Build、系统版本、开源许可声明（仅系统框架，无第三方）。
+8.7 缓存与存储 CacheManagerView：显示真实磁盘缓存/撤销副本占用；清理二次确认；自动淘汰说明。
+8.8 诊断日志 DiagnosticsView：复制诊断摘要、导出、清空、日志大小。
+8.9 外观与网格 AppearanceSettingsView：位置记忆文案改“本机文件”；列数即时预览；恢复默认。
+8.10 信息面板 MetadataView：文件名/格式/大小/EXIF/GPS 完整；复制全部；分享；加载态。
+8.11 编辑器 EditorViewController：未保存离开二次确认；裁剪比例 chips；旋转/翻转/重置；保存防连点。
+8.12 搜索/筛选 SearchView：结果计数、历史单条删除、250ms 防抖、空结果清除。
+8.13 智能清理 CleanupView：扫描取消二次确认、失败原因复制、结果重新扫描。
+8.14 整理回顾 SessionReviewView：逐项失败原因复制、全部恢复二次确认、空态。
+8.15 引导/权限 PermissionIntroView：.limited 管理入口、拒绝去设置、受限说明。
+8.16 最近删除 RecentlyDeletedView：30 天说明、去系统相册、FAQ、无删除入口。
+8.17 手势教学 GestureTutorialView：可交互练习、减弱动态效果、去设置。
+8.18 其余页面按矩阵核对，已具备则只补回归用例，不重复实现。
+
+每 3–4 页提交一次：
+   git commit -m "feat(pages): 相簿封面与详情分页"
+   git commit -m "feat(pages): 导出取消与进度"
+   git commit -m "fix(pages): 已隐藏密码按钮与失败原因复制"
+   git commit -m "feat(pages): 设置关于/缓存实际占用/诊断复制"
+   git commit -m "feat(pages): 工具页导航与快捷入口"
+   ...
+
+门禁：24 页矩阵每行有结论/证据；无 TODO/FIXME；每页至少一个 UI smoke 或明确“已具备”。
+
+====================================================================
+9. Phase 5 — 全量回归
+====================================================================
+
+9.1 本地 Core：
+   powershell -ExecutionPolicy Bypass -File scripts/test-core.ps1
+   目标 ≥300 条，0 失败；日志 artifacts/core-final-20261109.log。
+9.2 静态红线：
+   - grep -rn "URLSession" PhotoDesk PhotoDeskCore → 0；
+   - grep -rn "import UIKit\|import SwiftUI\|import Photos\|import Vision\|import CoreImage\|import Accelerate" PhotoDeskCore/Sources → 0；
+   - grep -rn "try!\|as!" PhotoDesk PhotoDeskCore → 0（IBOutlet 除外）；
+   - grep -rn "@Observable\|ContentUnavailableView\|SwiftData\|scrollTargetBehavior\|scrollPosition" PhotoDesk → 0。
+9.3 CI 全量：
+   gh workflow run ios.yml --ref fix/m15-20261109
+   gh run watch <run-id> --exit-status
+   或 push 自动触发；确认：
+   - core-linux success；
+   - Build(simulator) success；
+   - Test(simulator) success（iOS 单测 191+，UI 53+，全绿）；
+   - Performance 4/4 success；
+   - Build/Verify unsigned ipa success。
+9.4 失败处理：
+   gh run view <run-id> --log-failed > artifacts/ci/<run-id>-failed.log
+   逐条修，不得跳过/弱化断言；修复后重跑。
+9.5 内存/性能：
+   - 网格滚动内存峰值 <250MB；
+   - 查看器快滑 <250MB；
+   - 滚动 ≥55 FPS（模拟器参考值；真机另测）。
+9.6 提交：如回归中有修复，按模块提交；无修复则只记录。
+
+门禁：full run success；0 .ips；0 红线命中。
+
+====================================================================
+10. Phase 6 — Release 1.5.0 (6)
+====================================================================
+
+10.1 改 project.yml：
+   MARKETING_VERSION: "1.5.0"
+   CURRENT_PROJECT_VERSION: "6"
+10.2 提交：
+   git commit -m "chore(release): 1.5.0 (6)"
+10.3 触发 CI full run（push 或 workflow_dispatch），等待 success。
+10.4 下载 IPA：
+   mkdir -p artifacts/release/1.5.0
+   gh run download <run-id> -n PhotoDesk-unsigned-ipa -D artifacts/release/1.5.0/
+   把 build/PhotoDesk-unsigned.ipa 重命名为 PhotoDesk-1.5.0-build6-unsigned.ipa。
+10.5 校验（必须逐项）：
+   unzip -l ... | grep "Payload/PhotoDesk.app/PhotoDesk"
+   unzip -p ... Payload/PhotoDesk.app/Info.plist > /tmp/Info.plist
+   plutil -extract MinimumOSVersion raw -o - /tmp/Info.plist  # 16.0
+   unzip -p ... Payload/PhotoDesk.app/PhotoDesk > /tmp/PhotoDesk
+   otool -l /tmp/PhotoDesk | grep -A3 LC_BUILD_VERSION  # minos 16.0
+   codesign -dv ...  # 不应有 Signature
+   shasum -a 256 ...
+10.6 写 artifacts/release/1.5.0/release-manifest.json：
+   {
+     "version": "1.5.0",
+     "build": "6",
+     "commit": "<head>",
+     "ciRunId": "<run-id>",
+     "sha256": "<sha>",
+     "bytes": <bytes>,
+     "builtAt": "<ISO8601 +08:00>",
+     "ipaPath": "C:\\Users\\RuiZh\\Desktop\\photo_manager\\artifacts\\release\\1.5.0\\PhotoDesk-1.5.0-build6-unsigned.ipa",
+     "signed": false,
+     "minimumOSVersion": "16.0",
+     "bundleID": "com.example.PhotoDesk"
+   }
+10.7 最终必须报告绝对路径：
+   C:\Users\RuiZh\Desktop\photo_manager\artifacts\release\1.5.0\PhotoDesk-1.5.0-build6-unsigned.ipa
+
+====================================================================
+11. Phase 7 — 实机/物理设备
+====================================================================
+
+11.1 探测（两条命令都跑）：
+   pwsh -NoProfile -Command "Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -match 'Apple|iPhone|iPad' } | Select-Object Status,Class,FriendlyName"
+   (where.exe idevice_id; where.exe pymobiledevice3; where.exe AltServer) 2>$null
+11.2 若检测到 iPhone：
+   - 用 AltServer/pymobiledevice3 安装 1.5.0 IPA；
+   - 按 docs/12 M15 清单执行：
+     * P0-1：捏合 100 轮（进/出各 50）、翻页 20 次、旋转 10 次、双击 50 次；0 崩溃/0 卡死；
+     * P0-2：10 次冷启动（含 app switcher 上划杀），每次记录首可见 assetID + y，10/10 一致 ±2pt；
+     * P0-3：3 列/5 列左列下拉各 10 次，确认只选左列；
+     * P0-4：先选 6 格，从已选格下拉取消 3 格，计数减少 3；同手势回拖收缩；
+     * 24 页 smoke：每页进入/返回/空态/错误态；
+   - 采集：截图/录屏、idevicesyslog、.ips、内存/帧率；
+   - 写 artifacts/device/2026-11-09/README.md + 证据文件；
+   - 在 docs/27 中写 E4 证据。
+11.3 若未检测到 iPhone（当前基线）：
+   - 写 artifacts/device/2026-11-09/BLOCKED.md：
+     * 探测命令与输出；
+     * 缺失工具/设备；
+     * 已完成的模拟器证据；
+     * 用户 15 分钟自测清单（四项 P0 + 关键页面）；
+     * 明确“真机项 BLOCKED，未写 ✅”。
+   - 继续 Phase 8/9，不要停。
+11.4 禁止：把模拟器结果写成真机；伪造截图/日志；跳过探测。
+
+====================================================================
+12. Phase 8 — 文档回填
+====================================================================
+
+12.1 新建 docs/27-M15验收记录.md：
+   - 基线（分支/HEAD/版本/Core/CI）；
+   - 四项 P0 的新审查结论与实现；
+   - 每 Phase 的提交、CI run、测试数字；
+   - 24 页矩阵结论；
+   - Release manifest / IPA SHA256 / 绝对路径；
+   - 真机状态（E4 或 BLOCKED）；
+   - 残余风险。
+12.2 更新：
+   - docs/05-开发进程与里程碑.md 进度表/变更日志；
+   - README.md 文档索引（25/26/27）；
+   - 发布说明.md、安装说明.md、已知问题.md；
+   - docs/12-真机签名与验收.md 的 M15 清单。
+12.3 提交：
+   git commit -m "docs(m15): 验收记录与发布说明"
+
+====================================================================
+13. Phase 9 — 终检与最终报告
+====================================================================
+
+13.1 终检：
+   - git status 干净；
+   - git log --oneline 与本提示词的提交计划一致；
+   - CI 最终 run success；
+   - IPA SHA256 双端一致；
+   - grep 确认 viewForZooming / UIScrollViewDelegate / SlideSelectRangePolicy 0 命中；
+   - 红线 0 命中；
+   - docs/27 已写。
+13.2 最终报告（必须包含）：
+   A. 四项 P0 的根因、修复方式、证据（源码/测试/CI/真机或 BLOCKED）；
+   B. 24 页矩阵结论；
+   C. Core 测试数、iOS 单测数、UI 测试数、性能结果；
+   D. Release 版本、build、IPA 绝对路径、SHA256、字节数；
+   E. 真机状态（E4 或 BLOCKED + 原因）；
+   F. 残余风险/未完成项（必须诚实）。
+
+====================================================================
+14. 失败处理与禁止事项
+====================================================================
+
+14.1 任何测试失败：
+   - 先读原始日志，不猜；
+   - 修复根因，不削弱断言；
+   - 重跑；连续 2 次失败写 artifacts/failures/<phase>-<n>.md，继续修，不得跳过。
+14.2 CI 基础设施失败（runner hang / simulator boot 失败）：
+   - 记录 run id 与 spindump；
+   - 重跑一次；仍失败则换 workflow_dispatch 定向；
+   - 不得把基础设施失败记为通过。
+14.3 禁止：
+   - 禁止在 viewForZooming 上打补丁；
+   - 禁止保留整行带策略；
+   - 禁止恢复期保存；
+   - 禁止用 UserDefaults 存位置；
+   - 禁止伪造真机；
+   - 禁止永久删除；
+   - 禁止引入第三方依赖/网络；
+   - 禁止使用 iOS 17+ API；
+   - 禁止为了绿而删除/弱化本提示词未明确要求删除的断言。
+14.4 如果时间/上下文不足：
+   - 优先保证 Phase 1/2/3 三项结构性重做 + Phase 5/6；
+   - 页面补齐可缩范围，但必须在 docs/27 中列出未完成项，不得写 ✅。
+
+====================================================================
+15. 开始执行
+====================================================================
+
+现在从 Phase 0 开始，按顺序执行到 Phase 9。每完成一个 Phase 输出一行进度（Phase / 测试结果 / commit / CI run），不要等待用户确认。最终输出完整报告与 IPA 绝对路径。
+
