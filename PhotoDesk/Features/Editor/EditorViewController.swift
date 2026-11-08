@@ -18,6 +18,10 @@ final class EditorViewController: UIViewController {
     private var sliders: [UISlider] = []
     private let sliderNames = ["亮度", "对比度", "饱和度", "色温", "锐度"]
     private var observers: [AnyCancellable] = []
+    /// 保存门禁：另存/覆盖共享，防连点重复写入（docs/22 Phase 4 编辑器）
+    private var isSaving = false
+    private var saveCopyItem: UIBarButtonItem?
+    private var overwriteItem: UIBarButtonItem?
 
     private enum SliderID: Int, CaseIterable {
         case brightness = 0, contrast, saturation, temperature, sharpness
@@ -42,10 +46,14 @@ final class EditorViewController: UIViewController {
 
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "取消", style: .plain,
                                                            target: self, action: #selector(closeTapped))
+        let copyItem = UIBarButtonItem(title: "另存", style: .done, target: self, action: #selector(saveCopyTapped))
+        let overwriteItem = UIBarButtonItem(title: "覆盖", style: .plain, target: self, action: #selector(overwriteTapped))
+        saveCopyItem = copyItem
+        self.overwriteItem = overwriteItem
         navigationItem.rightBarButtonItems = [
             UIBarButtonItem(title: "还原", style: .plain, target: self, action: #selector(revertTapped)),
-            UIBarButtonItem(title: "覆盖", style: .plain, target: self, action: #selector(overwriteTapped)),
-            UIBarButtonItem(title: "另存", style: .done, target: self, action: #selector(saveCopyTapped)),
+            overwriteItem,
+            copyItem,
         ]
     }
 
@@ -247,7 +255,10 @@ final class EditorViewController: UIViewController {
     }
 
     @objc private func saveCopyTapped() {
-        Task {
+        guard !isSaving else { return }
+        setSaving(true)
+        Task { @MainActor in
+            defer { setSaving(false) }
             do {
                 try await viewModel.saveCopy()
                 let alert = UIAlertController(title: "已另存为新照片", message: nil, preferredStyle: .alert)
@@ -260,21 +271,32 @@ final class EditorViewController: UIViewController {
     }
 
     @objc private func overwriteTapped() {
+        guard !isSaving else { return }
         let alert = UIAlertController(title: "覆盖原件？",
                                       message: "编辑结果将替换原照片，系统相册保留「还原」能力。",
                                       preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "覆盖", style: .destructive) { [weak self] _ in
-            Task {
+            guard let self, !self.isSaving else { return }
+            self.setSaving(true)
+            Task { @MainActor in
+                defer { self.setSaving(false) }
                 do {
-                    try await self?.viewModel.saveOverwrite()
-                    self?.closeTapped()
+                    try await self.viewModel.saveOverwrite()
+                    self.closeTapped()
                 } catch {
-                    self?.presentError(error)
+                    self.presentError(error)
                 }
             }
         })
         present(alert, animated: true)
+    }
+
+    /// 保存中禁用重复点击；两个保存入口共享同一门禁。
+    private func setSaving(_ saving: Bool) {
+        isSaving = saving
+        saveCopyItem?.isEnabled = !saving
+        overwriteItem?.isEnabled = !saving
     }
 
     @objc private func revertTapped() {
