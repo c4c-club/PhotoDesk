@@ -1,0 +1,251 @@
+// MARK: - 职责说明：查看器缩放手势控制器（docs/25 §4.4 / M15 P0-1）——
+// 自管变换：pinch/pan/double-tap 全部只调 PhotoDeskCore.ZoomTransformPolicy，绝不触碰
+// UIScrollView 的 zoom API（delegate=nil、min=max zoom=1、isScrollEnabled=false 的纯容器）。
+// 状态机 idle → pinching → settling → idle / idle → panning → idle / idle → animating → idle；
+// isInteracting 期间 VC 禁用 collectionView 滚动与翻页；reset(animated:) 供复用/翻页/旋转调用。
+
+import UIKit
+import PhotoDeskCore
+
+@MainActor
+final class ZoomInteractionController: NSObject {
+    /// 交互状态
+    enum Phase: Equatable {
+        case idle
+        case pinching
+        case panning
+        case settling
+        case animating
+    }
+
+    /// 变换回调：cell 只做 imageView.transform / center 适配。
+    var onTransformChanged: ((ZoomTransform) -> Void)?
+    /// 交互状态回调：VC 用来禁用翻页/上下滑动作。
+    var onInteractionStateChanged: ((Bool) -> Void)?
+    /// 手势回到 idle（含动画完成）后回调一次；VC 用于串行 drain 删除队列。
+    var onInteractionDidEnd: (() -> Void)?
+
+    private(set) var phase: Phase = .idle
+    private(set) var transform = ZoomTransform.identity
+    private var lastActivity: TimeInterval = 0
+    /// cell 注入：视口（viewportScrollView）与内容 aspectFit 尺寸
+    private weak var viewportView: UIView?
+    private var contentFitSize: CGSize = .zero
+    /// 手势是否允许（无图/占位态关闭）
+    private var gesturesEnabled = false
+    /// 捏合起始快照（anchor 全程固定在起手视口坐标）
+    private var pinchStartTransform = ZoomTransform.identity
+    private var pinchAnchor: CGPoint = .zero
+    private var panStartTransform = ZoomTransform.identity
+
+    let pinch = UIPinchGestureRecognizer()
+    let pan = UIPanGestureRecognizer()
+    let doubleTap = UITapGestureRecognizer()
+
+    /// 供 ViewerGesturePolicy / UI 测试观察
+    var isInteracting: Bool { phase != .idle }
+    var isAnimating: Bool { phase == .animating || phase == .settling }
+    var scale: Double { transform.scale }
+    var secondsSinceActivity: TimeInterval { CACurrentMediaTime() - lastActivity }
+
+    init(viewportView: UIView) {
+        self.viewportView = viewportView
+        super.init()
+        configure(pinch)
+        pinch.addTarget(self, action: #selector(handlePinch(_:)))
+        configure(pan)
+        pan.maximumNumberOfTouches = 1
+        pan.addTarget(self, action: #selector(handlePan(_:)))
+        configure(doubleTap)
+        doubleTap.numberOfTapsRequired = 2
+        doubleTap.addTarget(self, action: #selector(handleDoubleTap(_:)))
+        viewportView.addGestureRecognizer(pinch)
+        viewportView.addGestureRecognizer(pan)
+        viewportView.addGestureRecognizer(doubleTap)
+    }
+
+    private func configure(_ gesture: UIGestureRecognizer) {
+        gesture.cancelsTouchesInView = false
+        gesture.delegate = self
+        gesture.isEnabled = false
+    }
+
+    // MARK: - cell 接线
+
+    func updateLayout(contentFitSize: CGSize, viewportSize: CGSize) {
+        self.contentFitSize = contentFitSize
+        let ready = gesturesEnabled && contentFitSize.width > 0 && contentFitSize.height > 0
+            && viewportSize.width > 0 && viewportSize.height > 0
+        if pinch.isEnabled != ready {
+            pinch.isEnabled = ready
+            doubleTap.isEnabled = ready
+            // pan 的 shouldBegin 里还有 scale > 1.01 门禁，enabled 只表达内容就绪
+            pan.isEnabled = ready
+        }
+    }
+
+    func setGesturesEnabled(_ enabled: Bool) {
+        gesturesEnabled = enabled
+        if !enabled, isInteracting, phase != .animating, phase != .settling {
+            endInteraction()
+        }
+    }
+
+    /// cell 布局/旋转时写入 relayout 结果（不进入交互状态，只同步钳制后的值）。
+    func applyRelayout(_ t: ZoomTransform) {
+        setTransform(t)
+    }
+
+    /// 复用/翻页/删除/旋转：直接回 1× 居中（无动画时立即生效）。
+    func reset(animated: Bool) {
+        guard transform != .identity else { return }
+        if animated && !UIAccessibility.isReduceMotionEnabled {
+            animate(to: .identity)
+        } else {
+            setTransform(.identity)
+            if isInteracting { endInteraction() }
+        }
+    }
+
+    // MARK: - 手势处理
+
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let viewport = viewportView, contentFitSize.width > 0 else { return }
+        switch gesture.state {
+        case .began:
+            guard !isAnimating else { gesture.state = .cancelled; return }
+            pinchStartTransform = transform
+            pinchAnchor = gesture.location(in: viewport)
+            begin(.pinching)
+        case .changed:
+            guard phase == .pinching else { return }
+            let t = ZoomTransformPolicy.pinch(
+                current: pinchStartTransform,
+                pinchScale: Double(gesture.scale),
+                anchorX: Double(pinchAnchor.x), anchorY: Double(pinchAnchor.y),
+                contentWidth: Double(contentFitSize.width), contentHeight: Double(contentFitSize.height),
+                viewportWidth: Double(viewport.bounds.width), viewportHeight: Double(viewport.bounds.height))
+            setTransform(t)
+        case .ended, .cancelled, .failed:
+            guard phase == .pinching else { return }
+            settleAfterGesture()
+        default:
+            break
+        }
+    }
+
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let viewport = viewportView, contentFitSize.width > 0 else { return }
+        switch gesture.state {
+        case .began:
+            // 只在已放大时接管单指平移；1× 时让位给翻页/上下滑
+            guard !isAnimating, transform.scale > 1.01 else { gesture.state = .cancelled; return }
+            panStartTransform = transform
+            begin(.panning)
+        case .changed:
+            guard phase == .panning else { return }
+            let translation = gesture.translation(in: viewport)
+            let t = ZoomTransformPolicy.pan(
+                current: panStartTransform,
+                deltaX: Double(translation.x), deltaY: Double(translation.y),
+                contentWidth: Double(contentFitSize.width), contentHeight: Double(contentFitSize.height),
+                viewportWidth: Double(viewport.bounds.width), viewportHeight: Double(viewport.bounds.height))
+            setTransform(t)
+        case .ended, .cancelled, .failed:
+            guard phase == .panning else { return }
+            settleAfterGesture()
+        default:
+            break
+        }
+    }
+
+    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard let viewport = viewportView, contentFitSize.width > 0,
+              gesture.state == .ended, !isAnimating else { return }
+        let point = gesture.location(in: viewport)
+        let target: ZoomTransform
+        if transform.scale > 1.01 {
+            target = .identity
+        } else {
+            target = ZoomTransformPolicy.doubleTap(
+                current: transform,
+                tapX: Double(point.x), tapY: Double(point.y),
+                contentWidth: Double(contentFitSize.width), contentHeight: Double(contentFitSize.height),
+                viewportWidth: Double(viewport.bounds.width), viewportHeight: Double(viewport.bounds.height))
+        }
+        animate(to: target)
+    }
+
+    // MARK: - 状态机
+
+    private func begin(_ newPhase: Phase) {
+        phase = newPhase
+        lastActivity = CACurrentMediaTime()
+        onInteractionStateChanged?(true)
+    }
+
+    /// 手势结束：终值在每帧已按策略钳制（scale 恒在 1...5、平移不露白），直接收敛回 idle。
+    private func settleAfterGesture() {
+        phase = .settling
+        lastActivity = CACurrentMediaTime()
+        setTransform(transform)
+        endInteraction()
+    }
+
+    private func animate(to target: ZoomTransform) {
+        phase = .animating
+        lastActivity = CACurrentMediaTime()
+        onInteractionStateChanged?(true)
+        let duration = target == .identity ? 0.22 : 0.25
+        UIView.animate(withDuration: duration, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.setTransform(target)
+        } completion: { _ in
+            self.endInteraction()
+        }
+    }
+
+    private func setTransform(_ t: ZoomTransform) {
+        transform = t
+        lastActivity = CACurrentMediaTime()
+        onTransformChanged?(t)
+    }
+
+    private func endInteraction() {
+        guard phase != .idle else { return }
+        phase = .idle
+        onInteractionStateChanged?(false)
+        onInteractionDidEnd?()
+    }
+}
+
+extension ZoomInteractionController: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gesturesEnabled, contentFitSize.width > 0, contentFitSize.height > 0,
+              let viewport = viewportView,
+              viewport.bounds.width > 0, viewport.bounds.height > 0 else { return false }
+        if gestureRecognizer === pan {
+            return transform.scale > 1.01
+        }
+        return true
+    }
+
+    /// 与外层翻页/上下滑手势互斥：捏合与放大平移期间绝不并行识别。
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        false
+    }
+
+    /// 放大平移时要求外层 pan 失败（cell pan 优先）。
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        false
+    }
+}
+
+#if DEBUG
+// 单元测试锚点（Release 不编译）
+extension ZoomInteractionController {
+    var test_areGesturesEnabled: Bool { pinch.isEnabled }
+    var test_transform: ZoomTransform { transform }
+}
+#endif

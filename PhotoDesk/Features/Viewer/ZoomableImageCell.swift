@@ -1,17 +1,14 @@
-// MARK: - 职责说明：可缩放大图 cell v5（docs/22 §3.4 / P0-1）——
-// 视图层级：contentView → scrollView → zoomContentView → imageView；viewForZooming 只 return zoomContentView。
-// 铁律：① viewForZooming 方法体内禁止读取任何 scrollView / view 属性、禁止 ViewerTrace.log、禁止字符串插值；
-// ② 缩放活跃期绝不写 zoomContentView.frame / contentSize / contentInset，几何只在
-//    layoutSubviews（1×）与 scrollViewDidEndZooming 收敛；③ configure / prepareForReuse 先摘 delegate
-//    再 resetZoom，复用期不触发缩放回调；④ 无图/占位通过 scrollView.isUserInteractionEnabled 与
-//    pinchGestureRecognizer.isEnabled 关闭捏合，不靠 viewForZooming 返回 nil 兜底；
-// ⑤ 诊断只维护纯值 ZoomDiagnostics（currentScale / zoomEndCount / lastActivity），不回调 VC 刷新 UI。
-// 全部几何来自 PhotoDeskCore（红线 2）。iCloud-only 占位与下载进度沿沿旧实现。
+// MARK: - 职责说明：可缩放大图 cell v6（docs/25 §4.5 / M15 P0-1 自管变换重写）——
+// 视图层级：contentView → viewportScrollView（纯容器：isScrollEnabled=false、delegate=nil、
+// min=max zoom=1，永不调用任何 UIScrollView zoom API）→ imageView。
+// 几何模型：imageView.bounds = aspectFit 尺寸；imageView.transform = scale；
+// imageView.center = viewport 中心 + translation。全部数值来自 PhotoDeskCore.ZoomTransformPolicy，
+// 手势状态机在 ZoomInteractionController。复用/翻页/旋转一律 reset/relayout，无 UIScrollView 重入窗口。
 
 import UIKit
 import PhotoDeskCore
 
-/// 纯值诊断快照：VC 只在翻页/定时器/用户操作时读取，delegate 内不回调 VC。
+/// 纯值诊断快照：VC 只在翻页/定时器/用户操作时读取，手势回调内不回调 VC。
 struct ZoomDiagnostics: Equatable {
     var currentScale: CGFloat = ZoomableImageCell.minZoomScale
     var zoomEndCount: Int = 0
@@ -23,22 +20,25 @@ final class ZoomableImageCell: UICollectionViewCell {
     static let minZoomScale: CGFloat = 1
     static let maxZoomScale: CGFloat = 5
 
-    private let scrollView: UIScrollView = {
+    /// 纯容器（UI 测试锚点保留）：不承担缩放，delegate 永远为 nil。
+    private let viewportScrollView: UIScrollView = {
         let view = UIScrollView()
         view.showsVerticalScrollIndicator = false
         view.showsHorizontalScrollIndicator = false
-        view.bouncesZoom = true
+        view.isScrollEnabled = false
+        view.bounces = false
+        view.minimumZoomScale = 1
+        view.maximumZoomScale = 1
+        view.contentInsetAdjustmentBehavior = .never
         view.translatesAutoresizingMaskIntoConstraints = false
         view.accessibilityIdentifier = "Viewer-ZoomScrollView"
         return view
     }()
-    /// 缩放载体（viewForZooming 返回它）；imageView 只负责显示
-    private let zoomContentView = UIView()
+    /// 显示载体：bounds = aspectFit 尺寸，center/transform 由变换回调写
     private let imageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFit
         view.isUserInteractionEnabled = false
-        view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
     /// iCloud 占位（docs/04 §4.13：云图标 + 文案 + 下载按钮 + 环形进度）
@@ -56,12 +56,13 @@ final class ZoomableImageCell: UICollectionViewCell {
     private let downloadButton = UIButton(type: .system)
     private let progressLayer = CAShapeLayer()
 
-    private var zoomTapGesture: UITapGestureRecognizer!
+    /// 手势状态机（pinch/pan/double-tap 全部挂 viewportScrollView）
+    private let zoomController: ZoomInteractionController
     /// 复用/离屏竞态防护
     private var configureToken = 0
     private var onDownloadRequested: ((String) -> Void)?
     private var onRetryRequested: (() -> Void)?
-    /// 缩放结束（或几何收敛）后通知 VC 串行 drain 删除/隐藏队列；不在此处执行 performBatchUpdates。
+    /// 交互回 idle（手势结束/动画完成）后通知 VC 串行 drain 删除/隐藏队列；不在此处执行 performBatchUpdates。
     var onZoomTransactionDidBecomeIdle: (() -> Void)?
     private(set) var itemID: String?
     /// cell 级加载 token（docs/09 D02：回填前校验 cell 未被复用给另一张照片）
@@ -69,55 +70,24 @@ final class ZoomableImageCell: UICollectionViewCell {
     /// VC 挂载的在途加载任务（离屏/复用即取消，docs/13 S08）
     var loadTask: Task<Void, Never>?
 
-    /// 纯值诊断；delegate 内只更新数字，不触碰 VC / 数据源。
+    /// 纯值诊断；手势回调内只更新数字。
     private(set) var diagnostics = ZoomDiagnostics()
-    /// 只在布局/配置路径写，不在 delegate 查询路径写。
-    private var hasValidZoomContent = false
-    private var isApplyingZoomLayout = false
-    private var needsResetZoomOnEnd = false
-    #if DEBUG
-    /// 单测模拟 isZooming（Release 不编译；UIScrollView.isZooming 为只读）
-    var test_zoomInProgress = false
-    #endif
-
-    private var isZoomActive: Bool {
-        #if DEBUG
-        if test_zoomInProgress { return true }
-        #endif
-        return scrollView.isZooming
-    }
-
-    /// 开始一次加载：返回 token；回填前用 matches(token:) 校验
-    func beginLoad() -> Int {
-        loadToken += 1
-        return loadToken
-    }
-
-    func matches(token: Int) -> Bool {
-        token == loadToken
-    }
-
-    /// 取消在途加载任务（didEndDisplaying / prepareForReuse，docs/13 S08）
-    func cancelLoad() {
-        loadTask?.cancel()
-        loadTask = nil
-        configureToken += 1
-    }
+    /// 当前内容 aspectFit 尺寸（layoutSubviews 维护；与 policy 的 contentWidth/Height 一致）
+    private var currentFitSize: CGSize = .zero
+    private var lastViewportSize: CGSize = .zero
+    private var hasAppliedLayout = false
 
     override init(frame: CGRect) {
+        // controller 需要 viewportView，先建视图再建 controller
+        zoomController = ZoomInteractionController(viewportView: viewportScrollView)
         super.init(frame: frame)
         contentView.backgroundColor = DSColor.bgViewer
-        contentView.addSubview(scrollView)
-        scrollView.addSubview(zoomContentView)
-        zoomContentView.addSubview(imageView)
+        contentView.addSubview(viewportScrollView)
+        viewportScrollView.addSubview(imageView)
         contentView.addSubview(cloudBox)
         cloudBox.addSubview(cloudIcon)
         cloudBox.addSubview(cloudLabel)
         cloudBox.addSubview(downloadButton)
-
-        scrollView.delegate = self
-        scrollView.minimumZoomScale = Self.minZoomScale
-        scrollView.maximumZoomScale = Self.maxZoomScale
 
         cloudBox.isHidden = true
         cloudBox.translatesAutoresizingMaskIntoConstraints = false
@@ -136,10 +106,6 @@ final class ZoomableImageCell: UICollectionViewCell {
         progressLayer.isHidden = true
         downloadButton.layer.addSublayer(progressLayer)
 
-        zoomTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
-        zoomTapGesture.numberOfTapsRequired = 2
-        scrollView.addGestureRecognizer(zoomTapGesture)
-
         downloadButton.addAction(UIAction { [weak self] _ in
             if let retry = self?.onRetryRequested {
                 retry()
@@ -149,16 +115,28 @@ final class ZoomableImageCell: UICollectionViewCell {
             self?.onDownloadRequested?(id)
         }, for: .touchUpInside)
 
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+        zoomController.onTransformChanged = { [weak self] t in
+            self?.applyTransform(t)
+        }
+        zoomController.onInteractionStateChanged = { [weak self] interacting in
+            self?.syncInteraction?(interacting)
+        }
+        zoomController.onInteractionDidEnd = { [weak self] in
+            guard let self else { return }
+            self.diagnostics.zoomEndCount += 1
+            self.diagnostics.lastActivity = CACurrentMediaTime()
+            self.diagnostics.currentScale = CGFloat(self.zoomController.scale)
+            ViewerTrace.log("zoom=end id=\(self.itemID?.prefix(8) ?? "-") scale=\(String(format: "%.2f", self.diagnostics.currentScale))")
+            DispatchQueue.main.async { [weak self] in
+                self?.onZoomTransactionDidBecomeIdle?()
+            }
+        }
 
-            imageView.topAnchor.constraint(equalTo: zoomContentView.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: zoomContentView.bottomAnchor),
-            imageView.leadingAnchor.constraint(equalTo: zoomContentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: zoomContentView.trailingAnchor),
+        NSLayoutConstraint.activate([
+            viewportScrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            viewportScrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            viewportScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            viewportScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 
             cloudBox.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             cloudBox.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
@@ -178,6 +156,9 @@ final class ZoomableImageCell: UICollectionViewCell {
         ])
     }
 
+    /// VC 挂载的交互状态回调（缩放交互期间禁用翻页/滚动；结束恢复）
+    var syncInteraction: ((Bool) -> Void)?
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) 未使用")
     }
@@ -188,31 +169,25 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        // 先摘 delegate：resetZoom / setZoomScale 不得触发任何缩放回调。
-        scrollView.delegate = nil
-        scrollView.isUserInteractionEnabled = false
-        scrollView.pinchGestureRecognizer?.isEnabled = false
         onZoomTransactionDidBecomeIdle = nil
+        syncInteraction = nil
         cancelLoad()
         imageView.image = nil
+        imageView.transform = .identity
         cloudBox.isHidden = true
         progressLayer.isHidden = true
         itemID = nil
         diagnostics = ZoomDiagnostics()
-        hasValidZoomContent = false
-        if scrollView.bounds.width > 0, scrollView.bounds.height > 0, !isZoomActive {
-            scrollView.setZoomScale(Self.minZoomScale, animated: false)
-            scrollView.contentInset = .zero
-        } else {
-            needsResetZoomOnEnd = true
-        }
-        scrollView.delegate = self
+        currentFitSize = .zero
+        lastViewportSize = .zero
+        hasAppliedLayout = false
+        zoomController.reset(animated: false)
         refreshInteraction()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        layoutImageContent()
+        relayoutForViewportChange()
         let center = CGPoint(x: downloadButton.bounds.midX, y: downloadButton.bounds.midY)
         progressLayer.frame = downloadButton.bounds
         progressLayer.path = UIBezierPath(arcCenter: center, radius: 17,
@@ -226,9 +201,9 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     var isZoomed: Bool { diagnostics.currentScale > 1.01 }
 
-    /// 当前缩放状态快照（B1 互斥判定信号源：纯值，不读 UIScrollView 几何）
+    /// 当前缩放状态快照（B1 互斥判定信号源：纯值，不读任何 UIScrollView 几何）
     var zoomState: ViewerGesturePolicy.CellState {
-        ViewerGesturePolicy.CellState(isZooming: isZoomActive,
+        ViewerGesturePolicy.CellState(isZooming: zoomController.isInteracting,
                                       zoomScale: diagnostics.currentScale,
                                       secondsSinceZoomActivity: CACurrentMediaTime() - diagnostics.lastActivity,
                                       geometryState: .idle)
@@ -238,9 +213,7 @@ final class ZoomableImageCell: UICollectionViewCell {
     var hasImage: Bool { imageView.image != nil }
 
     /// 调试/取证用只读快照：不含图片像素。
-    var zoomContentViewFrameWidth: CGFloat { zoomContentView.frame.width }
     var imageViewFrameWidth: CGFloat { imageView.frame.width }
-    var innerContentSize: String { "\(Int(scrollView.contentSize.width))x\(Int(scrollView.contentSize.height))" }
 
     func setZoomTransactionIdleHandler(_ handler: (() -> Void)?) {
         onZoomTransactionDidBecomeIdle = handler
@@ -250,12 +223,7 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     /// 显示大图；image 为 nil 且 iCloud-only 时进入占位态。
     func configure(item: PhotoItem, image: UIImage?) {
-        // 先摘 delegate，resetZoom 不触发回调；复用瞬间不显示上一张。
-        scrollView.delegate = nil
-        scrollView.isUserInteractionEnabled = false
-        scrollView.pinchGestureRecognizer?.isEnabled = false
         onZoomTransactionDidBecomeIdle = nil
-
         itemID = item.id
         configureToken += 1
         loadToken += 1
@@ -267,15 +235,11 @@ final class ZoomableImageCell: UICollectionViewCell {
         cloudBox.isHidden = !isPlaceholder
         imageView.image = image
         diagnostics = ZoomDiagnostics()
-        hasValidZoomContent = false
-        needsResetZoomOnEnd = false
-        if scrollView.bounds.width > 0, scrollView.bounds.height > 0, !isZoomActive {
-            scrollView.setZoomScale(Self.minZoomScale, animated: false)
-        } else {
-            needsResetZoomOnEnd = true
-        }
-        layoutImageContent()
-        scrollView.delegate = self
+        currentFitSize = .zero
+        lastViewportSize = .zero
+        hasAppliedLayout = false
+        zoomController.reset(animated: false)
+        relayoutForViewportChange()
         refreshInteraction()
     }
 
@@ -306,8 +270,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         cloudBox.isHidden = true
         progressLayer.isHidden = true
         imageView.image = image
-        resetZoom()
-        layoutImageContent()
+        currentFitSize = .zero
+        hasAppliedLayout = false
+        zoomController.reset(animated: false)
+        relayoutForViewportChange()
         refreshInteraction()
         ViewerTrace.log("img=ok id=\(itemID?.prefix(8) ?? "-") w=\(Int(image.size.width)) h=\(Int(image.size.height))")
     }
@@ -327,156 +293,86 @@ final class ZoomableImageCell: UICollectionViewCell {
         }
     }
 
-    /// 回到 1×（仅在 bounds 有效时执行；缩放进行中延迟到 didEndZooming）。
+    /// 回到 1× 居中（翻页/复用/旋转路径）。
     func resetZoom() {
-        guard scrollView.bounds.width > 0, scrollView.bounds.height > 0 else { return }
-        if isZoomActive {
-            needsResetZoomOnEnd = true
-            return
-        }
-        scrollView.setZoomScale(Self.minZoomScale, animated: false)
-        centerZoomContent()
+        zoomController.reset(animated: false)
     }
 
-    // MARK: - 布局（全部经 ZoomGeometry，零散几何值不得出现）
+    // MARK: - 布局（全部经 ZoomGeometry / ZoomTransformPolicy，零散几何值不得出现）
 
-    /// aspectFit 布局：只在 1× 且未缩放时写 frame/contentSize；缩放中绝不干预。
-    private func layoutImageContent() {
-        guard !isApplyingZoomLayout, !isZoomActive else { return }
+    /// viewport 尺寸或图片变化时重算 aspectFit；旋转用 ZoomTransformPolicy.relayout 保持中心内容点。
+    private func relayoutForViewportChange() {
+        let viewport = viewportScrollView.bounds.size
         guard let image = imageView.image,
-              scrollView.bounds.width > 0, scrollView.bounds.height > 0 else { return }
-        if needsResetZoomOnEnd {
-            needsResetZoomOnEnd = false
-            scrollView.setZoomScale(Self.minZoomScale, animated: false)
-        }
-        guard scrollView.zoomScale <= Self.minZoomScale + 0.001 else { return }
-
+              viewport.width > 0, viewport.height > 0 else { return }
         let fit = ZoomGeometry.aspectFitSize(imageWidth: Double(image.size.width),
                                              imageHeight: Double(image.size.height),
-                                             viewportWidth: Double(scrollView.bounds.width),
-                                             viewportHeight: Double(scrollView.bounds.height))
+                                             viewportWidth: Double(viewport.width),
+                                             viewportHeight: Double(viewport.height))
         guard fit.width > 0, fit.height > 0 else { return }
-        let size = CGSize(width: fit.width, height: fit.height)
-        isApplyingZoomLayout = true
+        let fitSize = CGSize(width: fit.width, height: fit.height)
+        let viewportChanged = !hasAppliedLayout || lastViewportSize != viewport
+        guard fitSize != currentFitSize || viewportChanged else { return }
+
+        if viewportChanged, hasAppliedLayout, currentFitSize.width > 0 {
+            // 旋转/尺寸变化：保持中心内容点，重新钳制（docs/25 §4.5）
+            let t = ZoomTransformPolicy.relayout(current: zoomController.transform,
+                                                 oldViewport: (Double(lastViewportSize.width), Double(lastViewportSize.height)),
+                                                 newViewport: (Double(viewport.width), Double(viewport.height)),
+                                                 contentWidth: Double(currentFitSize.width),
+                                                 contentHeight: Double(currentFitSize.height))
+            zoomController.applyRelayout(t)
+        } else if !hasAppliedLayout {
+            // 首次布局：回 1× 居中
+            zoomController.applyRelayout(.identity)
+        }
+        currentFitSize = fitSize
+        lastViewportSize = viewport
+        hasAppliedLayout = true
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        zoomContentView.frame = CGRect(origin: .zero, size: size)
-        scrollView.contentSize = size
+        imageView.bounds.size = fitSize
         CATransaction.commit()
-        hasValidZoomContent = true
-        isApplyingZoomLayout = false
-        centerZoomContent()
+        applyTransform(zoomController.transform)
+        zoomController.updateLayout(contentFitSize: fitSize, viewportSize: viewport)
         refreshInteraction()
     }
 
-    /// 内容居中 inset：用未变换 bounds（B3），只在布局与 didEndZooming 调用。
-    private func centerZoomContent() {
-        guard !isApplyingZoomLayout else { return }
-        guard scrollView.bounds.width > 0, scrollView.bounds.height > 0,
-              zoomContentView.bounds.width > 0, zoomContentView.bounds.height > 0 else { return }
-        let insets = ZoomGeometry.centeredInset(
-            contentWidth: Double(zoomContentView.bounds.width),
-            contentHeight: Double(zoomContentView.bounds.height),
-            viewportWidth: Double(scrollView.bounds.width),
-            viewportHeight: Double(scrollView.bounds.height),
-            zoomScale: Double(scrollView.zoomScale)
-        )
-        guard insets.top.isFinite, insets.left.isFinite,
-              insets.bottom.isFinite, insets.right.isFinite else { return }
-        isApplyingZoomLayout = true
-        scrollView.contentInset = UIEdgeInsets(top: insets.top, left: insets.left,
-                                               bottom: insets.bottom, right: insets.right)
-        isApplyingZoomLayout = false
+    /// 变换应用：transform 缩放绕中心；center = viewport 中心 + translation（与 policy 模型一致）。
+    private func applyTransform(_ t: ZoomTransform) {
+        let viewport = viewportScrollView.bounds.size
+        guard viewport.width > 0, viewport.height > 0 else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        imageView.transform = CGAffineTransform(scaleX: CGFloat(t.scale), y: CGFloat(t.scale))
+        imageView.center = CGPoint(x: viewport.width / 2 + CGFloat(t.translationX),
+                                   y: viewport.height / 2 + CGFloat(t.translationY))
+        CATransaction.commit()
+        diagnostics.currentScale = CGFloat(t.scale)
+        diagnostics.lastActivity = CACurrentMediaTime()
     }
 
-    /// 交互三条件护栏：image != nil && bounds > 0 && contentSize > 0 且非占位态。
+    /// 交互护栏：有图 && 视口有效 && 非占位态。无图时捏合/双击整体关闭。
     private func refreshInteraction() {
         let allowed = imageView.image != nil
-            && scrollView.bounds.width > 0 && scrollView.bounds.height > 0
-            && scrollView.contentSize.width > 0 && scrollView.contentSize.height > 0
+            && viewportScrollView.bounds.width > 0 && viewportScrollView.bounds.height > 0
             && cloudBox.isHidden
-        scrollView.isUserInteractionEnabled = allowed
-        scrollView.pinchGestureRecognizer?.isEnabled = allowed
-    }
-
-    // MARK: - 双击缩放（docs/04 §4.4：点击点为中心，1×↔2.5×；只调用一次 zoom(to:)）
-
-    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        guard imageView.image != nil, !isZoomActive,
-              scrollView.bounds.width > 0, scrollView.bounds.height > 0,
-              zoomContentView.bounds.width > 0, zoomContentView.bounds.height > 0 else { return }
-        let reduceMotion = UIAccessibility.isReduceMotionEnabled && AppContainer.shared.settings.respectReduceMotion
-        let animated = !reduceMotion
-
-        if scrollView.zoomScale > Self.minZoomScale + 0.01 {
-            scrollView.setZoomScale(Self.minZoomScale, animated: animated)
-            return
-        }
-        let point = gesture.location(in: zoomContentView)
-        guard let rect = ZoomGeometry.clampedZoomRect(
-            zoomScale: 2.5,
-            focusX: Double(point.x), focusY: Double(point.y),
-            viewportWidth: Double(scrollView.bounds.width),
-            viewportHeight: Double(scrollView.bounds.height),
-            imageWidth: Double(zoomContentView.bounds.width),
-            imageHeight: Double(zoomContentView.bounds.height)
-        ) else { return }
-        let targetRect = CGRect(x: CGFloat(rect.x), y: CGFloat(rect.y),
-                                width: CGFloat(rect.width), height: CGFloat(rect.height))
-        scrollView.zoom(to: targetRect, animated: animated)
-    }
-}
-
-extension ZoomableImageCell: UIScrollViewDelegate {
-    /// 铁律（docs/22 §3.4.3）：本方法只返回 zoomContentView。
-    /// 禁止读取任何 scrollView / view 属性，禁止 ViewerTrace.log，禁止字符串插值。
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        zoomContentView
-    }
-
-    func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
-        diagnostics.lastActivity = CACurrentMediaTime()
-    }
-
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        // 只更新纯值诊断；不写 contentInset / frame / contentSize，不回调 VC。
-        let scale = scrollView.zoomScale
-        if scale.isFinite {
-            diagnostics.currentScale = scale
-        }
-        diagnostics.lastActivity = CACurrentMediaTime()
-    }
-
-    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-        diagnostics.lastActivity = CACurrentMediaTime()
-        if scale.isFinite {
-            diagnostics.currentScale = scale
-        }
-        diagnostics.zoomEndCount += 1
-        if needsResetZoomOnEnd {
-            needsResetZoomOnEnd = false
-            scrollView.setZoomScale(Self.minZoomScale, animated: false)
-        }
-        centerZoomContent()
-        refreshInteraction()
-        ViewerTrace.log("zoom=end id=\(itemID?.prefix(8) ?? "-") scale=\(String(format: "%.2f", diagnostics.currentScale))")
-        // 队列 drain 排到下一轮主循环，避免与 CATransaction / 手势同一帧。
-        DispatchQueue.main.async { [weak self] in
-            self?.onZoomTransactionDidBecomeIdle?()
-        }
+        zoomController.setGesturesEnabled(allowed)
     }
 }
 
 #if DEBUG
-// 单元测试 I5′ / 交互护栏断言锚点（Release 不编译）
+// 单元测试锚点（Release 不编译）
 extension ZoomableImageCell {
-    var test_scrollView: UIScrollView { scrollView }
-    var test_zoomContentView: UIView { zoomContentView }
+    var test_scrollView: UIScrollView { viewportScrollView }
     var test_imageView: UIImageView { imageView }
     var test_cloudBox: UIView { cloudBox }
-    /// 单测无 runloop：显式触发居中收敛（生产路径由 layoutSubviews / didEndZooming 调用）
-    func test_recenterAfterZoom() {
-        centerZoomContent()
+    var test_zoomController: ZoomInteractionController { zoomController }
+    var test_imageViewFrame: CGRect { imageView.frame }
+    /// 单测无 runloop：显式写入一个变换并断言几何
+    func test_applyTransform(scale: Double, translationX: Double, translationY: Double) {
+        zoomController.applyRelayout(ZoomTransform(scale: scale, translationX: translationX, translationY: translationY))
     }
 }
 #endif

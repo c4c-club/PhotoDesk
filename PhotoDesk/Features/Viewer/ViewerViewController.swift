@@ -254,7 +254,7 @@ final class ViewerViewController: UIViewController {
         let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ZoomableImageCell
         let imgPart = cell.map { "img=\($0.hasImage ? "ok" : "nil")" } ?? "img=-"
         let zoom = Double(cell?.diagnostics.currentScale ?? ZoomableImageCell.minZoomScale)
-        let frameWidth = Double(cell?.zoomContentViewFrameWidth ?? -1)
+        let frameWidth = Double(cell?.imageViewFrameWidth ?? -1)
         let trace = ViewerTrace.recentLines()
         let nonFinite = trace.contains {
             $0.localizedCaseInsensitiveContains("nan")
@@ -262,11 +262,10 @@ final class ViewerViewController: UIViewController {
                 || $0.localizedCaseInsensitiveContains("非有限")
         }
         let pending = AppContainer.shared.reviewSession.pendingDeleteCount
-        let vfz = trace.filter { $0.contains("viewForZooming") }.count
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
                          "zoom=\(String(format: "%.2f", zoom)) load=\(inflightLoadCount) \(imgPart) " +
                          "frameW=\(String(format: "%.1f", frameWidth)) " +
-                         "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0) vfz=\(vfz)")
+                         "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0)")
     }
 
     /// 单元测试布局断言锚点（A4：itemSize 刷新；Release 不编译）
@@ -510,12 +509,23 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// cell 在缩放几何批量提交完成后回调；这里只做 @MainActor 串行排空，不在 cell 内执行 batchUpdates。
-    private func wireZoomTransactionIdleIfNeeded(_ cell: ZoomableImageCell) {
+    /// cell 手势回 idle 后回调；只做 @MainActor 串行排空，不读任何几何（docs/25 §4.6）。
+    private func wireZoomIdleIfNeeded(_ cell: ZoomableImageCell) {
         cell.setZoomTransactionIdleHandler { [weak self] in
             Task { @MainActor in
-                self?.refreshDebugBanner()
                 self?.schedulePendingRemovalDrain()
+            }
+        }
+        // 缩放交互期间禁用翻页滚动；交互结束且已回 1× 时恢复（放大静止态仍保持禁用）
+        cell.syncInteraction = { [weak self] interacting in
+            guard let self else { return }
+            if interacting {
+                if self.collectionView.isScrollEnabled { self.collectionView.isScrollEnabled = false }
+            } else {
+                let scale = self.currentCellZoomState()?.zoomScale ?? ZoomableImageCell.minZoomScale
+                if scale <= 1.01 && !self.collectionView.isScrollEnabled {
+                    self.collectionView.isScrollEnabled = true
+                }
             }
         }
     }
@@ -957,6 +967,10 @@ final class ViewerViewController: UIViewController {
 
     private func scrollTo(index: Int, animated: Bool = true) {
         guard index >= 0, index < viewModel.items.count else { return }
+        // 翻页/跳转前重置旧页缩放（docs/25 §4.6：翻页后无残留缩放）
+        if let oldCell = collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell {
+            oldCell.resetZoom()
+        }
         isProgrammaticScroll = true
         collectionView.scrollToItem(at: IndexPath(item: index, section: 0),
                                     at: .centeredHorizontally,
@@ -1068,7 +1082,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                                                           for: indexPath)
             if let imageCell = cell as? ZoomableImageCell {
                 imageCell.configure(item: Self.emptyItem, image: nil)
-                wireZoomTransactionIdleIfNeeded(imageCell)
+                wireZoomIdleIfNeeded(imageCell)
             }
             return cell
         }
@@ -1083,7 +1097,7 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
                                                       for: indexPath)
         guard let imageCell = cell as? ZoomableImageCell else { return cell }
         imageCell.configure(item: item, image: nil)
-        wireZoomTransactionIdleIfNeeded(imageCell)
+        wireZoomIdleIfNeeded(imageCell)
         schedulePendingRemovalDrain()
         imageCell.setDownloadHandler { [weak self, weak imageCell] id in
             guard let self, let imageCell else { return }
