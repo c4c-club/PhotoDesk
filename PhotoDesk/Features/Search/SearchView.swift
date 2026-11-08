@@ -22,7 +22,7 @@ struct SearchView: View {
     var body: some View {
         NavigationView {
             content
-                .navigationTitle("搜索")
+                .navigationTitle("搜索与筛选")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -34,6 +34,7 @@ struct SearchView: View {
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("应用到主库") {
+                            viewModel.recordCurrentFilter()
                             onApplyFilter?(viewModel.predicate)
                             dismiss()
                         }
@@ -51,6 +52,7 @@ struct SearchView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                historySection
                 filterSection
                 resultCount
                 resultGrid
@@ -59,6 +61,58 @@ struct SearchView: View {
             .padding(.bottom, 32)
         }
         .background(Color(ds: DSColor.bgPrimary))
+    }
+
+    // MARK: - 最近筛选历史
+
+    @ViewBuilder
+    private var historySection: some View {
+        if !viewModel.history.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("最近筛选")
+                        .font(.headline)
+                        .foregroundColor(Color(ds: DSColor.textPrimary))
+                    Spacer()
+                    Button("清除") { viewModel.clearHistory() }
+                        .font(.caption)
+                        .accessibilityIdentifier("Search-History-Clear")
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.history.indices, id: \.self) { index in
+                            let item = viewModel.history[index]
+                            Button {
+                                viewModel.applyHistory(item)
+                            } label: {
+                                Text(summary(of: item))
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color(ds: DSColor.bgSecondary))
+                                    .foregroundColor(Color(ds: DSColor.textPrimary))
+                                    .cornerRadius(14)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private func summary(of predicate: SearchPredicate) -> String {
+        var parts: [String] = []
+        if let year = predicate.year { parts.append("\(year)年") }
+        if let month = predicate.month { parts.append("\(month)月") }
+        if let day = predicate.day { parts.append("\(day)日") }
+        if !predicate.media.isEmpty {
+            parts.append(predicate.media.map(\.displayName).sorted().joined(separator: "/"))
+        }
+        if !predicate.status.isEmpty {
+            parts.append(predicate.status.map(\.displayName).sorted().joined(separator: "/"))
+        }
+        return parts.isEmpty ? "全部照片" : parts.joined(separator: " · ")
     }
 
     // MARK: - 筛选区
@@ -164,19 +218,39 @@ struct SearchView: View {
             .accessibilityLabel("筛选结果 \(viewModel.results.count) 项")
     }
 
+    @ViewBuilder
     private var resultGrid: some View {
-        // docs/09 D15：去掉 200 上限，全量懒加载展示；可点开查看器
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: DSSpacing.gridSpacing)],
-                  spacing: DSSpacing.gridSpacing) {
-            ForEach(viewModel.results) { item in
-                Button {
-                    viewerContext = ViewerContext(items: viewModel.results,
-                                                  startItemID: item.id,
-                                                  queryKey: "search")
-                } label: {
-                    ResultThumb(item: item, pipeline: AppContainer.shared.imagePipeline)
+        if viewModel.results.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 44))
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
+                Text("没有符合条件的照片")
+                    .font(.headline)
+                    .foregroundColor(Color(ds: DSColor.textPrimary))
+                Text("试试减少筛选条件，或清除全部筛选")
+                    .font(.subheadline)
+                    .foregroundColor(Color(ds: DSColor.textSecondary))
+                Button("清除筛选") { viewModel.reset() }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("Search-ClearFilters")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+        } else {
+            // docs/09 D15：去掉 200 上限，全量懒加载展示；可点开查看器
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: DSSpacing.gridSpacing)],
+                      spacing: DSSpacing.gridSpacing) {
+                ForEach(viewModel.results) { item in
+                    Button {
+                        viewerContext = ViewerContext(items: viewModel.results,
+                                                      startItemID: item.id,
+                                                      queryKey: "search")
+                    } label: {
+                        ResultThumb(item: item, pipeline: AppContainer.shared.imagePipeline)
+                    }
+                    .accessibilityLabel(PhotoGridCell.accessibilityLabel(for: item))
                 }
-                .accessibilityLabel(PhotoGridCell.accessibilityLabel(for: item))
             }
         }
     }

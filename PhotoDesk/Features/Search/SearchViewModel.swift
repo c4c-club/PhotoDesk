@@ -10,12 +10,16 @@ import SwiftUI
 final class SearchViewModel: ObservableObject {
     @Published var predicate = SearchPredicate.default
     @Published private(set) var results: [PhotoItem] = []
+    /// 最近筛选历史（最多 10 条，JSON 持久化；docs/22 Phase 4 搜索页）
+    @Published private(set) var history: [SearchPredicate] = []
 
     let items: [PhotoItem]
+    private static let historyKey = "search.filter.history"
 
     init(items: [PhotoItem]) {
         self.items = items
         results = items
+        loadHistory()
     }
 
     /// 谓词变化后重算（SwiftUI onChange 驱动）
@@ -62,6 +66,38 @@ final class SearchViewModel: ObservableObject {
     func reset() {
         predicate = .default
         apply()
+    }
+
+    // MARK: - 最近筛选历史（最多 10 条）
+
+    func recordCurrentFilter() {
+        guard !predicate.isDefault else { return }
+        var next = history.filter { $0 != predicate }
+        next.insert(predicate, at: 0)
+        if next.count > 10 { next = Array(next.prefix(10)) }
+        history = next
+        saveHistory()
+    }
+
+    func applyHistory(_ item: SearchPredicate) {
+        predicate = item
+        apply()
+    }
+
+    func clearHistory() {
+        history = []
+        UserDefaults.standard.removeObject(forKey: Self.historyKey)
+    }
+
+    private func loadHistory() {
+        guard let data = UserDefaults.standard.data(forKey: Self.historyKey),
+              let decoded = try? JSONDecoder().decode([SearchPredicate].self, from: data) else { return }
+        history = Array(decoded.prefix(10))
+    }
+
+    private func saveHistory() {
+        guard let data = try? JSONEncoder().encode(history) else { return }
+        UserDefaults.standard.set(data, forKey: Self.historyKey)
     }
 
     // MARK: - 下钻选项源
