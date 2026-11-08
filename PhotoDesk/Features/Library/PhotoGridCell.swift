@@ -141,6 +141,11 @@ final class PhotoGridCell: UICollectionViewCell {
         cancelLoad()
         imageView.image = nil
         updateBadges(item: nil)
+        // docs/25 §6.4：复用必须复位选中态，杜绝上一张的选中残留（P0-3 伴生缺陷）
+        setSelected(false)
+        setSelectionVisible(false)
+        contentView.layer.borderWidth = 0
+        selectionBadge.isHidden = true
     }
 
     /// VC 在 didEndDisplaying 调用：取消在途加载（AGENTS.md §3.6 cell 离屏取消）

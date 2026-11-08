@@ -1,7 +1,11 @@
-// MARK: - 职责说明：单指滑选状态机（docs/22 §5.5 重写）——
-// idle → pressing → selecting → autoScrolling → finished；激活不再做方向锁（移动 6pt 且起点在 cell 内）。
-// 每次 move/tick 用「窗口坐标」重新换算当前 cell；anchor/current 交给 Core SlideSelectRangePolicy 计算整行区间；
-// 目标 = 拖动开始快照 base ∪ range，按集合 diff 只刷新可见 cell；边缘 60pt 自动滚动逐帧重命中。
+// MARK: - 职责说明：单指矩形框选手势控制器（docs/25 §6.3 / M15 P0-3/4 重写）——
+// idle → pressing → selecting → autoScrolling → finished；移动 ≥3pt 激活。
+// began 记录 startPoint（content 坐标，激活后不再变）、anchorID、baseIDs、
+// mode = baseIDs.contains(anchorID) ? .deselect : .select。
+// 每帧：MarqueeRect(startPoint, currentContentPoint) → MarqueeSelectionPolicy.cells(in:)
+// → itemIDProvider 映射 → resolved(base:hitIDs:mode:scope) → 集合变化才 apply/haptic。
+// 回拖自然收缩；无 lastCurrentCell/visited/parity/insert-only；边缘 60pt 自动滚动逐帧重算；
+// cancelsTouchesInView=false，轻点仍走 didSelectItemAt。
 
 import UIKit
 import PhotoDeskCore
@@ -18,11 +22,11 @@ final class SlideSelectGestureController: NSObject {
 
     private weak var collectionView: UICollectionView?
     private var state: State = .idle
-    private var anchorCell: SlideSelectCell?
-    private var lastCurrentCell: SlideSelectCell?
+    private var anchorID: String?
+    private var startPoint: CGPoint = .zero
     private var baseIDs: Set<String> = []
+    private var mode: MarqueeMode = .select
     private var lastTargetIDs: Set<String> = []
-    private var hasMovedAwayFromAnchor = false
     private var lastFingerWindowPoint: CGPoint = .zero
     private var autoScrollLink: CADisplayLink?
     private let haptic = UISelectionFeedbackGenerator()
@@ -31,14 +35,16 @@ final class SlideSelectGestureController: NSObject {
     var isSelectionMode: () -> Bool = { false }
     /// VC 注入：拖动开始帧的选中 id 快照。
     var selectedIDsProvider: () -> Set<String> = { [] }
+    /// VC 注入：当前选择 scope（月份 scope 等子集下过滤矩形命中；nil = 不过滤）。
+    var scopeProvider: () -> Set<String>? = { nil }
     /// VC 注入：IndexPath → PhotoItem.id（apply 窗口内必须经 dataSource，不能用数组下标）。
     var itemIDProvider: (IndexPath) -> String? = { _ in nil }
     /// VC 注入：把目标选中 id 集合整体落到 selectionState / 可见 cell / 徽标 / 计数。
     var applyTargetIDs: (Set<String>) -> Void = { _ in }
-    /// VC 注入：当前列数（2–5）。
-    var columnsProvider: () -> Int = { 3 }
+    /// VC 注入：当前网格几何（列数/单元尺寸/间距/头高/每 section 数量 + section originY）。
+    var geometryProvider: () -> (metrics: GridMetrics, sectionOriginY: [Double])? = { nil }
 
-    /// 单指滑选 pan（delegate 由 VC 设置）。
+    /// 单指框选 pan（delegate 由 VC 设置）。
     let pan = UIPanGestureRecognizer()
 
     /// 供 VC delegate / UI 测试观察：拖动选择是否已激活。
@@ -61,29 +67,31 @@ final class SlideSelectGestureController: NSObject {
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-        guard let collectionView else { return }
         switch gesture.state {
         case .began:
             lastFingerWindowPoint = gesture.location(in: nil)
             guard isSelectionMode(),
-                  let point = windowToContent(lastFingerWindowPoint),
-                  let indexPath = collectionView.indexPathForItem(at: point) else {
+                  let collectionView,
+                  let startPoint = windowToContent(lastFingerWindowPoint),
+                  let indexPath = collectionView.indexPathForItem(at: startPoint),
+                  let id = itemIDProvider(indexPath) else {
                 state = .idle
                 return
             }
             state = .pressing
-            anchorCell = SlideSelectCell(section: indexPath.section, item: indexPath.item)
-            lastCurrentCell = anchorCell
+            self.startPoint = startPoint
+            anchorID = id
             baseIDs = selectedIDsProvider()
+            mode = MarqueeSelectionPolicy.mode(baseIDs: baseIDs, anchorID: id)
             lastTargetIDs = baseIDs
-            hasMovedAwayFromAnchor = false
             haptic.prepare()
         case .changed:
             lastFingerWindowPoint = gesture.location(in: nil)
-            let translation = gesture.translation(in: collectionView)
-            if state == .pressing,
-               hypot(Double(translation.x), Double(translation.y)) >= SlideSelectConfig.activationThreshold {
-                beginDragSelection()
+            if state == .pressing {
+                let translation = gesture.translation(in: collectionView)
+                if hypot(Double(translation.x), Double(translation.y)) >= SlideSelectConfig.activationThreshold {
+                    beginDragSelection()
+                }
             }
             guard isDragSelecting else { return }
             processFinger(atWindowPoint: lastFingerWindowPoint)
@@ -96,56 +104,41 @@ final class SlideSelectGestureController: NSObject {
     }
 
     private func beginDragSelection() {
-        guard let collectionView, let anchor = anchorCell else { return }
+        guard let collectionView else { return }
         state = .selecting
         collectionView.allowsSelection = false
-        // 起手 cell 立即进入目标（即使 range 为空）；回拖到起点时由 processFinger 恢复 base。
-        if let path = indexPathForCell(anchor), let id = itemIDProvider(path) {
-            var target = baseIDs
-            target.insert(id)
-            lastTargetIDs = target
-            applyTargetIDs(target)
-            haptic.selectionChanged()
-        }
+        // 激活帧即按矩形语义落一次目标（零尺寸矩形扩展 1pt 命中起手 cell）
+        processFinger(atWindowPoint: lastFingerWindowPoint)
     }
 
+    /// 每帧：矩形 → 命中 cell → 目标集合；只有集合变化才刷新/haptic。
     private func processFinger(atWindowPoint: CGPoint) {
         guard let collectionView,
-              let point = windowToContent(atWindowPoint),
-              let indexPath = collectionView.indexPathForItem(at: point) else { return }
-        let cell = SlideSelectCell(section: indexPath.section, item: indexPath.item)
-        if cell == anchorCell, !hasMovedAwayFromAnchor { return }
-        if cell != anchorCell { hasMovedAwayFromAnchor = true }
-        guard cell != lastCurrentCell else { return }
-        lastCurrentCell = cell
-        guard let anchor = anchorCell else { return }
-
-        let metrics = SlideGridMetrics(columns: max(1, columnsProvider()),
-                                       sectionItemCounts: (0..<collectionView.numberOfSections).map {
-                                           collectionView.numberOfItems(inSection: $0)
-                                       })
-        let range = SlideSelectRangePolicy.cells(anchor: anchor, current: cell, metrics: metrics)
-        var target = baseIDs
-        for rangeCell in range {
-            if let path = indexPathForCell(rangeCell), let id = itemIDProvider(path) {
-                target.insert(id)
+              let current = windowToContent(atWindowPoint),
+              let geometry = geometryProvider() else { return }
+        let rect = MarqueeRect(startX: Double(startPoint.x), startY: Double(startPoint.y),
+                               currentX: Double(current.x), currentY: Double(current.y))
+        let hitCells = MarqueeSelectionPolicy.cells(in: rect,
+                                                    metrics: geometry.metrics,
+                                                    sectionOriginY: geometry.sectionOriginY)
+        var hitIDs = Set<String>()
+        for cell in hitCells {
+            let path = IndexPath(item: cell.item, section: cell.section)
+            if let id = itemIDProvider(path) {
+                hitIDs.insert(id)
             }
         }
+        let target = MarqueeSelectionPolicy.resolved(base: baseIDs,
+                                                     hitIDs: hitIDs,
+                                                     mode: mode,
+                                                     scope: scopeProvider())
         guard target != lastTargetIDs else { return }
-        let grew = target.count > lastTargetIDs.count
         lastTargetIDs = target
         applyTargetIDs(target)
-        if grew { haptic.selectionChanged() }
+        haptic.selectionChanged()
     }
 
-    private func indexPathForCell(_ cell: SlideSelectCell) -> IndexPath? {
-        guard let collectionView,
-              cell.section >= 0, cell.section < collectionView.numberOfSections,
-              cell.item >= 0, cell.item < collectionView.numberOfItems(inSection: cell.section) else { return nil }
-        return IndexPath(item: cell.item, section: cell.section)
-    }
-
-    /// 窗口坐标 → collectionView 内容坐标（滚动后仍对应手指下的 cell）。
+    /// 窗口坐标 → collectionView 内容坐标（滚动后仍对应手指下的内容点）。
     private func windowToContent(_ windowPoint: CGPoint) -> CGPoint? {
         guard let collectionView, collectionView.window != nil else { return nil }
         return collectionView.convert(windowPoint, from: nil)
@@ -188,6 +181,7 @@ final class SlideSelectGestureController: NSObject {
                                                      max: maxY)
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: CGFloat(target)),
                                         animated: false)
+        // startPoint 保持 content 坐标不变：滚动后矩形按内容坐标重算，新流入的 cell 自然入集
         processFinger(atWindowPoint: lastFingerWindowPoint)
     }
 
@@ -210,15 +204,15 @@ final class SlideSelectGestureController: NSObject {
         autoScrollLink = nil
     }
 
-    /// 结束/取消/失败统一收尾：恢复点选、清快照/标记/displayLink。
+    /// 结束/取消/失败统一收尾：恢复点选、清快照/displayLink。
     func finishSlideSelection() {
         invalidateAutoScroll()
         state = .finished
-        anchorCell = nil
-        lastCurrentCell = nil
+        anchorID = nil
+        startPoint = .zero
         baseIDs = []
         lastTargetIDs = []
-        hasMovedAwayFromAnchor = false
+        mode = .select
         if let collectionView {
             DispatchQueue.main.async { [weak collectionView] in
                 collectionView?.allowsSelection = true

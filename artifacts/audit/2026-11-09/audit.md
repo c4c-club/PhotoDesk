@@ -1,7 +1,7 @@
 ﻿# M15 Audit Report
 
-- stamp: 2026-11-09 00:38:08+08:00
-- mode: BASELINE (P0 gates informational)
+- stamp: 2026-11-09 01:27:38+08:00
+- mode: GATE (P0 must be 0)
 
 ## Red lines (must be 0)
 - urlsession = 0
@@ -16,37 +16,37 @@
 - permanent_delete_entry = 0
 
 ## P0-1 zoom symbols in Viewer
-- viewForZooming = 6
-- UIScrollViewDelegate = 1
-- setZoomScale = 7
-- contentInset = 5
-- zoomContentView = 27
-- zoomScale_info_count = 14
-- scrollViewDidZoom = 5
+- viewForZooming = 0
+- UIScrollViewDelegate = 0
+- setZoomScale = 0
+- contentInset = 0
+- zoomContentView = 0
+- zoomScale_info_count = 9
+- scrollViewDidZoom = 0
 
 ## P0-2 position
 - positionStore_save_calls = 2
-- userdefaults_position_writes = 3
+- userdefaults_position_writes = 2
 - beginRestore_calls = 2
-- viewWillDisappear_conditional = 0
+- viewWillDisappear_conditional = 1
 - machine_maxAttempts = 0
 - machine_timeout_3s = 0
-- position_file_store = False
-- restore_machine_v5 = False
+- position_file_store = True
+- restore_machine_v5 = True
 
 ## P0-3/4 marquee
-- slideSelectRangePolicy_refs = 14
-- insert_only_target_baseIDs = 2
-- whole_row_banner = 2
-- marquee_policy = False
-- range_policy_file = True
-- range_policy_tests = True
-- old_tests_still_present = 2
+- slideSelectRangePolicy_refs = 0
+- insert_only_target_baseIDs = 0
+- whole_row_banner = 0
+- marquee_policy = True
+- range_policy_file = False
+- range_policy_tests = False
+- old_tests_still_present = 0
 
 ## Tests (func test count)
-- PhotoDeskTests = 191
-- PhotoDeskUITests = 57
-- PhotoDeskCore/Tests = 270
+- PhotoDeskTests = 223
+- PhotoDeskUITests = 67
+- PhotoDeskCore/Tests = 338
 
 ## Pages (29 view/viewcontroller files)
 - PhotoDesk/Features/Albums/AlbumDetailView.swift (123 lines, ax=False)
@@ -56,7 +56,7 @@
 - PhotoDesk/Features/Editor/EditorViewController.swift (277 lines, ax=False)
 - PhotoDesk/Features/Export/ExportView.swift (157 lines, ax=True)
 - PhotoDesk/Features/Export/StorageStatsView.swift (299 lines, ax=True)
-- PhotoDesk/Features/Library/LibraryViewController.swift (1519 lines, ax=True)
+- PhotoDesk/Features/Library/LibraryViewController.swift (1696 lines, ax=True)
 - PhotoDesk/Features/Library/LocationFilterView.swift (129 lines, ax=False)
 - PhotoDesk/Features/Library/RecentlyDeletedView.swift (52 lines, ax=False)
 - PhotoDesk/Features/Metadata/MetadataView.swift (214 lines, ax=True)
@@ -77,6 +77,6 @@
 - PhotoDesk/Features/Vault/VaultView.swift (225 lines, ax=True)
 - PhotoDesk/Features/Viewer/ActionOverlayView.swift (105 lines, ax=False)
 - PhotoDesk/Features/Viewer/FilmStripView.swift (138 lines, ax=False)
-- PhotoDesk/Features/Viewer/ViewerViewController.swift (1024 lines, ax=True)
+- PhotoDesk/Features/Viewer/ViewerViewController.swift (1101 lines, ax=True)
 
 ## RESULT: PASS

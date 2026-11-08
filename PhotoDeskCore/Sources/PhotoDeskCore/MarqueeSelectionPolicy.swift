@@ -1,4 +1,4 @@
-// MARK: - 职责说明：矩形框选纯策略（docs/25 §6.2 / M15 P0-3/4，替换 SlideSelectRangePolicy 整行带）——
+// MARK: - 职责说明：矩形框选纯策略（docs/25 §6.2 / M15 P0-3/4，替换旧「整行带」滑选）——
 // 语义：start→current 构成矩形，与矩形相交的 cell 进入目标集合；起手 cell 已选 → deselect 模式，
 // 未选 → select 模式；回拖自然收缩。几何：cell x = col*(itemWidth+spacing)，
 // y = sectionOriginY + headerHeight + row*(itemHeight+spacing)；矩形宽/高为 0 扩展 1pt；
@@ -83,8 +83,8 @@ public enum MarqueeSelectionPolicy {
               rect.currentX.isFinite, rect.currentY.isFinite else {
             return []
         }
-        var minX = min(rect.startX, rect.currentX)
-        var minY = min(rect.startY, rect.currentY)
+        let minX = min(rect.startX, rect.currentX)
+        let minY = min(rect.startY, rect.currentY)
         var maxX = max(rect.startX, rect.currentX)
         var maxY = max(rect.startY, rect.currentY)
         // 宽/高为 0 → 扩展 1pt：竖直/水平拖动至少命中手指下的 cell

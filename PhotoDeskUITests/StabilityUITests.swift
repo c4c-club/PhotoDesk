@@ -307,12 +307,12 @@ final class StabilityUITests: XCTestCase {
                                      fromY: CGFloat,
                                      toX: CGFloat,
                                      toY: CGFloat) {
-        // 两段都必须横向占优：纵向拖动会触发方向锁（让位滚动、不选择），
-        // 导致第二行选不中、计数断言达不到。两段各自独立手势、网格不滚动。
-        // 第一段：fromY 行整行横向滑选
+        // 两段横向矩形各自独立手势：第一段选 fromY 行，第二段锚点未选（该行尚未被
+        // 覆盖）→ select 模式选 toY 行；两段计数合计 = 2 行 × 3 列 = 6。
+        // 第一段：fromY 行横向矩形
         slideSelectGesture(in: collection, fromX: fromX, fromY: fromY,
                            toX: toX, toY: fromY)
-        // 第二段：toY 行整行反向横向滑选（跨第二行继续加选）
+        // 第二段：toY 行反向横向矩形（跨第二行继续加选）
         slideSelectGesture(in: collection, fromX: toX, fromY: toY,
                            toX: fromX, toY: toY)
     }
@@ -601,68 +601,25 @@ final class StabilityUITests: XCTestCase {
         snap(app, "m12-top-chrome-xxxl")
     }
 
-    // MARK: - M13 P3：单指滑选（方向锁 / 快照恢复 / 去重 / 边缘自动滚动）
+    // MARK: - M15 P0-3/4：矩形框选（整行带/快照恢复旧用例已删，验收在 MarqueeSelectionUITests）
 
     private func launchSelectableGrid(_ app: XCUIApplication) -> XCUIElement {
-        // -uiTestingClearPosition：滑选/轻点族断言依赖确定的首屏几何（首格可点、两行满格），
+        // -uiTestingClearPosition：框选/轻点族断言依赖确定的首屏几何（首格可点、两行满格），
         // 跨用例持久化的位置恢复会让首格停在半屏外（绿5 tapNotSwallowed 实锤）。
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition", "-uiTestingSelectMode"]
         return launchToGrid(app)
-    }
-
-    func testDragBackRemovesPreviouslySelected() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        slideAtLeastTwoRows(in: collection, fromX: 0.08, fromY: 0.22,
-                            toX: 0.92, toY: 0.42)
-        let before = waitForSelectionCount(app, atLeast: 6)
-        XCTAssertGreaterThanOrEqual(before, 6, "单指横向滑选应连续选中至少 6 格")
-        // 反向斜滑（独立手势）：快照语义 = 访问过的已选 cell 恢复为本手势开始时的值 → 保持选中，
-        // 不得误清除任何已选 cell；「同手势内反向滑回取消选中」（奇偶访问）由 Core
-        // SlideSelectPolicyTests.testSlidingBackRestoresSnapshotForUnselectedCells /
-        // testThirdPassSelectsAgain 覆盖，真机反向手势单独验证。
-        slideSelectGesture(in: collection, fromX: 0.92, fromY: 0.42,
-                           toX: 0.08, toY: 0.22)
-        let after = waitForSelectionCountEqual(app, to: before)
-        XCTAssertEqual(after, before, "反向手势按快照恢复：已选 cell 不得被误清除")
-        snap(app, "m13-drag-back-removes")
-    }
-
-    func testDragBackRestoresOriginal() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        first.tap()
-        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
-                                    "点选第一格应进入快照")
-        // 从第二行开始拖，避免经过首格（否则首格会被快照规则切换）
-        slideAtLeastTwoRows(in: collection, fromX: 0.10, fromY: 0.35,
-                            toX: 0.90, toY: 0.55)
-        let afterSlide = waitForSelectionCount(app, atLeast: 3)
-        XCTAssertGreaterThanOrEqual(afterSlide, 3, "滑出后应连续加选")
-        // 反向两行（独立手势）：快照语义恢复本手势开始时的值 → 选中集合原样保留，
-        // 不得误清除任何 cell；同手势内反向取消由 Core parity 用例覆盖（绿5 结论）。
-        slideAtLeastTwoRows(in: collection, fromX: 0.90, fromY: 0.55,
-                            toX: 0.10, toY: 0.35)
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: afterSlide), afterSlide,
-                       "反向手势按快照恢复：选中集合必须原样保留")
-        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
-                      "滑动开始前已选中的 cell 不得被误取消")
     }
 
     func testEdgeAutoScrollSelectsOffscreenCells() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        for _ in 0..<3 {
-            slideSelectGesture(in: collection, fromX: 0.05, fromY: 0.78,
-                               toX: 0.95, toY: 0.96, hold: 1.2)
-            Thread.sleep(forTimeInterval: 0.2)
-        }
-        let count = waitForSelectionCount(app, atLeast: 11, timeout: 8)
-        XCTAssertGreaterThanOrEqual(count, 11,
+        // 矩形语义：单次长按拖动顶住下缘 → 自动滚动逐帧重算，startPoint 固定在 content 坐标，
+        // 矩形随之拉长，屏幕外 cell 持续入集（反复起手会因锚点已选触发取消模式，故只拖一次）。
+        slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.40,
+                           toX: 0.12, toY: 0.96, hold: 2.0)
+        let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
+        XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")
         snap(app, "m13-edge-autoscroll")
     }
@@ -674,34 +631,17 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
         first.tap()
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
-                                    "点选第一格应进入快照")
-        // 从第二行开始拖，避免经过首格
+                                    "点选第一格应记入选中集合")
+        // 从第二行开始拖（锚点未选 → select 模式），矩形不覆盖首行 → 首格保持选中
         slideAtLeastTwoRows(in: collection, fromX: 0.10, fromY: 0.35,
                             toX: 0.90, toY: 0.55)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 3), 3,
-                                    "滑选应继续加选")
+                                    "框选应继续加选")
         XCTAssertTrue((first.value as? String ?? "").contains("selected"),
-                      "滑动开始前已选中的 cell 全程保持选中")
+                      "框选矩形未覆盖首格，首格必须保持选中")
     }
 
-    /// P0-3 用户原话：从右侧列向下滑，左侧同行必须一起选中（官方相册整行语义）。
-    func testVerticalSlideSelectSelectsLeftColumns() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        // 3 列网格：从最右列首行向下拖约 4 行（旧实现方向锁会把纵向手势让给滚动且不选）。
-        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.18,
-                           toX: 0.86, toY: 0.78)
-        let count = waitForSelectionCount(app, atLeast: 12, timeout: 8)
-        XCTAssertGreaterThanOrEqual(count, 12, "右列下滑 4 行应选中至少 12 格（整行）")
-        let left = collection.cells.element(boundBy: 0)
-        XCTAssertTrue(left.exists)
-        XCTAssertTrue((left.value as? String ?? "").contains("selected"),
-                      "最左列同行 cell 必须被选中；实际 value=\(left.value ?? "nil")")
-        snap(app, "p0-vertical-slide-select")
-    }
-
-    /// P0-4：选择模式双指滚动配置（单指已由滑选 pan 独占，collectionView pan 至少 2 指）。
+    /// P0-4：选择模式双指滚动配置（单指已由框选 pan 独占，collectionView pan 至少 2 指）。
     func testTwoFingerScrollInSelectionMode() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
@@ -720,28 +660,6 @@ final class StabilityUITests: XCTestCase {
         snap(app, "p0-two-finger-scroll-config")
     }
 
-    /// P0-4：拖选回拖恢复（Core 覆盖同手势 parity；此处验证独立手势不误清已选）。
-    func testSlideSelectDragBackRestores() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        first.tap()
-        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1)
-        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.28,
-                           toX: 0.86, toY: 0.58)
-        let afterForward = waitForSelectionCount(app, atLeast: 6, timeout: 6)
-        XCTAssertGreaterThanOrEqual(afterForward, 6, "下滑应整行加选")
-        // 回拖（独立手势从当前行回到起始行上方）：不得误取消拖动前已选 cell
-        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.58,
-                           toX: 0.86, toY: 0.28)
-        let afterBack = waitForSelectionCount(app, atLeast: 1, timeout: 6)
-        XCTAssertGreaterThanOrEqual(afterBack, 1, "回拖后至少保留最初点选的 cell")
-        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
-                      "拖动前已选中的 cell 不得被回拖误取消")
-        snap(app, "p0-slide-drag-back")
-    }
-
     func testTapNotSwallowedBySlidePan() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
@@ -752,27 +670,6 @@ final class StabilityUITests: XCTestCase {
                                     "cancelsTouchesInView=false 时轻点不得被 pan 吞掉")
         XCTAssertTrue((first.value as? String ?? "").contains("selected"),
                       "轻点后徽标与 AX 必须同步为 selected")
-    }
-
-    func testNoFlickerOnSameCell() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        // 第一次微拖（cell 自身坐标）：lastProcessedIndexPath 去重 → 只访问一次
-        let start = first.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
-        let end = first.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: end)
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
-                       "同一 cell 内单次经过必须恰好选中一次")
-        let before = (first.value as? String) ?? ""
-        XCTAssertTrue(before.contains("selected"), "首次经过后 AX 必须为 selected")
-        // 第二次微拖：同一 cell 再次经过（快照恢复 → 不闪烁不重复切换）
-        start.press(forDuration: 0.05, thenDragTo: end)
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 1), 1,
-                       "同一 cell 二次经过必须按快照恢复，不得切换")
-        let after = (first.value as? String) ?? ""
-        XCTAssertEqual(after, before, "同一 indexPath 去重 + 快照恢复后 AX 必须稳定")
     }
 
     func testScrollEnabledRestoredAfterDragEnd() throws {

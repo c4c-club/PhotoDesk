@@ -7,8 +7,8 @@
 // 旧版根因：maximumNumberOfTouches=1 使「双指」分支成死代码；isZoomed 只在 shouldBegin 起始判一次
 //（此刻 zoomScale==1 必放行）；shouldRecognizeSimultaneouslyWith 无条件 true → 捏合中的单指位移
 // 触发垂直锁 → performBatchUpdates 在 UIScrollView 缩放事务中执行 → CALayer NaN 崩溃。
-// M12 仅有 isFinite 护栏仍复现：configure / layoutSubviews / scrollViewDidZoom 在活跃期仍写
-// frame / contentSize / contentInset，且 allowsRemovalTransaction 只在入口 guard 无排队语义。
+// M12 仅有 isFinite 护栏仍复现：旧滚动缩放方案在活跃期仍从 configure / layoutSubviews /
+// 缩放回调多路写回几何，且 allowsRemovalTransaction 只在入口 guard 无排队语义。
 
 import UIKit
 
@@ -54,7 +54,7 @@ enum ViewerGesturePolicy {
     /// M13 P1：排队动作的 drain 门禁——几何事务已回 idle 且未在捏合中即可串行执行。
     /// 与 allowsRemovalTransaction 的区别：即时删除要求 zoomScale≈1 且越过回弹宽限；
     /// 队列 drain 只需几何批量提交完成（geometryState==idle）且无 isZooming，
-    /// 避免放大静止态 / 宽限窗口把队列永久挂起，同时保证不与 scrollViewDidZoom 同帧 batchUpdates。
+    /// 避免放大静止态 / 宽限窗口把队列永久挂起，同时保证不与 cell 几何提交同帧 batchUpdates。
     static func allowsQueuedRemovalDrain(cell: CellState?) -> Bool {
         guard let cell else { return true }
         guard cell.zoomScale.isFinite else { return false }

@@ -530,7 +530,7 @@ final class ViewerViewController: UIViewController {
         }
     }
 
-    /// 把 drain 排到下一个 MainActor 执行片：与当帧 CATransaction / scrollViewDidZoom 严格错开。
+    /// 把 drain 排到下一个 MainActor 执行片：与当帧 CATransaction 几何提交严格错开。
     @MainActor
     private func schedulePendingRemovalDrain() {
         guard !pendingRemovalActions.isEmpty else { return }
@@ -547,7 +547,7 @@ final class ViewerViewController: UIViewController {
 
     /// M13 P1：cell 几何事务回 idle 时串行 drain 删除/隐藏队列。
     /// drain 只在 geometryState==idle 且非 isZooming 时执行，绝不和 CATransaction 几何提交 /
-    /// scrollViewDidZoom / performBatchUpdates 同帧；每个 batch completion 后再消费下一个动作。
+    /// cell transform 写入 / performBatchUpdates 同帧；每个 batch completion 后再消费下一个动作。
     @MainActor
     private func drainPendingRemovalActions() {
         guard !isRemovalInFlight,

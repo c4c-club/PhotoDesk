@@ -29,7 +29,6 @@ final class ZoomableImageCell: UICollectionViewCell {
         view.bounces = false
         view.minimumZoomScale = 1
         view.maximumZoomScale = 1
-        view.contentInsetAdjustmentBehavior = .never
         view.translatesAutoresizingMaskIntoConstraints = false
         view.accessibilityIdentifier = "Viewer-ZoomScrollView"
         return view

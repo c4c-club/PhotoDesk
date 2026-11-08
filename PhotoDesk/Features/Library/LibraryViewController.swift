@@ -692,7 +692,10 @@ final class LibraryViewController: UIViewController {
         controller.applyTargetIDs = { [weak self] ids in
             self?.applySlideSelection(ids: ids)
         }
-        controller.columnsProvider = { [weak self] in self?.columns ?? 3 }
+        controller.scopeProvider = { [weak self] in self?.selectionState.scope }
+        controller.geometryProvider = { [weak self] in
+            self?.marqueeGeometry()
+        }
         slideSelectController = controller
         slideSelectPan = controller.pan
     }
@@ -740,7 +743,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "单指按住滑动可整行连续选择；双指滚动", duration: 2)
+        showTopBanner(text: "在照片上拖动可框选；从已选照片起拖可取消；双指滚动", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -881,6 +884,41 @@ final class LibraryViewController: UIViewController {
     // MARK: - M13 P3 单指滑动连续多选（VC 只做映射，判定全在 SlideSelectPolicy）
 
     /// 把 Core 行带计算出的目标 id 集合整体落到 SelectionState；只 diff 可见 cell，计数仅变化时刷新。
+    /// docs/25 §6.2：框选用网格几何（pt 单位）；sectionOriginY 取真实补充视图 minY，
+    /// 远距离估算布局回退累计估算（header + rows × pitch）。
+    private func marqueeGeometry() -> (metrics: GridMetrics, sectionOriginY: [Double])? {
+        guard collectionView.bounds.width > 0, !currentItemsBySection.isEmpty else { return nil }
+        let spacing = Double(DSSpacing.gridSpacing)
+        let header = Double(DSSpacing.monthHeaderHeight)
+        let width = Double(collectionView.bounds.width)
+        let itemSide = (width - spacing * Double(max(1, columns - 1))) / Double(max(1, columns))
+        guard itemSide.isFinite, itemSide > 0 else { return nil }
+        let counts = (0..<collectionView.numberOfSections).map { collectionView.numberOfItems(inSection: $0) }
+        guard counts.count == currentItemsBySection.count, !counts.isEmpty else { return nil }
+        let pitchY = itemSide + spacing
+        var origins: [Double] = []
+        var nextEstimate: Double = 0
+        for section in 0..<counts.count {
+            let rows = Int((Double(max(1, counts[section])) / Double(max(1, columns))).rounded(.up))
+            if let attrs = collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
+                ofKind: UICollectionView.elementKindSectionHeader,
+                at: IndexPath(item: 0, section: section)) {
+                origins.append(Double(attrs.frame.minY))
+                nextEstimate = Double(attrs.frame.maxY) + Double(rows) * pitchY
+            } else {
+                origins.append(nextEstimate)
+                nextEstimate += header + Double(rows) * pitchY
+            }
+        }
+        let metrics = GridMetrics(columns: columns,
+                                  itemWidth: itemSide,
+                                  itemHeight: itemSide,
+                                  interItemSpacing: spacing,
+                                  sectionHeaderHeight: header,
+                                  sectionItemCounts: counts)
+        return (metrics, origins)
+    }
+
     private func applySlideSelection(ids: Set<String>) {
         let previous = selectionState.selectedSet
         guard previous != ids else { return }
