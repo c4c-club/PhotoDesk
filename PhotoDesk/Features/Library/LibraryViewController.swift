@@ -1089,6 +1089,9 @@ final class LibraryViewController: UIViewController {
         var headInsertAnchor: (assetID: String, visualY: CGFloat)?
         if pending.queryKey == currentSnapshotQueryKey,
            !collectionView.isTracking, !collectionView.isDecelerating,
+           // M15 实锤：恢复进行中打的位置快照是恢复前落点，登记下去会在恢复 settle 后
+           // 把已精确恢复的位置拖走（冷启动 −520pt 实锤）——恢复期间绝不登记补偿。
+           !isRestoringPosition, !positionCoordinator.isRestoreInFlight,
            let snapshot = makePositionSnapshot() {
             headInsertAnchor = (snapshot.anchorAssetID, CGFloat(snapshot.anchorVisualY))
         }
@@ -1321,6 +1324,9 @@ final class LibraryViewController: UIViewController {
             showRestoreMaskIfNeeded()
         case .settled:
             hideRestoreMask()
+            // 恢复是权威定位：恢复 settle 时丢弃恢复期间登记（或登记后未消费）的前插补偿，
+            // 否则旧 visualY 会在恢复后把精确恢复的位置拖走（M15 冷启动 −520pt 实锤）。
+            pendingHeadInsertAnchor = nil
             viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)"
             refreshDebugScrollNote()
         case .idle:

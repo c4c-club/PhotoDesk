@@ -306,12 +306,10 @@ final class ViewerViewController: UIViewController {
         moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
-        // 点击屏幕切换 chrome；双击缩放不触发 chrome（D15）：单击 require 双击失败
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapNoop))
-        doubleTap.numberOfTapsRequired = 2
-        view.addGestureRecognizer(doubleTap)
+        // 点击屏幕切换 chrome。M15 实锤：根视图上的占位双击手势（只为让单击等待双击失败）
+        // 会与 cell 的双击互斥竞争且抢占成功 → cell 缩放从未触发。删除占位双击：
+        // 双击缩放时 chrome 会切换两次（无净变化），cell 的双击从此唯一持有双击语义。
         let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped(_:)))
-        tap.require(toFail: doubleTap)
         view.addGestureRecognizer(tap)
         // 长按操作菜单（docs/09 D15）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(viewLongPressed(_:)))
@@ -325,8 +323,6 @@ final class ViewerViewController: UIViewController {
         ])
         refreshChrome()
     }
-
-    @objc private func doubleTapNoop() {}   // 占位：只为让单击等待双击失败（缩放由 cell 处理）
 
     private func setupFilmStrip() {
         filmStrip.translatesAutoresizingMaskIntoConstraints = false

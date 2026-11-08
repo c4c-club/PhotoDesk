@@ -1,6 +1,6 @@
 ﻿# M15 Audit Report
 
-- stamp: 2026-11-09 06:53:15+08:00
+- stamp: 2026-11-09 07:51:19+08:00
 - mode: GATE (P0 must be 0)
 
 ## Red lines (must be 0)
@@ -56,7 +56,7 @@
 - PhotoDesk/Features/Editor/EditorViewController.swift (294 lines, ax=False)
 - PhotoDesk/Features/Export/ExportView.swift (162 lines, ax=True)
 - PhotoDesk/Features/Export/StorageStatsView.swift (299 lines, ax=True)
-- PhotoDesk/Features/Library/LibraryViewController.swift (1702 lines, ax=True)
+- PhotoDesk/Features/Library/LibraryViewController.swift (1708 lines, ax=True)
 - PhotoDesk/Features/Library/LocationFilterView.swift (129 lines, ax=False)
 - PhotoDesk/Features/Library/RecentlyDeletedView.swift (83 lines, ax=False)
 - PhotoDesk/Features/Metadata/MetadataView.swift (237 lines, ax=True)
@@ -77,6 +77,6 @@
 - PhotoDesk/Features/Vault/VaultView.swift (241 lines, ax=True)
 - PhotoDesk/Features/Viewer/ActionOverlayView.swift (105 lines, ax=False)
 - PhotoDesk/Features/Viewer/FilmStripView.swift (138 lines, ax=False)
-- PhotoDesk/Features/Viewer/ViewerViewController.swift (1101 lines, ax=True)
+- PhotoDesk/Features/Viewer/ViewerViewController.swift (1098 lines, ax=True)
 
 ## RESULT: PASS
