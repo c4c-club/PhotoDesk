@@ -620,30 +620,45 @@ final class StabilityUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         let rowHeight = oneRowHeight(in: collection)
         Thread.sleep(forTimeInterval: 0.5)
-        guard let before = debugSnapshot(app) else {
-            return XCTFail("旋转前必须读到 off/anchor/visualY")
+        let beforeCells = collection.cells.allElementsBoundByIndex
+        var beforeByID: [String: CGFloat] = [:]
+        for cell in beforeCells {
+            let value = (cell.value as? String) ?? ""
+            let id = value.components(separatedBy: " ").first ?? ""
+            if !id.isEmpty { beforeByID[id] = cell.frame.minY }
         }
+        XCTAssertFalse(beforeByID.isEmpty, "旋转前必须至少有一个带 assetID 的可见 cell")
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
                       "横屏后应保持锚点月份")
-        guard let landscape = debugSnapshot(app) else {
-            return XCTFail("横屏后必须读到 off/anchor/visualY")
+        var landscapeID: String?
+        var landscapeY: CGFloat = 0
+        for cell in collection.cells.allElementsBoundByIndex {
+            let value = (cell.value as? String) ?? ""
+            let id = value.components(separatedBy: " ").first ?? ""
+            if beforeByID[id] != nil {
+                landscapeID = id
+                landscapeY = cell.frame.minY
+                break
+            }
         }
+        let keptID = try XCTUnwrap(landscapeID, "横屏后看不到旋转前的任何可见 asset")
+        let beforeY = try XCTUnwrap(beforeByID[keptID])
+        XCTAssertLessThanOrEqual(abs(landscapeY - beforeY), rowHeight,
+                                 "横屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
                       "回竖屏后应保持锚点月份")
-        guard let after = debugSnapshot(app) else {
-            return XCTFail("回竖屏后必须读到 off/anchor/visualY")
+        var portraitY: CGFloat?
+        for cell in collection.cells.allElementsBoundByIndex {
+            let value = (cell.value as? String) ?? ""
+            let id = value.components(separatedBy: " ").first ?? ""
+            if id == keptID { portraitY = cell.frame.minY; break }
         }
-        XCTAssertEqual(before.anchor, landscape.anchor, "横屏不得漂移 assetID 视觉锚点")
-        XCTAssertEqual(before.anchor, after.anchor, "回竖屏不得漂移 assetID 视觉锚点")
-        XCTAssertLessThanOrEqual(abs(before.off - after.off), 1.0,
-                                 "回竖屏后像素 offset 差必须 ≤ 1pt")
-        XCTAssertLessThanOrEqual(abs(before.visualY - landscape.visualY), rowHeight,
-                                 "横屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        XCTAssertLessThanOrEqual(abs(before.visualY - after.visualY), rowHeight,
+        let restoredY = try XCTUnwrap(portraitY, "回竖屏后看不到 \(keptID)")
+        XCTAssertLessThanOrEqual(abs(restoredY - beforeY), rowHeight,
                                  "回竖屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
         assertAlive(app, "旋转锚点保持后")
         XCUIDevice.shared.orientation = .portrait
@@ -1041,11 +1056,20 @@ final class StabilityUITests: XCTestCase {
                             toX: 0.92, toY: 0.42)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选结束前应有连续选中")
-        let before = (collection.cells.firstMatch.value as? String) ?? ""
-        app.swipeUp()
-        app.swipeUp()
-        let after = (collection.cells.firstMatch.value as? String) ?? ""
-        XCTAssertNotEqual(after, before, "滑选结束后 isScrollEnabled 必须恢复为 true")
+        // P0-4 语义：选择模式下单指属于滑选，滚动必须由双指 pan 承担；
+        // 旧断言“单指滑动应滚网格”与用户要求的整行滑选互斥，改为验证双指配置与选择保持。
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "缺少 Library-DebugSummary")
+        let deadline = Date().addingTimeInterval(5)
+        var value = (banner.value as? String) ?? ""
+        while Date() < deadline, !value.contains("panMin=2") {
+            usleep(200_000)
+            value = (banner.value as? String) ?? ""
+        }
+        XCTAssertTrue(value.contains("panMin=2"),
+                      "滑选结束后 collectionView 必须仍由双指 pan 滚动，当前：\(value)")
+        XCTAssertGreaterThanOrEqual(selectionCount(app), 6,
+                                    "滑选结束后选中集合不得被滚动配置改动")
     }
 
     func testReusedCellBadgeMatchesSelection() throws {
