@@ -21,7 +21,7 @@ struct PrivacyView: View {
                              detail: "移到最近删除前会把原件拷贝进本机沙盒（默认上限 2GB），仅用于撤销窗口内恢复，可随时在「手势设置」关闭。")
             }
 
-            Section("锁定") {
+            Section {
                 Toggle(isOn: $vaultLockEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("「已隐藏」相册需要 Face ID / 密码")
@@ -30,6 +30,8 @@ struct PrivacyView: View {
                             .foregroundColor(Color(ds: DSColor.textSecondary))
                     }
                 }
+            } header: {
+                Text("锁定")
             } footer: {
                 Text("若 Face ID / 密码不可用，请到系统「设置 → 面容 ID 与密码」（或「触控 ID 与密码」）开启设备验证后返回重试。")
             }
