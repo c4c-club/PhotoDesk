@@ -235,7 +235,8 @@ final class PageRegressionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
-        let collection = launchToGrid(app)
+        launchToGrid(app)
+        let collection = app.collectionViews.firstMatch
 
         let count = app.staticTexts["Selection-Count"]
         XCTAssertTrue(count.waitForExistence(timeout: 5), "多选计数未出现")
