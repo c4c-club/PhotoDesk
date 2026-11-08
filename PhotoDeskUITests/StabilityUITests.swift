@@ -942,17 +942,62 @@ final class StabilityUITests: XCTestCase {
                       "滑动开始前已选中的 cell 全程保持选中")
     }
 
-    func testVerticalDragDoesNotSelectAndScrolls() throws {
+    /// P0-3 用户原话：从右侧列向下滑，左侧同行必须一起选中（官方相册整行语义）。
+    func testVerticalSlideSelectSelectsLeftColumns() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        let before = (collection.cells.firstMatch.value as? String) ?? ""
-        app.swipeUp()
-        app.swipeUp()
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 0), 0,
-                       "纵向占优必须让位给 CollectionView 滚动，不得激活滑选")
-        let after = (collection.cells.firstMatch.value as? String) ?? ""
-        XCTAssertNotEqual(after, before, "纵向手势必须真实滚动网格")
+        // 3 列网格：从最右列首行向下拖约 4 行（旧实现方向锁会把纵向手势让给滚动且不选）。
+        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.18,
+                           toX: 0.86, toY: 0.78)
+        let count = waitForSelectionCount(app, atLeast: 12, timeout: 8)
+        XCTAssertGreaterThanOrEqual(count, 12, "右列下滑 4 行应选中至少 12 格（整行）")
+        let left = collection.cells.element(boundBy: 0)
+        XCTAssertTrue(left.exists)
+        XCTAssertTrue((left.value as? String ?? "").contains("selected"),
+                      "最左列同行 cell 必须被选中；实际 value=\(left.value ?? "nil")")
+        snap(app, "p0-vertical-slide-select")
+    }
+
+    /// P0-4：选择模式双指滚动配置（单指已由滑选 pan 独占，collectionView pan 至少 2 指）。
+    func testTwoFingerScrollInSelectionMode() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "缺少 Library-DebugSummary")
+        let deadline = Date().addingTimeInterval(5)
+        var value = (banner.value as? String) ?? ""
+        while Date() < deadline, !value.contains("panMin=2") {
+            usleep(200_000)
+            value = (banner.value as? String) ?? ""
+        }
+        XCTAssertTrue(value.contains("panMin=2"),
+                      "多选模式 collectionView pan 必须至少两指，当前：\(value)")
+        XCTAssertEqual(selectionCount(app), 0, "双指滚动不应改变选择数")
+        snap(app, "p0-two-finger-scroll-config")
+    }
+
+    /// P0-4：拖选回拖恢复（Core 覆盖同手势 parity；此处验证独立手势不误清已选）。
+    func testSlideSelectDragBackRestores() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.tap()
+        XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1)
+        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.28,
+                           toX: 0.86, toY: 0.58)
+        let afterForward = waitForSelectionCount(app, atLeast: 6, timeout: 6)
+        XCTAssertGreaterThanOrEqual(afterForward, 6, "下滑应整行加选")
+        // 回拖（独立手势从当前行回到起始行上方）：不得误取消拖动前已选 cell
+        slideSelectGesture(in: collection, fromX: 0.86, fromY: 0.58,
+                           toX: 0.86, toY: 0.28)
+        let afterBack = waitForSelectionCount(app, atLeast: 1, timeout: 6)
+        XCTAssertGreaterThanOrEqual(afterBack, 1, "回拖后至少保留最初点选的 cell")
+        XCTAssertTrue((first.value as? String ?? "").contains("selected"),
+                      "拖动前已选中的 cell 不得被回拖误取消")
+        snap(app, "p0-slide-drag-back")
     }
 
     func testTapNotSwallowedBySlidePan() throws {

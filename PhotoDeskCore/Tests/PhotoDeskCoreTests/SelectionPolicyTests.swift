@@ -192,4 +192,36 @@ final class SelectionPolicyTests: XCTestCase {
         state.remove(id: "unknown")
         XCTAssertEqual(state.selected, ["a", "c"])
     }
+
+    // MARK: - docs/22 §5.4：selectedSet 缓存一致性 / applyRange / applyDelta
+
+    func testSelectedSetCacheMatchesArrayAfterRandomOps() {
+        var state = SelectionState()
+        let ids = (0..<200).map { "id-\($0)" }
+        state.begin(scope: Set(ids))
+        var rng = SystemRandomNumberGenerator()
+        for _ in 0..<1_000 {
+            let id = ids.randomElement(using: &rng) ?? "id-0"
+            switch Int.random(in: 0...3, using: &rng) {
+            case 0: state.toggle(id)
+            case 1: state.select(id)
+            case 2: state.remove(id: id)
+            default:
+                if Bool.random(using: &rng) { state.selectAll() } else { state.deselectAll() }
+            }
+            XCTAssertEqual(state.selectedSet, Set(state.selected),
+                           "selectedSet 必须始终与 selected 数组同步")
+        }
+    }
+
+    func testApplyRangeAndApplyDelta() {
+        var state = SelectionState()
+        state.begin(scope: Set((0..<20).map(String.init)))
+        state.applyRange(base: ["1", "19"], range: Set((0...5).map(String.init)))
+        XCTAssertEqual(state.selectedSet, Set((0...5).map(String.init)).union(["19"]))
+        state.applyDelta(add: ["7"], remove: ["0", "1"])
+        XCTAssertEqual(state.selectedSet, Set(["2", "3", "4", "5", "7", "19"]))
+        XCTAssertTrue(state.contains("7"))
+        XCTAssertFalse(state.contains("0"))
+    }
 }
