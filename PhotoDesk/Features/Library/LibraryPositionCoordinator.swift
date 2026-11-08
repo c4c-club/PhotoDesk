@@ -239,8 +239,5 @@ final class LibraryPositionCoordinator {
         pendingAnchor = nil
         onPhaseChange?(phase)
         ViewerTrace.log("position.restore.v4 \(phase.rawValue) reason=\(reason)")
-        if phase == .done {
-            lastRestoredQueryKey = lastRestoredQueryKey
-        }
     }
 }

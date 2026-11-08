@@ -100,7 +100,7 @@ final class SlideSelectGestureController: NSObject {
         state = .selecting
         collectionView.allowsSelection = false
         // 起手 cell 立即进入目标（即使 range 为空）；回拖到起点时由 processFinger 恢复 base。
-        if let path = indexPath(for: anchor), let id = itemIDProvider(path) {
+        if let path = indexPathForCell(anchor), let id = itemIDProvider(path) {
             var target = baseIDs
             target.insert(id)
             lastTargetIDs = target
@@ -127,7 +127,7 @@ final class SlideSelectGestureController: NSObject {
         let range = SlideSelectRangePolicy.cells(anchor: anchor, current: cell, metrics: metrics)
         var target = baseIDs
         for rangeCell in range {
-            if let path = indexPath(for: rangeCell), let id = itemIDProvider(path) {
+            if let path = indexPathForCell(rangeCell), let id = itemIDProvider(path) {
                 target.insert(id)
             }
         }
@@ -138,7 +138,7 @@ final class SlideSelectGestureController: NSObject {
         if grew { haptic.selectionChanged() }
     }
 
-    private func indexPath(for cell: SlideSelectCell) -> IndexPath? {
+    private func indexPathForCell(_ cell: SlideSelectCell) -> IndexPath? {
         guard let collectionView,
               cell.section >= 0, cell.section < collectionView.numberOfSections,
               cell.item >= 0, cell.item < collectionView.numberOfItems(inSection: cell.section) else { return nil }
