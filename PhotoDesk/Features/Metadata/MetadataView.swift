@@ -4,6 +4,7 @@
 // 解析纯逻辑在 MetadataParser（可单测）；本视图只做取图与展示。
 
 import SwiftUI
+import UIKit
 import Photos
 import ImageIO
 import UniformTypeIdentifiers
@@ -15,6 +16,7 @@ struct MetadataView: View {
     @State private var fields = MetadataFields()
     @State private var byteSize: Int64 = 0
     @State private var formatText = "—"
+    @State private var showCopiedToast = false
 
     private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -53,7 +55,13 @@ struct MetadataView: View {
 
             if let latitude = fields.gpsLatitude, let longitude = fields.gpsLongitude {
                 Section("位置") {
-                    row("坐标", String(format: "%.5f, %.5f", latitude, longitude))
+                    Button {
+                        openMaps(latitude: latitude, longitude: longitude)
+                    } label: {
+                        row("坐标（点按在地图中打开）",
+                            String(format: "%.5f, %.5f", latitude, longitude))
+                    }
+                    .buttonStyle(.plain)
                     miniMap(latitude: latitude, longitude: longitude)
                         .frame(height: 140)
                         .listRowInsets(EdgeInsets())
@@ -70,7 +78,56 @@ struct MetadataView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("信息")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("复制全部") { copyAll() }
+                    .accessibilityIdentifier("Metadata-CopyAll")
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showCopiedToast {
+                Text("已复制全部信息")
+                    .font(.caption)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(ds: DSColor.bgSecondary))
+                    .cornerRadius(DSSpacing.buttonCornerRadius)
+                    .padding(.bottom, 24)
+                    .transition(.opacity)
+            }
+        }
         .task { await load() }
+    }
+
+    private func copyAll() {
+        var lines = [
+            "尺寸：\(item.pixelWidth) × \(item.pixelHeight)",
+            "大小：\(byteSize > 0 ? Self.byteFormatter.string(fromByteCount: byteSize) : "未知")",
+            "格式：\(formatText)",
+        ]
+        if let created = item.creationDate {
+            lines.append("拍摄时间：\(Self.dateFormatter.string(from: created))")
+        }
+        if let model = fields.deviceModel { lines.append("设备：\(model)") }
+        if let lens = fields.lensModel { lines.append("镜头：\(lens)") }
+        if let latitude = fields.gpsLatitude, let longitude = fields.gpsLongitude {
+            lines.append(String(format: "坐标：%.5f, %.5f", latitude, longitude))
+        }
+        UIPasteboard.general.string = lines.joined(separator: "\n")
+        withAnimation { showCopiedToast = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            withAnimation { showCopiedToast = false }
+        }
+    }
+
+    private func openMaps(latitude: Double, longitude: Double) {
+        var components = URLComponents(string: "maps://")
+        components?.queryItems = [
+            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)"),
+            URLQueryItem(name: "q", value: "照片位置"),
+        ]
+        guard let url = components?.url else { return }
+        UIApplication.shared.open(url)
     }
 
     // MARK: - 子视图

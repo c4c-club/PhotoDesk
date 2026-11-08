@@ -15,6 +15,14 @@ struct VaultView: View {
     @State private var actionMessage: String?
     @State private var hasAttemptedUnlock = false
 
+    /// 解锁后标题显示「已隐藏 · N 项」（docs/22 Phase 4 已隐藏页）
+    private var navigationTitle: String {
+        if case .unlocked = viewModel.phase {
+            return "已隐藏 · \(viewModel.items.count) 项"
+        }
+        return "已隐藏"
+    }
+
     var body: some View {
         Group {
             switch viewModel.phase {
@@ -29,7 +37,7 @@ struct VaultView: View {
             }
         }
         .background(Color(ds: DSColor.bgPrimary))
-        .navigationTitle("已隐藏")
+        .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // iOS 15：ToolbarContentBuilder 不支持条件（buildIf iOS 16+）——条件放 ToolbarItem 内部视图
