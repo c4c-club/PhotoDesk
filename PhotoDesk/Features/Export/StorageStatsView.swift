@@ -166,6 +166,13 @@ struct StorageStatsView: View {
                     }
                 }
             }
+
+            Section {
+                Button("重新统计") {
+                    Task { await viewModel.start(forceRefresh: true) }
+                }
+                .accessibilityIdentifier("StorageStats-Rerun")
+            }
         }
         .listStyle(.insetGrouped)
         .refreshable {
