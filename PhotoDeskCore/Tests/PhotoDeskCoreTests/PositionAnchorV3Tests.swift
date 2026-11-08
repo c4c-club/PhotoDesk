@@ -18,8 +18,8 @@ final class PositionAnchorV3Tests: XCTestCase {
         return Data(json.utf8)
     }
 
-    func testCurrentSchemaVersionIsThree() {
-        XCTAssertEqual(PositionAnchorPolicy.schemaVersion, 3)
+    func testCurrentSchemaVersionIsFour() {
+        XCTAssertEqual(PositionAnchorPolicy.schemaVersion, 4)
         let anchor = PositionAnchorV3(
             anchorAssetID: "a",
             anchorVisualY: 12,
@@ -27,7 +27,7 @@ final class PositionAnchorV3Tests: XCTestCase {
             assetID: "a",
             sectionID: "s"
         )
-        XCTAssertEqual(anchor.schemaVersion, 3)
+        XCTAssertEqual(anchor.schemaVersion, 4)
     }
 
     func testV2DecodeFallsBackToLegacyAssetFields() throws {
@@ -50,7 +50,7 @@ final class PositionAnchorV3Tests: XCTestCase {
         XCTAssertEqual(anchor.sectionID, "2024-05")
     }
 
-    func testV3EncodeDecodeRoundTripPreservesAnchor() throws {
+    func testV4EncodeDecodeRoundTripPreservesAnchor() throws {
         let original = PositionAnchorV3(
             anchorAssetID: "asset-42",
             anchorVisualY: 37.5,
@@ -59,6 +59,8 @@ final class PositionAnchorV3Tests: XCTestCase {
             sectionID: "2026-11",
             itemIndexInSection: 5,
             offsetRatio: 0.8,
+            contentHeight: 12_000,
+            viewportHeight: 844,
             savedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         let data = try JSONEncoder().encode(original)
@@ -66,6 +68,19 @@ final class PositionAnchorV3Tests: XCTestCase {
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.anchorVisualY, 37.5)
         XCTAssertEqual(decoded.anchorContentOffsetY, 2480)
+        XCTAssertEqual(decoded.contentHeight, 12_000)
+        XCTAssertEqual(decoded.viewportHeight, 844)
+        XCTAssertEqual(decoded.schemaVersion, 4)
+    }
+
+    func testV3DecodeKeepsLegacyFieldsWithZeroNewFields() throws {
+        let json = """
+        {"anchorAssetID":"a3","anchorVisualY":20,"anchorContentOffsetY":900,"assetID":"a3","sectionID":"2024-01","itemIndexInSection":2,"offsetRatio":0.3,"savedAt":0,"schemaVersion":3}
+        """
+        let anchor = try JSONDecoder().decode(PositionAnchorV3.self, from: Data(json.utf8))
+        XCTAssertEqual(anchor.schemaVersion, 3)
+        XCTAssertEqual(anchor.contentHeight, 0)
+        XCTAssertEqual(anchor.viewportHeight, 0)
     }
 
     func testVisualYIsCellMinYMinusContentOffset() {
