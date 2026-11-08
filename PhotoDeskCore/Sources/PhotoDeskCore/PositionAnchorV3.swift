@@ -1,8 +1,10 @@
-// MARK: - 职责说明：位置锚点 v3 纯模型与恢复策略——视觉锚点像素计算、v1/v2 解码兼容、fallback 顺序、恢复期写回门禁全部下沉 Core；仅 Foundation / Double / String / Date，零 UIKit / IndexPath / CGPoint。
+// MARK: - 职责说明：位置锚点 v4 纯模型与恢复策略（类型名保留 V3 以兼容既有引用）——
+// v4 = 视觉锚点 + contentHeight/viewportHeight（恢复目标钳制与诊断）；v1/v2/v3 解码兼容；
+// fallback 顺序、恢复期写回门禁全部下沉 Core；仅 Foundation / Double / String / Date，零 UIKit。
 
 import Foundation
 
-/// v3 位置：视觉锚点优先；旧字段只作 fallback，schemaVersion 缺省按 v1/v2 兼容解码。
+/// v4 位置：视觉锚点优先；旧字段只作 fallback，schemaVersion 缺省按 v1/v2/v3 兼容解码。
 public struct PositionAnchorV3: Codable, Equatable, Sendable {
     public let anchorAssetID: String
     public let anchorVisualY: Double
@@ -11,6 +13,8 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
     public let sectionID: String
     public let itemIndexInSection: Int
     public let offsetRatio: Double
+    public let contentHeight: Double
+    public let viewportHeight: Double
     public let savedAt: Date
     public let schemaVersion: Int
 
@@ -22,6 +26,8 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
         sectionID: String,
         itemIndexInSection: Int = 0,
         offsetRatio: Double = 0,
+        contentHeight: Double = 0,
+        viewportHeight: Double = 0,
         savedAt: Date = Date(),
         schemaVersion: Int = PositionAnchorPolicy.schemaVersion
     ) {
@@ -32,13 +38,16 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
         self.sectionID = sectionID
         self.itemIndexInSection = itemIndexInSection
         self.offsetRatio = offsetRatio
+        self.contentHeight = contentHeight
+        self.viewportHeight = viewportHeight
         self.savedAt = savedAt
         self.schemaVersion = schemaVersion
     }
 
     private enum CodingKeys: String, CodingKey {
         case anchorAssetID, anchorVisualY, anchorContentOffsetY
-        case assetID, sectionID, itemIndexInSection, offsetRatio, savedAt, schemaVersion
+        case assetID, sectionID, itemIndexInSection, offsetRatio
+        case contentHeight, viewportHeight, savedAt, schemaVersion
     }
 
     public init(from decoder: Decoder) throws {
@@ -50,6 +59,8 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
         let section = try c.decodeIfPresent(String.self, forKey: .sectionID) ?? ""
         let index = try c.decodeIfPresent(Int.self, forKey: .itemIndexInSection) ?? 0
         let ratio = try c.decodeIfPresent(Double.self, forKey: .offsetRatio) ?? 0
+        let content = try c.decodeIfPresent(Double.self, forKey: .contentHeight) ?? 0
+        let viewport = try c.decodeIfPresent(Double.self, forKey: .viewportHeight) ?? 0
         let date = try c.decodeIfPresent(Date.self, forKey: .savedAt) ?? Date(timeIntervalSince1970: 0)
         let version = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
 
@@ -60,6 +71,8 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
         self.sectionID = section
         self.itemIndexInSection = index
         self.offsetRatio = ratio
+        self.contentHeight = content
+        self.viewportHeight = viewport
         self.savedAt = date
         self.schemaVersion = version
     }
@@ -73,6 +86,8 @@ public struct PositionAnchorV3: Codable, Equatable, Sendable {
         try c.encode(sectionID, forKey: .sectionID)
         try c.encode(itemIndexInSection, forKey: .itemIndexInSection)
         try c.encode(offsetRatio, forKey: .offsetRatio)
+        try c.encode(contentHeight, forKey: .contentHeight)
+        try c.encode(viewportHeight, forKey: .viewportHeight)
         try c.encode(savedAt, forKey: .savedAt)
         try c.encode(schemaVersion, forKey: .schemaVersion)
     }
@@ -86,7 +101,7 @@ public enum PositionRestoreStrategy: String, Equatable, Sendable {
 }
 
 public enum PositionAnchorPolicy {
-    public static let schemaVersion: Int = 3
+    public static let schemaVersion: Int = 4
 
     /// 视觉锚点视口内 y：cell 未变换 frame.minY - contentOffset.y。
     public static func visualY(cellMinY: Double, contentOffsetY: Double) -> Double {

@@ -7,6 +7,8 @@ enum DSSpacing {
     // 网格（docs/04 §3.1：间距 2pt、缩略图圆角 4pt）
     static let gridSpacing: CGFloat = 2
     static let gridCornerRadius: CGFloat = 4
+    /// 粘性月份头高度（docs/22 §4.4.2：锚点 effectiveTop 的唯一 token）
+    static let monthHeaderHeight: CGFloat = 48
 
     // 卡片与按钮（docs/04 §5.4：卡片 14pt、按钮 12pt、阴影 0/2/8 rgba(0,0,0,0.06)）
     static let cardCornerRadius: CGFloat = 14

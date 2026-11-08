@@ -1,12 +1,12 @@
-// MARK: - 职责说明：上次整理位置存取 v3（docs/19 §3.2 / docs/20 M13 P2）——
-// v3 = 视觉锚点 assetID + 视口内视觉 y + 保存时 contentOffset.y + 旧字段 fallback + schemaVersion=3。
-// 键空间仍沿用 library.lastPosition.v2.*（兼容 v1/v2 数据；新字段通过 decodeIfPresent 补默认），
-// 不新增第三套键；读取损坏 JSON 返回 nil，不崩溃。查看器记忆接口无调用点，按 docs/20 二选一删除。
+// MARK: - 职责说明：上次整理位置存取 v4（docs/22 §4.4.1）——
+// v4 = 视觉锚点 assetID + 视口内视觉 y + contentOffset / contentHeight / viewportHeight +
+// 旧字段 fallback + schemaVersion=4；键空间仍沿用 library.lastPosition.v2.*（兼容 v1/v2/v3），
+// 读取损坏 JSON 返回 nil，不崩溃。编码/UserDefaults 写在由 LibraryPositionCoordinator 的串行队列驱动。
 
 import Foundation
 import PhotoDeskCore
 
-/// 一条位置记忆（v3；旧构造参数保留默认值，旧字段只作 fallback）
+/// 一条位置记忆（v4；旧构造参数保留默认值，旧字段只作 fallback）
 struct LibraryPosition: Codable, Equatable {
     /// 视觉锚点 assetID（v1/v2 解码时回退 assetID）
     let anchorAssetID: String
@@ -20,6 +20,9 @@ struct LibraryPosition: Codable, Equatable {
     let itemIndexInSection: Int
     /// contentOffset.y / 可滚动高度（最后一级 fallback）
     let offsetRatio: Double
+    /// v4：保存时的内容总高与视口高（恢复目标钳制 + 诊断）
+    let contentHeight: Double
+    let viewportHeight: Double
     let savedAt: Date
     let schemaVersion: Int
 
@@ -30,6 +33,8 @@ struct LibraryPosition: Codable, Equatable {
          sectionID: String,
          itemIndexInSection: Int = 0,
          offsetRatio: Double = 0,
+         contentHeight: Double = 0,
+         viewportHeight: Double = 0,
          savedAt: Date = Date(),
          schemaVersion: Int = PositionAnchorPolicy.schemaVersion) {
         self.anchorAssetID = anchorAssetID ?? assetID
@@ -39,13 +44,16 @@ struct LibraryPosition: Codable, Equatable {
         self.sectionID = sectionID
         self.itemIndexInSection = itemIndexInSection
         self.offsetRatio = offsetRatio
+        self.contentHeight = contentHeight
+        self.viewportHeight = viewportHeight
         self.savedAt = savedAt
         self.schemaVersion = schemaVersion
     }
 
     private enum CodingKeys: String, CodingKey {
         case anchorAssetID, anchorVisualY, anchorContentOffsetY
-        case assetID, sectionID, itemIndexInSection, offsetRatio, savedAt, schemaVersion
+        case assetID, sectionID, itemIndexInSection, offsetRatio
+        case contentHeight, viewportHeight, savedAt, schemaVersion
     }
 
     /// v1/v2 兼容解码：新增字段缺失时补默认值，anchorAssetID 回退 assetID。
@@ -60,6 +68,8 @@ struct LibraryPosition: Codable, Equatable {
         sectionID = try c.decodeIfPresent(String.self, forKey: .sectionID) ?? ""
         itemIndexInSection = try c.decodeIfPresent(Int.self, forKey: .itemIndexInSection) ?? 0
         offsetRatio = try c.decodeIfPresent(Double.self, forKey: .offsetRatio) ?? 0
+        contentHeight = try c.decodeIfPresent(Double.self, forKey: .contentHeight) ?? 0
+        viewportHeight = try c.decodeIfPresent(Double.self, forKey: .viewportHeight) ?? 0
         savedAt = try c.decodeIfPresent(Date.self, forKey: .savedAt) ?? Date(timeIntervalSince1970: 0)
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
     }
@@ -73,6 +83,8 @@ struct LibraryPosition: Codable, Equatable {
         try c.encode(sectionID, forKey: .sectionID)
         try c.encode(itemIndexInSection, forKey: .itemIndexInSection)
         try c.encode(offsetRatio, forKey: .offsetRatio)
+        try c.encode(contentHeight, forKey: .contentHeight)
+        try c.encode(viewportHeight, forKey: .viewportHeight)
         try c.encode(savedAt, forKey: .savedAt)
         try c.encode(schemaVersion, forKey: .schemaVersion)
     }
@@ -86,6 +98,8 @@ struct LibraryPosition: Codable, Equatable {
                          sectionID: sectionID,
                          itemIndexInSection: itemIndexInSection,
                          offsetRatio: offsetRatio,
+                         contentHeight: contentHeight,
+                         viewportHeight: viewportHeight,
                          savedAt: savedAt,
                          schemaVersion: schemaVersion)
     }

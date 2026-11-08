@@ -64,13 +64,14 @@ final class LibraryViewController: UIViewController {
     private var pendingJumpVerifySectionID: String?
     private var jumpVerifyAttempts = 0
 
-    /// R03 前插补偿 v2 的锚点保持任务（绿14 实锤：completion 期一次性补偿会过冲）
-    private struct AnchorKeep {
-        let item: PhotoItem
+    /// v4 前插补偿：只记录锚点 assetID + 视觉 y，布局 pass 最多 3 次收敛（绿14 实锤：completion 期
+    /// 一次性补偿会过冲；用户拖动/减速时立即让位）。
+    private struct HeadInsertAnchor {
+        let assetID: String
         let visualY: CGFloat
         var passes: Int
     }
-    private var pendingAnchorKeep: AnchorKeep?
+    private var pendingHeadInsertAnchor: HeadInsertAnchor?
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
     var onOpenViewer: ((PhotoItem) -> Void)?
     /// 多选操作行「筛选」→ 打开筛选面板（docs/13 S06）
@@ -88,11 +89,10 @@ final class LibraryViewController: UIViewController {
     // MARK: - 位置记忆（docs/09 D08）
 
     private var isRestoringPosition = false
-    private var didRestorePosition = false
-    private var positionSaveTimer: Timer?
-    /// R03：锚点恢复流程进行中（首帧遮罩盖住网格；期间零位置回写，绝不把中间位置覆盖锚点）
-    private var isPositionRestoreInFlight = false
-    /// R03：恢复遮罩（锚点定位完成前盖住网格，用户看不到中间位置/两阶段跳转）
+    /// v4：唯一 save/restore 入口（docs/22 §4.4.3）
+    private lazy var positionCoordinator = LibraryPositionCoordinator(store: positionStore)
+    private var restoreMaskGeneration = 0
+    /// v4：恢复遮罩（0.15s 后才淡入；done/failed/timeout 淡出，绝不永久遮挡）
     private let restoreMaskView: UIView = {
         let view = UIView()
         view.backgroundColor = DSColor.bgPrimary
@@ -165,8 +165,15 @@ final class LibraryViewController: UIViewController {
             object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.savePositionNow(reason: "resignActive")
+                guard let self else { return }
+                self.positionCoordinator.saveNow(reason: "resignActive",
+                                                 snapshot: self.makePositionSnapshot())
             }
+        }
+
+        // v4：恢复阶段 → 遮罩/调试状态；几何写入仍由 attemptPositionRestore 负责。
+        positionCoordinator.onPhaseChange = { [weak self] phase in
+            self?.handlePositionPhase(phase)
         }
 
         // R03：恢复遮罩盖住网格（锚点定位完成才移除——用户看不到「先在别处、再滚过去」）
@@ -190,10 +197,8 @@ final class LibraryViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // 切 Tab / 进设置 / 返回前强制保存位置（docs/09 D08；docs/13 S04 v2）
-        positionSaveTimer?.invalidate()
-        positionSaveTimer = nil
-        savePositionNow(reason: "disappear")
+        // 切 Tab / 进设置 / 返回前强制保存位置（docs/22 §4.4.3）
+        positionCoordinator.saveNow(reason: "disappear", snapshot: makePositionSnapshot())
     }
 
     deinit {
@@ -1026,14 +1031,11 @@ final class LibraryViewController: UIViewController {
         // 及其视觉 y，viewDidLayoutSubviews 每个布局 pass 按该 asset 的真实 minY 重校
         // contentOffset，直到视觉 y 复位（≤0.5pt）或用户接管。仅同 query 的纯前插启用
         //（筛选变化是不同投影，不算漂移）。
-        var anchorKeepCandidate: (item: PhotoItem, visualY: CGFloat)?
+        var headInsertAnchor: (assetID: String, visualY: CGFloat)?
         if pending.queryKey == currentSnapshotQueryKey,
            !collectionView.isTracking, !collectionView.isDecelerating,
-           let firstVisible = collectionView.indexPathsForVisibleItems.sorted().first,
-           let item = dataSource.itemIdentifier(for: firstVisible),
-           let minY = collectionView.collectionViewLayout
-               .layoutAttributesForItem(at: firstVisible)?.frame.minY {
-            anchorKeepCandidate = (item, minY - collectionView.contentOffset.y)
+           let snapshot = makePositionSnapshot() {
+            headInsertAnchor = (snapshot.anchorAssetID, CGFloat(snapshot.anchorVisualY))
         }
 
         var diffable = NSDiffableDataSourceSnapshot<MonthSection, PhotoItem>()
@@ -1053,9 +1055,11 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
-            // R03：前插补偿 v2——登记锚点保持任务（enforceAnchorKeep 在布局 pass 里收敛）
-            if let keep = anchorKeepCandidate {
-                pendingAnchorKeep = AnchorKeep(item: keep.item, visualY: keep.visualY, passes: 0)
+            // v4 前插补偿：登记锚点保持任务（enforceHeadInsertAnchor 在布局 pass 里收敛）
+            if let keep = headInsertAnchor {
+                pendingHeadInsertAnchor = HeadInsertAnchor(assetID: keep.assetID,
+                                                           visualY: keep.visualY,
+                                                           passes: 0)
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
@@ -1075,8 +1079,9 @@ final class LibraryViewController: UIViewController {
             // 恢复与排空全部推迟到下一轮主循环（杜绝 _existingNumberOfItemsInSection abort）
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.isViewLoaded else { return }
-                // 位置记忆恢复（docs/09 D08；docs/16 M12 R03 v2 策略）
-                self.restorePositionIfNeeded()
+                // 位置记忆恢复 v4（docs/22 §4.4.4）：beginRestore 只 load 一次；attempt 可重入
+                self.positionCoordinator.beginRestore(queryKey: pending.queryKey)
+                self.attemptPositionRestore()
                 #if DEBUG
                 // M13 绿5 实锤：月份跳转钩子必须晚于恢复——恢复会覆盖跳转落点（等价用户点卡片
                 // 的语义优先于跨进程位置恢复）；retry 语义不变（每次 apply completion 都尝试）。
@@ -1156,121 +1161,114 @@ final class LibraryViewController: UIViewController {
         #endif
     }
 
-    // MARK: - 位置记忆 v3（docs/19 §3.2：视觉锚点像素恢复；恢复期零回写）
+    // MARK: - 位置记忆 v4（docs/22 §4.4：单一协调器 + 恢复状态机；恢复期零回写）
 
-    private var pendingRestorePosition: LibraryPosition?
-    private var lastRestoredQueryKey: String?
     private var resignActiveObserver: NSObjectProtocol?
-    /// v3：精确 offset 是否已落地（与 bounds/section/snapshot drain 共同构成 finish 门禁）。
-    private var didApplyRestoreOffset = false
 
+    /// 兼容入口：LibraryContainer / 旧单测只认这个方法名；内部只走 coordinator。
     func savePositionNow(reason: String) {
-        guard PositionAnchorPolicy.allowsWriteback(isRestoreInFlight: isPositionRestoreInFlight),
+        positionCoordinator.saveNow(reason: reason, snapshot: makePositionSnapshot())
+    }
+
+    /// 主线程抓取几何快照：PositionAnchorSelector 选第一条完整可见、不被粘性头遮挡的 cell。
+    private func makePositionSnapshot() -> LibraryPositionSnapshot? {
+        guard !isRestoringPosition,
               positionStore.isEnabled,
-              !isRestoringPosition,
               let queryKey = currentSnapshotQueryKey,
               !currentSections.isEmpty, !currentItemsBySection.isEmpty,
-              let (indexPath, item, section) = visualAnchorCandidate() else { return }
+              collectionView.bounds.width > 0, collectionView.bounds.height > 0 else { return nil }
         let offsetY = Double(collectionView.contentOffset.y)
-        guard let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath) else { return }
-        let visualY = PositionAnchorPolicy.visualY(cellMinY: Double(attributes.frame.minY),
-                                                   contentOffsetY: offsetY)
-        let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
-        let ratio = min(1, max(0, collectionView.contentOffset.y / scrollable))
-        positionStore.save(LibraryPosition(anchorAssetID: item.id,
-                                           anchorVisualY: visualY,
-                                           anchorContentOffsetY: offsetY,
-                                           assetID: item.id,
-                                           sectionID: section.id,
-                                           itemIndexInSection: indexPath.item,
-                                           offsetRatio: Double(ratio),
-                                           savedAt: Date()),
-                           queryKey: queryKey)
-        ViewerTrace.log("position.save.v3 \(reason) section=\(section.id) idx=\(indexPath.item) visualY=\(Int(visualY)) off=\(Int(offsetY))")
-        refreshDebugScrollNote()
-    }
-
-    /// 视觉锚点：contentOffset.y 对应视口安全区附近、frame.minY 不大于安全区下沿的最近 cell；
-    /// 不再用 indexPathsForVisibleItems.sorted().first 决定位置。
-    private func visualAnchorCandidate() -> (IndexPath, PhotoItem, MonthSection)? {
-        let contentTop = collectionView.contentOffset.y
-        let safeTop = contentTop + collectionView.adjustedContentInset.top
-        let candidates = collectionView.indexPathsForVisibleItems.compactMap { ip -> (IndexPath, CGFloat, PhotoItem, MonthSection)? in
-            guard let item = dataSource.itemIdentifier(for: ip),
-                  let section = currentSections[safe: ip.section],
-                  let minY = collectionView.collectionViewLayout.layoutAttributesForItem(at: ip)?.frame.minY else { return nil }
-            return (ip, minY, item, section)
-        }
-        let anchor = candidates.filter { $0.1 <= safeTop + DSSpacing.screenPadding }
-            .max { $0.1 < $1.1 }
-            ?? candidates.min { abs($0.1 - safeTop) < abs($1.1 - safeTop) }
-        guard let anchor else { return nil }
-        return (anchor.0, anchor.2, anchor.3)
-    }
-
-    private func restorePositionIfNeeded() {
-        if lastRestoredQueryKey != currentSnapshotQueryKey {
-            lastRestoredQueryKey = currentSnapshotQueryKey
-            pendingRestorePosition = nil
-            didRestorePosition = false
-            didApplyRestoreOffset = false
-            isPositionRestoreInFlight = false
-            hideRestoreMask()
-        }
-        if !didRestorePosition {
-            guard !currentSections.isEmpty, !currentItemsBySection.isEmpty else { return }
-            didRestorePosition = true
-            // （清位置钩子已前移到 LibraryViewModel.loadIfNeeded 的锚点窗口计算之前）
-            pendingRestorePosition = positionStore.load(queryKey: currentSnapshotQueryKey ?? viewModel.query.key)
-            if pendingRestorePosition != nil {
-                isPositionRestoreInFlight = true
-                showRestoreMask()
-            }
-        }
-        guard let position = pendingRestorePosition else { return }
-        guard collectionView.bounds.width > 0, collectionView.bounds.height > 0,
-              collectionView.numberOfSections > 0 else { return }
-        let assetMinY = layoutMinY(forAssetID: position.anchorAssetID)
-        // R03 / docs/19 §3.2：锚点 asset 尚未出现在快照且索引未补齐时，恢复必须保持 pending
-        //（遮罩不撤、零回写、不走 section/ratio 回退），等下一个快照带锚点后再精确定位。
-        if assetMinY == nil, !viewModel.isIndexComplete {
-            ViewerTrace.log("position.restore.v3 pending anchor=\(position.anchorAssetID) indexComplete=false")
-            return
-        }
-        let sectionMinY = layoutMinY(sectionID: position.sectionID, itemIndex: position.itemIndexInSection)
-        let contentHeight = Double(collectionView.contentSize.height)
-        let viewportHeight = Double(collectionView.bounds.height)
         let adjustedTop = Double(collectionView.adjustedContentInset.top)
-        let bottomInset = Double(collectionView.adjustedContentInset.bottom)
-        let resolved = PositionAnchorPolicy.resolve(anchor: position.toCoreAnchor,
-                                                    assetCellMinY: assetMinY,
-                                                    sectionCellMinY: sectionMinY,
-                                                    contentHeight: contentHeight,
-                                                    viewportHeight: viewportHeight,
-                                                    adjustedTop: adjustedTop,
-                                                    bottomInset: bottomInset)
-        guard resolved.strategy != .none else {
-            finishPositionRestore(reason: "no-anchor")
-            return
+        let effectiveTop = offsetY + adjustedTop + Double(DSSpacing.monthHeaderHeight)
+        let viewportBottom = offsetY + Double(collectionView.bounds.height)
+            - Double(collectionView.adjustedContentInset.bottom)
+        let cells: [VisibleGridCell] = collectionView.indexPathsForVisibleItems.compactMap { ip in
+            guard let attrs = collectionView.collectionViewLayout.layoutAttributesForItem(at: ip) else { return nil }
+            return VisibleGridCell(section: ip.section,
+                                   item: ip.item,
+                                   minY: Double(attrs.frame.minY),
+                                   maxY: Double(attrs.frame.maxY))
         }
-        isRestoringPosition = true
-        collectionView.layoutIfNeeded()
-        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: resolved.offsetY),
-                                        animated: false)
-        collectionView.layoutIfNeeded()
-        isRestoringPosition = false
-        didApplyRestoreOffset = true
-        pendingRestorePosition = nil
-        refreshDebugScrollNote()
-        ViewerTrace.log("position.restore.v3 strategy=\(resolved.strategy.rawValue) section=\(position.sectionID) off=\(Int(resolved.offsetY)) visualY=\(Int(position.anchorVisualY))")
-        finishPositionRestore(reason: resolved.strategy.rawValue)
+        guard let anchor = PositionAnchorSelector.select(cells: cells,
+                                                         effectiveTop: effectiveTop,
+                                                         viewportBottom: viewportBottom),
+              let item = dataSource.itemIdentifier(for: IndexPath(item: anchor.item, section: anchor.section)),
+              let section = currentSections[safe: anchor.section] else { return nil }
+        return LibraryPositionSnapshot(queryKey: queryKey,
+                                       anchorAssetID: item.id,
+                                       anchorVisualY: PositionAnchorPolicy.visualY(cellMinY: anchor.minY,
+                                                                                  contentOffsetY: offsetY),
+                                       anchorSectionID: section.id,
+                                       anchorItemIndex: anchor.item,
+                                       contentOffsetY: offsetY,
+                                       contentHeight: Double(collectionView.contentSize.height),
+                                       viewportHeight: Double(collectionView.bounds.height))
+    }
+
+    private func attemptPositionRestore() {
+        guard positionCoordinator.isRestoreInFlight else { return }
+        let context = LibraryPositionRestoreContext(
+            bounds: collectionView.bounds.size,
+            numberOfSections: collectionView.numberOfSections,
+            isIndexComplete: viewModel.isIndexComplete,
+            contentHeight: Double(collectionView.contentSize.height),
+            viewportHeight: Double(collectionView.bounds.height),
+            adjustedTop: Double(collectionView.adjustedContentInset.top),
+            bottomInset: Double(collectionView.adjustedContentInset.bottom),
+            anchorMinY: { [weak self] id in
+                guard let self else { return nil }
+                return self.layoutMinY(forAssetID: id)
+            },
+            sectionMinY: { [weak self] sectionID, itemIndex in
+                guard let self else { return nil }
+                return self.layoutMinY(sectionID: sectionID, itemIndex: itemIndex)
+            },
+            applyOffset: { [weak self] y in
+                guard let self else { return }
+                self.isRestoringPosition = true
+                self.collectionView.layoutIfNeeded()
+                self.collectionView.setContentOffset(
+                    CGPoint(x: self.collectionView.contentOffset.x, y: CGFloat(y)),
+                    animated: false
+                )
+                self.collectionView.layoutIfNeeded()
+                self.isRestoringPosition = false
+                self.refreshDebugScrollNote()
+            },
+            actualOffsetY: { [weak self] in
+                Double(self?.collectionView.contentOffset.y ?? 0)
+            }
+        )
+        positionCoordinator.attemptRestore(context: context)
+    }
+
+    private func handlePositionPhase(_ phase: PositionRestorePhase) {
+        switch phase {
+        case .waitingSnapshot, .waitingLayout, .applying, .verifying:
+            showRestoreMaskIfNeeded()
+        case .done:
+            hideRestoreMask()
+            viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)"
+            refreshDebugScrollNote()
+        case .failed:
+            hideRestoreMask()
+            viewModel.debugRestoreNote = "restore=failed"
+            refreshDebugScrollNote()
+        case .idle:
+            break
+        }
     }
 
     private func layoutMinY(forAssetID id: String) -> Double? {
-        guard !id.isEmpty else { return nil }
+        guard !id.isEmpty, let path = indexPath(forAssetID: id) else { return nil }
+        return layoutMinY(at: path)
+    }
+
+    private func indexPath(forAssetID id: String) -> IndexPath? {
         for sectionIndex in 0..<currentItemsBySection.count {
-            guard let itemIndex = currentItemsBySection[sectionIndex].firstIndex(where: { $0.id == id }) else { continue }
-            return layoutMinY(at: IndexPath(item: itemIndex, section: sectionIndex))
+            if let itemIndex = currentItemsBySection[sectionIndex].firstIndex(where: { $0.id == id }) {
+                return IndexPath(item: itemIndex, section: sectionIndex)
+            }
         }
         return nil
     }
@@ -1288,26 +1286,23 @@ final class LibraryViewController: UIViewController {
         return Double(frame.minY)
     }
 
-    private func finishPositionRestore(reason: String) {
-        let canFinish = PositionAnchorPolicy.canFinish(
-            boundsWidth: Double(collectionView.bounds.width),
-            boundsHeight: Double(collectionView.bounds.height),
-            numberOfSections: collectionView.numberOfSections,
-            snapshotDrained: !isApplyingSnapshot && pendingSnapshot == nil,
-            offsetApplied: didApplyRestoreOffset || reason == "no-anchor"
-        )
-        guard canFinish else { return }
-        isPositionRestoreInFlight = false
-        hideRestoreMask()
-        viewModel.debugRestoreNote = "restore=ok by=\(reason)"
-    }
-    private func showRestoreMask() {
-        restoreMaskView.alpha = 1
+    /// 0.15s 后才淡入；done/failed/timeout 立即淡出，绝不永久遮挡。
+    private func showRestoreMaskIfNeeded() {
+        guard restoreMaskView.alpha == 0 else { return }
+        restoreMaskGeneration += 1
+        let generation = restoreMaskGeneration
         view.bringSubviewToFront(restoreMaskView)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self,
+                  generation == self.restoreMaskGeneration,
+                  self.positionCoordinator.isRestoreInFlight else { return }
+            UIView.animate(withDuration: 0.15) { self.restoreMaskView.alpha = 1 }
+        }
     }
 
     private func hideRestoreMask() {
-        restoreMaskView.alpha = 0
+        restoreMaskGeneration += 1
+        UIView.animate(withDuration: 0.15) { self.restoreMaskView.alpha = 0 }
     }
 
     /// 月份/索引条跳转（docs/13 S09/S11）：校验 → 滚动 → 抵消粘性 header → 同步保存 → 顶部细横幅
@@ -1341,24 +1336,9 @@ final class LibraryViewController: UIViewController {
         }
         isRestoringPosition = false
         indexBar.setHighlighted(index: index, notify: false)
-        // M13 P2：月份跳转后保存 v3 视觉锚点（与用户滚动保存同一语义）。
-        if let section = currentSections[safe: index],
-           let item = currentItemsBySection[safe: index]?.first, let queryKey = currentSnapshotQueryKey,
-           let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: IndexPath(item: 0, section: index)) {
-            let offsetY = Double(collectionView.contentOffset.y)
-            let visualY = PositionAnchorPolicy.visualY(cellMinY: Double(attributes.frame.minY),
-                                                       contentOffsetY: offsetY)
-            let scrollable = max(1, collectionView.contentSize.height - collectionView.bounds.height)
-            positionStore.save(LibraryPosition(anchorAssetID: item.id,
-                                               anchorVisualY: visualY,
-                                               anchorContentOffsetY: offsetY,
-                                               assetID: item.id,
-                                               sectionID: section.id,
-                                               itemIndexInSection: 0,
-                                               offsetRatio: Double(min(1, max(0, collectionView.contentOffset.y / scrollable))),
-                                               savedAt: Date()),
-                               queryKey: queryKey)
-            ViewerTrace.log("position.save.v3 monthJump section=\(section.id) visualY=\(Int(visualY))")
+        // v4：月份跳转后走同一协调器保存（不允许 VC 直写 store）。
+        positionCoordinator.saveNow(reason: "monthJump", snapshot: makePositionSnapshot())
+        if let section = currentSections[safe: index] {
             // M13 绿12 实锤：跳转存档正确后视口仍会被 UIKit 内部调整（pinned header 重排 /
             // 快照 apply 期间的位置保持）推离目标月（AX 与 idle 存档均显示漂移到别的月份）。
             // 月跳语义必须落在目标月：登记复核目标，viewDidLayoutSubviews 里按真实钉住线核对，
@@ -1404,18 +1384,17 @@ final class LibraryViewController: UIViewController {
         scrollToSection(targetIndex)
     }
 
-    /// R03 前插补偿 v2：按锚点保持任务的首可见 asset 真实位置收敛 contentOffset。
-    /// 布局过渡期（apply 后前几帧）属性仍是估算，逐 pass 校正直至视觉 y 复位（≤0.5pt）；
-    /// 用户接管（拖动/减速）或 asset 离开快照即放弃，绝不与用户抢滚动。
-    private func enforceAnchorKeep() {
-        guard let keep = pendingAnchorKeep else { return }
-        guard !isRestoringPosition, !isPositionRestoreInFlight, !isApplyingSnapshot,
+    /// v4 前插补偿：按同一锚点 assetID + 视觉 y 收敛 contentOffset，最多 3 个布局 pass。
+    /// 用户接管（拖动/减速）或恢复进行中立即让位，绝不与用户/恢复抢滚动。
+    private func enforceHeadInsertAnchor() {
+        guard let keep = pendingHeadInsertAnchor else { return }
+        guard !isRestoringPosition, !positionCoordinator.isRestoreInFlight, !isApplyingSnapshot,
               collectionView.window != nil, collectionView.bounds.width > 0,
               !collectionView.isTracking, !collectionView.isDecelerating else { return }
-        guard let path = dataSource.indexPath(for: keep.item),
+        guard let path = indexPath(forAssetID: keep.assetID),
               let attrs = collectionView.collectionViewLayout.layoutAttributesForItem(at: path) else {
-            pendingAnchorKeep = nil
-            ViewerTrace.log("snapshot.anchor-keep dropped item=\(keep.item.id) 不在当前快照")
+            pendingHeadInsertAnchor = nil
+            ViewerTrace.log("snapshot.head-insert dropped asset=\(keep.assetID.prefix(8)) 不在当前快照")
             return
         }
         let maxY = max(0, collectionView.contentSize.height
@@ -1424,18 +1403,18 @@ final class LibraryViewController: UIViewController {
         if abs(collectionView.contentOffset.y - targetY) > 0.5 {
             var updated = keep
             updated.passes += 1
-            if updated.passes >= 5 {
-                pendingAnchorKeep = nil
-                ViewerTrace.log("snapshot.anchor-keep give-up item=\(keep.item.id) passes=5")
+            if updated.passes >= 3 {
+                pendingHeadInsertAnchor = nil
+                ViewerTrace.log("snapshot.head-insert give-up asset=\(keep.assetID.prefix(8)) passes=3")
                 return
             }
-            pendingAnchorKeep = updated
+            pendingHeadInsertAnchor = updated
             let dy = targetY - collectionView.contentOffset.y
             collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
-            ViewerTrace.log("snapshot.anchor-keep dy=\(Int(dy)) item=\(keep.item.id) pass=\(updated.passes)")
+            ViewerTrace.log("snapshot.head-insert dy=\(Int(dy)) asset=\(keep.assetID.prefix(8)) pass=\(updated.passes)")
         } else {
-            pendingAnchorKeep = nil
-            ViewerTrace.log("snapshot.anchor-keep settled item=\(keep.item.id) visualY=\(Int(keep.visualY))")
+            pendingHeadInsertAnchor = nil
+            ViewerTrace.log("snapshot.head-insert settled asset=\(keep.assetID.prefix(8)) visualY=\(Int(keep.visualY))")
         }
     }
 
@@ -1445,7 +1424,7 @@ final class LibraryViewController: UIViewController {
         isRestoringPosition = true
         collectionView.setContentOffset(.zero, animated: false)
         isRestoringPosition = false
-        savePositionNow(reason: "scrollTop")
+        positionCoordinator.saveNow(reason: "scrollTop", snapshot: makePositionSnapshot())
     }
 
     /// 跳转/提示共用顶部细横幅（不挡网格；generation 令牌防旧动画隐藏新横幅）
@@ -1555,6 +1534,12 @@ final class LibraryViewController: UIViewController {
         return UICollectionViewCompositionalLayout(section: section)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // v4：appear 是 restore 的第三个入口（applySnapshot / viewDidLayoutSubviews 之外）
+        attemptPositionRestore()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 首次布局前 dequeue 的 cell 拿到的是占位尺寸：布局稳定后重配可视 cell（缓存键含尺寸）。
@@ -1576,8 +1561,10 @@ final class LibraryViewController: UIViewController {
         lastConfiguredPixelSize = pixel
         // M13：月跳落地复核——布局稳定后按真实钉住线核对目标月，未钉住再校正
         verifyJumpLanding()
-        // M13：前插补偿 v2——按首可见 asset 的真实布局位置收敛视觉 y
-        enforceAnchorKeep()
+        // v4 前插补偿——按同一锚点 assetID + 视觉 y 收敛布局
+        enforceHeadInsertAnchor()
+        // v4：viewDidLayoutSubviews 是 bounds=0 竞态的唯一重试入口（不再只依赖 apply completion）
+        attemptPositionRestore()
         // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
         if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
             drainPendingSnapshot()
@@ -1628,25 +1615,18 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // 位置记忆：滚动停止 0.3 秒兜底保存（docs/13 S04：0.5s → 0.3s）。
-        // R03：锚点恢复流程进行中不启动保存 Timer（中间位置绝不回写）
-        guard !isRestoringPosition, !isPositionRestoreInFlight else { return }
-        positionSaveTimer?.invalidate()
-        positionSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.savePositionNow(reason: "idle")
-            }
-        }
+        // 位置记忆 v4：0.35s 防抖，由 coordinator 统一持有 DispatchWorkItem/revision。
+        guard !isRestoringPosition, !positionCoordinator.isRestoreInFlight else { return }
+        positionCoordinator.scheduleSave(reason: "scroll", snapshot: makePositionSnapshot())
     }
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        savePositionNow(reason: "decelerating")
+        positionCoordinator.saveNow(reason: "decelerating", snapshot: makePositionSnapshot())
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if !decelerate {
-            savePositionNow(reason: "dragging")
-        }
+        // docs/22 §4.4.3：无论是否继续减速都保存一次（旧实现只在 !decelerate 保存，是漏洞）。
+        positionCoordinator.saveNow(reason: "dragging", snapshot: makePositionSnapshot())
     }
 
     func collectionView(_ collectionView: UICollectionView,
