@@ -98,7 +98,7 @@ final class LibraryPositionStoreTests: XCTestCase {
         XCTAssertNil(store.load(queryKey: "k2"))
     }
 
-    func testSchemaVersionAlwaysWrittenAsThree() {
+    func testSchemaVersionAlwaysWrittenAsFour() {
         let (store, defaults) = makeStore()
         let position = LibraryPosition(anchorAssetID: "asset-1",
                                        anchorVisualY: 42,
@@ -111,9 +111,9 @@ final class LibraryPositionStoreTests: XCTestCase {
         store.save(position, queryKey: "q1")
         guard let data = defaults.data(forKey: "library.lastPosition.v2.q1"),
               let decoded = try? JSONDecoder().decode(LibraryPosition.self, from: data) else {
-            return XCTFail("v3 数据应可解码")
+            return XCTFail("v4 数据应可解码")
         }
-        XCTAssertEqual(decoded.schemaVersion, 3)
+        XCTAssertEqual(decoded.schemaVersion, 4)
         XCTAssertEqual(decoded.anchorAssetID, "asset-1")
         XCTAssertEqual(decoded.anchorVisualY, 42)
         XCTAssertEqual(decoded.anchorContentOffsetY, 1000)

@@ -153,6 +153,14 @@ final class LibraryPositionCoordinator {
         onPhaseChange?(state.phase)
     }
 
+    /// 用户主动跳转/接管时取消恢复：清除锚点、收起遮罩，后续滚动可正常保存。
+    func cancelRestore(reason: String) {
+        guard state.isInFlight else { return }
+        pendingAnchor = nil
+        state.skip()
+        finish(.done, reason: "cancel-\(reason)")
+    }
+
     /// applySnapshot completion / viewDidLayoutSubviews / viewDidAppear 都调用；bounds=0 保持 waitingLayout。
     func attemptRestore(context: LibraryPositionRestoreContext) {
         guard state.isInFlight, let anchor = pendingAnchor else { return }

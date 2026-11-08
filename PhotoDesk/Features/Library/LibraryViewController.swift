@@ -1169,8 +1169,9 @@ final class LibraryViewController: UIViewController {
         let visualY = Int(saved?.anchorVisualY ?? 0)
         let off = String(Int(Double(collectionView.contentOffset.y)))
         let maxOffset = String(Int(Double(max(0, collectionView.contentSize.height - collectionView.bounds.height))))
-        let sections = String(collectionView.numberOfSections)
-        let cells = String(collectionView.numberOfItems(inSection: 0))
+        let sectionCount = collectionView.numberOfSections
+        let sections = String(sectionCount)
+        let cells = sectionCount > 0 ? String(collectionView.numberOfItems(inSection: 0)) : "0"
         viewModel.debugScrollNote = "off=" + off + "/" + maxOffset +
             " anchor=" + anchor + " visualY=" + String(visualY) +
             " sec=" + sections + " cells=" + cells +
@@ -1326,6 +1327,8 @@ final class LibraryViewController: UIViewController {
     /// - Returns: 是否实际执行了滚动（false = 校验未通过/快照未提交，调用方可重试）
     @discardableResult
     func scrollToSection(_ index: Int) -> Bool {
+        // 用户主动月份跳转优先于跨进程恢复：取消恢复并收起遮罩，避免异步 restore 覆盖跳转落点。
+        positionCoordinator.cancelRestore(reason: "monthJump")
         // S03 修复：校验 collectionView 实际 section/item 数（apply 未提交时 currentSections 已是新值）
         guard index < currentSections.count,
               index < collectionView.numberOfSections,

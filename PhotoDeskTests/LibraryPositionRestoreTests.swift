@@ -211,6 +211,8 @@ final class LibraryPositionRestoreTests: XCTestCase {
                                    sectionID: "2026-11",
                                    itemIndexInSection: 5,
                                    offsetRatio: 0,
+                                   contentHeight: 2_000,
+                                   viewportHeight: 844,
                                    savedAt: Date()),
                    queryKey: queryKey)
         let controller = makeViewController(viewModel: viewModel, store: store)
