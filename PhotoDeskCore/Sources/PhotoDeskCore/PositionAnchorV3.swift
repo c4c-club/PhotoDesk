@@ -101,7 +101,7 @@ public enum PositionRestoreStrategy: String, Equatable, Sendable {
 }
 
 public enum PositionAnchorPolicy {
-    public static let schemaVersion: Int = 4
+    public static let schemaVersion: Int = 5
 
     /// 视觉锚点视口内 y：cell 未变换 frame.minY - contentOffset.y。
     public static func visualY(cellMinY: Double, contentOffsetY: Double) -> Double {

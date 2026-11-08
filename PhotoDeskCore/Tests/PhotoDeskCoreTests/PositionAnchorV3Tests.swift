@@ -19,7 +19,7 @@ final class PositionAnchorV3Tests: XCTestCase {
     }
 
     func testCurrentSchemaVersionIsFour() {
-        XCTAssertEqual(PositionAnchorPolicy.schemaVersion, 4)
+        XCTAssertEqual(PositionAnchorPolicy.schemaVersion, 5)
         let anchor = PositionAnchorV3(
             anchorAssetID: "a",
             anchorVisualY: 12,
@@ -27,7 +27,7 @@ final class PositionAnchorV3Tests: XCTestCase {
             assetID: "a",
             sectionID: "s"
         )
-        XCTAssertEqual(anchor.schemaVersion, 4)
+        XCTAssertEqual(anchor.schemaVersion, 5)
     }
 
     func testV2DecodeFallsBackToLegacyAssetFields() throws {
@@ -70,7 +70,7 @@ final class PositionAnchorV3Tests: XCTestCase {
         XCTAssertEqual(decoded.anchorContentOffsetY, 2480)
         XCTAssertEqual(decoded.contentHeight, 12_000)
         XCTAssertEqual(decoded.viewportHeight, 844)
-        XCTAssertEqual(decoded.schemaVersion, 4)
+        XCTAssertEqual(decoded.schemaVersion, 5)
     }
 
     func testV3DecodeKeepsLegacyFieldsWithZeroNewFields() throws {
