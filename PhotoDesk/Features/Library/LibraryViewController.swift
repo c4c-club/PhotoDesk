@@ -210,11 +210,20 @@ final class LibraryViewController: UIViewController {
     /// 旋转 / 分屏（docs/09 Phase 7）：布局随尺寸更新，保持当前锚点不跳
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
+        // 旋转前抓同一锚点，布局完成后按新几何复位（docs/22 Phase 4 网格验收）
+        let preRotation = makePositionSnapshot()
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
             self.collectionView.collectionViewLayout = self.makeLayout(columns: self.columns)
             self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
-        }, completion: nil)
+        }, completion: { [weak self] _ in
+            guard let self, let preRotation else { return }
+            self.pendingHeadInsertAnchor = HeadInsertAnchor(assetID: preRotation.anchorAssetID,
+                                                            visualY: CGFloat(preRotation.anchorVisualY),
+                                                            passes: 0)
+            self.collectionView.layoutIfNeeded()
+            self.enforceHeadInsertAnchor()
+        })
     }
 
     // MARK: - 构建
@@ -1602,7 +1611,22 @@ final class LibraryViewController: UIViewController {
                 entries.append(MonthIndexBar.Entry(label: nil, detail: section.title))
             }
         }
-        indexBar.update(entries: entries, highlightedIndex: -1)
+        indexBar.update(entries: entries, highlightedIndex: visibleSectionIndex)
+    }
+
+    /// 当前视口第一条可见 cell 所属 section（用于索引条常亮当前月份）。
+    private var visibleSectionIndex: Int {
+        let paths = collectionView.indexPathsForVisibleItems
+        guard let first = paths.min(by: {
+            $0.section == $1.section ? $0.item < $1.item : $0.section < $1.section
+        }) else { return -1 }
+        return first.section
+    }
+
+    private func updateIndexBarHighlight() {
+        let index = visibleSectionIndex
+        guard index >= 0 else { return }
+        indexBar.setHighlighted(index: index, notify: false)
     }
 }
 
@@ -1623,6 +1647,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateIndexBarHighlight()
         // 位置记忆 v4：0.35s 防抖，由 coordinator 统一持有 DispatchWorkItem/revision。
         guard !isRestoringPosition, !positionCoordinator.isRestoreInFlight else { return }
         positionCoordinator.scheduleSave(reason: "scroll", snapshot: makePositionSnapshot())

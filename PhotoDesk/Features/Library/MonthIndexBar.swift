@@ -85,13 +85,12 @@ final class MonthIndexBar: UIControl {
     }
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
-        highlightedIndex = -1
+        // 拖动结束保留当前月份高亮（旧实现清成 -1，索引条永远没有“当前月份”）。
         hideOverlay()
         setNeedsDisplay()
     }
 
     override func cancelTracking(with event: UIEvent?) {
-        highlightedIndex = -1
         hideOverlay()
         setNeedsDisplay()
     }

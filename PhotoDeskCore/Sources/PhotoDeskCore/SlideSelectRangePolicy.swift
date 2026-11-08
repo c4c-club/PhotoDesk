@@ -55,7 +55,7 @@ public enum SlideSelectRangePolicy {
         // 控制器在激活帧会单独把 anchor 加入目标，保证起手 cell 立即可见选中。
         if anchor == current { return [] }
         let lastSection = metrics.sectionItemCounts.count - 1
-        let startSection = max(0, min(anchor.section, current.section, lastSection))
+        let startSection = max(0, min(min(anchor.section, current.section), lastSection))
         let endSection = max(0, min(max(anchor.section, current.section), lastSection))
         guard startSection <= endSection else { return [] }
 
