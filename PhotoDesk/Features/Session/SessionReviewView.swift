@@ -60,6 +60,12 @@ struct SessionReviewView: View {
                             .frame(width: 80)
                     }
                 }
+                if !session.isEmpty {
+                    Button("全部恢复（零系统写入）") {
+                        session.restoreAll()
+                    }
+                    .accessibilityIdentifier("Session-RestoreAll")
+                }
             }
 
             if !session.session.pendingDeleteIDs.isEmpty {

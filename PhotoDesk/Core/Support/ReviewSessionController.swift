@@ -78,6 +78,17 @@ final class ReviewSessionController: ObservableObject {
         sessionChanged()
     }
 
+    /// review 页「全部恢复」：零 PhotoKit 写，仅清空待处理队列（docs/22 Phase 4 整理回顾页）
+    func restoreAll() {
+        for id in session.pendingDeleteIDs {
+            session.unmark(id, kind: .delete)
+        }
+        for id in session.pendingHideIDs {
+            session.unmark(id, kind: .hide)
+        }
+        sessionChanged()
+    }
+
     // MARK: - 批量提交（唯一 PhotoKit 写入口）
 
     /// 「全部移到最近删除」：副本（尊重开关）→ 分批一次批量删除请求/批。返回 (成功, 跳过, 失败?)
