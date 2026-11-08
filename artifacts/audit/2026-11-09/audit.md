@@ -1,6 +1,6 @@
 ﻿# M15 Audit Report
 
-- stamp: 2026-11-09 00:33:33+08:00
+- stamp: 2026-11-09 00:38:08+08:00
 - mode: BASELINE (P0 gates informational)
 
 ## Red lines (must be 0)
@@ -37,7 +37,7 @@
 ## P0-3/4 marquee
 - slideSelectRangePolicy_refs = 14
 - insert_only_target_baseIDs = 2
-- whole_row_banner = 0
+- whole_row_banner = 2
 - marquee_policy = False
 - range_policy_file = True
 - range_policy_tests = True

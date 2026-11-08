@@ -1,4 +1,4 @@
-# audit-m15.ps1 - M15 audit script (docs/25 Phase 0). ASCII-only output for cp936 consoles.
+﻿# audit-m15.ps1 - M15 audit script (docs/25 Phase 0). ASCII-only output for cp936 consoles.
 # Exit codes: 0 = pass, 2 = required file missing, 3 = red-line violation, 4 = P0 gate violation.
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/audit-m15.ps1 [-Baseline]
 #   -Baseline: skip P0 gate failures (Phase 0 evidence run; P0 counters still reported).
@@ -21,7 +21,7 @@ function Count-Hits([string]$pattern, [string[]]$paths, [string[]]$globs = @("*.
         $full = Join-Path $repo $p
         if (-not (Test-Path $full)) { continue }
         $files = Get-ChildItem -Path $full -Recurse -Include $globs -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch '\\\.build\\' }
+            Where-Object { $_.FullName -notmatch '[\/]\.build[\/]' }
         foreach ($f in $files) {
             $lines = [System.IO.File]::ReadAllLines($f.FullName, [System.Text.Encoding]::UTF8)
             foreach ($line in $lines) { $total += $rx.Matches($line).Count }
@@ -54,6 +54,28 @@ if ($failures.Count -gt 0) {
     exit 2
 }
 
+
+# permanent-delete entries: only actionable UI literals / APIs count; compliance
+# sentences like "本 App 不提供永久删除" and policy comments are excluded.
+function Count-PermanentDeleteEntry([string[]]$paths) {
+    $total = 0
+    foreach ($p in $paths) {
+        $full = Join-Path $repo $p
+        if (-not (Test-Path $full)) { continue }
+        $files = Get-ChildItem -Path $full -Recurse -Include "*.swift" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '[\/]\.build[\/]' }
+        foreach ($f in $files) {
+            $lines = [System.IO.File]::ReadAllLines($f.FullName, [System.Text.Encoding]::UTF8)
+            foreach ($line in $lines) {
+                if ($line -match "deleteAllAssets|permanentlyDelete") { $total++; continue }
+                if ($line -match "Text\(|Button\(|setTitle|titleLabel|navigationTitle|alertTitle|confirmationDialog") {
+                    if ($line -match "彻底删除|永久删除" -and $line -notmatch "不提供|禁用|不做|不出现") { $total++ }
+                }
+            }
+        }
+    }
+    return $total
+}
 # --- b) red lines (must be 0) ---
 $red = [ordered]@{
     urlsession              = Count-Hits "URLSession" @("PhotoDesk", "PhotoDeskCore/Sources")
@@ -65,7 +87,7 @@ $red = [ordered]@{
     swiftData               = Count-Hits "SwiftData" @("PhotoDesk")
     scrollTargetBehavior    = Count-Hits "scrollTargetBehavior" @("PhotoDesk")
     scrollPosition          = Count-Hits "\.scrollPosition" @("PhotoDesk")
-    permanent_delete_entry  = Count-Hits "deleteAllAssets|permanentlyDelete|彻底删除|永久删除" @("PhotoDesk", "PhotoDeskCore/Sources")
+    permanent_delete_entry  = Count-PermanentDeleteEntry @("PhotoDesk", "PhotoDeskCore/Sources")
 }
 $result.redlines = $red
 foreach ($k in $red.Keys) {

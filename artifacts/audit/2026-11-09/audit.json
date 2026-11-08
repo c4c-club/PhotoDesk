@@ -1,5 +1,5 @@
 ﻿{
-    "timestamp":  "2026-11-09 00:33:33+08:00",
+    "timestamp":  "2026-11-09 00:38:08+08:00",
     "requiredFiles":  [
                           {
                               "path":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
@@ -77,7 +77,7 @@
                "marquee":  {
                                "slideSelectRangePolicy_refs":  14,
                                "insert_only_target_baseIDs":  2,
-                               "whole_row_banner":  0,
+                               "whole_row_banner":  2,
                                "marquee_policy":  false,
                                "range_policy_file":  true,
                                "range_policy_tests":  true,
