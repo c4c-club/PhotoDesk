@@ -38,8 +38,19 @@ struct CleanupView: View {
             case .completed:
                 resultView
             case .failed(let message):
-                Text("扫描失败：\(message)")
-                    .foregroundColor(Color(ds: DSColor.accentDelete))
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 44))
+                        .foregroundColor(Color(ds: DSColor.accentDelete))
+                    Text("扫描失败：\(message)")
+                        .font(.body)
+                        .foregroundColor(Color(ds: DSColor.accentDelete))
+                        .multilineTextAlignment(.center)
+                    Button("重试") { viewModel.startScan() }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("Cleanup-Retry")
+                }
+                .padding(DSSpacing.screenPadding)
             }
         }
         .background(Color(ds: DSColor.bgPrimary))
