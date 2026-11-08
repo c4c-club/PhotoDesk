@@ -85,12 +85,47 @@ final class ViewerCellGeometryTests: XCTestCase {
         XCTAssertFalse(cell.test_scrollView.isUserInteractionEnabled, "无图必须禁交互")
     }
 
-    /// 零 contentSize 时 viewForZooming 必须返回 nil（旧版返回零尺寸 view → UIScrollView 内部除零 → NaN）
-    func testViewForZoomingNilOnZeroContentSize() {
-        let cell = ZoomableImageCell(frame: .zero)
+    /// P0-1：viewForZooming 必须是常量返回函数——连续 1000 次返回同一 zoomContentView，
+    /// 且 contentSize / frame 完全不变（旧实现在回调内读几何并字符串插值 → 无限递归 SIGSEGV）。
+    func testViewForZoomingReturnsSameViewWithoutMutation() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         cell.configure(item: makeItem(), image: makeImage())
-        XCTAssertNil(cell.viewForZooming(in: cell.test_scrollView),
-                     "B2：零 contentSize 时 viewForZooming 返回 nil，杜绝 CALayer position NaN")
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let beforeFrame = cell.test_zoomContentView.frame
+        let beforeContentSize = cell.test_scrollView.contentSize
+        let first = cell.viewForZooming(in: cell.test_scrollView)
+        XCTAssertTrue(first === cell.test_zoomContentView,
+                      "viewForZooming 必须返回 zoomContentView")
+        for _ in 0..<1_000 {
+            XCTAssertTrue(cell.viewForZooming(in: cell.test_scrollView) === cell.test_zoomContentView)
+        }
+        XCTAssertEqual(cell.test_zoomContentView.frame, beforeFrame,
+                       "1000 次 viewForZooming 不得改变 zoomContentView.frame")
+        XCTAssertEqual(cell.test_scrollView.contentSize, beforeContentSize,
+                       "1000 次 viewForZooming 不得改变 contentSize")
+    }
+
+    /// P0-1：缩放进行中 configure / prepareForReuse 不得写 frame/contentSize / setZoomScale。
+    func testConfigureAndReuseDoNotTouchGeometryWhileZooming() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_scrollView.setZoomScale(2, animated: false)
+        cell.test_recenterAfterZoom()
+        let zoomedFrame = cell.test_zoomContentView.frame
+        let zoomedContentSize = cell.test_scrollView.contentSize
+        cell.test_zoomInProgress = true
+        cell.configure(item: makeItem(), image: makeImage())
+        XCTAssertEqual(cell.test_zoomContentView.frame, zoomedFrame,
+                       "缩放中 configure 不得改写 zoomContentView.frame")
+        XCTAssertEqual(cell.test_scrollView.contentSize, zoomedContentSize,
+                       "缩放中 configure 不得改写 contentSize")
+        cell.prepareForReuse()
+        XCTAssertEqual(cell.test_zoomContentView.frame, zoomedFrame,
+                       "缩放中 prepareForReuse 不得改写 zoomContentView.frame")
+        XCTAssertEqual(cell.test_scrollView.contentSize, zoomedContentSize,
+                       "缩放中 prepareForReuse 不得改写 contentSize")
+        cell.test_zoomInProgress = false
     }
 
     // MARK: - R02/B3：居中 inset 不受 transform 污染
@@ -105,9 +140,9 @@ final class ViewerCellGeometryTests: XCTestCase {
         let baseHeight = cell.test_zoomContentView.bounds.height
         XCTAssertEqual(baseHeight, 156, accuracy: 1.0, "aspectFit 基准高度应为 156")
         cell.test_scrollView.setZoomScale(2, animated: false)
-        // M13 状态机：setZoomScale 触发 didZoom → 事务 active，inset 推迟到 settling 批量提交
-        //（生产由 0.4s 宽限定时器触发；单测无 runloop，显式驱动同一条 commitPendingGeometry 路径）。
-        cell.test_flushPendingGeometry()
+        // v5：setZoomScale 只更新 diagnostics；居中收敛由 layoutSubviews / didEndZooming 驱动，
+        // 单测无 runloop，显式调用 test_recenterAfterZoom（与生产同一条 centerZoomContent 路径）。
+        cell.test_recenterAfterZoom()
         let inset = cell.test_scrollView.contentInset
         let expected = (844 - baseHeight * 2) / 2
         XCTAssertEqual(inset.top, expected, accuracy: 1.0,

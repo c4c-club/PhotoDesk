@@ -457,7 +457,7 @@ final class StabilityUITests: XCTestCase {
                       "cell 内 UIScrollView 未以 Viewer-ZoomScrollView 暴露\n\(hierarchy(app))")
         XCTAssertGreaterThan(inner.frame.width, 0, "内层 scrollView 实际宽度必须 > 0")
         XCTAssertGreaterThan(inner.frame.height, 0, "内层 scrollView 实际高度必须 > 0")
-        for round in 0..<30 {
+        for round in 0..<50 {
             inner.pinch(withScale: 0.45, velocity: -1.4)
             inner.pinch(withScale: 2.2, velocity: 1.4)
             if round % 10 == 9 {
@@ -483,6 +483,8 @@ final class StabilityUITests: XCTestCase {
                        "捏合全过程 pendingDeleteCount 必须为 0：\(banner.label)")
         XCTAssertEqual(Self.parseField(label, "traceNonFinite"), 0,
                        "viewer-trace 不得出现 non-finite / NaN：\(banner.label)")
+        XCTAssertEqual(Self.parseField(label, "vfz"), 0,
+                       "viewer-trace 不得出现 viewForZooming 行：\(banner.label)")
         assertViewerImageVisible(app, "真捏合后大图像素必须非背景色")
         let badge = anyElement(app, identifier: "SessionBadge")
         let badgeLabel = badge.exists ? badge.label : ""
@@ -491,6 +493,59 @@ final class StabilityUITests: XCTestCase {
         let close = anyElement(app, identifier: "Viewer-Close")
         XCTAssertTrue(close.exists, "查看器顶部关闭按钮仍应可达\n\(hierarchy(app))")
         snap(app, "m13-inner-scrollview-pinch")
+    }
+
+    /// P0-1：放大 → 翻页 → 再捏合 → 返回 → 再捏合（覆盖 cell 复用与跨页 zoomView 重挂）。
+    func testPinchAfterPageChange() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        let viewer = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        let inner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(inner.waitForExistence(timeout: 8), "内层 scrollView 未出现\n\(hierarchy(app))")
+        inner.pinch(withScale: 2.2, velocity: 1.4)
+        swipeLeftFast(in: viewer)
+        Thread.sleep(forTimeInterval: 0.5)
+        let nextInner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(nextInner.waitForExistence(timeout: 5), "翻页后内层 scrollView 未出现\n\(hierarchy(app))")
+        nextInner.pinch(withScale: 0.45, velocity: -1.4)
+        nextInner.pinch(withScale: 2.2, velocity: 1.4)
+        viewer.swipeRight()
+        Thread.sleep(forTimeInterval: 0.5)
+        let backInner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(backInner.waitForExistence(timeout: 5), "返回上一张后内层 scrollView 未出现\n\(hierarchy(app))")
+        backInner.pinch(withScale: 0.45, velocity: -1.4)
+        backInner.pinch(withScale: 2.2, velocity: 1.4)
+        assertAlive(app, "翻页往返 + 四次捏合后")
+        XCTAssertTrue(banner.label.contains("img=ok"), "翻页后当前图未加载：\(banner.label)")
+        XCTAssertEqual(Self.parseField(banner.label.lowercased(), "pendingDeleteCount"), 0,
+                       "翻页捏合不得进入待删除事务：\(banner.label)")
+        XCTAssertEqual(Self.parseField(banner.label.lowercased(), "vfz"), 0,
+                       "viewer-trace 不得出现 viewForZooming 行：\(banner.label)")
+        snap(app, "p0-pinch-after-page-change")
+    }
+
+    /// P0-1：快速翻 10 页后立即捏合（覆盖 cell 复用竞态）。
+    func testPinchAfterReuse() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        let viewer = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        for _ in 0..<10 {
+            swipeLeftFast(in: viewer)
+            Thread.sleep(forTimeInterval: 0.15)
+        }
+        let inner = app.scrollViews["Viewer-ZoomScrollView"].firstMatch
+        XCTAssertTrue(inner.waitForExistence(timeout: 5), "复用后内层 scrollView 未出现\n\(hierarchy(app))")
+        inner.pinch(withScale: 2.2, velocity: 1.4)
+        inner.pinch(withScale: 0.45, velocity: -1.4)
+        assertAlive(app, "快速翻 10 页后捏合")
+        XCTAssertTrue(banner.label.contains("img=ok"), "复用后当前图未加载：\(banner.label)")
+        XCTAssertEqual(Self.parseField(banner.label.lowercased(), "vfz"), 0,
+                       "viewer-trace 不得出现 viewForZooming 行：\(banner.label)")
+        snap(app, "p0-pinch-after-reuse")
     }
 
     // MARK: - S01 捏合缩放 20 轮不卡死不闪退
