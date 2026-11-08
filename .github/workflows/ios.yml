@@ -15,6 +15,12 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: '可选：xcodebuild -only-testing 参数（留空跑全量）'
+        required: false
+        type: string
 
 # 私有仓库 macOS 按 10× 计费，快速连续 push 时取消过期 run 省额度
 concurrency:
@@ -107,12 +113,23 @@ jobs:
           bash scripts/sim-photos-dated.sh 2
 
       - name: Test (simulator)
+        env:
+          TEST_FILTER: ${{ github.event.inputs.test_filter }}
         run: |
-          xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
-            -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
-            -derivedDataPath build/DerivedData \
-            -resultBundlePath build/TestResults.xcresult \
-            -skip-testing:PhotoDeskUITests/PerformanceUITests test
+          if [ -n "$TEST_FILTER" ]; then
+            echo "targeted test filter: $TEST_FILTER"
+            xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+              -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
+              -derivedDataPath build/DerivedData \
+              -resultBundlePath build/TestResults.xcresult \
+              $TEST_FILTER test
+          else
+            xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+              -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
+              -derivedDataPath build/DerivedData \
+              -resultBundlePath build/TestResults.xcresult \
+              -skip-testing:PhotoDeskUITests/PerformanceUITests test
+          fi
 
       # M12/M13 取证：UI 测试失败时 App 视觉现场 + App 自写崩溃/缩放日志
       - name: Capture simulator state on failure
