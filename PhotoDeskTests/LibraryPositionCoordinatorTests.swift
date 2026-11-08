@@ -323,7 +323,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         let recorder = ContextRecorder()
         let coordinator = LibraryPositionCoordinator(store: store)
         coordinator.beginRestore(queryKey: "scope.all")
-        coordinator.attemptRestore(context: recorder.context(anchorInData: false, isIndexComplete: false))
+        coordinator.attemptRestore(context: recorder.context(isIndexComplete: false, anchorInData: false))
         XCTAssertEqual(coordinator.phase, .restoring, "I4：锚点未到 + 索引未完成 → 保持等待，不失败")
         XCTAssertTrue(recorder.appliedOffsets.isEmpty)
         coordinator.saveNow(reason: "waiting", snapshot: snapshot("should-be-rejected"))
