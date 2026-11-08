@@ -64,12 +64,11 @@ final class LibraryViewController: UIViewController {
     private var pendingJumpVerifySectionID: String?
     private var jumpVerifyAttempts = 0
 
-    /// v4 前插补偿：只记录锚点 assetID + 视觉 y，布局 pass 最多 3 次收敛（绿14 实锤：completion 期
-    /// 一次性补偿会过冲；用户拖动/减速时立即让位）。
+    /// v5 前插补偿（docs/25 §5.7）：只记录锚点 assetID + 视觉 y；apply completion 登记一次补偿，
+    /// 布局 pass 按真实 minY 收敛（≤0.5pt），无 3 次上限；用户拖动/减速/恢复中立即让位。
     private struct HeadInsertAnchor {
         let assetID: String
         let visualY: CGFloat
-        var passes: Int
     }
     private var pendingHeadInsertAnchor: HeadInsertAnchor?
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
@@ -197,8 +196,11 @@ final class LibraryViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // 切 Tab / 进设置 / 返回前强制保存位置（docs/22 §4.4.3）
-        positionCoordinator.saveNow(reason: "disappear", snapshot: makePositionSnapshot())
+        // docs/25 §5.6：只在真正离开页面（被移除/被 dismiss）时保存；
+        // 打开查看器 / 弹 sheet 不保存，避免临态覆盖已保存锚点。
+        if isMovingFromParent || isBeingDismissed {
+            positionCoordinator.saveNow(reason: "disappear", snapshot: makePositionSnapshot())
+        }
     }
 
     deinit {
@@ -219,8 +221,7 @@ final class LibraryViewController: UIViewController {
         }, completion: { [weak self] _ in
             guard let self, let preRotation else { return }
             self.pendingHeadInsertAnchor = HeadInsertAnchor(assetID: preRotation.anchorAssetID,
-                                                            visualY: CGFloat(preRotation.anchorVisualY),
-                                                            passes: 0)
+                                                            visualY: CGFloat(preRotation.anchorVisualY))
             self.collectionView.layoutIfNeeded()
             self.enforceHeadInsertAnchor()
         })
@@ -1074,8 +1075,7 @@ final class LibraryViewController: UIViewController {
             // v4 前插补偿：登记锚点保持任务（enforceHeadInsertAnchor 在布局 pass 里收敛）
             if let keep = headInsertAnchor {
                 pendingHeadInsertAnchor = HeadInsertAnchor(assetID: keep.assetID,
-                                                           visualY: keep.visualY,
-                                                           passes: 0)
+                                                           visualY: keep.visualY)
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
@@ -1230,12 +1230,14 @@ final class LibraryViewController: UIViewController {
         collectionView.layoutIfNeeded()
         let context = LibraryPositionRestoreContext(
             bounds: collectionView.bounds.size,
-            numberOfSections: collectionView.numberOfSections,
             isIndexComplete: viewModel.isIndexComplete,
             contentHeight: Double(collectionView.contentSize.height),
             viewportHeight: Double(collectionView.bounds.height),
             adjustedTop: Double(collectionView.adjustedContentInset.top),
             bottomInset: Double(collectionView.adjustedContentInset.bottom),
+            anchorInData: { [weak self] id in
+                self?.indexPath(forAssetID: id) != nil
+            },
             anchorMinY: { [weak self] id in
                 guard let self else { return nil }
                 return self.layoutMinY(forAssetID: id)
@@ -1243,6 +1245,15 @@ final class LibraryViewController: UIViewController {
             sectionMinY: { [weak self] sectionID, itemIndex in
                 guard let self else { return nil }
                 return self.layoutMinY(sectionID: sectionID, itemIndex: itemIndex)
+            },
+            scrollToAnchorTop: { [weak self] id in
+                guard let self, let path = self.indexPath(forAssetID: id) else { return false }
+                // §5.5：scrollToItem(.top) 让 UICollectionView 自己算目标 offset（知道全部 header 几何）
+                self.isRestoringPosition = true
+                self.collectionView.scrollToItem(at: path, at: .top, animated: false)
+                self.collectionView.layoutIfNeeded()
+                self.isRestoringPosition = false
+                return true
             },
             applyOffset: { [weak self] y in
                 guard let self else { return }
@@ -1258,22 +1269,21 @@ final class LibraryViewController: UIViewController {
             },
             actualOffsetY: { [weak self] in
                 Double(self?.collectionView.contentOffset.y ?? 0)
+            },
+            layoutNow: { [weak self] in
+                self?.collectionView.layoutIfNeeded()
             }
         )
         positionCoordinator.attemptRestore(context: context)
     }
 
-    private func handlePositionPhase(_ phase: PositionRestorePhase) {
+    private func handlePositionPhase(_ phase: PositionRestorePhaseV5) {
         switch phase {
-        case .waitingSnapshot, .waitingLayout, .applying, .verifying:
+        case .restoring, .applying, .verifying, .fallback:
             showRestoreMaskIfNeeded()
-        case .done:
+        case .settled:
             hideRestoreMask()
             viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)"
-            refreshDebugScrollNote()
-        case .failed:
-            hideRestoreMask()
-            viewModel.debugRestoreNote = "restore=failed"
             refreshDebugScrollNote()
         case .idle:
             break
@@ -1322,6 +1332,13 @@ final class LibraryViewController: UIViewController {
                   generation == self.restoreMaskGeneration,
                   self.positionCoordinator.isRestoreInFlight else { return }
             UIView.animate(withDuration: 0.15) { self.restoreMaskView.alpha = 1 }
+            // §5.4：遮罩最长显示 1.5s；消失不代表恢复失败，恢复可在后台继续
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self, generation == self.restoreMaskGeneration else { return }
+                if self.restoreMaskView.alpha > 0 {
+                    UIView.animate(withDuration: 0.15) { self.restoreMaskView.alpha = 0 }
+                }
+            }
         }
     }
 
@@ -1428,17 +1445,10 @@ final class LibraryViewController: UIViewController {
             - collectionView.bounds.height + collectionView.adjustedContentInset.bottom)
         let targetY = min(max(0, attrs.frame.minY - keep.visualY), maxY)
         if abs(collectionView.contentOffset.y - targetY) > 0.5 {
-            var updated = keep
-            updated.passes += 1
-            if updated.passes >= 3 {
-                pendingHeadInsertAnchor = nil
-                ViewerTrace.log("snapshot.head-insert give-up asset=\(keep.assetID.prefix(8)) passes=3")
-                return
-            }
-            pendingHeadInsertAnchor = updated
+            // 无 3 次上限（docs/25 §5.7）：每 pass 用当前真实布局重算；锚点被删则上游已丢弃
             let dy = targetY - collectionView.contentOffset.y
             collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: targetY), animated: false)
-            ViewerTrace.log("snapshot.head-insert dy=\(Int(dy)) asset=\(keep.assetID.prefix(8)) pass=\(updated.passes)")
+            ViewerTrace.log("snapshot.head-insert dy=\(Int(dy)) asset=\(keep.assetID.prefix(8))")
         } else {
             pendingHeadInsertAnchor = nil
             ViewerTrace.log("snapshot.head-insert settled asset=\(keep.assetID.prefix(8)) visualY=\(Int(keep.visualY))")
@@ -1661,8 +1671,9 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateIndexBarHighlight()
-        // 位置记忆 v4：0.35s 防抖，由 coordinator 统一持有 DispatchWorkItem/revision。
-        guard !isRestoringPosition, !positionCoordinator.isRestoreInFlight else { return }
+        // 位置记忆 v5：0.5s 防抖且只在用户 tracking 时（程序化 offset 不保存），coordinator 门禁兜底。
+        guard scrollView.isTracking,
+              !isRestoringPosition, !positionCoordinator.isRestoreInFlight else { return }
         positionCoordinator.scheduleSave(reason: "scroll", snapshot: makePositionSnapshot())
     }
 

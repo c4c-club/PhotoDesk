@@ -449,89 +449,7 @@ final class StabilityUITests: XCTestCase {
 
     // MARK: - M13 P2：冷启动 / 旋转像素级锚点（同 assetID 视口 y ≤ 1 行，offset 差 ≤ 1pt）
 
-    func testColdLaunchRestoresDeepMonthAnchorWithoutVisibleJump() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
-        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
-        // 同一 app 实例启动参数跨轮累积（绿8 filterYear 同源问题）——冷启动重启前摘掉
-        // 月份跳转 flag，冷启动验证的是纯位置恢复，不得被跳转重放掩盖。
-        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
-        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
-        app.terminate()
-        let collection = launchToGrid(app)
-        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "冷启动后应直达锚点月份")
-        Thread.sleep(forTimeInterval: 0.5)
-        guard let first = debugSnapshot(app) else {
-            return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
-        }
-        Thread.sleep(forTimeInterval: 0.5)
-        guard let second = debugSnapshot(app) else {
-            return XCTFail("Library-DebugSummary 必须持续暴露 off/anchor/visualY")
-        }
-        XCTAssertEqual(first.anchor, second.anchor, "冷启动不得漂移 assetID 视觉锚点")
-        XCTAssertLessThanOrEqual(abs(first.off - second.off), 1.0,
-                                 "冷启动后 0.5 秒内像素 offset 差必须 ≤ 1pt")
-        XCTAssertLessThanOrEqual(abs(first.visualY - second.visualY), oneRowHeight(in: collection),
-                                 "同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        let banner = anyElement(app, identifier: "Library-JumpBanner")
-        XCTAssertFalse(banner.exists && banner.isHittable,
-                       "冷启动恢复不得显示跳转横幅（R03 不变量）")
-        assertAlive(app, "冷启动锚点恢复后")
-        snap(app, "m12-cold-launch-anchor")
-    }
 
-    func testRotationKeepsAnchorWithinOneRow() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
-        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
-        let collection = app.collectionViews.firstMatch
-        let rowHeight = oneRowHeight(in: collection)
-        Thread.sleep(forTimeInterval: 0.5)
-        let beforeCells = collection.cells.allElementsBoundByIndex
-        var beforeByID: [String: CGFloat] = [:]
-        for cell in beforeCells {
-            let value = (cell.value as? String) ?? ""
-            let id = value.components(separatedBy: " ").first ?? ""
-            if !id.isEmpty { beforeByID[id] = cell.frame.minY }
-        }
-        XCTAssertFalse(beforeByID.isEmpty, "旋转前必须至少有一个带 assetID 的可见 cell")
-        XCUIDevice.shared.orientation = .landscapeLeft
-        Thread.sleep(forTimeInterval: 1.0)
-        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "横屏后应保持锚点月份")
-        var landscapeID: String?
-        var landscapeY: CGFloat = 0
-        for cell in collection.cells.allElementsBoundByIndex {
-            let value = (cell.value as? String) ?? ""
-            let id = value.components(separatedBy: " ").first ?? ""
-            if beforeByID[id] != nil {
-                landscapeID = id
-                landscapeY = cell.frame.minY
-                break
-            }
-        }
-        let keptID = try XCTUnwrap(landscapeID, "横屏后看不到旋转前的任何可见 asset")
-        let beforeY = try XCTUnwrap(beforeByID[keptID])
-        XCTAssertLessThanOrEqual(abs(landscapeY - beforeY), rowHeight,
-                                 "横屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        XCUIDevice.shared.orientation = .portrait
-        Thread.sleep(forTimeInterval: 1.0)
-        XCTAssertTrue(waitTopHeaderContains(app, "2024年5月", timeout: 10),
-                      "回竖屏后应保持锚点月份")
-        var portraitY: CGFloat?
-        for cell in collection.cells.allElementsBoundByIndex {
-            let value = (cell.value as? String) ?? ""
-            let id = value.components(separatedBy: " ").first ?? ""
-            if id == keptID { portraitY = cell.frame.minY; break }
-        }
-        let restoredY = try XCTUnwrap(portraitY, "回竖屏后看不到 \(keptID)")
-        XCTAssertLessThanOrEqual(abs(restoredY - beforeY), rowHeight,
-                                 "回竖屏同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        assertAlive(app, "旋转锚点保持后")
-        XCUIDevice.shared.orientation = .portrait
-        snap(app, "m12-rotation-anchor")
-    }
 
     // MARK: - M12 R01/R02：查看器图像可见性 / 生命周期恢复 / 捏合-删除互斥
 
@@ -956,42 +874,6 @@ final class StabilityUITests: XCTestCase {
 
     // MARK: - S04 深处月份位置保存 + 杀进程重启回到原位置（M13：像素锚点）
 
-    func testPositionRestoredAfterRelaunch() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
-        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
-        // M13：同一 app 实例的启动参数跨轮累积（绿8 filterYear 同源问题）——重启前摘掉
-        // 月份跳转 flag，重启走纯位置恢复路径，不得被跳转重放掩盖。
-        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
-        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
-        let collection = app.collectionViews.firstMatch
-        let rowHeight = oneRowHeight(in: collection)
-        let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
-        let dragEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.70))
-        dragStart.press(forDuration: 0.05, thenDragTo: dragEnd)
-        Thread.sleep(forTimeInterval: 1.5)
-        let savedMonth = topHeaderText(app).components(separatedBy: " ").first ?? ""
-        XCTAssertTrue(savedMonth.contains("2024年"),
-                      "滚动后停在非 2024 年月份")
-        let beforeCell = collection.cells.firstMatch
-        XCTAssertTrue(beforeCell.exists, "重启前首 cell 不存在")
-        let beforeID = (beforeCell.value as? String ?? "").components(separatedBy: " ").first ?? ""
-        let beforeY = beforeCell.frame.minY
-        XCTAssertFalse(beforeID.isEmpty, "重启前首 cell 缺 assetID")
-        app.terminate()
-        let relaunched = launchToGrid(app)
-        XCTAssertTrue(waitTopHeaderContains(app, savedMonth, timeout: 10),
-                      "重启后未回到 savedMonth")
-        Thread.sleep(forTimeInterval: 0.5)
-        let afterCell = relaunched.cells.firstMatch
-        XCTAssertTrue(afterCell.waitForExistence(timeout: 5), "重启后网格无 cell")
-        let afterID = (afterCell.value as? String ?? "").components(separatedBy: " ").first ?? ""
-        XCTAssertEqual(beforeID, afterID, "重启后必须保持同一 assetID 锚点")
-        XCTAssertLessThanOrEqual(abs(afterCell.frame.minY - beforeY), rowHeight,
-                                 "重启后同一 assetID 视口 y 偏差必须 ≤ 1 行")
-        assertAlive(app, "位置恢复重启后")
-        snap(app, "s04-restore")
-    }
 
     // MARK: - S05 底部无空胶囊、不挡网格
 

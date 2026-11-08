@@ -48,7 +48,7 @@ struct AppearanceSettingsView: View {
                 }
                 .accessibilityIdentifier("Settings-Clear-Position")
             } footer: {
-                Text("位置记忆只存在本机（UserDefaults），按当前视图与筛选组合分别保存。")
+                Text("位置记忆只存在本机文件（Application Support），按当前视图与筛选组合分别保存。")
             }
 
             Section("iCloud") {
