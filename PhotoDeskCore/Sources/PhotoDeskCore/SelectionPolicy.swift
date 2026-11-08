@@ -1,18 +1,19 @@
-// MARK: - 职责说明：多选状态纯逻辑（docs/09 D11/D12）——scope（当前筛选结果全集）内的
-// 点选切换 / 全选 / 取消全选 / 反选；筛选变化时 selected ∩ newScope 收敛（已筛掉的 id 不再保留）。
-// O(n) 集合操作，不逐 cell 遍历；App 侧只负责把 scope 传进来并刷新可见 cell。
+// MARK: - 职责说明：多选状态纯逻辑（docs/09 D11/D12；docs/22 §5.4 性能改造）——
+// scope（当前筛选结果全集）内的点选切换 / 全选 / 取消全选 / 反选；筛选变化时 selected ∩ newScope 收敛。
+// selected 数组保持插入顺序，selectedSet 同步缓存，所有集合判定 O(1)、批量操作 O(n) 或 O(delta)。
 
 import Foundation
 
 public struct SelectionState: Equatable {
-    /// 当前选中（保持插入顺序供批量操作展示；集合判定用 selectedSet）
+    /// 当前选中（保持插入顺序供批量操作展示）
     public private(set) var selected: [String]
+    /// 与 selected 同步的集合缓存（docs/22 §5.4：禁止每次 O(n) 构造 Set）
+    public private(set) var selectedSet: Set<String>
     /// 多选作用域 = 进入多选时（或筛选变化后）的「当前筛选结果」id 全集
     public private(set) var scope: Set<String>
     /// 作用域标识（docs/13 S10）："month:2024-05" = 单月多选；nil = 普通多选（当前筛选全集）
     public private(set) var scopeID: String?
 
-    public var selectedSet: Set<String> { Set(selected) }
     /// 全选态：scope 非空且 selected 覆盖 scope
     public var allSelected: Bool { !scope.isEmpty && selectedSet == scope }
     public var isEmpty: Bool { selected.isEmpty }
@@ -21,6 +22,7 @@ public struct SelectionState: Equatable {
 
     public init() {
         selected = []
+        selectedSet = []
         scope = []
         scopeID = nil
     }
@@ -31,18 +33,22 @@ public struct SelectionState: Equatable {
         self.scope = scope
         self.scopeID = scopeID
         selected = []
+        selectedSet = []
         if let initial, scope.contains(initial) {
             selected.append(initial)
+            selectedSet.insert(initial)
         }
     }
 
     /// 点选切换（scope 外的 id 忽略——不该出现在网格上，防御性）
     public mutating func toggle(_ id: String) {
         guard scope.contains(id) else { return }
-        if let index = selected.firstIndex(of: id) {
-            selected.remove(at: index)
+        if selectedSet.contains(id) {
+            selectedSet.remove(id)
+            selected.removeAll { $0 == id }
         } else {
             selected.append(id)
+            selectedSet.insert(id)
         }
     }
 
@@ -50,19 +56,18 @@ public struct SelectionState: Equatable {
     public mutating func select(_ id: String) {
         guard scope.contains(id), !selectedSet.contains(id) else { return }
         selected.append(id)
+        selectedSet.insert(id)
     }
 
     /// 批量加选（docs/13 S07）：顺序保持、去重、scope 外 id 忽略
     public mutating func select(_ ids: [String]) {
-        for id in ids {
-            select(id)
-        }
+        for id in ids { select(id) }
     }
 
-    /// M13 P3：反向滑回时按快照取消单个 cell；不得误取消「滑动开始前已选中」的 cell。
+    /// 反向滑回时按快照取消单个 cell；不得误取消「滑动开始前已选中」的 cell。
     public mutating func remove(id: String) {
-        guard let index = selected.firstIndex(of: id) else { return }
-        selected.remove(at: index)
+        guard selectedSet.remove(id) != nil else { return }
+        selected.removeAll { $0 == id }
     }
 
     /// 范围替换（docs/13 S07 长按拖选）：选中集整体替换为给定 id 列表
@@ -74,6 +79,25 @@ public struct SelectionState: Equatable {
             result.append(id)
         }
         selected = result
+        selectedSet = seen
+    }
+
+    /// v4 滑选：base 为拖动开始帧快照，range 为行带；目标 = base ∪ range。
+    public mutating func applyRange(base: Set<String>, range: Set<String>) {
+        replaceSelection(Array(base.union(range)).sorted())
+    }
+
+    /// 增量应用：只处理 added/removed（O(delta)）。
+    public mutating func applyDelta(add: Set<String>, remove: Set<String>) {
+        var next = selectedSet
+        next.subtract(remove)
+        next.formUnion(add)
+        replaceSelection(Array(next).sorted())
+    }
+
+    /// O(1) 选中判定（cell 配置/徽标刷新高频路径）。
+    public func contains(_ id: String) -> Bool {
+        selectedSet.contains(id)
     }
 
     /// 范围选择（docs/13 S07）：orderedIDs 内 anchor→target 连续范围与当前选中取并集；
@@ -90,28 +114,31 @@ public struct SelectionState: Equatable {
 
     public mutating func selectAll() {
         selected = scope.sorted()
+        selectedSet = scope
     }
 
     public mutating func deselectAll() {
         selected = []
+        selectedSet = []
     }
 
     /// 反选：selected = scope - selected
     public mutating func invert() {
-        let current = selectedSet
-        selected = scope.filter { !current.contains($0) }.sorted()
+        selectedSet = scope.subtracting(selectedSet)
+        selected = selectedSet.sorted()
     }
 
     /// 筛选/scope 变化：selected 收敛到新 scope 的交集，并整体替换 scope
     public mutating func intersectScope(with newScope: Set<String>) {
-        let keep = selected.filter { newScope.contains($0) }
+        selectedSet = selectedSet.intersection(newScope)
+        selected = selected.filter { newScope.contains($0) }
         scope = newScope
-        selected = keep
     }
 
     /// 移除已不在库中的 id（提交删除后调用）
     public mutating func removeAll(_ ids: Set<String>) {
         selected.removeAll { ids.contains($0) }
+        selectedSet.subtract(ids)
         scope.subtract(ids)
     }
 }

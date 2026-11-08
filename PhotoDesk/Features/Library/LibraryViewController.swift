@@ -675,13 +675,14 @@ final class LibraryViewController: UIViewController {
         let controller = SlideSelectGestureController(collectionView: collectionView)
         controller.attachDelegate(self)
         controller.isSelectionMode = { [weak self] in self?.isSelecting ?? false }
-        controller.initiallySelectedIndexPaths = { [weak self] in
-            guard let self else { return [] }
-            return self.collectionView.indexPathsForSelectedItems ?? []
+        controller.selectedIDsProvider = { [weak self] in self?.selectionState.selectedSet ?? [] }
+        controller.itemIDProvider = { [weak self] indexPath in
+            self?.dataSource.itemIdentifier(for: indexPath)?.id
         }
-        controller.applyTarget = { [weak self] indexPath, selected in
-            self?.applySlideSelection(at: indexPath, selected: selected)
+        controller.applyTargetIDs = { [weak self] ids in
+            self?.applySlideSelection(ids: ids)
         }
+        controller.columnsProvider = { [weak self] in self?.columns ?? 3 }
         slideSelectController = controller
         slideSelectPan = controller.pan
     }
@@ -715,9 +716,12 @@ final class LibraryViewController: UIViewController {
         selectionState.begin(scope: scope, initial: id)
         selectionBar.isHidden = false
         indexBar.isHidden = true
+        // 单指选择 / 双指滚动（docs/22 §5.5）：选择模式下 collectionView pan 至少两指。
+        collectionView.panGestureRecognizer.minimumNumberOfTouches = 2
         reloadSelectionBadges()
         updateSelectionCount()
         updateToastPosition()   // docs/13 S05：Toast 上移到 selectionBar 之上
+        refreshDebugScrollNote()
         showSlideSelectHintOnce()
     }
 
@@ -726,7 +730,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "单指横向滑动可连续选择，滑回取消", duration: 2)
+        showTopBanner(text: "单指按住滑动可整行连续选择；双指滚动", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -743,6 +747,7 @@ final class LibraryViewController: UIViewController {
         selectionScopeTitle = currentSections[section].title
         selectionBar.isHidden = false
         indexBar.isHidden = true
+        collectionView.panGestureRecognizer.minimumNumberOfTouches = 2
         if selectAll {
             selectionState.selectAll()
         }
@@ -763,8 +768,10 @@ final class LibraryViewController: UIViewController {
         selectionScopeTitle = nil
         selectionBar.isHidden = true
         indexBar.isHidden = false
+        collectionView.panGestureRecognizer.minimumNumberOfTouches = 1
         reloadSelectionBadges()
         updateSelectionCount()
+        refreshDebugScrollNote()
         updateToastPosition()   // docs/13 S05：退出多选恢复 Toast 常规位置
     }
 
@@ -863,24 +870,24 @@ final class LibraryViewController: UIViewController {
 
     // MARK: - M13 P3 单指滑动连续多选（VC 只做映射，判定全在 SlideSelectPolicy）
 
-    /// 把 Core 计算出的目标态落到 SelectionState / CollectionView / 徽标 / 计数。
-    private func applySlideSelection(at indexPath: IndexPath, selected: Bool) {
-        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
-        if selected {
-            selectionState.select(item.id)
-        } else {
-            selectionState.remove(id: item.id)
-        }
-        if selected {
-            collectionView.selectItem(at: indexPath, animated: false, scrollPosition: [])
-        } else {
-            collectionView.deselectItem(at: indexPath, animated: false)
-        }
-        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell {
+    /// 把 Core 行带计算出的目标 id 集合整体落到 SelectionState；只 diff 可见 cell，计数仅变化时刷新。
+    private func applySlideSelection(ids: Set<String>) {
+        let previous = selectionState.selectedSet
+        guard previous != ids else { return }
+        selectionState.replaceSelection(Array(ids).sorted())
+        let current = selectionState.selectedSet
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard let item = dataSource.itemIdentifier(for: indexPath) else { continue }
+            let wasSelected = previous.contains(item.id)
+            let isSelectedNow = current.contains(item.id)
+            guard wasSelected != isSelectedNow else { continue }
+            guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoGridCell else { continue }
             cell.setSelectionVisible(isSelecting)
-            cell.setSelected(selected)
+            cell.setSelected(isSelectedNow)
         }
-        updateSelectionCount()
+        if previous.count != current.count {
+            updateSelectionCount()
+        }
     }
     // MARK: - 批量动作（docs/09 D12/D16：收藏即时写；隐藏/删除入队；无 App 内删除确认）
 
@@ -1157,7 +1164,8 @@ final class LibraryViewController: UIViewController {
         let cells = String(collectionView.numberOfItems(inSection: 0))
         viewModel.debugScrollNote = "off=" + off + "/" + maxOffset +
             " anchor=" + anchor + " visualY=" + String(visualY) +
-            " sec=" + sections + " cells=" + cells
+            " sec=" + sections + " cells=" + cells +
+            " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches)
         #endif
     }
 
@@ -1660,22 +1668,20 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 // MARK: - 手势代理（捏合与滚动同时识别，docs/09 D14）
 
 extension LibraryViewController: UIGestureRecognizerDelegate {
-    /// M13 P3 ①：非选择模式 / 多指 / 缩放事务期滑选手势让位，CollectionView 正常滚动与捏合列数。
+    /// docs/22 §5.5：单指 pan 只在起点位于 cell 上时让滑选手势开始；双指交给 collectionView。
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === slideSelectPan else { return true }
         guard isSelecting else { return false }
-        guard gestureRecognizer.numberOfTouches <= 1 else { return false }
-        return gestureRecognizer is UIPanGestureRecognizer
+        guard gestureRecognizer.numberOfTouches <= 1,
+              let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+        let point = pan.location(in: collectionView)
+        return collectionView.indexPathForItem(at: point) != nil
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        if gestureRecognizer === slideSelectPan, other === collectionView.panGestureRecognizer { return true }
-        // 双指捏合列数与滑选绝不互认；捏合自身仍可与滚动同时识别（docs/09 D14）。
-        if gestureRecognizer === slideSelectPan || other === slideSelectPan {
-            if gestureRecognizer is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer { return false }
-            return gestureRecognizer.numberOfTouches < 2 && other.numberOfTouches < 2
-        }
+        // 滑选 pan 不与 collectionView 滚动/捏合同时识别（单指已由 minimumNumberOfTouches=2 分离）。
+        if gestureRecognizer === slideSelectPan || other === slideSelectPan { return false }
         return true
     }
 }
