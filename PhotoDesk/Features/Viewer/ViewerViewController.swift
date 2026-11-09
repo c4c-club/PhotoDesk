@@ -31,6 +31,10 @@ final class ViewerViewController: UIViewController {
     private let filmStrip = FilmStripView(frame: .zero)
     private let toast = DSToast(frame: .zero)
     private var topBarItems: [UIBarButtonItem] = []
+    /// chrome 单击手势（必须等 cell 双击失败后才识别，见 setupChrome 注释）
+    private let chromeTap = UITapGestureRecognizer()
+    /// 已注册 require(toFail:) 的 cell 双击手势（cell 复用去重）
+    private var tapRequireRegistered = Set<ObjectIdentifier>()
     /// ⋯ 菜单按钮（actionSheet popover 锚点）
     private var moreButtonItem: UIBarButtonItem?
     private var favoriteButton: UIBarButtonItem!
@@ -264,6 +268,7 @@ final class ViewerViewController: UIViewController {
         let pending = AppContainer.shared.reviewSession.pendingDeleteCount
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
                          "zoom=\(String(format: "%.2f", zoom)) dtap=\(cell?.diagnostics.doubleTapCount ?? -1) " +
+                         "dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1) " +
                          "load=\(inflightLoadCount) \(imgPart) " +
                          "frameW=\(String(format: "%.1f", frameWidth)) " +
                          "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0)")
@@ -307,13 +312,14 @@ final class ViewerViewController: UIViewController {
         moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
-        // 点击屏幕切换 chrome。M15 两次实锤：① 根视图占位双击会抢赢 cell 双击；② 即便删掉
-        // 占位双击，tap 识别成功后默认 cancelsTouchesInView=true 会取消触摸 → cell 双击
-        // 收不到第二击，缩放永不触发。tap 必须不取消触摸：双击时 chrome 切两次（无净变化），
-        // cell 的双击拿到完整两击正常缩放。
-        let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped(_:)))
-        tap.cancelsTouchesInView = false
-        view.addGestureRecognizer(tap)
+        // 点击屏幕切换 chrome。M15 三次实锤后定案：cell 双击被杀的根因是跨 view 互斥规则
+        // （任一方 delegate 拒绝并行即 fail）——chrome tap 第一击识别成功后 cell 双击被强制
+        // fail，删占位双击/cancelsTouchesInView=false 都救不了。教科书解法：chrome tap
+        // require(toFail:) cell 的双击（cellForItemAt 里逐 cell 注册）——单击等双击失败后才
+        // 识别，双击时 tap 永久 fail（chrome 不闪），cell 拿完整两击缩放。
+        chromeTap.addTarget(self, action: #selector(viewTapped(_:)))
+        chromeTap.cancelsTouchesInView = false
+        view.addGestureRecognizer(chromeTap)
         // 长按操作菜单（docs/09 D15）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(viewLongPressed(_:)))
         view.addGestureRecognizer(longPress)
@@ -325,6 +331,18 @@ final class ViewerViewController: UIViewController {
             topBar.heightAnchor.constraint(equalToConstant: 44),
         ])
         refreshChrome()
+    }
+
+    /// chrome 单击必须等该 cell 的双击失败后才识别（docs/09 D15 / setupChrome 注释）。
+    /// 每个 cell 的双击手势实例只注册一次（复用后 controller/handshake 不变）。
+    /// 【M15 暂缓启用】require 对"未跟踪触摸"的手势永不 fail → 多 cell 时单击会死等；
+    /// 先用 dtapIn 取证定位双击被杀的真实环节再决定启用面。
+    private func requireChromeTapToFailZoomDoubleTap(_ cell: ZoomableImageCell) {
+        let doubleTap = cell.zoomController.doubleTap
+        let key = ObjectIdentifier(doubleTap)
+        guard !tapRequireRegistered.contains(key) else { return }
+        tapRequireRegistered.insert(key)
+        chromeTap.require(toFail: doubleTap)
     }
 
     private func setupFilmStrip() {
