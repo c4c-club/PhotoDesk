@@ -98,13 +98,13 @@ final class PositionRestoreUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.2)
     }
 
-    private static func parseDoubleField(_ label: String, _ key: String) -> Double {
+    private static func parseDoubleField(_ label: String, _ key: String) -> Double? {
         let escaped = NSRegularExpression.escapedPattern(for: key)
         guard let regex = try? NSRegularExpression(pattern: "\(escaped)=(-?[0-9]+(?:\\.[0-9]+)?)", options: .caseInsensitive),
               let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
               match.numberOfRanges >= 2,
-              let range = Range(match.range(at: 1), in: label) else { return -1 }
-        return Double(label[range]) ?? -1
+              let range = Range(match.range(at: 1), in: label) else { return nil }
+        return Double(label[range])
     }
 
     private static func parseStringField(_ label: String, _ key: String) -> String? {
@@ -121,13 +121,13 @@ final class PositionRestoreUITests: XCTestCase {
         }
     }
 
-    /// Library-DebugSummary → (off, anchor, visualY)
-    private func debugSnapshot(_ app: XCUIApplication) -> (off: Double, anchor: String, visualY: Double)? {
+    /// Library-DebugSummary → (off, anchor, visualY)；off/visualY 允许负值（顶部回弹区 off=-44 合法）
+    private func debugSnapshot(_ app: XCUIApplication) -> (off: Double, anchor: String, visualY: Double?)? {
         let raw = rawSummary(app)
         guard !raw.isEmpty else { return nil }
         let off = Self.parseDoubleField(raw, "off")
         let visualY = Self.parseDoubleField(raw, "visualY")
-        guard off >= 0,
+        guard let off, off.isFinite,
               let anchor = Self.parseStringField(raw, "anchor"), !anchor.isEmpty else { return nil }
         return (off, anchor, visualY)
     }
@@ -141,9 +141,9 @@ final class PositionRestoreUITests: XCTestCase {
     /// 重启/回前台后的读取必须等恢复收敛：轮询直到连续两次读取一致（20s 上限）。
     /// 不硬性要求 raw 含 restore=（2023 视图等首启场景没有恢复，只有稳定快照）。
     private func debugSnapshotAfterRestore(_ app: XCUIApplication,
-                                           timeout: TimeInterval = 20) -> (off: Double, anchor: String, visualY: Double)? {
+                                           timeout: TimeInterval = 20) -> (off: Double, anchor: String, visualY: Double?)? {
         let deadline = Date().addingTimeInterval(timeout)
-        var stable: (off: Double, anchor: String, visualY: Double)?
+        var stable: (off: Double, anchor: String, visualY: Double?)?
         while Date() < deadline {
             if let snap = debugSnapshot(app) {
                 if let prev = stable, prev.anchor == snap.anchor, abs(prev.off - snap.off) <= 1.0 {
@@ -162,6 +162,8 @@ final class PositionRestoreUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    private func fmt(_ value: Double?) -> String { value.map { String($0) } ?? "nil" }
 
     private func swipeUpOnce(in collection: XCUIElement) {
         let start = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
@@ -199,6 +201,8 @@ final class PositionRestoreUITests: XCTestCase {
             guard let before = debugSnapshotAfterRestore(app) else {
                 return XCTFail("轮 \(round + 1)：Library-DebugSummary 必须暴露 off/anchor/visualY raw=\(rawSummary(app))")
             }
+            // 拖动结束的 saveNow 是减速中途值，静止补存在 +1.5s；terminate 前给足静止时间
+            Thread.sleep(forTimeInterval: 1.6)
             app.terminate()
             _ = launchToGrid(app)
             guard let after = debugSnapshotAfterRestore(app) else {
@@ -206,7 +210,7 @@ final class PositionRestoreUITests: XCTestCase {
             }
             guard after.anchor == before.anchor else {
                 return XCTFail("轮 \(round + 1)：冷启动锚点 assetID 必须一致（before=\(before.anchor) off=\(before.off) " +
-                               "visualY=\(before.visualY) after=\(after.anchor) off=\(after.off) visualY=\(after.visualY)）" +
+                               "visualY=\(fmt(before.visualY)) after=\(after.anchor) off=\(after.off) visualY=\(fmt(after.visualY))）" +
                                "raw=\(rawSummary(app))")
             }
             XCTAssertLessThanOrEqual(abs(after.off - before.off), 2.0,
@@ -231,6 +235,7 @@ final class PositionRestoreUITests: XCTestCase {
         guard let before = debugSnapshotAfterRestore(app) else {
             return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
         }
+        Thread.sleep(forTimeInterval: 1.6)   // 静止补存 +1.5s 落盘后再杀
         app.terminate()
         _ = launchToGrid(app)
         guard let after = debugSnapshotAfterRestore(app) else {
@@ -255,6 +260,7 @@ final class PositionRestoreUITests: XCTestCase {
         guard let before = debugSnapshotAfterRestore(app) else {
             return XCTFail("Library-DebugSummary 必须暴露 off/anchor/visualY")
         }
+        Thread.sleep(forTimeInterval: 1.6)   // 静止补存落盘，退后台读到的就是静止位置
         XCUIDevice.shared.press(XCUIDevice.Button.home)
         Thread.sleep(forTimeInterval: 1.0)
         app.activate()

@@ -71,6 +71,8 @@ final class LibraryViewController: UIViewController {
         let visualY: CGFloat
     }
     private var pendingHeadInsertAnchor: HeadInsertAnchor?
+    /// 减速静止补存（拖动结束且将减速时安排 +1.5s 重新抓快照保存）
+    private var restSaveWorkItem: DispatchWorkItem?
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
     var onOpenViewer: ((PhotoItem) -> Void)?
     /// 多选操作行「筛选」→ 打开筛选面板（docs/13 S06）
@@ -1724,6 +1726,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         positionCoordinator.saveNow(reason: "decelerating", snapshot: makePositionSnapshot())
+        cancelRestSave()
         #if DEBUG
         refreshDebugScrollNote()   // 取证摘要跟随真实滚动位置（UI 测试读 off/anchor）
         #endif
@@ -1732,9 +1735,27 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         // docs/22 §4.4.3：无论是否继续减速都保存一次（旧实现只在 !decelerate 保存，是漏洞）。
         positionCoordinator.saveNow(reason: "dragging", snapshot: makePositionSnapshot())
+        if decelerate {
+            // 减速结束回调与进程死亡存在竞速（M15 冷启动实锤：文件里留下减速中途快照）。
+            // 安排"静止补存"：触发时重新抓快照——长滑未静止时它是兜底，已静止时与
+            // decelerating 保存同值幂等；didEndDecelerating 到达时取消。
+            cancelRestSave()
+            let work = DispatchWorkItem { [weak self] in
+                self?.savePositionNow(reason: "rest")
+            }
+            restSaveWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+        } else {
+            cancelRestSave()
+        }
         #if DEBUG
         refreshDebugScrollNote()
         #endif
+    }
+
+    private func cancelRestSave() {
+        restSaveWorkItem?.cancel()
+        restSaveWorkItem = nil
     }
 
     func collectionView(_ collectionView: UICollectionView,

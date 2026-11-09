@@ -29,6 +29,10 @@ final class SlideSelectGestureController: NSObject {
     private var lastTargetIDs: Set<String> = []
     private var lastFingerWindowPoint: CGPoint = .zero
     private var autoScrollLink: CADisplayLink?
+    /// 本次手势的边缘滚动方向记忆（+1 下 / −1 上）：曾在边缘区才记录；
+    /// 手指静止 >0.25s 时 tick 据此以最小步速续滚（hold 阶段无 .changed 采样）。
+    private var holdScrollDirection: (direction: Int, elapsedBase: TimeInterval)?
+    private var lastChangedAt: TimeInterval = 0
     private let haptic = UISelectionFeedbackGenerator()
 
     /// VC 注入：是否处于多选模式（非选择模式 delegate 直接让位给滚动）。
@@ -94,6 +98,16 @@ final class SlideSelectGestureController: NSObject {
                 }
             }
             guard isDragSelecting else { return }
+            lastChangedAt = CACurrentMediaTime()
+            let v = edgeVelocity()
+            if v != 0 {
+                if holdScrollDirection == nil {
+                    holdScrollDirection = (v > 0 ? 1 : -1, CACurrentMediaTime())
+                } else if holdScrollDirection?.direction != (v > 0 ? 1 : -1) {
+                    // 反向离边：清记忆，回边缘区重新累积
+                    holdScrollDirection = nil
+                }
+            }
             processFinger(atWindowPoint: lastFingerWindowPoint)
         case .ended, .cancelled, .failed:
             finishSlideSelection()
@@ -162,7 +176,14 @@ final class SlideSelectGestureController: NSObject {
             invalidateAutoScroll()
             return
         }
-        let velocity = edgeVelocity()
+        var velocity = edgeVelocity()
+        if velocity == 0, let hold = holdScrollDirection,
+           CACurrentMediaTime() - hold.elapsedBase > 0.25 {
+            // 手指静止 >0.25s 且本次手势曾进入边缘区：按记忆方向以最小步速继续滚。
+            // 逐帧采样在 hold 阶段可能缺失/滞后（M15 CI 实锤 count 卡 6），方向记忆补上这个洞；
+            // 手指停在中途（从未进边缘区）时 holdScrollDirection 为 nil，绝不滚动。
+            velocity = Double(hold.direction) * SlideSelectConfig.minStep
+        }
         // 指尖不在边缘区：保持 tick 空转（不重建），hold 停进边缘区的下一帧即开始滚动
         guard velocity != 0 else { return }
         let minY = -Double(collectionView.adjustedContentInset.top)
@@ -209,6 +230,8 @@ final class SlideSelectGestureController: NSObject {
         baseIDs = []
         lastTargetIDs = []
         mode = .select
+        holdScrollDirection = nil
+        lastChangedAt = 0
         if let collectionView {
             DispatchQueue.main.async { [weak collectionView] in
                 collectionView?.allowsSelection = true

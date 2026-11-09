@@ -212,7 +212,9 @@ final class LibraryPositionRestoreTests: XCTestCase {
                                    sectionID: "2026-11",
                                    itemIndexInSection: 5,
                                    offsetRatio: 0,
-                                   contentHeight: 2_000,
+                                   // contentHeight 给极小值：本用例验证保存门禁语义，contentHeight
+                                   // 门禁（估算布局未收齐等待）在无布局 pass 的单测环境里必须直接放行
+                                   contentHeight: 10,
                                    viewportHeight: 844,
                                    savedAt: Date()),
                    queryKey: queryKey)
