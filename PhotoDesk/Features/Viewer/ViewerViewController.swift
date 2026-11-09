@@ -31,10 +31,8 @@ final class ViewerViewController: UIViewController {
     private let filmStrip = FilmStripView(frame: .zero)
     private let toast = DSToast(frame: .zero)
     private var topBarItems: [UIBarButtonItem] = []
-    /// chrome 单击手势（必须等 cell 双击失败后才识别，见 setupChrome 注释）
+    /// chrome 单击手势（不取消触摸：双击时切两次无净变化，cell 双击拿完整两击）
     private let chromeTap = UITapGestureRecognizer()
-    /// 已注册 require(toFail:) 的 cell 双击手势（cell 复用去重）
-    private var tapRequireRegistered = Set<ObjectIdentifier>()
     /// ⋯ 菜单按钮（actionSheet popover 锚点）
     private var moreButtonItem: UIBarButtonItem?
     private var favoriteButton: UIBarButtonItem!
@@ -331,18 +329,6 @@ final class ViewerViewController: UIViewController {
             topBar.heightAnchor.constraint(equalToConstant: 44),
         ])
         refreshChrome()
-    }
-
-    /// chrome 单击必须等该 cell 的双击失败后才识别（docs/09 D15 / setupChrome 注释）。
-    /// 每个 cell 的双击手势实例只注册一次（复用后 controller/handshake 不变）。
-    /// 【M15 暂缓启用】require 对"未跟踪触摸"的手势永不 fail → 多 cell 时单击会死等；
-    /// 先用 dtapIn 取证定位双击被杀的真实环节再决定启用面。
-    private func requireChromeTapToFailZoomDoubleTap(_ cell: ZoomableImageCell) {
-        let doubleTap = cell.zoomController.doubleTap
-        let key = ObjectIdentifier(doubleTap)
-        guard !tapRequireRegistered.contains(key) else { return }
-        tapRequireRegistered.insert(key)
-        chromeTap.require(toFail: doubleTap)
     }
 
     private func setupFilmStrip() {
