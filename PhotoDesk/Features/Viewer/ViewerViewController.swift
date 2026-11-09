@@ -306,10 +306,12 @@ final class ViewerViewController: UIViewController {
         moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
-        // 点击屏幕切换 chrome。M15 实锤：根视图上的占位双击手势（只为让单击等待双击失败）
-        // 会与 cell 的双击互斥竞争且抢占成功 → cell 缩放从未触发。删除占位双击：
-        // 双击缩放时 chrome 会切换两次（无净变化），cell 的双击从此唯一持有双击语义。
+        // 点击屏幕切换 chrome。M15 两次实锤：① 根视图占位双击会抢赢 cell 双击；② 即便删掉
+        // 占位双击，tap 识别成功后默认 cancelsTouchesInView=true 会取消触摸 → cell 双击
+        // 收不到第二击，缩放永不触发。tap 必须不取消触摸：双击时 chrome 切两次（无净变化），
+        // cell 的双击拿到完整两击正常缩放。
         let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped(_:)))
+        tap.cancelsTouchesInView = false
         view.addGestureRecognizer(tap)
         // 长按操作菜单（docs/09 D15）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(viewLongPressed(_:)))
