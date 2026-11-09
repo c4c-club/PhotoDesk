@@ -62,6 +62,8 @@ final class LibraryViewController: UIViewController {
     private var lastConfiguredPixelSize: CGSize = .zero
     /// 月跳落地复核：待核对的目标月（viewDidLayoutSubviews 按真实钉住线核对，未钉住再校正）
     private var pendingJumpVerifySectionID: String?
+    /// 月跳待存标记：落地点是估算布局，等 verifyJumpLanding 收敛后按真实几何保存
+    private var pendingJumpSave = false
     private var jumpVerifyAttempts = 0
 
     /// v5 前插补偿（docs/25 §5.7）：只记录锚点 assetID + 视觉 y；apply completion 登记一次补偿，
@@ -1427,8 +1429,10 @@ final class LibraryViewController: UIViewController {
         }
         isRestoringPosition = false
         indexBar.setHighlighted(index: index, notify: false)
-        // v4：月份跳转后走同一协调器保存（不允许 VC 直写 store）。
-        positionCoordinator.saveNow(reason: "monthJump", snapshot: makePositionSnapshot())
+        // v4：月份跳转后走同一协调器保存。M15 冷启动实锤：落地点的布局属性是估算值，
+        // 立即保存会把校正前的位置写进文件（下一次恢复差 520pt）。改为登记待存标记，
+        // 由 verifyJumpLanding 收敛（真实布局、钉住线复核通过）后保存。
+        pendingJumpSave = true
         if let section = currentSections[safe: index] {
             // M13 绿12 实锤：跳转存档正确后视口仍会被 UIKit 内部调整（pinned header 重排 /
             // 快照 apply 期间的位置保持）推离目标月（AX 与 idle 存档均显示漂移到别的月份）。
@@ -1439,6 +1443,13 @@ final class LibraryViewController: UIViewController {
         }
         showJumpBanner(section: currentSections[index])
         return true
+    }
+
+    /// 月跳待存的落盘出口：复核收敛（或放弃复核）后按当前真实几何保存一次。
+    private func flushPendingJumpSave(reason: String) {
+        guard pendingJumpSave else { return }
+        pendingJumpSave = false
+        positionCoordinator.saveNow(reason: reason, snapshot: makePositionSnapshot())
     }
 
     /// 月跳落地复核：钉住线上的 section 必须是目标月，否则按当前真实布局再校正
@@ -1452,6 +1463,7 @@ final class LibraryViewController: UIViewController {
         }
         if jumpVerifyAttempts >= 5 {
             pendingJumpVerifySectionID = nil
+            flushPendingJumpSave(reason: "jump-verify-give-up")
             ViewerTrace.log("position.jump-verify give-up target=\(targetID) attempts=5")
             return
         }
@@ -1468,6 +1480,10 @@ final class LibraryViewController: UIViewController {
             pendingJumpVerifySectionID = nil
             jumpVerifyAttempts = 0
             ViewerTrace.log("position.jump-verified section=\(targetID)")
+            flushPendingJumpSave(reason: "monthJump")
+            #if DEBUG
+            refreshDebugScrollNote()   // 校正后的真实位置要同步进取证摘要
+            #endif
             return
         }
         jumpVerifyAttempts += 1

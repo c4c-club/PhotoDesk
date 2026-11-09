@@ -233,7 +233,7 @@ final class MarqueeSelectionUITests: XCTestCase {
     func testAutoScrollMarquee() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.30, toX: 0.12, toY: 0.995, hold: 3.0)
+        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.40, toX: 0.12, toY: 0.995, hold: 2.0)
         let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
         XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须让屏幕外 cell 入集（count=\(count)）")
