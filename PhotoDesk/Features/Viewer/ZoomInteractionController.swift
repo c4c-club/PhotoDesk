@@ -243,9 +243,14 @@ extension ZoomInteractionController: UIGestureRecognizerDelegate {
     }
 
     /// 与外层翻页/上下滑手势互斥：捏合与放大平移期间绝不并行识别。
+    /// M15 dtap=0 实锤：UIKit 并行规则是"任一方 delegate 拒绝即互斥"——第一击 chrome tap
+    /// （view 层、无 require）识别成功后，本 delegate 一律 false 会把 cell 双击强制 fail，
+    /// 缩放从未触发。故仅对本 cell 的三个手势拒绝并行；对外部识别器放行——
+    /// 放大期间的翻页互斥由 isScrollEnabled 门禁（cell.syncInteraction）与 shouldBegin 承担。
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        false
+        if other === pinch || other === pan || other === doubleTap { return false }
+        return true
     }
 
     /// 放大平移时要求外层 pan 失败（cell pan 优先）。
