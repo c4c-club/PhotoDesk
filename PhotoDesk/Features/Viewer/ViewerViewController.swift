@@ -263,7 +263,8 @@ final class ViewerViewController: UIViewController {
         }
         let pending = AppContainer.shared.reviewSession.pendingDeleteCount
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", zoom)) load=\(inflightLoadCount) \(imgPart) " +
+                         "zoom=\(String(format: "%.2f", zoom)) dtap=\(cell?.diagnostics.doubleTapCount ?? -1) " +
+                         "load=\(inflightLoadCount) \(imgPart) " +
                          "frameW=\(String(format: "%.1f", frameWidth)) " +
                          "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0)")
     }

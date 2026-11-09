@@ -20,6 +20,8 @@ final class ZoomInteractionController: NSObject {
 
     /// 变换回调：cell 只做 imageView.transform / center 适配。
     var onTransformChanged: ((ZoomTransform) -> Void)?
+    /// 双击识别器回调进入（guard 通过后即计，取证用：区分手势未触达与触发了没缩放）。
+    var onDoubleTapObserved: (() -> Void)?
     /// 交互状态回调：VC 用来禁用翻页/上下滑动作。
     var onInteractionStateChanged: ((Bool) -> Void)?
     /// 手势回到 idle（含动画完成）后回调一次；VC 用于串行 drain 删除队列。
@@ -168,6 +170,7 @@ final class ZoomInteractionController: NSObject {
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard let viewport = viewportView, contentFitSize.width > 0,
               gesture.state == .ended, !isAnimating else { return }
+        onDoubleTapObserved?()
         let point = gesture.location(in: viewport)
         let target: ZoomTransform
         if transform.scale > 1.01 {

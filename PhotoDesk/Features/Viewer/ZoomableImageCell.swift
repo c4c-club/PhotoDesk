@@ -12,6 +12,8 @@ import PhotoDeskCore
 struct ZoomDiagnostics: Equatable {
     var currentScale: CGFloat = ZoomableImageCell.minZoomScale
     var zoomEndCount: Int = 0
+    /// 双击识别器回调进入次数（M15 取证：区分"手势没收到触摸"与"触发了但没缩放"）
+    var doubleTapCount: Int = 0
     var lastActivity: TimeInterval = 0
 }
 
@@ -116,6 +118,9 @@ final class ZoomableImageCell: UICollectionViewCell {
 
         zoomController.onTransformChanged = { [weak self] t in
             self?.applyTransform(t)
+        }
+        zoomController.onDoubleTapObserved = { [weak self] in
+            self?.diagnostics.doubleTapCount += 1
         }
         zoomController.onInteractionStateChanged = { [weak self] interacting in
             self?.syncInteraction?(interacting)
