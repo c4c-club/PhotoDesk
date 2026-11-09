@@ -1327,7 +1327,8 @@ final class LibraryViewController: UIViewController {
             // 恢复是权威定位：恢复 settle 时丢弃恢复期间登记（或登记后未消费）的前插补偿，
             // 否则旧 visualY 会在恢复后把精确恢复的位置拖走（M15 冷启动 −520pt 实锤）。
             pendingHeadInsertAnchor = nil
-            viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)"
+            viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)" +
+                (positionCoordinator.lastRestoreDiagnostics.isEmpty ? "" : " | \(positionCoordinator.lastRestoreDiagnostics)")
             refreshDebugScrollNote()
         case .idle:
             break

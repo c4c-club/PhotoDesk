@@ -51,9 +51,12 @@ final class LibraryPositionCoordinator {
     private var pendingSave: DispatchWorkItem?
     private var lastRestoredQueryKey: String?
     private var targetOffsetY: Double = 0
+    private var contentWaitAttempts = 0
 
     /// 最近一次恢复采用的策略（asset / section / ratio / none），供调试汇总。
     private(set) var lastStrategy: PositionRestoreStrategy = .none
+    /// 最近一次恢复/等待的诊断串（目标值/钳制值/保存与当前 contentHeight/尝试次数），供 UI 取证。
+    private(set) var lastRestoreDiagnostics = ""
     /// 阶段变化回调（VC 用于遮罩开关；不参与几何写入）。
     var onPhaseChange: ((PositionRestorePhaseV5) -> Void)?
 
@@ -119,6 +122,7 @@ final class LibraryPositionCoordinator {
         guard queryKey != lastRestoredQueryKey else { return }
         lastRestoredQueryKey = queryKey
         cancelPendingSaves()
+        contentWaitAttempts = 0
         pendingAnchor = store.isEnabled ? store.load(queryKey: queryKey) : nil
         let phase = machine.begin(hasAnchor: pendingAnchor != nil)
         if pendingAnchor == nil {
@@ -147,9 +151,24 @@ final class LibraryPositionCoordinator {
             return
         }
         let assetInData = context.anchorInData(anchor.anchorAssetID)
+        // contentHeight 门禁：估算布局未收齐时 anchorMinY 是估算值，落地必漂（M15 冷启动 −520pt 实锤）。
+        // 有界等待：30 个布局 pass 后放行（钳制兜底），避免极端情况下永久等待。
+        let savedContentHeight = anchor.contentHeight
+        if contentWaitAttempts < 30, savedContentHeight > 0,
+           context.contentHeight + 2 < savedContentHeight {
+            contentWaitAttempts += 1
+            lastRestoreDiagnostics = "wait ch cur=\(Int(context.contentHeight)) saved=\(Int(savedContentHeight)) n=\(contentWaitAttempts)"
+            let phase = machine.dataAvailable(anchorPresent: assetInData,
+                                              indexComplete: context.isIndexComplete,
+                                              boundsReady: context.bounds.width > 0 && context.bounds.height > 0,
+                                              contentHeightReady: false)
+            onPhaseChange?(phase)
+            return
+        }
         let phase = machine.dataAvailable(anchorPresent: assetInData,
                                           indexComplete: context.isIndexComplete,
-                                          boundsReady: context.bounds.width > 0 && context.bounds.height > 0)
+                                          boundsReady: context.bounds.width > 0 && context.bounds.height > 0,
+                                          contentHeightReady: true)
         onPhaseChange?(phase)
         switch phase {
         case .applying:
@@ -173,6 +192,8 @@ final class LibraryPositionCoordinator {
                                                                   adjustedTop: context.adjustedTop,
                                                                   bottomInset: context.bottomInset)
         lastStrategy = .asset
+        lastRestoreDiagnostics = "asset minY=\(Int(minY)) target=\(Int(target)) clamped=\(Int(targetOffsetY)) " +
+            "savedCH=\(Int(anchor.contentHeight)) curCH=\(Int(context.contentHeight)) att=\(machine.attempts)"
         machine.applied()
         context.applyOffset(targetOffsetY)
         onPhaseChange?(machine.phase)
@@ -198,6 +219,8 @@ final class LibraryPositionCoordinator {
             return
         }
         targetOffsetY = resolved.offsetY
+        lastRestoreDiagnostics = "\(resolved.strategy.rawValue) offset=\(Int(resolved.offsetY)) " +
+            "savedCH=\(Int(anchor.contentHeight)) curCH=\(Int(context.contentHeight))"
         machine.applied()
         context.applyOffset(resolved.offsetY)
         onPhaseChange?(machine.phase)
@@ -218,8 +241,8 @@ final class LibraryPositionCoordinator {
         let ok = offsetOK && visualOK
         let phase = machine.verified(ok: ok)
         onPhaseChange?(phase)
-        ViewerTrace.log("position.restore.v5 verify actual=\(Int(actual)) target=\(Int(targetOffsetY)) " +
-                        "visualY=\(Int(anchor.anchorVisualY)) ok=\(ok) attempts=\(machine.attempts)")
+        lastRestoreDiagnostics += " verify actual=\(Int(actual)) target=\(Int(targetOffsetY)) " +
+            "visualY=\(Int(anchor.anchorVisualY)) ok=\(ok) att=\(machine.attempts)"
         switch phase {
         case .settled:
             finish(reason: machine.attempts > 0 ? "verify-failed" : lastStrategy.rawValue)

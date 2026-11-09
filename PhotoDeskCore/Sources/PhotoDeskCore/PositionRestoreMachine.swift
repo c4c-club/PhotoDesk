@@ -47,18 +47,23 @@ public struct PositionRestoreMachineV5: Equatable, Sendable {
 
     /// 快照/布局/索引状态推进（只在 in-flight 时有意义）：
     /// - bounds 未就绪 → 保持 restoring；
+    /// - 锚点在数据但 contentHeight 未达保存值（估算布局未收齐）→ 保持 restoring（等布局稳定）；
     /// - 锚点在数据 → applying；
     /// - 锚点缺失 + 索引未完成 → 保持 restoring（等待全量索引，不失败）；
     /// - 锚点缺失 + 索引完成 → fallback（section/ratio）。
     @discardableResult
     public mutating func dataAvailable(anchorPresent: Bool,
                                        indexComplete: Bool,
-                                       boundsReady: Bool) -> PositionRestorePhaseV5 {
+                                       boundsReady: Bool,
+                                       contentHeightReady: Bool = true) -> PositionRestorePhaseV5 {
         guard isInFlight else { return phase }
         if !boundsReady {
             phase = .restoring
-        } else if anchorPresent {
+        } else if anchorPresent, contentHeightReady {
             phase = .applying
+        } else if anchorPresent {
+            // 布局高度未收齐：此时读 minY 会拿估算值，落地必漂——等下一个布局 pass 再试
+            phase = .restoring
         } else if !indexComplete {
             phase = .restoring
         } else {

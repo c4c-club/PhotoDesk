@@ -197,15 +197,18 @@ final class PositionRestoreUITests: XCTestCase {
             }
             Thread.sleep(forTimeInterval: 0.5)
             guard let before = debugSnapshotAfterRestore(app) else {
-                return XCTFail("轮 \(round + 1)：Library-DebugSummary 必须暴露 off/anchor/visualY")
+                return XCTFail("轮 \(round + 1)：Library-DebugSummary 必须暴露 off/anchor/visualY raw=\(rawSummary(app))")
             }
             app.terminate()
             _ = launchToGrid(app)
             guard let after = debugSnapshotAfterRestore(app) else {
-                return XCTFail("轮 \(round + 1)：重启后必须能读取位置快照")
+                return XCTFail("轮 \(round + 1)：重启后必须能读取位置快照 raw=\(rawSummary(app))")
             }
-            XCTAssertEqual(after.anchor, before.anchor,
-                           "轮 \(round + 1)：冷启动锚点 assetID 必须一致（before=\(before.anchor) off=\(before.off) visualY=\(before.visualY) after=\(after.anchor) off=\(after.off) visualY=\(after.visualY)）")
+            guard after.anchor == before.anchor else {
+                return XCTFail("轮 \(round + 1)：冷启动锚点 assetID 必须一致（before=\(before.anchor) off=\(before.off) " +
+                               "visualY=\(before.visualY) after=\(after.anchor) off=\(after.off) visualY=\(after.visualY)）" +
+                               "raw=\(rawSummary(app))")
+            }
             XCTAssertLessThanOrEqual(abs(after.off - before.off), 2.0,
                                      "轮 \(round + 1)：冷启动像素 offset 差必须 ≤ 2pt（before=\(before.off) after=\(after.off)）")
             assertAlive(app, "轮 \(round + 1) 冷启动恢复后")
@@ -315,7 +318,7 @@ final class PositionRestoreUITests: XCTestCase {
         XCTAssertTrue(waitTopHeaderContains(app, "2023", timeout: 10),
                       "筛选 2023 后顶部应为 2023（顶部：\(topHeaderText(app))）")
         guard let snapshot2023 = debugSnapshotAfterRestore(app) else {
-            return XCTFail("2023 视图必须能读取位置快照")
+            return XCTFail("2023 视图必须能读取位置快照 raw=\(rawSummary(app))")
         }
         // 2023 scope 首次打开从未保存过位置 → 必须从顶部开始；绝不能带进 2024 的锚点/offset
         XCTAssertLessThanOrEqual(snapshot2023.off, 2.0,
