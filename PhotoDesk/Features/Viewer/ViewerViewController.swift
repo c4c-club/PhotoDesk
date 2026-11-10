@@ -270,7 +270,7 @@ final class ViewerViewController: UIViewController {
         fields.append("idx=\(index)")
         fields.append(idPart)
         fields.append("zoom=\(String(format: "%.2f", zoom))")
-        fields.append("ges=\(cell.map { $0.test_areGesturesEnabled ? 1 : 0 } ?? -1)")
+        fields.append("ges=\(cell.map { $0.test_zoomController.test_areGesturesEnabled ? 1 : 0 } ?? -1)")
         fields.append("dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1)")
         fields.append("sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1)")
         fields.append("load=\(inflightLoadCount)")
