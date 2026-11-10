@@ -264,12 +264,21 @@ final class ViewerViewController: UIViewController {
                 || $0.localizedCaseInsensitiveContains("非有限")
         }
         let pending = AppContainer.shared.reviewSession.pendingDeleteCount
-        updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", zoom)) ges=\(cell.map { $0.test_areGesturesEnabled ? 1 : 0 } ?? -1) " +
-                         "dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1) sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1) " +
-                         "load=\(inflightLoadCount) \(imgPart) " +
-                         "frameW=\(String(format: "%.1f", frameWidth)) " +
-                         "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0)")
+        // 字段拆开拼接：长插值表达式类型检查超时（M15 实锤）
+        var fields: [String] = []
+        fields.append("items=\(viewModel.items.count)")
+        fields.append("idx=\(index)")
+        fields.append(idPart)
+        fields.append("zoom=\(String(format: "%.2f", zoom))")
+        fields.append("ges=\(cell.map { $0.test_areGesturesEnabled ? 1 : 0 } ?? -1)")
+        fields.append("dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1)")
+        fields.append("sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1)")
+        fields.append("load=\(inflightLoadCount)")
+        fields.append(imgPart)
+        fields.append("frameW=\(String(format: "%.1f", frameWidth))")
+        fields.append("pendingDeleteCount=\(pending)")
+        fields.append("traceNonFinite=\(nonFinite ? 1 : 0)")
+        updateDebugLabel(fields.joined(separator: " "))
     }
 
     /// 单元测试布局断言锚点（A4：itemSize 刷新；Release 不编译）
