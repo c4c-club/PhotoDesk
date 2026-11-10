@@ -258,11 +258,6 @@ extension ZoomInteractionController: UIGestureRecognizerDelegate {
         return result
     }
 
-    /// 双击 action 进入次数（任意 state；M15 取证 dtapIn）
-    private(set) var doubleTapEnterCount = 0
-    /// shouldBegin 被问双击的次数（M15 取证 sb）
-    private(set) var shouldBeginDoubleTapCount = 0
-
     /// 与外层翻页/上下滑手势互斥：捏合与放大平移期间绝不并行识别。
     /// M15 dtap=0 实锤：UIKit 并行规则是"任一方 delegate 拒绝即互斥"——第一击 chrome tap
     /// （view 层、无 require）识别成功后，本 delegate 一律 false 会把 cell 双击强制 fail，
