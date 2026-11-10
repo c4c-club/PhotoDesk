@@ -174,6 +174,14 @@ final class ZoomableImageCell: UICollectionViewCell {
     /// VC 挂载的交互状态回调（缩放交互期间禁用翻页/滚动；结束恢复）
     var syncInteraction: ((Bool) -> Void)?
 
+    /// 单击（双击失败后）落在视口：查看器 chrome 切换/视频播放切换的唯一入口。
+    /// 挂在 cell 视口上（与双击同 view，require(toFail:) 教科书序）——根 view 层 tap
+    /// 会经跨 view 互斥规则把 cell 双击强制 fail（M15 三轮实锤 dtapIn=0）。
+    var onSingleTapInViewport: (() -> Void)? {
+        get { zoomController.onSingleTap }
+        set { zoomController.onSingleTap = newValue }
+    }
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) 未使用")
     }

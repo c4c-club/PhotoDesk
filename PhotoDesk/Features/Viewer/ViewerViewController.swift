@@ -31,8 +31,6 @@ final class ViewerViewController: UIViewController {
     private let filmStrip = FilmStripView(frame: .zero)
     private let toast = DSToast(frame: .zero)
     private var topBarItems: [UIBarButtonItem] = []
-    /// chrome 单击手势（不取消触摸：双击时切两次无净变化，cell 双击拿完整两击）
-    private let chromeTap = UITapGestureRecognizer()
     /// ⋯ 菜单按钮（actionSheet popover 锚点）
     private var moreButtonItem: UIBarButtonItem?
     private var favoriteButton: UIBarButtonItem!
@@ -319,14 +317,9 @@ final class ViewerViewController: UIViewController {
         moreButtonItem = more
         topBar.setItems(topBarItems, animated: false)
 
-        // 点击屏幕切换 chrome。M15 三次实锤后定案：cell 双击被杀的根因是跨 view 互斥规则
-        // （任一方 delegate 拒绝并行即 fail）——chrome tap 第一击识别成功后 cell 双击被强制
-        // fail，删占位双击/cancelsTouchesInView=false 都救不了。教科书解法：chrome tap
-        // require(toFail:) cell 的双击（cellForItemAt 里逐 cell 注册）——单击等双击失败后才
-        // 识别，双击时 tap 永久 fail（chrome 不闪），cell 拿完整两击缩放。
-        chromeTap.addTarget(self, action: #selector(viewTapped(_:)))
-        chromeTap.cancelsTouchesInView = false
-        view.addGestureRecognizer(chromeTap)
+        // 点击屏幕切换 chrome——入口在 cell 视口的单击手势（ZoomInteractionController.tap，
+        // 与双击同 view require(toFail:) 教科书序）。根 view 层 tap 经跨 view 互斥规则
+        // 会在第一击识别成功时强制 fail cell 双击（M15 三轮实锤 dtapIn=0），故此处不挂任何 tap。
         // 长按操作菜单（docs/09 D15）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(viewLongPressed(_:)))
         view.addGestureRecognizer(longPress)
@@ -527,6 +520,10 @@ final class ViewerViewController: UIViewController {
             Task { @MainActor in
                 self?.schedulePendingRemovalDrain()
             }
+        }
+        // chrome 切换唯一入口：cell 视口单击（与双击同 view require(toFail:)，跨 view 互斥不伤双击）
+        cell.onSingleTapInViewport = { [weak self, weak cell] in
+            self?.handleViewportSingleTap(inCell: cell)
         }
         // 缩放交互期间禁用翻页滚动；交互结束且已回 1× 时恢复（放大静止态仍保持禁用）
         cell.syncInteraction = { [weak self] interacting in
@@ -735,12 +732,11 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - Chrome（3 秒无操作淡出，docs/04 §3.2）
 
-    @objc private func viewTapped(_ gesture: UITapGestureRecognizer) {
+    /// cell 视口单击（ZoomInteractionController.tap，双击失败后触发）：视频播放切换 / chrome 切换
+    private func handleViewportSingleTap(inCell cell: ZoomableImageCell?) {
         // 视频点击暂停/继续（docs/09 D15）：点在视频 cell 上时切换播放，不切换 chrome
-        let point = gesture.location(in: view)
-        if let indexPath = collectionView.indexPathForItem(at: collectionView.convert(point, from: view)),
-           let cell = collectionView.cellForItem(at: indexPath) as? VideoCell {
-            cell.togglePlayback()
+        if let videoCell = cell as? VideoCell {
+            videoCell.togglePlayback()
             return
         }
         setChrome(visible: !chromeVisible)
@@ -1100,9 +1096,13 @@ extension ViewerViewController: UICollectionViewDataSource, UICollectionViewDele
         }
         let item = viewModel.items[indexPath.item]
         if item.mediaType == .video {
-            // 视频资产在 willDisplay 拉取并起播（离屏停止）
-            return collectionView.dequeueReusableCell(withReuseIdentifier: VideoCell.reuseID,
-                                                      for: indexPath)
+            // 视频资产在 willDisplay 拉取并起播（离屏停止）；单击=播放切换（cell 级手势）
+            let videoCell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoCell.reuseID,
+                                                               for: indexPath)
+            (videoCell as? VideoCell)?.onSingleTap = { [weak self, weak videoCell] in
+                self?.handleViewportSingleTap(inCell: videoCell)
+            }
+            return videoCell
         }
 
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ZoomableImageCell.reuseID,

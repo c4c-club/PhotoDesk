@@ -28,6 +28,8 @@ final class ZoomInteractionController: NSObject {
     private(set) var doubleTapEnterCount = 0
     /// shouldBegin 被问双击次数
     private(set) var shouldBeginDoubleTapCount = 0
+    /// 单击（双击失败后）落在视口：chrome 切换/视频播放的唯一入口（同 view require，无跨 view 互斥）。
+    var onSingleTap: (() -> Void)?
     /// 交互状态回调：VC 用来禁用翻页/上下滑动作。
     var onInteractionStateChanged: ((Bool) -> Void)?
     /// 手势回到 idle（含动画完成）后回调一次；VC 用于串行 drain 删除队列。
@@ -49,6 +51,10 @@ final class ZoomInteractionController: NSObject {
     let pinch = UIPinchGestureRecognizer()
     let pan = UIPanGestureRecognizer()
     let doubleTap = UITapGestureRecognizer()
+    /// 单击（chrome 切换）：与双击同 view，require(toFail:) 教科书序——双击成功则单击 fail（chrome 不闪），
+    /// 双击被禁（无图）时依赖视为 vacuous，单击立即可用。chromeTap 不能挂在查看器根 view 上：
+    /// 跨 view 互斥规则（任一 delegate 拒绝并行）会在根 tap 识别成功时强制 fail cell 双击（M15 三轮实锤）。
+    let tap = UITapGestureRecognizer()
 
     /// 供 ViewerGesturePolicy / UI 测试观察
     var isInteracting: Bool { phase != .idle }
@@ -67,9 +73,14 @@ final class ZoomInteractionController: NSObject {
         configure(doubleTap)
         doubleTap.numberOfTapsRequired = 2
         doubleTap.addTarget(self, action: #selector(handleDoubleTap(_:)))
+        configure(tap)
+        tap.isEnabled = true   // chrome 切换不依赖图片就绪（其余手势按 ready 门禁）
+        tap.require(toFail: doubleTap)
+        tap.addTarget(self, action: #selector(handleTap(_:)))
         viewportView.addGestureRecognizer(pinch)
         viewportView.addGestureRecognizer(pan)
         viewportView.addGestureRecognizer(doubleTap)
+        viewportView.addGestureRecognizer(tap)
     }
 
     private func configure(_ gesture: UIGestureRecognizer) {
@@ -193,6 +204,11 @@ final class ZoomInteractionController: NSObject {
         animate(to: target)
     }
 
+    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        onSingleTap?()
+    }
+
     // MARK: - 状态机
 
     private func begin(_ newPhase: Phase) {
@@ -241,6 +257,7 @@ final class ZoomInteractionController: NSObject {
 
 extension ZoomInteractionController: UIGestureRecognizerDelegate {
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === tap { return true }   // chrome 切换不依赖图片就绪（tap 不走 ready 门禁）
         let result: Bool
         guard gesturesEnabled, contentFitSize.width > 0, contentFitSize.height > 0,
               let viewport = viewportView,

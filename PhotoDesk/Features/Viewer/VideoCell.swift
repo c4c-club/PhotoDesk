@@ -16,6 +16,10 @@ final class VideoCell: UICollectionViewCell {
     private(set) var itemID: String?
     /// 点击暂停/继续（docs/09 D15）
     private(set) var isPaused = false
+    /// 单击回调（chrome 切换的唯一入口已移至 cell 级手势：根 view 层 tap 会经跨 view
+    /// 互斥规则强制 fail 图片 cell 的双击，M15 实锤）。视频 cell 自持单击手势。
+    var onSingleTap: (() -> Void)?
+    private let tapGesture = UITapGestureRecognizer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -30,6 +34,14 @@ final class VideoCell: UICollectionViewCell {
             activityIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
         ])
+        tapGesture.cancelsTouchesInView = false
+        tapGesture.addTarget(self, action: #selector(handleTap(_:)))
+        contentView.addGestureRecognizer(tapGesture)
+    }
+
+    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        onSingleTap?()
     }
 
     required init?(coder: NSCoder) {
