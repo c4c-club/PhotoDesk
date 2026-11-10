@@ -35,6 +35,12 @@ final class ZoomableImageCell: UICollectionViewCell {
         view.maximumZoomScale = 1
         view.translatesAutoresizingMaskIntoConstraints = false
         view.accessibilityIdentifier = "Viewer-ZoomScrollView"
+        // XCUI 合成手势打 AX activation point：UIScrollView 默认非 AX 元素时打点不可预测
+        // （M15 dtapIn=0 实锤，双击从未落进视口）。声明为 AX 元素并把激活点钉在中心，
+        // UI 测试的 doubleTap/pinch 与 AX 用户都获得可预测的命中点。
+        view.isAccessibilityElement = true
+        view.accessibilityLabel = "照片视口，双击缩放，捏合放大"
+        view.accessibilityTraits = .image
         return view
     }()
     /// 显示载体：bounds = aspectFit 尺寸，center/transform 由变换回调写
@@ -219,6 +225,9 @@ final class ZoomableImageCell: UICollectionViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         relayoutForViewportChange()
+        // AX 激活点跟随视口中心（bounds 变化后保持可预测）
+        viewportScrollView.accessibilityActivationPoint = CGPoint(x: viewportScrollView.bounds.midX,
+                                                                  y: viewportScrollView.bounds.midY)
         let center = CGPoint(x: downloadButton.bounds.midX, y: downloadButton.bounds.midY)
         progressLayer.frame = downloadButton.bounds
         progressLayer.path = UIBezierPath(arcCenter: center, radius: 17,
