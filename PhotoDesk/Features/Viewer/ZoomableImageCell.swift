@@ -12,10 +12,10 @@ import PhotoDeskCore
 struct ZoomDiagnostics: Equatable {
     var currentScale: CGFloat = ZoomableImageCell.minZoomScale
     var zoomEndCount: Int = 0
-    /// 双击识别器 guard 通过次数（缩放真正触发的入口）
-    var doubleTapCount: Int = 0
-    /// 双击识别器 action 任意 state 进入次数（>doubleTapCount ⇒ 手势被识别系统 fail）
+    /// 双击识别器 action 任意 state 进入次数（dtapIn）
     var doubleTapEnterCount: Int = 0
+    /// shouldBegin 被问双击次数（sb）
+    var shouldBeginDoubleTapCount: Int = 0
     var lastActivity: TimeInterval = 0
 }
 
@@ -121,11 +121,11 @@ final class ZoomableImageCell: UICollectionViewCell {
         zoomController.onTransformChanged = { [weak self] t in
             self?.applyTransform(t)
         }
-        zoomController.onDoubleTapObserved = { [weak self] in
-            self?.diagnostics.doubleTapCount += 1
-        }
         zoomController.onDoubleTapEntered = { [weak self] in
             self?.diagnostics.doubleTapEnterCount += 1
+        }
+        zoomController.onShouldBeginDoubleTap = { [weak self] _ in
+            self?.diagnostics.shouldBeginDoubleTapCount += 1
         }
         zoomController.onInteractionStateChanged = { [weak self] interacting in
             self?.syncInteraction?(interacting)

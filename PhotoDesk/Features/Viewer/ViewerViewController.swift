@@ -265,8 +265,8 @@ final class ViewerViewController: UIViewController {
         }
         let pending = AppContainer.shared.reviewSession.pendingDeleteCount
         updateDebugLabel("items=\(viewModel.items.count) idx=\(index) \(idPart) " +
-                         "zoom=\(String(format: "%.2f", zoom)) dtap=\(cell?.diagnostics.doubleTapCount ?? -1) " +
-                         "dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1) " +
+                         "zoom=\(String(format: "%.2f", zoom)) ges=\(cell.map { $0.test_areGesturesEnabled ? 1 : 0 } ?? -1) " +
+                         "dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1) sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1) " +
                          "load=\(inflightLoadCount) \(imgPart) " +
                          "frameW=\(String(format: "%.1f", frameWidth)) " +
                          "pendingDeleteCount=\(pending) traceNonFinite=\(nonFinite ? 1 : 0)")

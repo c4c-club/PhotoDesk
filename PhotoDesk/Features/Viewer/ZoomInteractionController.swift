@@ -20,11 +20,14 @@ final class ZoomInteractionController: NSObject {
 
     /// 变换回调：cell 只做 imageView.transform / center 适配。
     var onTransformChanged: ((ZoomTransform) -> Void)?
-    /// 双击识别器回调进入（guard 通过后即计，取证用：区分手势未触达与触发了没缩放）。
-    var onDoubleTapObserved: (() -> Void)?
-    /// 双击识别器 action 以任意 state 进入（含 .failed），取证用。
+    /// 双击识别器 action 以任意 state 进入（含 .failed），取证用（dtapIn）。
     var onDoubleTapEntered: (() -> Void)?
-    private var doubleTapEnterCount = 0
+    /// shouldBegin 被问双击（取证 sb/sbr：区分"没收到触摸"与"shouldBegin 拒绝"）。
+    var onShouldBeginDoubleTap: ((_ result: Bool) -> Void)?
+    /// 双击 action 进入次数（任意 state）
+    private(set) var doubleTapEnterCount = 0
+    /// shouldBegin 被问双击次数
+    private(set) var shouldBeginDoubleTapCount = 0
     /// 交互状态回调：VC 用来禁用翻页/上下滑动作。
     var onInteractionStateChanged: ((Bool) -> Void)?
     /// 手势回到 idle（含动画完成）后回调一次；VC 用于串行 drain 删除队列。
@@ -171,13 +174,11 @@ final class ZoomInteractionController: NSObject {
     }
 
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        // 取证：任何 state 进入都计（.failed/.cancelled 也会调 action）——
-        // dtap 只在 guard 过后计，dtapIn=dtap 且 dtap=0 ⇒ 手势被识别系统 fail
+        // 取证：任何 state 进入都计（.failed/.cancelled 也会调 action）
         doubleTapEnterCount += 1
         onDoubleTapEntered?()
         guard let viewport = viewportView, contentFitSize.width > 0,
               gesture.state == .ended, !isAnimating else { return }
-        onDoubleTapObserved?()
         let point = gesture.location(in: viewport)
         let target: ZoomTransform
         if transform.scale > 1.01 {
@@ -240,14 +241,27 @@ final class ZoomInteractionController: NSObject {
 
 extension ZoomInteractionController: UIGestureRecognizerDelegate {
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        let result: Bool
         guard gesturesEnabled, contentFitSize.width > 0, contentFitSize.height > 0,
               let viewport = viewportView,
-              viewport.bounds.width > 0, viewport.bounds.height > 0 else { return false }
-        if gestureRecognizer === pan {
-            return transform.scale > 1.01
+              viewport.bounds.width > 0, viewport.bounds.height > 0 else {
+            result = false
+            if gestureRecognizer === doubleTap { shouldBeginDoubleTapCount += 1; onShouldBeginDoubleTap?(false) }
+            return result
         }
-        return true
+        if gestureRecognizer === pan {
+            result = transform.scale > 1.01
+        } else {
+            result = true
+        }
+        if gestureRecognizer === doubleTap { shouldBeginDoubleTapCount += 1; onShouldBeginDoubleTap?(result) }
+        return result
     }
+
+    /// 双击 action 进入次数（任意 state；M15 取证 dtapIn）
+    private(set) var doubleTapEnterCount = 0
+    /// shouldBegin 被问双击的次数（M15 取证 sb）
+    private(set) var shouldBeginDoubleTapCount = 0
 
     /// 与外层翻页/上下滑手势互斥：捏合与放大平移期间绝不并行识别。
     /// M15 dtap=0 实锤：UIKit 并行规则是"任一方 delegate 拒绝即互斥"——第一击 chrome tap
