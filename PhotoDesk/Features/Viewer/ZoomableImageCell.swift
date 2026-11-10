@@ -81,6 +81,21 @@ final class ZoomableImageCell: UICollectionViewCell {
 
     /// 纯值诊断；手势回调内只更新数字。
     private(set) var diagnostics = ZoomDiagnostics()
+    #if DEBUG
+    /// UI 取证探针：任何落在 cell 上的单击（含被 chrome/双击链吃掉的）都计数。
+    /// probe>0 而 dtapIn=0 → 触摸到达 cell 但双击识别器没收到（配置/互斥问题）；
+    /// probe=0 → 触摸根本没到 cell（测试打点/hit-test 问题）。
+    private(set) var probeTapCount = 0
+    private lazy var probeTap: UITapGestureRecognizer = {
+        let g = UITapGestureRecognizer(target: self, action: #selector(handleProbeTap(_:)))
+        g.cancelsTouchesInView = false
+        g.delegate = self  // 与一切并行；只为计数
+        return g
+    }()
+    @objc private func handleProbeTap(_ g: UITapGestureRecognizer) {
+        if g.state == .ended { probeTapCount += 1 }
+    }
+    #endif
     /// 当前内容 aspectFit 尺寸（layoutSubviews 维护；与 policy 的 contentWidth/Height 一致）
     private var currentFitSize: CGSize = .zero
     private var lastViewportSize: CGSize = .zero
@@ -114,6 +129,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         progressLayer.lineCap = .round
         progressLayer.isHidden = true
         downloadButton.layer.addSublayer(progressLayer)
+
+        #if DEBUG
+        contentView.addGestureRecognizer(probeTap)   // UI 取证探针（与一切并行）
+        #endif
 
         downloadButton.addAction(UIAction { [weak self] _ in
             if let retry = self?.onRetryRequested {
@@ -413,6 +432,14 @@ final class ZoomableImageCell: UICollectionViewCell {
 }
 
 #if DEBUG
+// 取证探针：与一切手势并行，绝不拦截
+extension ZoomableImageCell: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                                  shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+}
+
 // 单元测试锚点（Release 不编译）
 extension ZoomableImageCell {
     var test_scrollView: UIScrollView { viewportScrollView }

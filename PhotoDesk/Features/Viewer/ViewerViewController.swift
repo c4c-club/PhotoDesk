@@ -271,6 +271,7 @@ final class ViewerViewController: UIViewController {
         fields.append("ges=\(cell.map { $0.test_zoomController.test_areGesturesEnabled ? 1 : 0 } ?? -1)")
         fields.append("dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1)")
         fields.append("sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1)")
+        fields.append("probe=\(cell?.probeTapCount ?? -1)")
         fields.append("load=\(inflightLoadCount)")
         fields.append(imgPart)
         fields.append("frameW=\(String(format: "%.1f", frameWidth))")

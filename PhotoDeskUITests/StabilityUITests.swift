@@ -616,9 +616,10 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
         // 矩形语义：单次长按拖动顶住下缘 → 自动滚动逐帧重算，startPoint 固定在 content 坐标，
         // 矩形随之拉长，屏幕外 cell 持续入集（反复起手会因锚点已选触发取消模式，故只拖一次）。
-        // hold 3.0：边缘速度按入边深度比例，2.0s 在全量套件上下文里余量不足（6<8 实锤）。
+        // toY 0.90：落在边缘区（bottomLimit 750..810，60pt 缓冲）内且避开主屏幕指示条吞触区；
+        // 0.995 实测只加 2 行（844×0.995=840 在指示条区，尾采样不进有效边缘区，count 6<8 实锤）。
         slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.40,
-                           toX: 0.12, toY: 0.995, hold: 3.0)
+                           toX: 0.12, toY: 0.90, hold: 3.0)
         let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
         XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")
@@ -706,12 +707,13 @@ final class StabilityUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 6), 6,
                                     "滑选应连续选中至少 6 格")
         // 选择模式下的复用驱动器是框选自动滚动本身（MonthIndexBar 在多选态 isHidden，
-        // 单指 swipe 是框选手势）：第一段拖动选中的是行 0–2 × 3 列，第二段必须从
-        // 未选中的行 3 起手（0.55）——起手在已选格会进取消模式，边滚边取消（count 6→4 实锤）。
+        // 单指 swipe 是框选手势）：第一段拖动选中的是行 1–2 × 3 列（6 格），第二段从
+        // 未选中的行 3 起手短矩形（行 3–6 首列，不触发自动滚动）→ 计数 6+4=10。
+        // 起手在已选格会进取消模式；可见徽标断言要求滚动幅度小（深滚后可见区全未选）。
         slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.55,
-                           toX: 0.12, toY: 0.995, hold: 2.5)
+                           toX: 0.12, toY: 0.78)
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 10, timeout: 8), 10,
-                                    "自动滚动复用路径上选中集合必须持续增长")
+                                    "第二段矩形必须在已选集合上继续增长")
         Thread.sleep(forTimeInterval: 0.8)
         XCTAssertGreaterThanOrEqual(selectionCount(app), 10,
                                     "复用稳定后选中集合不得丢失")
