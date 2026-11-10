@@ -732,8 +732,9 @@ final class ViewerViewController: UIViewController {
 
     // MARK: - Chrome（3 秒无操作淡出，docs/04 §3.2）
 
-    /// cell 视口单击（ZoomInteractionController.tap，双击失败后触发）：视频播放切换 / chrome 切换
-    private func handleViewportSingleTap(inCell cell: ZoomableImageCell?) {
+    /// cell 视口单击（ZoomInteractionController.tap / VideoCell.tapGesture，双击失败后触发）：
+    /// 视频播放切换 / chrome 切换
+    private func handleViewportSingleTap(inCell cell: UICollectionViewCell?) {
         // 视频点击暂停/继续（docs/09 D15）：点在视频 cell 上时切换播放，不切换 chrome
         if let videoCell = cell as? VideoCell {
             videoCell.togglePlayback()
