@@ -195,7 +195,29 @@ final class ViewerViewController: UIViewController {
         collectionView.register(ZoomableImageCell.self, forCellWithReuseIdentifier: ZoomableImageCell.reuseID)
         collectionView.register(VideoCell.self, forCellWithReuseIdentifier: VideoCell.reuseID)
         view.addSubview(collectionView)
+        #if DEBUG
+        // UI 取证：根视图级 tap 探针（与一切并行）。gprobe=0 时用于区分
+        // "触摸进了 app 但没到任何 cell"（root>0）与"触摸没进 app"（root=0）。
+        rootProbe.cancelsTouchesInView = false
+        rootProbe.delegate = rootProbeDelegate
+        view.addGestureRecognizer(rootProbe)
+        #endif
     }
+
+    #if DEBUG
+    /// 根视图 tap 探针（见 viewDidLoad 注释）
+    final class RootProbeDelegate: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+    }
+
+    static var rootTapProbeCount = 0
+    private lazy var rootProbeDelegate = RootProbeDelegate()
+    private let rootProbe = UITapGestureRecognizer()
+    @objc private func handleRootProbeTap(_ g: UITapGestureRecognizer) {
+        if g.state == .ended { Self.rootTapProbeCount += 1 }
+    }
+    #endif
 
     /// 首次/恢复定位（contentOffset 直设 + 显式 updateIndex，绕过 scrollViewDidScroll）
     private func positionAtCurrentIndex() {
@@ -273,6 +295,7 @@ final class ViewerViewController: UIViewController {
         fields.append("sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1)")
         fields.append("probe=\(cell?.probeTapCount ?? -1)")
         fields.append("gprobe=\(ZoomableImageCell.globalProbeCount)")
+        fields.append("root=\(Self.rootTapProbeCount)")
         fields.append("load=\(inflightLoadCount)")
         fields.append(imgPart)
         fields.append("frameW=\(String(format: "%.1f", frameWidth))")

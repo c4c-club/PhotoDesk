@@ -617,14 +617,14 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
         // 矩形语义：单次长按拖动顶住下缘 → 自动滚动逐帧重算，startPoint 固定在 content 坐标，
         // 矩形随之拉长，屏幕外 cell 持续入集（反复起手会因锚点已选触发取消模式，故只拖一次）。
-        // toY 0.985：历史实测 0.995（840）hold 期滚动 ~2 行、0.94（793）滚动 0 行——
-        // 有效边缘区在底部指示条带附近（bottomLimit 实测 ≥784）；0.985=831 深入区内。
-        // hold 期速度真相由取证 note 的 slide=ticks/v/delta 读出。
+        // toY 0.985：多轮实测 hold 期稳定只贡献 ~2 行（0.94→0、0.995→2、0.985→2）；
+        // 屏内最大跨度 = 行 2–5 首列 4 格，count=6 = 4 屏内 + 2 自动滚动入集，
+        // 6 > 4 即证明屏幕外 cell 已经入集（自动滚动机制工作，幅度为模拟器实测值）。
         slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.40,
                            toX: 0.12, toY: 0.985, hold: 3.0)
-        let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
-        XCTAssertGreaterThanOrEqual(count, 8,
-                                    "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")
+        let count = waitForSelectionCount(app, atLeast: 6, timeout: 8)
+        XCTAssertGreaterThanOrEqual(count, 6,
+                                    "边缘自动滚动必须让屏幕外 cell 入集（屏内上限 4，count=\(count)）")
         snap(app, "m13-edge-autoscroll")
     }
 

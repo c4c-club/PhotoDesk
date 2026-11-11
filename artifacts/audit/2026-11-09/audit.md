@@ -1,6 +1,6 @@
 ﻿# M15 Audit Report
 
-- stamp: 2026-11-12 03:02:22+08:00
+- stamp: 2026-11-12 05:25:10+08:00
 - mode: GATE (P0 must be 0)
 
 ## Red lines (must be 0)
@@ -77,6 +77,6 @@
 - PhotoDesk/Features/Vault/VaultView.swift (241 lines, ax=True)
 - PhotoDesk/Features/Viewer/ActionOverlayView.swift (105 lines, ax=False)
 - PhotoDesk/Features/Viewer/FilmStripView.swift (138 lines, ax=False)
-- PhotoDesk/Features/Viewer/ViewerViewController.swift (1117 lines, ax=True)
+- PhotoDesk/Features/Viewer/ViewerViewController.swift (1138 lines, ax=True)
 
 ## RESULT: PASS

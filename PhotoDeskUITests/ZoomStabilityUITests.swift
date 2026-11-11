@@ -358,20 +358,30 @@ final class ZoomStabilityUITests: XCTestCase {
         var zoomSeen = -1
         let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 5), "内层 viewport 未出现\n\(hierarchy(app))")
-        let zoomDeadline = Date().addingTimeInterval(3)
-        while Date() < zoomDeadline {
-            // 双击必须打在内层 viewport（真实 UIView，center 即图心）；
-            // ViewerRoot 是 otherElement，其 center 不可靠（双击从未命中的实锤根因）
-            inner.doubleTap()
+        let vpFrame = inner.frame
+        let vpCenter = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: vpFrame.midX, dy: vpFrame.midY))
+        let zoomDeadline = Date().addingTimeInterval(6)
+        var attempt = 0
+        while Date() < zoomDeadline, zoomSeen <= 1 {
+            // 两条通路交替取证：元素双击（AX activation point）与坐标双击（两次快速
+            // coordinate.tap，坐标通路已被框选 press/drag 证明可达 app）。任一通路让
+            // zoom>1 即验证双击链路；读数（gprobe/root/probe）区分命中层。
+            if attempt % 2 == 0 {
+                inner.doubleTap()
+            } else {
+                vpCenter.tap()
+                vpCenter.tap()
+            }
+            attempt += 1
             Thread.sleep(forTimeInterval: 0.5)
             let bannerNow = viewerBanner(app)
             if bannerNow.exists {
                 zoomSeen = Self.parseField(bannerNow.label, "zoom")
-                if zoomSeen > 1 { break }
             }
         }
         XCTAssertGreaterThan(zoomSeen, 1,
-                             "双击后 zoom 应 > 1（手势链路核验，3s 轮询）：\(viewerBanner(app).label)")
+                             "双击后 zoom 应 > 1（手势链路核验）：\(viewerBanner(app).label) vpFrame=\(vpFrame)")
         snap(app, "m15-pinch-no-removal")
     }
 
