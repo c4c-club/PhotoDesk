@@ -1221,7 +1221,8 @@ final class LibraryViewController: UIViewController {
         viewModel.debugScrollNote = "off=" + off + "/" + maxOffset +
             " anchor=" + anchor + " visualY=" + String(visualY) +
             " sec=" + sections + " cells=" + cells +
-            " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches)
+            " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches) +
+            " slide=" + SlideSelectGestureController.lastSessionDiagnostics
         #endif
     }
 

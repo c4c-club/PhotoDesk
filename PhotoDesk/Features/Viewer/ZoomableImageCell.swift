@@ -84,8 +84,10 @@ final class ZoomableImageCell: UICollectionViewCell {
     #if DEBUG
     /// UI 取证探针：任何落在 cell 上的单击（含被 chrome/双击链吃掉的）都计数。
     /// probe>0 而 dtapIn=0 → 触摸到达 cell 但双击识别器没收到（配置/互斥问题）；
-    /// probe=0 → 触摸根本没到 cell（测试打点/hit-test 问题）。
+    /// probe=0 → 触摸根本没到当前 cell（测试打点/hit-test 问题；gprobe 跨 cell 全局计数
+    /// 可区分"打在邻居 cell"与"没进 app"）。
     private(set) var probeTapCount = 0
+    static var globalProbeCount = 0
     private lazy var probeTap: UITapGestureRecognizer = {
         let g = UITapGestureRecognizer(target: self, action: #selector(handleProbeTap(_:)))
         g.cancelsTouchesInView = false
@@ -93,7 +95,10 @@ final class ZoomableImageCell: UICollectionViewCell {
         return g
     }()
     @objc private func handleProbeTap(_ g: UITapGestureRecognizer) {
-        if g.state == .ended { probeTapCount += 1 }
+        if g.state == .ended {
+            probeTapCount += 1
+            Self.globalProbeCount += 1
+        }
     }
     #endif
     /// 当前内容 aspectFit 尺寸（layoutSubviews 维护；与 policy 的 contentWidth/Height 一致）

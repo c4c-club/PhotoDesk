@@ -272,6 +272,7 @@ final class ViewerViewController: UIViewController {
         fields.append("dtapIn=\(cell?.diagnostics.doubleTapEnterCount ?? -1)")
         fields.append("sb=\(cell?.diagnostics.shouldBeginDoubleTapCount ?? -1)")
         fields.append("probe=\(cell?.probeTapCount ?? -1)")
+        fields.append("gprobe=\(ZoomableImageCell.globalProbeCount)")
         fields.append("load=\(inflightLoadCount)")
         fields.append(imgPart)
         fields.append("frameW=\(String(format: "%.1f", frameWidth))")

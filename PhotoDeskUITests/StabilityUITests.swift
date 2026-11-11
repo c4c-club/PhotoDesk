@@ -86,8 +86,9 @@ final class StabilityUITests: XCTestCase {
         // 绿7/绿8 实锤：顶栏按钮的合成点按会先做 AX scroll-to-visible（kAXErrorCannotComplete），
         // 且 DEBUG 取证横幅与顶栏在 AX 树上重叠导致 isHittable 恒假；固定坐标又在两种顶栏
         // 高度间漂移。改读元素 frame 后按绝对坐标点中心，绕开 scroll-to-visible 与遮挡判定。
+        // 10s 等待：切 scope 后慢 runner 下 AX 树重建可超过 5s（M15 两次实锤）。
         let category = anyElement(app, identifier: "Library-Category")
-        XCTAssertTrue(category.waitForExistence(timeout: 5), "分类按钮不存在")
+        XCTAssertTrue(category.waitForExistence(timeout: 10), "分类按钮不存在")
         let frame = category.frame
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
@@ -616,11 +617,11 @@ final class StabilityUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
         // 矩形语义：单次长按拖动顶住下缘 → 自动滚动逐帧重算，startPoint 固定在 content 坐标，
         // 矩形随之拉长，屏幕外 cell 持续入集（反复起手会因锚点已选触发取消模式，故只拖一次）。
-        // toY 0.94：hold 期 edgeVelocity 按最后采样点入边深度比例（(793−750)/60≈0.72 →
-        // ~8.6pt/frame ≈ 516pt/s，3s ≈ 11 行 → count ≫8）；0.90 实测只加 2 行（深度 0.17
-        // → minStep 2pt/frame，count 4<8 实锤）；0.995 落主屏幕指示条吞触区（count 6<8 实锤）。
+        // toY 0.985：历史实测 0.995（840）hold 期滚动 ~2 行、0.94（793）滚动 0 行——
+        // 有效边缘区在底部指示条带附近（bottomLimit 实测 ≥784）；0.985=831 深入区内。
+        // hold 期速度真相由取证 note 的 slide=ticks/v/delta 读出。
         slideSelectGesture(in: collection, fromX: 0.12, fromY: 0.40,
-                           toX: 0.12, toY: 0.94, hold: 3.0)
+                           toX: 0.12, toY: 0.985, hold: 3.0)
         let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
         XCTAssertGreaterThanOrEqual(count, 8,
                                     "边缘自动滚动必须逐帧重算命中，选中屏幕外 cell")

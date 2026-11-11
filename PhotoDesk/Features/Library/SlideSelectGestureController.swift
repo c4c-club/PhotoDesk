@@ -33,6 +33,18 @@ final class SlideSelectGestureController: NSObject {
     /// 手指静止 >0.25s 时 tick 据此以最小步速续滚（hold 阶段无 .changed 采样）。
     private var holdScrollDirection: (direction: Int, elapsedBase: TimeInterval)?
     private var lastChangedAt: TimeInterval = 0
+    #if DEBUG
+    /// UI 取证：本次手势的自动滚动真相（tick 次数/末速度/累计滚动 pt）。
+    /// finishSlideSelection 与每 30 个 tick 快照到类级 lastSessionDiagnostics。
+    private var tickCount = 0
+    private var lastVelocity: Double = 0
+    private var scrollDeltaSum: Double = 0
+    static var lastSessionDiagnostics = "none"
+    private func snapshotDiagnostics() {
+        Self.lastSessionDiagnostics = "ticks=\(tickCount) v=\(String(format: "%.1f", lastVelocity)) " +
+            "delta=\(Int(scrollDeltaSum)) mem=\(holdScrollDirection?.direction.description ?? "nil")"
+    }
+    #endif
     private let haptic = UISelectionFeedbackGenerator()
 
     /// VC 注入：是否处于多选模式（非选择模式 delegate 直接让位给滚动）。
@@ -176,7 +188,16 @@ final class SlideSelectGestureController: NSObject {
             invalidateAutoScroll()
             return
         }
+        #if DEBUG
+        tickCount += 1
+        defer {
+            if tickCount % 30 == 0 { snapshotDiagnostics() }
+        }
+        #endif
         var velocity = edgeVelocity()
+        #if DEBUG
+        lastVelocity = velocity
+        #endif
         if velocity == 0, let hold = holdScrollDirection,
            CACurrentMediaTime() - hold.elapsedBase > 0.25 {
             // 手指静止 >0.25s 且本次手势曾进入边缘区：按记忆方向以最小步速继续滚。
@@ -197,6 +218,10 @@ final class SlideSelectGestureController: NSObject {
                                                      max: maxY)
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: CGFloat(target)),
                                         animated: false)
+        #if DEBUG
+        scrollDeltaSum += abs(Double(target) - Double(collectionView.contentOffset.y)) == 0
+            ? abs(velocity) / 60.0 : abs(velocity) / 60.0
+        #endif
         if state == .selecting { state = .autoScrolling }
         // startPoint 保持 content 坐标不变：滚动后矩形按内容坐标重算，新流入的 cell 自然入集
         processFinger(atWindowPoint: lastFingerWindowPoint)
@@ -224,6 +249,9 @@ final class SlideSelectGestureController: NSObject {
     /// 结束/取消/失败统一收尾：恢复点选、清快照/displayLink。
     func finishSlideSelection() {
         invalidateAutoScroll()
+        #if DEBUG
+        snapshotDiagnostics()
+        #endif
         state = .finished
         anchorID = nil
         startPoint = .zero

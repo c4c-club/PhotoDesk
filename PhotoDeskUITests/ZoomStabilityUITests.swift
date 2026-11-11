@@ -54,14 +54,19 @@ final class ZoomStabilityUITests: XCTestCase {
 
     /// 分页 collection 里同一 identifier 存在 3 份（前/当前/后 cell 的内层视口），
     /// firstMatch 可能选中离屏邻居 → 合成手势（pinch/doubleTap）打在屏幕外
-    /// （M15 实锤 probe=0：触摸从未到达当前 cell）。必须取 isHittable 的那份。
-    private func hittableViewport(_ app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
+    /// （M15 实锤 probe=0：触摸从未到达当前 cell）。isHittable 可能被 DEBUG 横幅
+    /// 压恒假（docs/15 §3.2 同款），改按几何选当前页：frame 中点必须落在屏幕内。
+    private func currentViewport(_ app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
         let query = app.descendants(matching: .any).matching(identifier: "Viewer-ZoomScrollView")
+        let appWidth = app.frame.width
         let deadline = Date().addingTimeInterval(timeout)
         var all: [XCUIElement] = []
         while Date() < deadline {
             all = query.allElementsBoundByIndex
-            if let hit = all.first(where: { $0.isHittable }) { return hit }
+            if let hit = all.first(where: { el in
+                let f = el.frame
+                return f.width >= 300 && f.midX >= 0 && f.maxX <= appWidth + 1
+            }) { return hit }
             usleep(200_000)
         }
         return all.first ?? query.firstMatch
@@ -179,7 +184,7 @@ final class ZoomStabilityUITests: XCTestCase {
         _ = openViewer(app, startIndex: 7)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 8),
                       "cell 内 UIScrollView 未以 Viewer-ZoomScrollView 暴露\n\(hierarchy(app))")
         XCTAssertGreaterThan(inner.frame.width, 0)
@@ -219,7 +224,7 @@ final class ZoomStabilityUITests: XCTestCase {
         _ = openViewer(app, startIndex: 7)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 8),
                       "cell 内 UIScrollView 未以 Viewer-ZoomScrollView 暴露\n\(hierarchy(app))")
         XCTAssertGreaterThan(inner.frame.width, 0)
@@ -246,18 +251,18 @@ final class ZoomStabilityUITests: XCTestCase {
         let viewer = openViewer(app, startIndex: 7)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 8), "内层 scrollView 未出现\n\(hierarchy(app))")
         inner.pinch(withScale: 2.2, velocity: 1.4)
         swipeLeftFast(in: viewer)
         Thread.sleep(forTimeInterval: 0.5)
-        let nextInner = hittableViewport(app)
+        let nextInner = currentViewport(app)
         XCTAssertTrue(nextInner.waitForExistence(timeout: 5), "翻页后内层 scrollView 未出现\n\(hierarchy(app))")
         nextInner.pinch(withScale: 0.45, velocity: -1.4)
         nextInner.pinch(withScale: 2.2, velocity: 1.4)
         viewer.swipeRight()
         Thread.sleep(forTimeInterval: 0.5)
-        let backInner = hittableViewport(app)
+        let backInner = currentViewport(app)
         XCTAssertTrue(backInner.waitForExistence(timeout: 5), "返回上一张后内层 scrollView 未出现\n\(hierarchy(app))")
         backInner.pinch(withScale: 0.45, velocity: -1.4)
         backInner.pinch(withScale: 2.2, velocity: 1.4)
@@ -279,7 +284,7 @@ final class ZoomStabilityUITests: XCTestCase {
             swipeLeftFast(in: viewer)
             Thread.sleep(forTimeInterval: 0.15)
         }
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 5), "复用后内层 scrollView 未出现\n\(hierarchy(app))")
         inner.pinch(withScale: 2.2, velocity: 1.4)
         inner.pinch(withScale: 0.45, velocity: -1.4)
@@ -295,14 +300,14 @@ final class ZoomStabilityUITests: XCTestCase {
         _ = openViewer(app, startIndex: 7)
         let banner = viewerBanner(app)
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 8), "内层 scrollView 未出现\n\(hierarchy(app))")
         inner.pinch(withScale: 2.2, velocity: 1.4)
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1.0)
         XCUIDevice.shared.orientation = .portrait
         Thread.sleep(forTimeInterval: 1.0)
-        let rotated = hittableViewport(app)
+        let rotated = currentViewport(app)
         XCTAssertTrue(rotated.waitForExistence(timeout: 5), "旋转后内层 scrollView 未出现\n\(hierarchy(app))")
         rotated.pinch(withScale: 0.45, velocity: -1.4)
         rotated.pinch(withScale: 2.2, velocity: 1.4)
@@ -351,7 +356,7 @@ final class ZoomStabilityUITests: XCTestCase {
         XCTAssertFalse(badgeLabel.contains("待删除"),
                        "捏合过程不得触发删除事务（badge=\(badgeLabel)）")
         var zoomSeen = -1
-        let inner = hittableViewport(app)
+        let inner = currentViewport(app)
         XCTAssertTrue(inner.waitForExistence(timeout: 5), "内层 viewport 未出现\n\(hierarchy(app))")
         let zoomDeadline = Date().addingTimeInterval(3)
         while Date() < zoomDeadline {
