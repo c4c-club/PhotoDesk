@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | T00 基线审查与脚本重写 | DONE | 0c9935c + 453daf0 | audit-m16.ps1 两连跑一致（除时间戳）；红线命中 6 · 违规 0；Core 338/338（Docker 实测）；设备探测 BLOCKED（原样记录） | artifacts/audit/2026-11-12/（audit.md / audit.json / root-cause.md / test-gap.md / core-baseline-20261112.log / device-probe.txt） |
 | T01 查看器缩放事务 | DONE | 9d8270b + b254d58 + a42eb3f | Core 366/366（Docker）；CI 定向 run 43279827299 ✅（单测）/ 43268212545 UI 套件 12/12 ✅（含 500 轮捏合）；红线违规 0 | 首轮 run 43268212545 抓出宽限窗口真缺陷（a42eb3f 修复后单测重跑绿）；真机 BLOCKED |
-| T02 网格捏合事务 | TODO | — | — | — |
+| T02 网格捏合事务 | DONE | 49eacdb + d1c74ee + ee1acaa + 88d2787 + 78d8767 + 4709e58 + 33932ce | Core 388/388（Docker，+22 reducer 用例）；CI run 43306687066 ✅（单测 8 + UI 4，含 200 轮捏合）；红线违规 0 | 存量缺陷实锤并修复：viewDidLayoutSubviews reloadItems 直改 Diffable 在 iOS 16 必崩（三轮 .ips 取证）→ reconfigureItems；真机 BLOCKED |
 | T03 位置记忆 v6 | TODO | — | — | — |
 | T04 滑动多选 | TODO | — | — | — |
 | T05 页面 1–2 | TODO | — | — | — |
