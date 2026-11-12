@@ -1,0 +1,58 @@
+# T10 — 页面回归：保险箱、元数据、编辑器、工具（8、18–20）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+核对已隐藏页的设备密码解锁与后台锁定、信息面板字段、编辑器三路径、工具页导航。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §7 第8、18–20行、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Vault/VaultView.swift、VaultGridView.swift
+- PhotoDesk/Features/Metadata/MetadataView.swift
+- PhotoDesk/Features/Editor/EditorViewController.swift、CropOverlayView.swift、EditorViewModel.swift
+- PhotoDesk/App/ToolsView.swift
+- PhotoDeskUITests/PageRegressionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T09 已 DONE；写 08-vault.md、18-metadata.md、19-editor.md、20-tools.md 页面卡。
+2. 保险箱：设备密码解锁按钮行为与文案一致；后台立即锁定；失败原因可复制；确认无永久删除入口。
+3. 元数据：文件名/格式/大小/EXIF/GPS、坏图、空字段“—”、复制全部、加载态。
+4. 编辑器：未保存离开二次确认、裁剪比例 chips、旋转/翻转/重置、保存防连点、覆盖/另存/还原三路径。
+5. 工具页：NavigationView(.stack) 不 split；存储/相簿快捷入口；关闭按钮；所有入口可达。
+6. 只改真实缺口；补 smoke。跑 CI 定向 PageRegressionUITests。
+7. 更新 progress/docs/05；提交 feat(pages) 或 fix(pages)。
+
+## 4. 测试与验收
+
+- 四页卡齐全；保险箱回前台重新验证。
+- 坏图/无 EXIF 不崩；编辑器三路径有中文提示。
+- 工具页 iPad 不 split，入口全部可达。
+
+## 5. Git 提交
+
+- feat(pages): 保险箱元数据编辑器工具页面回归
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止在保险箱/最近删除加入永久删除或清空入口。
+- 禁止编辑器保存连点造成重复写。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T10 完成后，只读 T11-页面回归-引导最近删除教学徽标.txt。

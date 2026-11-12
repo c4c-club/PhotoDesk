@@ -1,0 +1,65 @@
+# T04 — P0-3 滑动多选
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+修掉滑动多选不显示选中与计数错误：真实 layoutAttributes 命中、touch-down 起点、单一选中渲染、单一计数源，并用可见角标/像素断言替代 AX 假绿。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §6、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Library/SlideSelectGestureController.swift
+- PhotoDesk/Features/Library/LibraryViewController.swift（marqueeGeometry/applySlideSelection）
+- PhotoDesk/Features/Library/PhotoGridCell.swift
+- PhotoDesk/Core/Support/MarqueeSelectionPolicy.swift（或现有策略）
+- PhotoDeskTests/PhotoGridCellTests.swift、MarqueeSelectionPolicyTests
+- PhotoDeskUITests/MarqueeSelectionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T03 已 DONE；git status 干净；读源码并记录当前 marqueeGeometry 的坐标来源、applySlideSelection 的差量逻辑、badge 的显示条件。
+2. 先写红测试：GridHitRegion/MarqueeSelectionPolicy 的相交/边界/反向/从已选取消；PhotoGridCellTests 的 badge.isHidden/dimView.alpha/borderWidth/reuse 复位；UI 至少一条 badge 可见性断言。
+3. 新增或复用 GridHitRegion；LibraryViewController 遍历 indexPathsForVisibleItems + layoutAttributesForItem(at:) 计算真实 frame；header 不参与命中。
+4. 改 SlideSelectGestureController：记录 touch-down 起点（0 时长长按或自定义 recognizer）；起点 cell 用真实 attributes 命中；拖动中不 reload/layout。
+5. 改 PhotoGridCell 为 applySelection(isSelected:isSelecting:) 单一入口：选中就显示 badge/压暗/边框；prepareForReuse 全复位；AX value 与视觉同源。
+6. 改 applySlideSelection：每次 apply 都 updateSelectionCount(selectionState.selected.count)，删除 previous.count != current.count 条件；结束 reconfigureItems 一次。
+6a. 修 scope：enterSelectionMode 默认 scope 用 viewModel.filteredItems 全量（或明确的全局选择域），不能只用 currentItemsBySection；selectAll 后再次 intersectScope 用同一全量 scope。补一条“索引未完成/只加载首批时全选，计数等于筛选总数”的红测试。
+7. 扩展 MarqueeSelectionUITests：左列下拉、跨行、反向取消、自动滚动、粘性头存在、计数精确等于可见 badge 数；附截图；至少一条像素断言（badge 中心颜色/压暗 alpha，5% 容差）。
+8. 跑 Core 测试；推送并跑 CI 定向 PhotoDeskTests/PhotoGridCellTests + PhotoDeskUITests/MarqueeSelectionUITests；记录 run id。
+9. 提交 test(selection) 与 fix(selection) 两个原子提交。
+
+## 4. 测试与验收
+
+- 手指经过的 cell 100% 出现可见角标；badge accessibilityIdentifier 可查询且 hittable。
+- 计数与 SelectionState 完全一致；同数量换成员也刷新；全选覆盖全部筛选结果，不只当前已加载 section。
+- 粘性头存在时命中不整体偏移；无整行误选。
+- UI 测试不再只查 AX value 或宽松计数范围。
+
+## 5. Git 提交
+
+- test(selection): 新增滑选几何与视觉红测试
+- fix(selection): 真实 layoutAttributes 命中与单一选中渲染
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止用 DSSpacing 重建网格几何作为命中来源。
+- 禁止只改 AX value 而不改 badge/dim/border。
+- 禁止在拖动中 reloadData 或切换布局。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T04 完成后，只读 T05-页面回归-照片库与查看器.txt。

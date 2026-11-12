@@ -1,0 +1,58 @@
+# T08 — 页面回归：导出、统计、设置、外观（9–12）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+核对导出取消与临时文件清理、存储统计取消/部分结果、设置版本号、外观列数即时预览与重启保持。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §7 第9–12行、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Export/ExportView.swift、ExportViewModel.swift
+- PhotoDesk/Features/Storage/StorageStatsView.swift、StorageStatsViewModel.swift
+- PhotoDesk/Features/Settings/SettingsView.swift、AppearanceSettingsView.swift
+- PhotoDeskUITests/PageRegressionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T07 已 DONE；写 09-export.md、10-storage.md、11-settings.md、12-appearance.md 页面卡。
+2. 导出：导出中取消、进度、重试保留选项、成功回执；取消后清理临时文件，确认无残留。
+3. 统计：取消/继续、90s 软超时后仍可继续、部分结果说明、按年图可读、未知大小脚注。
+4. 设置：版本/构建号与 project.yml 一致；系统版本、开源许可可见。
+5. 外观：2–5 列即时预览、重启保持、恢复默认、位置说明为本机文件。
+6. 只改真实缺口；补 smoke。跑 CI 定向 PageRegressionUITests；记录导出取消后文件清单。
+7. 更新 progress/docs/05；提交 feat(pages) 或 fix(pages)。
+
+## 4. 测试与验收
+
+- 导出取消后无临时文件残留、无崩溃。
+- 统计软超时后仍可继续；数字来源真实。
+- 版本/构建号与 project.yml 一致；外观列数重启保持。
+- 四页卡齐全。
+
+## 5. Git 提交
+
+- feat(pages): 导出统计设置外观页面回归
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止导出取消只改 UI 不取消 Task。
+- 禁止用静态数字冒充缓存/统计占用。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T08 完成后，只读 T09-页面回归-手势隐私安全缓存诊断.txt。

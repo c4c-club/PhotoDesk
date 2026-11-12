@@ -1,0 +1,60 @@
+# T05 — 页面回归：照片库与查看器（1–2）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+对照片库网格和全屏查看器做页面级 fresh audit，复测 P0-1/P0-3，补齐加载失败、旋转、复用、索引条等真实缺口。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §7 第1–2行、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Library/LibraryViewController.swift、PhotoGridCell.swift、MonthIndexBar.swift、MonthJumpSheet.swift
+- PhotoDesk/Features/Viewer/ViewerViewController.swift、ZoomableImageCell.swift、FilmStripView.swift
+- PhotoDeskUITests/ZoomStabilityUITests.swift、GridPinchUITests.swift、MarqueeSelectionUITests.swift
+- PhotoDeskUITests/PageRegressionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T04 已 DONE；git status 干净；先写 artifacts/pages/2026-11-12/01-library.md 和 02-viewer.md，按模板填现状/缺口。
+2. 复跑 P0-1A、P0-1B、P0-3 的测试；确认页面级改动没有回退三个 P0。
+3. 照片库核对：复用 cell 选中态复位、月份索引条拖动高亮、筛选空态、10k 照片滚动、捏合后滚动位置。
+4. 查看器核对：加载占位、失败重试、旋转复位、翻页复位、缩放时禁翻页/删除、FilmStrip 选中同步。
+5. 只对真实缺口写代码；已具备的补 UI smoke 或手动步骤，不重复实现。
+6. 新增/扩展 PageRegressionUITests 的页面 smoke；每页至少 1 条可验证路径。
+7. 跑 CI 定向 PhotoDeskUITests/ZoomStabilityUITests、GridPinchUITests、MarqueeSelectionUITests、PageRegressionUITests；记录 run id。
+8. 更新 progress 和 docs/05；提交 feat(pages) 或 test(pages)。
+
+## 4. 测试与验收
+
+- 两个页面卡有现状/缺口/改动/验证四栏，且附截图或用例名。
+- 三个 P0 复测全绿；无新增崩溃。
+- 10k 滚动内存 <250MB、≥55FPS（模拟器参考值）。
+- 页面 smoke 不依赖 AX value 代替视觉。
+
+## 5. Git 提交
+
+- feat(pages): 照片库与查看器页面回归
+- test(pages): 补充照片库与查看器 smoke
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止为了页面任务改 P0 已定的状态机/几何方案。
+- 禁止用静态文案代替真实加载/失败路径。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T05 完成后，只读 T06-页面回归-相簿与搜索.txt。

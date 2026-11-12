@@ -1,0 +1,65 @@
+# T00 — 基线审查与脚本重写
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+锁定 M16 基线，完成一次不依赖旧结论的全新静态/测试审查，重写可重复运行的 audit-m16.ps1，并列出三个 P0 + docs/28 §7A X01–X16 的红测试清单。本任务不修改业务代码。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. T00 无上一任务；打开 artifacts/plan/progress.md，确认 T00 当前为 TODO。
+4. 只读这些 docs/28 小节：docs/28 §0–3、§7A、§8 的 T00 行、§9.1、§10.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- scripts/audit-current-state.ps1（只读旧脚本，禁止复用其结论）
+- scripts/test-core.ps1、.github/workflows/ios.yml
+- PhotoDesk/Features/Viewer/ZoomInteractionController.swift、ZoomableImageCell.swift
+- PhotoDesk/Features/Library/LibraryViewController.swift、LibraryViewModel.swift
+- PhotoDesk/Features/Library/SlideSelectGestureController.swift、PhotoGridCell.swift
+- PhotoDeskCore/ 与 PhotoDeskTests/、PhotoDeskUITests/ 的目录清单
+
+## 3. 执行步骤
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager；记录 git rev-parse HEAD、git status --short、project.yml 的版本字段。
+2. 从 864af86 创建分支 fix/m16-20261112；不要删除当前分支，不要 rebase 已推送提交。
+3. 做设备探测并原样记录输出：Get-PnpDevice 过滤 Apple/iPhone；Get-Command idevice_id；pymobiledevice3 --version；Get-Process 过滤 AltServer。结论只能是 CONNECTED 或 BLOCKED。
+4. 运行 scripts/test-core.ps1，记录真实通过/失败数字；Docker 未启动时先启动 Docker Desktop 再重试，禁止伪造数字。
+5. 新建 scripts/audit-m16.ps1。要求：参数化根目录；确定性输出；支持 -FailOnRedline；至少覆盖 docs/28 §3.2 的全部检查项；优先 rg，缺失时用 Select-String。
+6. 运行 audit-m16.ps1 两次，确认第二次输出除时间戳外一致；生成 artifacts/audit/2026-11-12/audit.md、audit.json、root-cause.md、test-gap.md。
+7. root-cause.md 只写当前源码证据：文件、行号、代码片段、触发条件；不引用 docs/25/27 的“已修复”结论。
+8. test-gap.md 按 P0-1A、P0-1B、P0-2、P0-3 与 §7A X01–X16 列出缺失测试，标明计划新增的测试类名和任务号。
+9. 建立 artifacts/pages/2026-11-12/_template.md，字段固定为：页面、入口、现状、缺口、改动、验证、截图。
+10. 更新 docs/05 的 M16 行（如尚无则新增“进行中”），更新 artifacts/plan/progress.md 的 T00 行。
+
+## 4. 测试与验收
+
+- audit-m16.ps1 可重复运行；必需输出文件齐全；红线命中为 0。
+- Core 基线数字已记录；没有把旧 docs/27 数字当成本轮结果。
+- 设备探测输出已记录；不得把 BLOCKED 写成通过。
+- git status 只包含本任务文档/脚本/审计产物。
+
+## 5. Git 提交
+
+- docs(m16): 新增三连 P0 与全页面补齐规划（docs/28、docs/29、docs/30）
+- chore(audit): 重写 M16 审查脚本与基线取证
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止修改任何 .swift、project.yml、测试 target 或 CI workflow。
+- 禁止复用 audit-current-state.ps1 的旧结论；可以读它的实现找可复用函数，但必须重写检查项。
+- 禁止为了让脚本通过而删检查项或降低阈值。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T00 完成后，只读 T01-P0-1A-查看器缩放事务.txt。

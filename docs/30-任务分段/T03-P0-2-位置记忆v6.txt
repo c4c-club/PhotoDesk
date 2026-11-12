@@ -1,0 +1,69 @@
+# T03 — P0-2 位置记忆 v6
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+把位置记忆升级为 schema v6：锚点 assetID + 真实视觉 y + 全量索引；恢复必须等 head 回填稳定或精确补偿，verify 不允许 nil 假通过。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §5、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Core/Support/LibraryPositionStore.swift
+- PhotoDesk/Core/Support/PositionFileStore.swift
+- PhotoDesk/Core/Support/PositionRestoreMachine.swift
+- PhotoDesk/Features/Library/LibraryPositionCoordinator.swift
+- PhotoDesk/Features/Library/LibraryViewController.swift（snapshot/restore/headInsert 相关）
+- PhotoDesk/Features/Library/LibraryViewModel.swift（fetchFirstBatch/head 回填）
+- PhotoDesk/Features/Settings/AppearanceSettingsView.swift（位置说明文案）
+- PhotoDeskTests/ 与 PhotoDeskUITests/PositionRestoreUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T02 已 DONE；git status 干净；读 docs/28 §5 和源码，画出“首批窗口 → head 回填 → apply → verify”的当前时序。
+2. 先写红测试：PositionStoreV6Tests（roundtrip、损坏 JSON、容量、queryKey 隔离、v5 迁移）；PositionRestoreMachineV6Tests（状态转移、重复 begin、恢复中 save 拒绝、verify nil 失败、fallback）；HeadInsertCompensationTests（单批/多批、上方/下方、delta、clamp）。
+3. 实现 schema v6 和 anchors-v6.json；保留 v5 只读迁移；写失败保留旧文件；最多 64 条按 savedAt 淘汰。
+4. 实现状态机 v6：idle/loading/waitingForWindow/waitingForHead/applying/verifying/settled/fallback；canSave 只在 settled 且无恢复/过渡。
+5. 改 LibraryViewModel：暴露 firstBatchWindowStart、isIndexComplete、headInsertGeneration；fetchFirstBatch 支持 anchorGlobalIndex - 250；head 回填每批更新 generation。
+6. 改 LibraryViewController：makePositionSnapshot 取第一张完整可见 cell；保存触发矩阵按 docs/28 §5.6；删除恢复中禁止补偿、settled 清空补偿的竞态逻辑，改为每批精确 contentHeight delta 补偿。
+7. 改 LibraryPositionCoordinator：apply 用真实 attributes frame；verify 必须拿到 anchor cell attributes，nil/不可见/超过 ±2pt 均失败；失败重试一次，再 fallback。
+8. 扩展 PositionRestoreUITests：20 次冷启动；锚点 index > 500；跨月窗口；强杀；前后台；旋转；筛选；月跳；恢复中强制滚动；记录 assetID/visualY/headGeneration。
+9. 跑 Core 测试；推送并跑 CI 定向 PhotoDeskTests/位置相关 + PhotoDeskUITests/PositionRestoreUITests；记录结果。
+10. 提交 red test、store/schema、coordinator/VC、tests 四类原子提交。
+
+## 4. 测试与验收
+
+- 20 次冷启动至少 19 次同一 assetID、视觉 y ±2pt；0 次假 settled。
+- 恢复前 save 次数为 0；verify anchorMinY 为 nil 时不再通过。
+- head 回填前后锚点视觉 y 漂移 ≤2pt；contentOffset 不越界。
+- v5 用户升级后能读到旧记录；损坏记录 fallback 有日志、不崩溃。
+
+## 5. Git 提交
+
+- test(position): 新增位置 v6 与 head 补偿红测试
+- feat(position): 位置 schema v6 与原子迁移
+- fix(position): 恢复门禁、真实 frame 验证与 head 补偿
+- test(position): 扩展 20 次冷启动 UI 测试
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止在恢复中保存位置；禁止用估算布局 pass 数代替真实 anchor frame。
+- 禁止把 anchorMinY 为 nil 当成通过。
+- 禁止删除 v5 迁移或把旧文件直接覆盖。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T03 完成后，只读 T04-P0-3-滑动多选.txt。

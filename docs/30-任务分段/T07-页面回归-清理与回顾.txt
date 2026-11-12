@@ -1,0 +1,55 @@
+# T07 — 页面回归：智能清理与整理回顾（6–7）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+核对清理扫描的取消/失败/重扫，以及整理回顾的恢复队列、失败原因、全部恢复确认和计数。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §7 第6–7行、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Cleanup/CleanupView.swift、CleanupViewModel.swift
+- PhotoDesk/Features/SessionReview/SessionReviewView.swift
+- PhotoDeskUITests/PageRegressionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T06 已 DONE；写 06-cleanup.md、07-session-review.md 页面卡。
+2. 清理：核对扫描进度、取消二次确认、取消后 1s 内停止、失败原因可复制、结果可重扫。
+3. 回顾：核对失败队列保留、逐项失败原因、全部恢复二次确认、空态、计数刷新；确认恢复路径不新增 PhotoKit 写操作。
+4. 只改真实缺口；补 UI smoke 或手动步骤。
+5. 跑 CI 定向 PageRegressionUITests；记录取消耗时和失败重试结果。
+6. 更新 progress/docs/05；提交 feat(pages) 或 fix(pages)。
+
+## 4. 测试与验收
+
+- 清理取消 <1s 停止；无残留任务。
+- 回顾恢复零 PhotoKit 写；失败队列不丢。
+- 两页卡齐全，文案符合 docs/04 §7。
+
+## 5. Git 提交
+
+- feat(pages): 清理与整理回顾页面回归
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止把取消做成仅隐藏 UI、后台仍继续扫。
+- 禁止在回顾页新增永久删除/清空入口。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T07 完成后，只读 T08-页面回归-导出统计设置外观.txt。

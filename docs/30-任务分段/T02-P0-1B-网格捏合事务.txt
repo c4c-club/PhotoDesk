@@ -1,0 +1,63 @@
+# T02 — P0-1B 网格捏合事务
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+修掉照片库网格双指捏合换列崩溃：把连续 setCollectionViewLayout 改为单飞事务，锚点从旧 IndexPath 改为 assetID，删除过渡中的 reloadItems/旧路径滚动。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §4.1、§4.3、§4.4.1、§4.4.3–4.4.4、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Library/LibraryViewController.swift（onPinch、setColumns、makeLayout）
+- PhotoDesk/Features/Library/LibraryViewModel.swift（仅看窗口/锚点接口）
+- PhotoDeskCore/ 现有 Grid/Selection 相关源码
+- PhotoDeskTests/ 新增 PinchColumnReducerTests、LibraryGridPinchTests
+- PhotoDeskUITests/ 新增 GridPinchUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T01 已 DONE；git status 干净；读源码，记录 onPinch 当前每个 .changed 的调用链和 setColumns 的 completion 行为。
+2. 先写红测试：PinchColumnReducerTests（2...5 列、连续缩放、阈值滞回、快速反向、重复提交幂等）；LibraryGridPinchTests（模拟 200 次 target 变更，断言最多一个在途 transition、最终列数正确、anchorAssetID 不变）。
+3. 实现 PhotoDeskCore 的 PinchColumnReducer：纯 Double/Int 输入输出，不 import UIKit；阈值和列数上下限来自可注入配置。
+4. 改 onPinch：.began 记录 startColumns、startScale、pinchAnchorAssetID；.changed 只计算 pendingTarget；.ended/.cancelled 只提交一次。
+5. 改 setColumns：单飞状态机；completion 只清标志、按 assetID 找 IndexPath、一次滚动、再消费 pendingTarget；删除 reloadItems(at: indexPathsForVisibleItems) 和旧 IndexPath scrollToItem。
+6. 列数过渡期间冻结下拉刷新、批量编辑、删除、筛选重载；过渡结束恢复；被中断时取消 pending，不留下半状态。
+7. 新增 GridPinchUITests：2→5→2 快速 200 轮；跨月锚点；粘性头存在时捏合；捏合后滚动不跳；至少一条记录屏幕录制。
+8. 跑 Core 测试；推送并跑 CI 定向 PhotoDeskTests/LibraryGridPinchTests + PhotoDeskUITests/GridPinchUITests；记录 run id。
+9. 提交 test(library) 与 fix(library) 两个原子提交。
+
+## 4. 测试与验收
+
+- 200 轮快速捏合 0 崩溃；无 layout 过渡重入日志。
+- 任意时刻最多一个 setCollectionViewLayout 在途；completion 不再 reloadItems。
+- 捏合后锚点 assetID 仍在原视觉位置 ±1 个 cell 高度。
+- 2/3/4/5 列切换正确，重启后列数保持。
+
+## 5. Git 提交
+
+- test(library): 新增网格捏合单飞红测试
+- fix(library): 网格捏合单飞事务与 assetID 锚点
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止在 .changed 中直接调用 setCollectionViewLayout。
+- 禁止用 reloadData 解决布局错乱。
+- 禁止把锚点继续存成 IndexPath 作为跨布局身份。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T02 完成后，只读 T03-P0-2-位置记忆v6.txt。

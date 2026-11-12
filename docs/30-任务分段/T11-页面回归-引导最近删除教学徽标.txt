@@ -1,0 +1,58 @@
+# T11 — 页面回归：引导、最近删除、手势教学、会话徽标（21–24）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+核对权限引导三态、最近删除红线、手势教学可交互、会话徽标计数实时。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §7 第21–24行、§9.1。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Features/Permission/PermissionIntroView.swift
+- PhotoDesk/Features/Library/RecentlyDeletedView.swift
+- PhotoDesk/Features/GestureTutorial/GestureTutorialView.swift
+- PhotoDesk/Features/Session/SessionBadgeView.swift、SessionReviewView.swift
+- PhotoDeskUITests/PageRegressionUITests.swift
+
+## 3. 执行步骤
+
+1. 确认 T10 已 DONE；写 21-permission.md、22-recently-deleted.md、23-tutorial.md、24-session-badge.md 页面卡。
+2. 引导：三态文案、.limited 管理入口、拒绝去系统设置、零上传口径。
+3. 最近删除：只说明 30 天与跳系统相册；确认无删除/清空入口；跑红线静态检查。
+4. 手势教学：3 秒循环、可跳过、减弱动态效果、去设置。
+5. 会话徽标：计数实时、0 隐藏、点击进整理回顾、失败原因；计数与队列一致。
+6. 只改真实缺口；补 smoke。跑 CI 定向 PageRegressionUITests。
+7. 更新 progress/docs/05；提交 feat(pages) 或 fix(pages)。
+
+## 4. 测试与验收
+
+- 四页卡齐全；最近删除红线 0 违规。
+- 引导三态/教学循环/徽标计数均有证据。
+- 页面文案符合 docs/04 §7。
+
+## 5. Git 提交
+
+- feat(pages): 引导最近删除教学徽标页面回归
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止在最近删除页新增任何删除/清空按钮。
+- 禁止用系统“最近删除”之外的路径处理删除。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：T11 完成后，只读 T12-全量回归与发布.txt。

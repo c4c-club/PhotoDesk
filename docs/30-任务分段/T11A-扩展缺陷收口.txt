@@ -1,0 +1,93 @@
+# T11A — 扩展缺陷收口（三 P0 之外 X01–X16）
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 §7A、§9.1；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+把 docs/28 §7A 已确认的 X01–X16 逐条关闭：每条先有复现/红测试，再修复，再跑回归；不允许“看到了但跳过”。完成后 T12 才能进入全量回归与发布。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认 T11 为 DONE；如果未完成，停止并报告。
+4. 只读 docs/28 §7A、§9.1；需要定位时再按本卡列出的文件逐段读源码。
+5. 确认 GitHub CLI 状态；涉及 CI 时不得伪造 run。
+
+## 2. 必读源码/文件
+
+- PhotoDesk/Core/Photos/BatchCommitCoordinator.swift、PhotoWriter.swift、AssetRepository.swift
+- PhotoDesk/Core/Support/ReviewSessionController.swift、StorageStatsService.swift、DiagnosticsExporter.swift、PendingActionStore.swift
+- PhotoDesk/Core/Trash/TrashBin.swift
+- PhotoDesk/Core/Imaging/MemoryCache.swift、ExportRenderer.swift
+- PhotoDesk/Features/Export/ExportViewModel.swift
+- PhotoDesk/Features/Vault/VaultViewModel.swift
+- PhotoDesk/Features/Albums/AlbumDetailView.swift
+- PhotoDesk/Features/Editor/EditorViewController.swift、EditorViewModel.swift
+- PhotoDesk/Features/Settings/CacheManagerView.swift
+- PhotoDesk/App/AppLockController.swift
+- 相应 PhotoDeskTests、PhotoDeskUITests 与 docs/05
+
+## 3. 执行步骤
+
+1. 在 artifacts/pages/2026-11-13/extended-bugs.md 建 X01–X16 表：现象、复现、红测试名、修复文件、验收证据。每行必须有状态。
+2. 数据正确性优先：
+   - X01：让 BatchCommitCoordinator 返回/携带 committed，ReviewSessionController 在 catch 中先移除已成功批次；重试前 fetch 校验，已删除资产按幂等成功处理。测试：两批删除，第二批失败，第一批从队列移除且不再次提交。
+   - X02：createAlbum 捕获 placeholder.localIdentifier，按 localIdentifier 精确定位；测试已存在同名相簿时返回新相簿 ID，照片进入新相簿。
+   - X03：删除 isCloudOnly 的假实现；禁止私有 KVC。用 PHImageRequestOptions.isNetworkAccessAllowed=false + PHImageResultIsInCloudKey 或 ImagePipeline 回填 cloudOnlyIDs；导出先尝试本地 input，失败再 fullImage(allowNetwork:true) 后重试。测试 iCloud-only 导出成功、云角标出现、删除预检拒绝未下载原件。
+3. 编辑器：
+   - X04：统一 previewView 图像区域到 cropOverlay.superview 的坐标；测试 safeArea/旋转/iPad 下遮罩与裁剪结果不偏移。
+   - X05：applyAspect 先保存旧 quarterTurns/flip 再重建；测试旋转/翻转后切比例仍保留。
+   - X15：revertTapped 改 do/catch + presentError；测试失败提示。
+4. 资源与性能：
+   - X06：StorageStatsService 用 [id: modificationDate] 字典替代 items.first(where:)；10k 条统计主线程阻塞 <50ms。
+   - X07：TrashBin.storeCopy 的文件复制移出主线程，临时文件 + 原子 rename；500MB 视频复制时主线程不卡死。
+   - X08：VaultViewModel 改分页 fetch（200/500），滚动续拉；10k 隐藏项内存受控。
+   - X16：ExportViewModel 保存成功后删除临时文件；分享 completion 清理；连续导出文件数稳定。
+5. 低风险缺陷：
+   - X09：AlbumDetailView removeFromAlbum 后 total -= removed.count；hasMore 用实际 items.count；viewerContext 用完整相簿 id 列表或明确边界。
+   - X10：PhotoWriter.renameAlbum trim + 空标题拒绝。
+   - X11：MemoryCache 保存 NotificationCenter token，deinit 移除。
+   - X12：purgeTrash 后清理 UndoCenter 对应活跃条目。
+   - X13：DiagnosticsExporter 导出前清理旧同前缀文件，分享完成删除本次文件。
+   - X14：AppLockController.isBiometryAvailable 改明确 switch；unlockedThisSession 要么接入判断，要么删除。
+6. 跑门禁：Core 改动执行 scripts/test-core.ps1；App 改动跑 CI 定向测试；新增 UI 路径补 smoke 或明确手动步骤。
+7. 更新 docs/05 与 artifacts/plan/progress.md；按组提交，不把 X01–X16 混成一个不可审查的大提交。
+
+## 4. 测试与验收
+
+- X01：二批删除、第二批失败，队列只保留失败批；重试不重复删除，最终可清空。
+- X02：同名相簿场景返回新 ID；照片数量与目标相簿正确。
+- X03：iCloud-only 场景有云角标、导出可下载后成功、未下载删除被拒绝；无私有 KVC。
+- X04/X05：裁剪遮罩像素位置误差 ≤1pt；旋转/翻转后切比例保留状态。
+- X06：10k 条统计主线程单次阻塞 <50ms；结果与旧实现一致。
+- X07：大文件复制主线程无 >100ms 卡顿；副本可撤销。
+- X08：10k 隐藏项分页加载，首屏不一次性 fetch 全部。
+- X09：删除后不重复 loadMore、无“正在加载…”常驻；查看器可覆盖全部已加载/完整相簿。
+- X10–X16：各自单测/集成测试通过；不允许 try? 静默吞错。
+- 全量：Core 0 失败；CI 定向测试通过；docs/28 §7A 每行有证据链接或用例名。
+
+## 5. Git 提交
+
+建议分组：
+- fix(photos): 修复批量删除部分成功与同名相簿 ID
+- fix(photos): 补齐 iCloud-only 判定与导出回退
+- fix(editor): 修复裁剪坐标与比例状态
+- perf(storage): 优化统计与副本复制
+- fix(ui): 修复相簿分页、缓存撤销与诊断临时文件
+- test(extended): 扩展缺陷回归用例
+
+## 6. 禁止事项
+
+- 禁止用私有 KVC 探测 iCloud（会崩溃）。
+- 禁止 try? 吞掉写操作/导出/还原错误。
+- 禁止删除/绕过测试断言来“变绿”。
+- 禁止一次大提交混合无关文件。
+- 禁止修改任务范围外文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；删除文案只能是「移到最近删除」。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：T11A 状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志。
+3. 只输出一句交接：T11A 完成后，只读 T12-全量回归与发布.txt。

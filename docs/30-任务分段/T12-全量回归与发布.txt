@@ -1,0 +1,64 @@
+# T12 — 全量回归与发布 1.6.0 (7)
+
+> 本文件是自包含任务卡。只读本文件 + docs/28 指定小节；不要一次读完整份 docs/28，也不要读后续任务文件。
+
+## 0. 任务目标
+
+跑全量 Core/CI/性能门禁，完成 24 页终检，产出 1.6.0 (7) 未签名 IPA，做真机或 BLOCKED 记录，并报告绝对路径。
+
+## 1. 前置门禁
+
+1. Set-Location C:/Users/RuiZh/Desktop/photo_manager。
+2. git status --short；工作树只允许本任务尚未提交的改动。
+3. 打开 artifacts/plan/progress.md，确认上一任务为 DONE；如果未完成，停止并报告。
+4. 只读这些 docs/28 小节：docs/28 §9、§10、§12、§7A.3；docs/06、docs/12。不要读其他章节。
+5. 如果任务涉及 CI，确认 GitHub CLI 已登录；没有登录就报告阻塞，不伪造 run。
+
+## 2. 必读源码/文件
+
+- 全仓；scripts/test-core.ps1、.github/workflows/ios.yml、project.yml
+- artifacts/plan/progress.md、artifacts/pages/2026-11-12/
+- docs/05、docs/12、docs/27（或新建 docs/31-M16验收记录.md）
+
+## 3. 执行步骤
+
+1. 确认 T00–T11 + T11A 全部 DONE；git status 干净；汇总每任务提交和测试数字。
+2. 跑 scripts/test-core.ps1 全量；记录实际条数/失败数。
+3. 触发 CI full：先跑 PhotoDeskTests + PhotoDeskUITests（可跳过 Performance），再单跑 PerformanceUITests；记录 run id。
+4. 跑 scripts/audit-m16.ps1 -FailOnRedline；确认 0 URLSession、0 Core Apple import、0 try!/as!、0 iOS 17+ API、0 永久删除文案。
+5. 检查 24 页卡齐全；每页有证据/截图/用例名；缺的补，不得空表。
+6. 改 project.yml 为 MARKETING_VERSION 1.6.0、CURRENT_PROJECT_VERSION 7；提交 chore(release): 1.6.0 (7)。
+7. 推送触发 CI，等待成功；下载 artifact PhotoDesk-unsigned-ipa 到 artifacts/release/1.6.0/。
+8. 校验 IPA：unzip -l 含 Payload/PhotoDesk.app/PhotoDesk；MinimumOSVersion=16.0；otool -l minos=16.0；无 _CodeSignature；Bundle ID 正确。
+9. 重命名为 PhotoDesk-1.6.0-build7-unsigned.ipa；计算 SHA256；写 release-manifest.json（版本/构建/commit/runId/SHA256/字节/绝对路径/unsigned/minOS/bundleID）。
+10. 再次探测真机。CONNECTED：用 AltServer/pymobiledevice3 安装，按 docs/12 测三个 P0 各 10 次 + 24 页 smoke，采集截图/日志/.ips。BLOCKED：写 artifacts/device/2026-11-12/BLOCKED.md 和 15 分钟用户自测清单，验收记录写 BLOCKED。
+11. 更新 docs/05、docs/12、新建 docs/31-M16验收记录.md；提交 docs(m16): 验收记录与发布说明。
+12. 最终报告：三个 P0 证据、24 页结论、Core/CI 数字、IPA 绝对路径、SHA256、真机状态。
+
+## 4. 测试与验收
+
+- Core 0 失败；CI full success；性能达标或明确记录不达标。
+- 静态红线 0；24 页证据齐全；无 TODO/FIXME/未实现。
+- IPA 存在、校验通过、SHA256 可复算；绝对路径为 Windows 反斜杠形式。
+- 真机未接入时验收记录必须是 BLOCKED，不得写 ✅。
+
+## 5. Git 提交
+
+- chore(release): 1.6.0 (7)
+- docs(m16): M16 验收记录与发布说明
+
+要求：每个提交前跑对应门禁；提交信息使用中文摘要 + 规定前缀；不要提交 build/、DerivedData、临时截图之外的产物。
+
+## 6. 禁止事项
+
+- 禁止跳过失败测试或弱化断言。
+- 禁止伪造 CI run、真机结果、IPA 路径或 SHA256。
+- 禁止在 release 中夹带未提交的工作树改动。
+- 禁止修改任务范围外的文件；禁止引入第三方依赖。
+- 禁止违反 AGENTS.md 两条红线；禁止把“移到最近删除”写成“彻底删除”。
+
+## 7. 完成后
+
+1. 更新 artifacts/plan/progress.md：状态 DONE、提交号、测试数字、证据路径。
+2. 更新 docs/05 的进度/变更日志（若本任务有代码或测试改动）。
+3. 只输出一句交接：全部完成后输出最终报告，不再读其他任务文件。
