@@ -285,6 +285,8 @@ final class LibraryViewModel: ObservableObject {
         // 空库也要监听变更：第一张照片加入时增量同步并切出空态
         startObservingChanges()
         guard totalCount > 0 else {
+            // 空索引视同完成（同 reloadForQuery：恢复状态机不得等待不会到来的索引）
+            isIndexComplete = true
             rebuildDerived(animated: false)
             viewState = .empty
             return
@@ -542,6 +544,10 @@ final class LibraryViewModel: ObservableObject {
         guard totalCount > 0 else {
             firstBatchWindowStart = 0
             allItems = []
+            // 空索引视同完成：0 ≥ 0 无可等待。否则恢复状态机按 I4 永远等一个
+            // 不会到来的索引，恢复遮罩被相位事件反复重显盖住全屏（M15 切空收藏
+            // 后顶栏 AX 整体消失的实锤根因）。
+            isIndexComplete = true
             rebuildDerived(animated: false)
             viewState = .empty
             return

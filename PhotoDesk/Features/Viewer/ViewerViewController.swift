@@ -543,12 +543,22 @@ final class ViewerViewController: UIViewController {
     private func wireZoomIdleIfNeeded(_ cell: ZoomableImageCell) {
         cell.setZoomTransactionIdleHandler { [weak self] in
             Task { @MainActor in
-                self?.schedulePendingRemovalDrain()
+                guard let self else { return }
+                self.schedulePendingRemovalDrain()
+                // DEBUG 取证横幅跟随手势链路刷新（zoom/probe/root 计数）：
+                // 否则 banner 停在加载时刻，UI 测试轮询读到的是冻结快照（M15 实锤）。
+                #if DEBUG
+                self.refreshDebugBanner()
+                #endif
             }
         }
-        // chrome 切换唯一入口：cell 视口单击（与双击同 view require(toFail:)，跨 view 互斥不伤双击）
+        // chrome 切换唯一入口：cell 视口单击（与双击同 view require(toFail:)，跨 view 互斥不伤双击）。
+        // DEBUG 下单击后同步刷新取证横幅（probe/root 计数）。
         cell.onSingleTapInViewport = { [weak self, weak cell] in
             self?.handleViewportSingleTap(inCell: cell)
+            #if DEBUG
+            self?.refreshDebugBanner()
+            #endif
         }
         // 缩放交互期间禁用翻页滚动；交互结束且已回 1× 时恢复（放大静止态仍保持禁用）
         cell.syncInteraction = { [weak self] interacting in
