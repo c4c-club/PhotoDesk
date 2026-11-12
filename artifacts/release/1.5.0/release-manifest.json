@@ -1,0 +1,27 @@
+{
+  "version": "1.5.0",
+  "build": "6",
+  "commit": "27fcdcb",
+  "branch": "fix/m15-20261109",
+  "ciRunId": "43128234097",
+  "ciRunResult": "success（全量：core-linux + build 含全部单测/UI 测试/性能/冒烟/IPA 构建校验）",
+  "sha256": "42cd16e3ada499b5347dbc6a3b7da01482b9d02be25689ece07cc7c5db6996ea",
+  "bytes": 1236787,
+  "builtAt": "2026-11-12T23:05:00+08:00",
+  "ipaPath": "C:\\Users\\RuiZh\\Desktop\\photo_manager\\artifacts\\release\\1.5.0\\PhotoDesk-1.5.0-build6-unsigned.ipa",
+  "signed": false,
+  "minimumOSVersion": "16.0",
+  "bundleID": "com.example.PhotoDesk",
+  "verify": {
+    "payloadBinary": "Payload/PhotoDesk.app/PhotoDesk (Mach-O cffaedfe)",
+    "infoPlist": "MinimumOSVersion=16.0 CFBundleShortVersionString=1.5.0 CFBundleVersion=6 CFBundleIdentifier=com.example.PhotoDesk",
+    "codeSignature": "_CodeSignature absent (unsigned, AltServer 侧签预期)",
+    "sha256Source": "python hashlib (本地) 与 CI artifact PhotoDesk-unsigned.ipa.sha256 双端一致"
+  },
+  "testEvidence": {
+    "coreLinux": "338/338",
+    "unitTests": "223/223 (7.7s)",
+    "uiTests": "63/63 (4868s，含 ZoomStability/Stability/Marquee/Position/Flow/全部套件)",
+    "performance": "4/4：滚动内存增量 avg 98.3KB / 滚动单调耗时 12.649s / 查看器快滑内存峰值 42143KB(41.2MB, 红线 250MB)"
+  }
+}
