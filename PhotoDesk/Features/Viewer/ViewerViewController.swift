@@ -583,6 +583,11 @@ final class ViewerViewController: UIViewController {
         }
     }
 
+    /// 当前页图片 cell（M16 T01：dismiss / 批量 reload 门禁的 settle 目标）
+    private func currentZoomableCell() -> ZoomableImageCell? {
+        collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0)) as? ZoomableImageCell
+    }
+
     /// 当前页 cell 的缩放状态快照（B1 互斥判定信号源；无 cell = nil）
     private func currentCellZoomState() -> ViewerGesturePolicy.CellState? {
         (collectionView.cellForItem(at: IndexPath(item: viewModel.currentIndex, section: 0))
@@ -697,6 +702,8 @@ final class ViewerViewController: UIViewController {
 
     /// staged 撤销（恢复 item）：全量重载集合视图并定位回恢复位置
     private func reloadAfterRestore() {
+        // M16 T01：批量 reload 前强制几何事务 settled（禁止在缩放事务中 reloadData）
+        currentZoomableCell()?.settleForBatchUpdate()
         collectionView.reloadData()
         let index = max(0, min(viewModel.currentIndex, max(0, viewModel.items.count - 1)))
         scrollTo(index: index, animated: false)
@@ -899,6 +906,8 @@ final class ViewerViewController: UIViewController {
     // MARK: - 按钮
 
     @objc private func closeTapped() {
+        // M16 T01：缩放/动画事务未 settled 前禁止 dismiss——先强制当前 cell settled（立即回 1×）再关闭
+        currentZoomableCell()?.settleForBatchUpdate()
         ViewerTrace.log("close idx=\(viewModel.currentIndex) count=\(viewModel.items.count)")
         undoCenter.dismissActive()
         onClose?()

@@ -1,8 +1,12 @@
-// MARK: - 职责说明：查看器缩放手势控制器（docs/25 §4.4 / M15 P0-1）——
+// MARK: - 职责说明：查看器缩放手势控制器（docs/25 §4.4 / M15 P0-1；docs/28 §4.4.2 / M16 P0-1A 事务化）——
 // 自管变换：pinch/pan/double-tap 全部只调 PhotoDeskCore.ZoomTransformPolicy，绝不触碰
 // UIScrollView 的 zoom API（delegate=nil、min=max zoom=1、isScrollEnabled=false 的纯容器）。
 // 状态机 idle → pinching → settling → idle / idle → panning → idle / idle → animating → idle；
-// isInteracting 期间 VC 禁用 collectionView 滚动与翻页；reset(animated:) 供复用/翻页/旋转调用。
+// M16 T01：手势/动画窗口的事件决策收口到 Core.ZoomTransformTransaction——
+// ① 禁止对 UIGestureRecognizer.state 赋值（旧实现 .cancelled 赋值破坏 UIKit 手势状态机，捏合必崩根因）；
+// ② 动画使用代际 token transactionToken，复用/新动画后旧 completion 一律失效；
+// ③ invalidated（复用/旋转/布局/程序性复位）立即回 idle 并复位 identity。
+// isInteracting 期间 VC 禁用 collectionView 滚动与翻页；reset/invalidate 供复用/翻页/旋转调用。
 
 import UIKit
 import PhotoDeskCore
@@ -37,6 +41,8 @@ final class ZoomInteractionController: NSObject {
 
     private(set) var phase: Phase = .idle
     private(set) var transform = ZoomTransform.identity
+    /// 动画代际 token：每次开动画 +1，invalidated 清零（决策表唯一事实源在 Core）
+    private(set) var transactionToken = 0
     private var lastActivity: TimeInterval = 0
     /// cell 注入：视口（viewportScrollView）与内容 aspectFit 尺寸
     private weak var viewportView: UIView?
@@ -61,6 +67,17 @@ final class ZoomInteractionController: NSObject {
     var isAnimating: Bool { phase == .animating || phase == .settling }
     var scale: Double { transform.scale }
     var secondsSinceActivity: TimeInterval { CACurrentMediaTime() - lastActivity }
+
+    /// Core 决策输入快照：App 4 态映射到 Core 3 相（pinching/panning → interacting；settling/animating → animating）
+    private var transactionSnapshot: ZoomTransactionSnapshot {
+        let corePhase: ZoomTransactionSnapshot.Phase
+        switch phase {
+        case .idle: corePhase = .idle
+        case .pinching, .panning: corePhase = .interacting
+        case .settling, .animating: corePhase = .animating
+        }
+        return ZoomTransactionSnapshot(phase: corePhase, animationToken: transactionToken)
+    }
 
     init(viewportView: UIView) {
         self.viewportView = viewportView
@@ -119,17 +136,31 @@ final class ZoomInteractionController: NSObject {
         setTransform(t)
     }
 
-    /// 复用/翻页/删除/旋转：直接回 1× 居中（无动画时立即生效）。
-    /// 程序性复位属于一次"事务结束"：必须发 didEnd（VC 串行 drain 依赖该信号），
-    /// 且不得刷新 lastActivity（宽限窗口只应挂在真实用户手势之后，否则翻页/复用后被宽限卡 1s）。
+    /// 复用/翻页/删除/旋转：立即回 1× 居中（无动画）。
+    /// animated=true 且空闲时走动画收敛；动画/交互窗口一律 invalidate（禁止未 settled 复位半途）。
     func reset(animated: Bool) {
-        guard transform != .identity else { return }
-        if animated && !UIAccessibility.isReduceMotionEnabled {
+        guard transform != .identity || isInteracting else { return }
+        if animated, !isInteracting, !UIAccessibility.isReduceMotionEnabled {
             animate(to: .identity)
         } else {
-            setTransform(.identity)
-            endInteraction(forceNotify: true)
+            invalidateTransaction()
         }
+    }
+
+    /// invalidated 决策入口：复用/旋转/布局/程序性复位。
+    /// 取消动画代际（旧 completion 失配）并立即回 identity；程序性复位属于一次"事务结束"：
+    /// 必须发 didEnd（VC 串行 drain 依赖该信号）。
+    func invalidateTransaction() {
+        let wasInteracting = phase != .idle
+        let wasTransformed = transform != .identity
+        transactionToken = 0
+        guard wasInteracting || wasTransformed else { return }
+        phase = .idle
+        setTransform(.identity)
+        if wasInteracting {
+            onInteractionStateChanged?(false)
+        }
+        onInteractionDidEnd?()
     }
 
     // MARK: - 手势处理
@@ -138,7 +169,9 @@ final class ZoomInteractionController: NSObject {
         guard let viewport = viewportView, contentFitSize.width > 0 else { return }
         switch gesture.state {
         case .began:
-            guard !isAnimating else { gesture.state = .cancelled; return }
+            // M16 T01：动画/交互窗口直接 return（Core 决策），绝不写 gesture.state（旧实现 .cancelled 赋值 = 崩溃根因）
+            guard ZoomTransformTransaction.decide(state: transactionSnapshot,
+                                                  event: .gestureBegan(.pinch)) == .beginInteraction else { return }
             pinchStartTransform = transform
             pinchAnchor = gesture.location(in: viewport)
             begin(.pinching)
@@ -163,8 +196,10 @@ final class ZoomInteractionController: NSObject {
         guard let viewport = viewportView, contentFitSize.width > 0 else { return }
         switch gesture.state {
         case .began:
-            // 只在已放大时接管单指平移；1× 时让位给翻页/上下滑
-            guard !isAnimating, transform.scale > 1.01 else { gesture.state = .cancelled; return }
+            // 只在已放大时接管单指平移；1× 时让位给翻页/上下滑；动画/交互窗口直接 return（绝不写 gesture.state）
+            guard transform.scale > 1.01,
+                  ZoomTransformTransaction.decide(state: transactionSnapshot,
+                                                  event: .gestureBegan(.pan)) == .beginInteraction else { return }
             panStartTransform = transform
             begin(.panning)
         case .changed:
@@ -189,7 +224,9 @@ final class ZoomInteractionController: NSObject {
         doubleTapEnterCount += 1
         onDoubleTapEntered?()
         guard let viewport = viewportView, contentFitSize.width > 0,
-              gesture.state == .ended, !isAnimating else { return }
+              gesture.state == .ended,
+              ZoomTransformTransaction.decide(state: transactionSnapshot,
+                                              event: .animationRequested) == .beginAnimation else { return }
         let point = gesture.location(in: viewport)
         let target: ZoomTransform
         if transform.scale > 1.01 {
@@ -219,6 +256,8 @@ final class ZoomInteractionController: NSObject {
 
     /// 手势结束：终值在每帧已按策略钳制（scale 恒在 1...5、平移不露白），直接收敛回 idle。
     private func settleAfterGesture() {
+        guard ZoomTransformTransaction.decide(state: transactionSnapshot,
+                                              event: .gestureEnded) == .settle else { return }
         phase = .settling
         lastActivity = CACurrentMediaTime()
         setTransform(transform)
@@ -226,6 +265,10 @@ final class ZoomInteractionController: NSObject {
     }
 
     private func animate(to target: ZoomTransform) {
+        let decision = ZoomTransformTransaction.decide(state: transactionSnapshot, event: .animationRequested)
+        guard decision == .beginAnimation else { return }
+        transactionToken = ZoomTransformTransaction.advanced(transactionSnapshot, by: decision).animationToken
+        let token = transactionToken
         phase = .animating
         lastActivity = CACurrentMediaTime()
         onInteractionStateChanged?(true)
@@ -233,6 +276,11 @@ final class ZoomInteractionController: NSObject {
         UIView.animate(withDuration: duration, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
             self.setTransform(target)
         } completion: { _ in
+            // 代际校验：复用（invalidateTransaction）或新动画开启后，旧 completion 一律失效（docs/28 §4.4.2 #3）
+            let completion = ZoomTransformTransaction.decide(
+                state: self.transactionSnapshot,
+                event: .animationCompleted(token: token))
+            guard completion == .finishAnimation else { return }
             self.endInteraction()
         }
     }
@@ -298,5 +346,7 @@ extension ZoomInteractionController: UIGestureRecognizerDelegate {
 extension ZoomInteractionController {
     var test_areGesturesEnabled: Bool { pinch.isEnabled }
     var test_transform: ZoomTransform { transform }
+    var test_transactionToken: Int { transactionToken }
+    func test_invalidate() { invalidateTransaction() }
 }
 #endif

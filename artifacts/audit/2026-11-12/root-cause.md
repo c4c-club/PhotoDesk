@@ -1,6 +1,6 @@
 ﻿# M16 根因取证（fresh audit，仅当前源码证据）
 
-> 生成：audit-m16.ps1（generatedAt 2026-11-13T00:44:13+08:00）。证据全部来自本轮对当前源码的扫描（同轮 audit.json 可交叉核对）；不引用 docs/25/27 的任何历史结论。
+> 生成：audit-m16.ps1（generatedAt 2026-11-13T01:04:45+08:00）。证据全部来自本轮对当前源码的扫描（同轮 audit.json 可交叉核对）；不引用 docs/25/27 的任何历史结论。
 
 ## P0-1A 查看器缩放（入口 A）
 
@@ -10,11 +10,9 @@
 
 | 文件:行 | 代码 |
 |---|---|
-| PhotoDesk/Features/Viewer/ViewerViewController.swift:784 | guard gesture.state == .began else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:141 | guard !isAnimating else { gesture.state = .cancelled; return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:167 | guard !isAnimating, transform.scale > 1.01 else { gesture.state = .cancelled; return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:192 | gesture.state == .ended, !isAnimating else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:208 | guard gesture.state == .ended else { return } |
+| PhotoDesk/Features/Viewer/ViewerViewController.swift:791 | guard gesture.state == .began else { return } |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:227 | gesture.state == .ended, |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:245 | guard gesture.state == .ended else { return } |
 
 **触发条件**：动画/收敛窗口（Phase = animating 或 settling）内再次捏合——handlePinch 的 .began 命中 guard !isAnimating 直接置 gesture.state = .cancelled（被取消手势的后续触摸事件仍会到达）；随后 UIKit 送达的 .changed/.ended 被 guard phase == .pinching 丢弃，状态机停在非 idle 窗口；动画块内 imageView.transform/center 持续改写，与 cell 复用/翻页 zoomController.reset 竞态。
 

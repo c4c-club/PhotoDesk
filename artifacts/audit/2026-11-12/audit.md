@@ -1,12 +1,12 @@
-﻿# PhotoDesk M16 基线审查（generatedAt 2026-11-13T00:44:13+08:00）
+﻿# PhotoDesk M16 基线审查（generatedAt 2026-11-13T01:04:45+08:00）
 
 ## 1. 基线
 
 | 项 | 值 |
 |---|---|
 | 分支 | fix/m16-20261112 |
-| HEAD | 864af86510feec9b6c0369b8ea6025c8473e82a9 |
-| 最后提交 | 864af86510feec9b6c0369b8ea6025c8473e82a9 2026-11-12 23:07:45 +0800 docs(m15): 全量绿最终数字回填 docs/27（run 43128234097 全绿）+ release manifest 更新为 27fcdcb IPA |
+| HEAD | a803265cd2bad50fef1f93466531f3f2f97a2f53 |
+| 最后提交 | a803265cd2bad50fef1f93466531f3f2f97a2f53 2026-11-13 00:46:37 +0800 docs(m16): 回填 T00 进度与证据路径 |
 | 扫描器 | rg |
 
 ### 版本
@@ -22,11 +22,11 @@
 
 | 目录 | Swift 文件 | 行数 |
 |---|---:|---:|
-| PhotoDesk | 110 | 19153 |
-| PhotoDeskCore/Sources | 30 | 2627 |
-| PhotoDeskCore/Tests | 26 | 3347 |
-| PhotoDeskTests | 30 | 4545 |
-| PhotoDeskUITests | 9 | 2823 |
+| PhotoDesk | 110 | 19241 |
+| PhotoDeskCore/Sources | 31 | 2757 |
+| PhotoDeskCore/Tests | 27 | 3563 |
+| PhotoDeskTests | 30 | 4636 |
+| PhotoDeskUITests | 9 | 2889 |
 
 ## 2. 红线（命中 6 · 违规 0）
 
@@ -91,15 +91,13 @@
 | 文件:行 | 代码 |
 |---|---|
 
-### 3.gestureStateAssign（5 处）
+### 3.gestureStateAssign（3 处）
 
 | 文件:行 | 代码 |
 |---|---|
-| PhotoDesk/Features/Viewer/ViewerViewController.swift:784 | guard gesture.state == .began else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:141 | guard !isAnimating else { gesture.state = .cancelled; return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:167 | guard !isAnimating, transform.scale > 1.01 else { gesture.state = .cancelled; return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:192 | gesture.state == .ended, !isAnimating else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:208 | guard gesture.state == .ended else { return } |
+| PhotoDesk/Features/Viewer/ViewerViewController.swift:791 | guard gesture.state == .began else { return } |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:227 | gesture.state == .ended, |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:245 | guard gesture.state == .ended else { return } |
 
 ### 3.animatingGuard（0 处）
 
@@ -305,9 +303,9 @@
 
 | 层 | 类数 | test 函数数 |
 |---|---:|---:|
-| PhotoDeskCore/Tests | 28 | 338 |
-| PhotoDeskTests | 30 | 223 |
-| PhotoDeskUITests | 9 | 67 |
+| PhotoDeskCore/Tests | 29 | 366 |
+| PhotoDeskTests | 30 | 230 |
+| PhotoDeskUITests | 9 | 70 |
 
 ## 9. 输出文件
 

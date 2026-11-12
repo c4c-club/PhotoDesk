@@ -280,7 +280,16 @@ final class ZoomableImageCell: UICollectionViewCell {
         ViewerGesturePolicy.CellState(isZooming: zoomController.isInteracting,
                                       zoomScale: diagnostics.currentScale,
                                       secondsSinceZoomActivity: zoomController.secondsSinceActivity,
-                                      geometryState: .idle)
+                                      geometryState: geometryTransactionState)
+    }
+
+    /// M16 T01：几何事务态由控制器实际 phase 派生（旧实现硬编码 .idle，VC 误判几何稳定）
+    private var geometryTransactionState: ZoomTransactionState {
+        switch zoomController.phase {
+        case .idle: return .idle
+        case .pinching, .panning: return .active
+        case .settling, .animating: return .settling
+        }
     }
 
     /// 是否已有图（VC appear 重挂判断 + DEBUG 横幅 img 字段）
@@ -372,6 +381,12 @@ final class ZoomableImageCell: UICollectionViewCell {
         zoomController.reset(animated: false)
     }
 
+    /// M16 T01：批量更新（reloadData / performBatchUpdates / dismiss）前强制几何事务 settled。
+    /// 禁止在缩放事务中执行批量更新——VC 在 closeTapped / reloadAfterRestore 前调用。
+    func settleForBatchUpdate() {
+        zoomController.invalidateTransaction()
+    }
+
     // MARK: - 布局（全部经 ZoomGeometry / ZoomTransformPolicy，零散几何值不得出现）
 
     /// viewport 尺寸或图片变化时重算 aspectFit；旋转用 ZoomTransformPolicy.relayout 保持中心内容点。
@@ -387,6 +402,11 @@ final class ZoomableImageCell: UICollectionViewCell {
         let fitSize = CGSize(width: fit.width, height: fit.height)
         let viewportChanged = !hasAppliedLayout || lastViewportSize != viewport
         guard fitSize != currentFitSize || viewportChanged else { return }
+        // M16 T01：旋转/布局打断在途动画——先 settled（旧 completion 失效）再 relayout；
+        // 静止放大态不受影响（保持中心内容点的 relayout 语义）。
+        if zoomController.isAnimating {
+            zoomController.invalidateTransaction()
+        }
 
         if viewportChanged, hasAppliedLayout, currentFitSize.width > 0 {
             // 旋转/尺寸变化：保持中心内容点，重新钳制（docs/25 §4.5）
@@ -414,16 +434,25 @@ final class ZoomableImageCell: UICollectionViewCell {
     }
 
     /// 变换应用：transform 缩放绕中心；center = viewport 中心 + translation（与 policy 模型一致）。
+    /// M16 T01：写入层最后一道闸——非有限分量/零 bounds 一律拒绝并复位 identity（旧实现直接写 CALayer）。
     private func applyTransform(_ t: ZoomTransform) {
         let viewport = viewportScrollView.bounds.size
-        guard viewport.width > 0, viewport.height > 0 else { return }
+        guard ZoomTransformTransaction.isUsableViewport(width: Double(viewport.width),
+                                                        height: Double(viewport.height)),
+              let sanitized = ZoomTransformTransaction.sanitizedTransform(scale: t.scale,
+                                                                          translationX: t.translationX,
+                                                                          translationY: t.translationY) else {
+            ViewerTrace.log("zoom=non-finite rejected scale=\(t.scale)")
+            resetZoom()
+            return
+        }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        imageView.transform = CGAffineTransform(scaleX: CGFloat(t.scale), y: CGFloat(t.scale))
-        imageView.center = CGPoint(x: viewport.width / 2 + CGFloat(t.translationX),
-                                   y: viewport.height / 2 + CGFloat(t.translationY))
+        imageView.transform = CGAffineTransform(scaleX: CGFloat(sanitized.scale), y: CGFloat(sanitized.scale))
+        imageView.center = CGPoint(x: viewport.width / 2 + CGFloat(sanitized.translationX),
+                                   y: viewport.height / 2 + CGFloat(sanitized.translationY))
         CATransaction.commit()
-        diagnostics.currentScale = CGFloat(t.scale)
+        diagnostics.currentScale = CGFloat(sanitized.scale)
         diagnostics.lastActivity = CACurrentMediaTime()
     }
 

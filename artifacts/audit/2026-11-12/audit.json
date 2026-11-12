@@ -1,9 +1,9 @@
 ﻿{
-    "generatedAt":  "2026-11-13T00:44:13+08:00",
+    "generatedAt":  "2026-11-13T01:04:45+08:00",
     "repo":  "C:\\Users\\RuiZh\\Desktop\\photo_manager",
     "branch":  "fix/m16-20261112",
-    "head":  "864af86510feec9b6c0369b8ea6025c8473e82a9",
-    "lastCommit":  "864af86510feec9b6c0369b8ea6025c8473e82a9 2026-11-12 23:07:45 +0800 docs(m15): 全量绿最终数字回填 docs/27（run 43128234097 全绿）+ release manifest 更新为 27fcdcb IPA",
+    "head":  "a803265cd2bad50fef1f93466531f3f2f97a2f53",
+    "lastCommit":  "a803265cd2bad50fef1f93466531f3f2f97a2f53 2026-11-13 00:46:37 +0800 docs(m16): 回填 T00 进度与证据路径",
     "scanner":  "rg",
     "versions":  {
                      "MARKETING_VERSION":  "1.5.0",
@@ -14,23 +14,23 @@
     "scale":  {
                   "PhotoDesk":  {
                                     "files":  110,
-                                    "lines":  19153
+                                    "lines":  19241
                                 },
                   "PhotoDeskCore/Sources":  {
-                                                "files":  30,
-                                                "lines":  2627
+                                                "files":  31,
+                                                "lines":  2757
                                             },
                   "PhotoDeskCore/Tests":  {
-                                              "files":  26,
-                                              "lines":  3347
+                                              "files":  27,
+                                              "lines":  3563
                                           },
                   "PhotoDeskTests":  {
                                          "files":  30,
-                                         "lines":  4545
+                                         "lines":  4636
                                      },
                   "PhotoDeskUITests":  {
                                            "files":  9,
-                                           "lines":  2823
+                                           "lines":  2889
                                        }
               },
     "fileInventory":  [
@@ -428,7 +428,7 @@
                           },
                           {
                               "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                              "lines":  1260
+                              "lines":  1269
                           },
                           {
                               "file":  "PhotoDesk/Features/Viewer/ViewerViewModel.swift",
@@ -436,11 +436,11 @@
                           },
                           {
                               "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                              "lines":  460
+                              "lines":  489
                           },
                           {
                               "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                              "lines":  302
+                              "lines":  352
                           },
                           {
                               "file":  "PhotoDesk/UI/Bridges/ActivityViewWrapper.swift",
@@ -595,6 +595,10 @@
                               "lines":  144
                           },
                           {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ZoomTransformTransaction.swift",
+                              "lines":  130
+                          },
+                          {
                               "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/BatchCommitPlannerTests.swift",
                               "lines":  71
                           },
@@ -699,6 +703,10 @@
                               "lines":  325
                           },
                           {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomTransformTransactionBoundaryTests.swift",
+                              "lines":  216
+                          },
+                          {
                               "file":  "PhotoDeskTests/BiometricGateTests.swift",
                               "lines":  104
                           },
@@ -800,7 +808,7 @@
                           },
                           {
                               "file":  "PhotoDeskTests/ViewerGestureGuardTests.swift",
-                              "lines":  124
+                              "lines":  132
                           },
                           {
                               "file":  "PhotoDeskTests/ViewerRemovalPlannerTests.swift",
@@ -816,7 +824,7 @@
                           },
                           {
                               "file":  "PhotoDeskTests/ZoomableImageCellTests.swift",
-                              "lines":  153
+                              "lines":  236
                           },
                           {
                               "file":  "PhotoDeskUITests/FlowUITests.swift",
@@ -852,7 +860,7 @@
                           },
                           {
                               "file":  "PhotoDeskUITests/ZoomStabilityUITests.swift",
-                              "lines":  433
+                              "lines":  499
                           }
                       ],
     "redlines":  {
@@ -969,27 +977,17 @@
                   "gestureStateAssign":  [
                                              {
                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                 "line":  784,
+                                                 "line":  791,
                                                  "text":  "guard gesture.state == .began else { return }"
                                              },
                                              {
                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  141,
-                                                 "text":  "guard !isAnimating else { gesture.state = .cancelled; return }"
+                                                 "line":  227,
+                                                 "text":  "gesture.state == .ended,"
                                              },
                                              {
                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  167,
-                                                 "text":  "guard !isAnimating, transform.scale \u003e 1.01 else { gesture.state = .cancelled; return }"
-                                             },
-                                             {
-                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  192,
-                                                 "text":  "gesture.state == .ended, !isAnimating else { return }"
-                                             },
-                                             {
-                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  208,
+                                                 "line":  245,
                                                  "text":  "guard gesture.state == .ended else { return }"
                                              }
                                          ],
@@ -2176,22 +2174,22 @@
                             "errorHits":  [
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                  "line":  770,
+                                                  "line":  777,
                                                   "text":  "/// cell 视口单击（ZoomInteractionController.tap / VideoCell.tapGesture，双击失败后触发）："
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                  "line":  945,
+                                                  "line":  954,
                                                   "text":  "self.showToast(text: \"操作失败：\\(error.localizedDescription)\","
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                  "line":  1087,
+                                                  "line":  1096,
                                                   "text":  "cell.showFailurePlaceholder { [weak self, weak cell] in"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                  "line":  1172,
+                                                  "line":  1181,
                                                   "text":  "// 仍未拿到（下载失败/仍受限）：保持占位态，用户可重试"
                                               },
                                               {
@@ -2211,27 +2209,27 @@
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                  "line":  331,
+                                                  "line":  340,
                                                   "text":  "/// 大图加载失败（非 iCloud）：占位 + 中文重试（docs/22 Phase 4 查看器）"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                  "line":  332,
+                                                  "line":  341,
                                                   "text":  "func showFailurePlaceholder(onRetry: @escaping () -\u003e Void) {"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                  "line":  335,
+                                                  "line":  344,
                                                   "text":  "cloudLabel.text = \"加载失败，请检查照片是否仍在本机\""
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                  "line":  31,
+                                                  "line":  35,
                                                   "text":  "/// 单击（双击失败后）落在视口：chrome 切换/视频播放的唯一入口（同 view require，无跨 view 互斥）。"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                  "line":  289,
+                                                  "line":  337,
                                                   "text":  "/// 放大平移时要求外层 pan 失败（cell pan 优先）。"
                                               }
                                           ],
@@ -2268,7 +2266,7 @@
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
-                                                   "line":  860,
+                                                   "line":  867,
                                                    "text":  "favoriteButton.image = UIImage(systemName: favoriteIconName)"
                                                },
                                                {
@@ -2278,28 +2276,28 @@
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                   "line":  305,
+                                                   "line":  314,
                                                    "text":  "cloudIcon.image = UIImage(systemName: \"icloud\")"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                   "line":  323,
+                                                   "line":  332,
                                                    "text":  "cloudIcon.image = UIImage(systemName: \"icloud\")"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
-                                                   "line":  334,
+                                                   "line":  343,
                                                    "text":  "cloudIcon.image = UIImage(systemName: \"exclamationmark.triangle\")"
                                                }
                                            ]
                         }
                     ],
     "tests":  {
-                  "coreClasses":  28,
-                  "coreTests":  338,
+                  "coreClasses":  29,
+                  "coreTests":  366,
                   "iosClasses":  30,
-                  "iosTests":  223,
+                  "iosTests":  230,
                   "uiClasses":  9,
-                  "uiTests":  67
+                  "uiTests":  70
               }
 }
