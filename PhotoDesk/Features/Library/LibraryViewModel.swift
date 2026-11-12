@@ -48,6 +48,10 @@ final class LibraryViewModel: ObservableObject {
     @Published private(set) var isIndexComplete = false
     @Published private(set) var isLimitedAccess = false
     @Published private(set) var isLoadingMore = false
+    /// head 回填代际（v6 §5.4）：每个 head 批次前插后 +1；恢复状态机据此判定「连续两轮不变」
+    @Published private(set) var headInsertGeneration = 0
+    /// head 回填进行中（首批窗口 > 0 且头部批次尚未全部插完）
+    @Published private(set) var isHeadBackfillActive = false
 
     /// VC 注册：快照数据推送（主线程）。已在加载完成的 VC 接入时立即重放当前快照——
     /// 否则 VM 先于 VC 完成加载，回调错过唯一一次推送，网格永远空白（CI 实测的根因）。
@@ -82,7 +86,12 @@ final class LibraryViewModel: ObservableObject {
     private var hasLoadedOnce = false
     private var indexingTask: Task<Void, Never>?
     /// 首批窗口在全量结果中的起始 offset（R03：锚点窗口 > 0 时，头部月份延后回填）
-    private var firstBatchWindowStart = 0
+    private(set) var firstBatchWindowStart = 0
+    /// assetID → 全量索引位置（v6 anchorGlobalIndex 取证用；rebuildDerived 维护）
+    private var globalIndexByID: [String: Int] = [:]
+
+    /// 全量索引位置查询（O(1)；未收录/已删除 → nil）
+    func globalIndex(ofAssetID id: String) -> Int? { globalIndexByID[id] }
 
     init(service: PhotoLibraryService,
          repository: AssetRepositoryProtocol,
@@ -312,8 +321,13 @@ final class LibraryViewModel: ObservableObject {
     private func fetchFirstBatch() async -> [PhotoItem] {
         var windowStart = 0
         if let anchor = positionStore?.load(queryKey: query.key) {
-            if let anchorIndex = await repository.globalIndex(of: anchor.anchorAssetID, scope: query.scope) {
-                windowStart = max(0, anchorIndex - batchSize / 2)
+            // v6：优先落盘的 anchorGlobalIndex（仅用于窗口定位，非身份；陈旧值钳制进结果范围），
+            // 缺失再回退实时全量查询
+            let savedIndex = anchor.anchorGlobalIndex
+            let resolved = savedIndex ?? await repository.globalIndex(of: anchor.anchorAssetID, scope: query.scope)
+            if let anchorIndex = resolved {
+                let clampedIndex = min(max(anchorIndex, 0), max(0, totalCount - 1))
+                windowStart = max(0, clampedIndex - batchSize / 2)
                 ViewerTrace.log("anchor-window key=\(query.key.prefix(8)) anchorIdx=\(anchorIndex) start=\(windowStart)")
             }
         }
@@ -363,16 +377,25 @@ final class LibraryViewModel: ObservableObject {
                 sinceRebuild = 0
             }
         }
-        // R03：头部回填（锚点窗口之前的更早月份）——Diffable 前插，VC 侧按布局 minY 差值补偿 contentOffset
+        // v6（docs/28 §5.5 步骤 4）：头部回填按批前插，每批 +1 headInsertGeneration 并推送一次快照，
+        // 恢复协调器按 contentHeight delta 逐批补偿（不再依赖恢复期禁登记的旧竞态语义）。
         if !Task.isCancelled, firstBatchWindowStart > 0 {
-            let head = await repository.fetch(scope: query.scope, offset: 0, limit: firstBatchWindowStart)
-            if !head.isEmpty {
+            isHeadBackfillActive = true
+            defer { isHeadBackfillActive = false }
+            var headOffset = 0
+            while !Task.isCancelled, headOffset < firstBatchWindowStart {
+                let limit = min(batchSize, firstBatchWindowStart - headOffset)
+                let head = await repository.fetch(scope: query.scope, offset: headOffset, limit: limit)
+                guard !head.isEmpty else { break }
                 let existing = Set(allItems.map(\.id))
                 let freshHead = head.filter { !existing.contains($0.id) }
                 if !freshHead.isEmpty {
                     allItems = freshHead + allItems
-                    sinceRebuild += freshHead.count
+                    headInsertGeneration += 1
+                    rebuildDerived(animated: false)
                 }
+                headOffset += head.count
+                if head.count < limit { break }
             }
         }
         if !Task.isCancelled {
@@ -452,6 +475,8 @@ final class LibraryViewModel: ObservableObject {
         let pendingDeletes = Set(reviewSession.session.pendingDeleteIDs)
         let pendingHides = Set(reviewSession.session.pendingHideIDs)
         let pending = pendingDeletes.union(pendingHides)
+        globalIndexByID = Dictionary(allItems.enumerated().map { ($1.id, $0) },
+                                     uniquingKeysWith: { first, _ in first })
         visibleItems = pending.isEmpty ? allItems : allItems.filter { !pending.contains($0.id) }
         filteredItems = PhotoFilter.apply(visibleItems, predicate: query.filter)
         rebuildSections(animated: animated)

@@ -164,12 +164,14 @@ final class PositionStoreV6Tests: XCTestCase {
                       "迁移结果必须落 v6 文件")
     }
 
-    func testMigrationSkippedWhenV6FileAlreadyExists() throws {
+    func testMigrationRunsExactlyOnce() throws {
         try writeLegacyV5File(anchor: "legacy-5", queryKey: "k5")
-        let store = PositionFileStore(directory: dir)
-        store.save(makeV6(anchor: "fresh-6", queryKey: "k6"), queryKey: "k6")
-        store.flush()
-        let reloaded = PositionFileStore(directory: dir)
+        let first = PositionFileStore(directory: dir)   // 首次初始化 → 迁移 k5
+        XCTAssertNotNil(first.load(queryKey: "k5"), "首次初始化必须迁入 v5 记录")
+        first.remove(queryKey: "k5")                    // 用户清除旧记录
+        first.save(makeV6(anchor: "fresh-6", queryKey: "k6"), queryKey: "k6")
+        first.flush()
+        let reloaded = PositionFileStore(directory: dir) // v6 文件已存在 → 不再迁移
         XCTAssertNotNil(reloaded.load(queryKey: "k6"))
         XCTAssertNil(reloaded.load(queryKey: "k5"),
                      "v6 文件已存在 → 迁移只执行一次，不得把旧 v5 再灌进来")

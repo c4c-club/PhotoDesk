@@ -33,17 +33,19 @@ final class LibraryPositionStoreTests: XCTestCase {
     private func makePosition(assetID: String = "asset-1",
                               sectionID: String = "2024-05",
                               itemIndex: Int = 3,
-                              ratio: Double = 0.42) -> LibraryPosition {
-        LibraryPosition(anchorAssetID: assetID,
-                        anchorVisualY: 42,
-                        anchorContentOffsetY: 1_000,
-                        assetID: assetID,
-                        sectionID: sectionID,
-                        itemIndexInSection: itemIndex,
-                        offsetRatio: ratio,
-                        contentHeight: 8_000,
-                        viewportHeight: 844,
-                        savedAt: Date())
+                              ratio: Double = 0.42) -> LibraryPositionV6 {
+        LibraryPositionV6(queryKey: "",
+                          anchorAssetID: assetID,
+                          anchorGlobalIndex: nil,
+                          anchorSectionID: sectionID,
+                          anchorSectionItemIndex: itemIndex,
+                          anchorVisualY: 42,
+                          anchorContentOffsetY: 1_000,
+                          gridColumns: 3,
+                          contentInsetTop: 0,
+                          contentHeight: 8_000,
+                          viewportHeight: 844,
+                          savedAt: Date())
     }
 
     func testRoundTripPreservesAllFields() {
@@ -84,11 +86,11 @@ final class LibraryPositionStoreTests: XCTestCase {
         let migrated = store.load(queryKey: "q1")
         XCTAssertEqual(migrated?.anchorAssetID, "legacy-4")
         XCTAssertEqual(migrated?.anchorVisualY, 55)
-        XCTAssertEqual(migrated?.itemIndexInSection, 7)
+        XCTAssertEqual(migrated?.anchorSectionItemIndex, 7)
         XCTAssertEqual(migrated?.queryKey, "q1")
         store.flush()   // 迁移写盘走串行队列：先等落盘再断言文件存在
-        XCTAssertNotNil(FileManager.default.contents(atPath: dir.appendingPathComponent("anchors-v5.json").path),
-                        "迁移结果必须落 v5 文件")
+        XCTAssertNotNil(FileManager.default.contents(atPath: dir.appendingPathComponent("anchors-v6.json").path),
+                        "迁移结果必须落 v6 文件")
         XCTAssertNotNil(defaults.data(forKey: "library.lastPosition.v2.q1"),
                         "迁移成功不删除旧键（只读兼容）")
     }
@@ -154,15 +156,16 @@ final class LibraryPositionStoreTests: XCTestCase {
                        "flush 后跨实例必须可读（杀进程不丢最后一笔）")
     }
 
-    func testSchemaVersionAlwaysWrittenAsFive() {
+    func testSchemaVersionAlwaysWrittenAsSix() {
         let store = makeStore()
         store.save(makePosition(), queryKey: "q1")
         let decoded = store.load(queryKey: "q1")
-        XCTAssertEqual(decoded?.schemaVersion, 5)
+        XCTAssertEqual(decoded?.schemaVersion, 6)
         XCTAssertEqual(decoded?.anchorAssetID, "asset-1")
         XCTAssertEqual(decoded?.anchorVisualY, 42)
         XCTAssertEqual(decoded?.anchorContentOffsetY, 1_000)
-        XCTAssertEqual(decoded?.itemIndexInSection, 3)
+        XCTAssertEqual(decoded?.anchorSectionItemIndex, 3)
+        XCTAssertEqual(decoded?.gridColumns, 3)
     }
 
     func testLegacyV1DecodeStillFallsBack() throws {
