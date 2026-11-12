@@ -1,0 +1,8 @@
+=== PnP (Apple/iPhone) ===
+(no Apple/iPhone PnP device)
+=== idevice_id ===
+NOT FOUND
+=== pymobiledevice3 ===
+NOT FOUND
+=== AltServer process ===
+NOT RUNNING

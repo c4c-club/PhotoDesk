@@ -1,0 +1,2305 @@
+﻿{
+    "generatedAt":  "2026-11-13T00:44:13+08:00",
+    "repo":  "C:\\Users\\RuiZh\\Desktop\\photo_manager",
+    "branch":  "fix/m16-20261112",
+    "head":  "864af86510feec9b6c0369b8ea6025c8473e82a9",
+    "lastCommit":  "864af86510feec9b6c0369b8ea6025c8473e82a9 2026-11-12 23:07:45 +0800 docs(m15): 全量绿最终数字回填 docs/27（run 43128234097 全绿）+ release manifest 更新为 27fcdcb IPA",
+    "scanner":  "rg",
+    "versions":  {
+                     "MARKETING_VERSION":  "1.5.0",
+                     "CURRENT_PROJECT_VERSION":  "6",
+                     "IPHONEOS_DEPLOYMENT_TARGET":  "16.0",
+                     "SWIFT_VERSION":  "5.9"
+                 },
+    "scale":  {
+                  "PhotoDesk":  {
+                                    "files":  110,
+                                    "lines":  19153
+                                },
+                  "PhotoDeskCore/Sources":  {
+                                                "files":  30,
+                                                "lines":  2627
+                                            },
+                  "PhotoDeskCore/Tests":  {
+                                              "files":  26,
+                                              "lines":  3347
+                                          },
+                  "PhotoDeskTests":  {
+                                         "files":  30,
+                                         "lines":  4545
+                                     },
+                  "PhotoDeskUITests":  {
+                                           "files":  9,
+                                           "lines":  2823
+                                       }
+              },
+    "fileInventory":  [
+                          {
+                              "file":  "PhotoDesk/App/AppContainer.swift",
+                              "lines":  171
+                          },
+                          {
+                              "file":  "PhotoDesk/App/AppLockController.swift",
+                              "lines":  103
+                          },
+                          {
+                              "file":  "PhotoDesk/App/AppLockView.swift",
+                              "lines":  83
+                          },
+                          {
+                              "file":  "PhotoDesk/App/PhotoDeskApp.swift",
+                              "lines":  49
+                          },
+                          {
+                              "file":  "PhotoDesk/App/ToolsView.swift",
+                              "lines":  104
+                          },
+                          {
+                              "file":  "PhotoDesk/App/UITestHooks.swift",
+                              "lines":  38
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Analysis/FingerprintService.swift",
+                              "lines":  155
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Analysis/MetadataParser.swift",
+                              "lines":  131
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Analysis/ScanCoordinator.swift",
+                              "lines":  291
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Export/ExportRenderer.swift",
+                              "lines":  139
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/DiskCache.swift",
+                              "lines":  93
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/ImagePipeline.swift",
+                              "lines":  449
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/ImageRequesting.swift",
+                              "lines":  92
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/MemoryCache.swift",
+                              "lines":  38
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/PrefetchWindowTracker.swift",
+                              "lines":  88
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/ResumeOnce.swift",
+                              "lines":  83
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Imaging/ThumbnailRequest.swift",
+                              "lines":  53
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Persistence/PersistenceController.swift",
+                              "lines":  158
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/AssetRepository.swift",
+                              "lines":  230
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/AssetSizeProvider.swift",
+                              "lines":  95
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/BatchCommitCoordinator.swift",
+                              "lines":  76
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PHAsset+FileSize.swift",
+                              "lines":  20
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoChangeObserver.swift",
+                              "lines":  58
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoItem.swift",
+                              "lines":  49
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoLibraryService.swift",
+                              "lines":  50
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoScope.swift",
+                              "lines":  158
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoWriter.swift",
+                              "lines":  324
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/PhotoWriter+Mock.swift",
+                              "lines":  48
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Photos/UITestDatedPhotoSeeder.swift",
+                              "lines":  145
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Routing/Router.swift",
+                              "lines":  5
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/AppCrashLogger.swift",
+                              "lines":  129
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/AppVersion.swift",
+                              "lines":  25
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/AssetSizeCache.swift",
+                              "lines":  81
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/DateSectionizer.swift",
+                              "lines":  33
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/DiagnosticsExporter.swift",
+                              "lines":  98
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                              "lines":  194
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/LibraryQuery.swift",
+                              "lines":  59
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/PendingActionStore.swift",
+                              "lines":  69
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/PhotoFilter.swift",
+                              "lines":  125
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
+                              "lines":  142
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/ReviewSessionController.swift",
+                              "lines":  178
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/SettingsStore.swift",
+                              "lines":  108
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/StorageStatsService.swift",
+                              "lines":  84
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/UndoCenter.swift",
+                              "lines":  265
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/UndoCountdownDriver.swift",
+                              "lines":  109
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Support/ViewerTrace.swift",
+                              "lines":  76
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Trash/TrashBin.swift",
+                              "lines":  323
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Vault/BiometricGate.swift",
+                              "lines":  197
+                          },
+                          {
+                              "file":  "PhotoDesk/Core/Vault/VaultService.swift",
+                              "lines":  34
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Albums/AlbumDetailView.swift",
+                              "lines":  164
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                              "lines":  207
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                              "lines":  332
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Cleanup/CleanupViewModel.swift",
+                              "lines":  84
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Editor/Adjustments.swift",
+                              "lines":  45
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Editor/CropOverlayView.swift",
+                              "lines":  155
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                              "lines":  342
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Editor/EditorViewModel.swift",
+                              "lines":  248
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Export/ExportView.swift",
+                              "lines":  178
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Export/ExportViewModel.swift",
+                              "lines":  127
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Export/StorageStatsView.swift",
+                              "lines":  341
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Export/StorageStatsViewModel.swift",
+                              "lines":  128
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryCategoryMenuBuilder.swift",
+                              "lines":  67
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                              "lines":  348
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                              "lines":  310
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                              "lines":  274
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                              "lines":  1908
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                              "lines":  627
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                              "lines":  142
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/MonthIndexBar.swift",
+                              "lines":  154
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/MonthJumpSheet.swift",
+                              "lines":  145
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                              "lines":  215
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
+                              "lines":  93
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Library/SlideSelectGestureController.swift",
+                              "lines":  272
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Metadata/MetadataView.swift",
+                              "lines":  264
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
+                              "lines":  147
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Onboarding/PermissionIntroView.swift",
+                              "lines":  96
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Search/SearchView.swift",
+                              "lines":  298
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Search/SearchViewModel.swift",
+                              "lines":  123
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Session/SessionBadgeView.swift",
+                              "lines":  39
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                              "lines":  249
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/ActionPickerView.swift",
+                              "lines":  78
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/AppearanceSettingsView.swift",
+                              "lines":  106
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/CacheManagerView.swift",
+                              "lines":  111
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                              "lines":  116
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                              "lines":  148
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/PrivacyView.swift",
+                              "lines":  97
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/SecuritySettingsView.swift",
+                              "lines":  89
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Settings/SettingsView.swift",
+                              "lines":  105
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Vault/VaultGridView.swift",
+                              "lines":  142
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                              "lines":  261
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                              "lines":  236
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ActionOverlayView.swift",
+                              "lines":  127
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/FilmStripView.swift",
+                              "lines":  158
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/SwipeGestureEngine.swift",
+                              "lines":  107
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/VideoCell.swift",
+                              "lines":  116
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ViewerContainer.swift",
+                              "lines":  32
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ViewerContext.swift",
+                              "lines":  21
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ViewerGesturePolicy.swift",
+                              "lines":  68
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                              "lines":  1260
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ViewerViewModel.swift",
+                              "lines":  305
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                              "lines":  460
+                          },
+                          {
+                              "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                              "lines":  302
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/Bridges/ActivityViewWrapper.swift",
+                              "lines":  48
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/Bridges/AlertTextFieldBridge.swift",
+                              "lines":  58
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/Colors.swift",
+                              "lines":  59
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/DSEmptyState.swift",
+                              "lines":  114
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/DSToast.swift",
+                              "lines":  286
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/Motion.swift",
+                              "lines":  26
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/Spacing.swift",
+                              "lines":  34
+                          },
+                          {
+                              "file":  "PhotoDesk/UI/DesignSystem/Typography.swift",
+                              "lines":  56
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/BatchCommitPlanner.swift",
+                              "lines":  61
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/DateSectionizer.swift",
+                              "lines":  122
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/DuplicateGrouper.swift",
+                              "lines":  134
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/EditorTransform.swift",
+                              "lines":  123
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ExportOptions.swift",
+                              "lines":  97
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/GeoFilter.swift",
+                              "lines":  106
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/GestureConfig.swift",
+                              "lines":  46
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/GridHitRegion.swift",
+                              "lines":  106
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/Hash/BlurDetector.swift",
+                              "lines":  42
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/Hash/DHash.swift",
+                              "lines":  28
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/Hash/Phash.swift",
+                              "lines":  63
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/MarqueeSelectionPolicy.swift",
+                              "lines":  140
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/MonthNavigator.swift",
+                              "lines":  128
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PhotoDeskCore.swift",
+                              "lines":  8
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionAnchorSelector.swift",
+                              "lines":  52
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionAnchorV3.swift",
+                              "lines":  220
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                              "lines":  115
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ReplacementPlanner.swift",
+                              "lines":  67
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ReviewSession.swift",
+                              "lines":  121
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift",
+                              "lines":  144
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionRange.swift",
+                              "lines":  30
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectConfig.swift",
+                              "lines":  14
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectPolicy.swift",
+                              "lines":  133
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/StorageMath.swift",
+                              "lines":  60
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SwipeResolver.swift",
+                              "lines":  59
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/TrashPolicy.swift",
+                              "lines":  41
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/UndoPolicy.swift",
+                              "lines":  36
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ZoomGeometry.swift",
+                              "lines":  131
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ZoomGeometryTransaction.swift",
+                              "lines":  56
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ZoomTransform.swift",
+                              "lines":  144
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/BatchCommitPlannerTests.swift",
+                              "lines":  71
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/DateSectionizerTests.swift",
+                              "lines":  133
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/DuplicateGrouperTests.swift",
+                              "lines":  120
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/EditorTransformTests.swift",
+                              "lines":  139
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ExportOptionsTests.swift",
+                              "lines":  73
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/FingerprintServiceTests.swift",
+                              "lines":  140
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/GeoFilterTests.swift",
+                              "lines":  100
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/GridHitRegionTests.swift",
+                              "lines":  147
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/MarqueeSelectionPolicyTests.swift",
+                              "lines":  239
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/MonthNavigatorTests.swift",
+                              "lines":  130
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionAnchorPolicyV5Tests.swift",
+                              "lines":  172
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionAnchorSelectorTests.swift",
+                              "lines":  66
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionAnchorV3Tests.swift",
+                              "lines":  191
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionRestoreMachineV5Tests.swift",
+                              "lines":  141
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ReplacementPlannerTests.swift",
+                              "lines":  98
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ReviewSessionTests.swift",
+                              "lines":  86
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SelectionPolicyTests.swift",
+                              "lines":  227
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SelectionRangeTests.swift",
+                              "lines":  60
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SlideSelectPolicyTests.swift",
+                              "lines":  106
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SmokeTests.swift",
+                              "lines":  31
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/StorageMathTests.swift",
+                              "lines":  70
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SwipeResolverTests.swift",
+                              "lines":  107
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/UndoPolicyTests.swift",
+                              "lines":  90
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomGeometryTests.swift",
+                              "lines":  189
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomGeometryTransactionTests.swift",
+                              "lines":  96
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomTransformPolicyTests.swift",
+                              "lines":  325
+                          },
+                          {
+                              "file":  "PhotoDeskTests/BiometricGateTests.swift",
+                              "lines":  104
+                          },
+                          {
+                              "file":  "PhotoDeskTests/CoreLinkSmokeTests.swift",
+                              "lines":  10
+                          },
+                          {
+                              "file":  "PhotoDeskTests/DateSectionizerTests.swift",
+                              "lines":  49
+                          },
+                          {
+                              "file":  "PhotoDeskTests/DiagnosticsExportTests.swift",
+                              "lines":  28
+                          },
+                          {
+                              "file":  "PhotoDeskTests/DSToastUndoTests.swift",
+                              "lines":  256
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ExportRendererTests.swift",
+                              "lines":  147
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ImagePipelineInCloudTests.swift",
+                              "lines":  100
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ImagePipelineResumeTests.swift",
+                              "lines":  250
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryCategoryMenuBuilderTests.swift",
+                              "lines":  43
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryDataTests.swift",
+                              "lines":  163
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryPositionCoordinatorTests.swift",
+                              "lines":  355
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryPositionRestoreTests.swift",
+                              "lines":  401
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryPositionStoreTests.swift",
+                              "lines":  179
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryViewModelTests.swift",
+                              "lines":  356
+                          },
+                          {
+                              "file":  "PhotoDeskTests/MetadataParserTests.swift",
+                              "lines":  108
+                          },
+                          {
+                              "file":  "PhotoDeskTests/PhotoFilterLocationTests.swift",
+                              "lines":  100
+                          },
+                          {
+                              "file":  "PhotoDeskTests/PhotoGridCellTests.swift",
+                              "lines":  60
+                          },
+                          {
+                              "file":  "PhotoDeskTests/PositionFileStoreTests.swift",
+                              "lines":  148
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ReviewSessionControllerTests.swift",
+                              "lines":  146
+                          },
+                          {
+                              "file":  "PhotoDeskTests/SearchPredicateTests.swift",
+                              "lines":  198
+                          },
+                          {
+                              "file":  "PhotoDeskTests/StorageStatsServiceTests.swift",
+                              "lines":  133
+                          },
+                          {
+                              "file":  "PhotoDeskTests/SwipeResolverTests.swift",
+                              "lines":  73
+                          },
+                          {
+                              "file":  "PhotoDeskTests/TrashBinTests.swift",
+                              "lines":  106
+                          },
+                          {
+                              "file":  "PhotoDeskTests/UndoCenterTests.swift",
+                              "lines":  147
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ViewerCellGeometryTests.swift",
+                              "lines":  190
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ViewerGestureGuardTests.swift",
+                              "lines":  124
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ViewerRemovalPlannerTests.swift",
+                              "lines":  178
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ViewerViewControllerLayoutTests.swift",
+                              "lines":  65
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ViewerViewModelTests.swift",
+                              "lines":  175
+                          },
+                          {
+                              "file":  "PhotoDeskTests/ZoomableImageCellTests.swift",
+                              "lines":  153
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/FlowUITests.swift",
+                              "lines":  143
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/GestureUITests.swift",
+                              "lines":  80
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/LaunchUITests.swift",
+                              "lines":  36
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                              "lines":  296
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/PageRegressionUITests.swift",
+                              "lines":  282
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/PerformanceUITests.swift",
+                              "lines":  134
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/PositionRestoreUITests.swift",
+                              "lines":  355
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                              "lines":  1064
+                          },
+                          {
+                              "file":  "PhotoDeskUITests/ZoomStabilityUITests.swift",
+                              "lines":  433
+                          }
+                      ],
+    "redlines":  {
+                     "coreAppleImport":  null,
+                     "urlSession":  null,
+                     "tryForce":  null,
+                     "asForce":  [
+                                     {
+                                         "file":  "PhotoDeskTests/MetadataParserTests.swift",
+                                         "line":  59,
+                                         "text":  "var gps = properties[kCGImagePropertyGPSDictionary as String] as! [String: Any]"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskTests/MetadataParserTests.swift",
+                                         "line":  72,
+                                         "text":  "var exif = properties[kCGImagePropertyExifDictionary as String] as! [String: Any]"
+                                     }
+                                 ],
+                     "ios17Api":  null,
+                     "forbiddenCopy":  [
+                                           {
+                                               "file":  "PhotoDesk/Core/Support/SettingsStore.swift",
+                                               "line":  13,
+                                               "text":  "/// 展示名（docs/04 §7 文案口径：删除一律「移到最近删除」，禁用「彻底删除」）"
+                                           },
+                                           {
+                                               "file":  "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
+                                               "line":  74,
+                                               "text":  "faqRow(\"应用能帮我彻底删除照片吗？\","
+                                           },
+                                           {
+                                               "file":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                                               "line":  84,
+                                               "text":  "Text(\"上下滑标记不会立刻删除：先进入待删除清单，点「全部移到最近删除」时 iOS 弹一次系统确认（每批一次，不是每张一次）。照片进入系统「最近删除」保留 30 天，本 App 不提供永久删除。\")"
+                                           },
+                                           {
+                                               "file":  "PhotoDesk/Features/Settings/PrivacyView.swift",
+                                               "line":  33,
+                                               "text":  "detail: \"所有「删除」都是移入系统「最近删除」，由系统保留 30 天后清除，本 App 不提供永久删除。\")"
+                                           }
+                                       ]
+                 },
+    "redlineTotal":  6,
+    "redlineViolations":  0,
+    "violationRows":  [
+
+                      ],
+    "exemptRows":  [
+                       {
+                           "check":  "asForce",
+                           "file":  "PhotoDeskTests/MetadataParserTests.swift",
+                           "line":  59,
+                           "text":  "var gps = properties[kCGImagePropertyGPSDictionary as String] as! [String: Any]",
+                           "reason":  "豁免：测试 target 断言转换"
+                       },
+                       {
+                           "check":  "asForce",
+                           "file":  "PhotoDeskTests/MetadataParserTests.swift",
+                           "line":  72,
+                           "text":  "var exif = properties[kCGImagePropertyExifDictionary as String] as! [String: Any]",
+                           "reason":  "豁免：测试 target 断言转换"
+                       },
+                       {
+                           "check":  "forbiddenCopy",
+                           "file":  "PhotoDesk/Core/Support/SettingsStore.swift",
+                           "line":  13,
+                           "text":  "/// 展示名（docs/04 §7 文案口径：删除一律「移到最近删除」，禁用「彻底删除」）",
+                           "reason":  "豁免：否定句/说明语境"
+                       },
+                       {
+                           "check":  "forbiddenCopy",
+                           "file":  "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
+                           "line":  74,
+                           "text":  "faqRow(\"应用能帮我彻底删除照片吗？\",",
+                           "reason":  "豁免：否定句/说明语境"
+                       },
+                       {
+                           "check":  "forbiddenCopy",
+                           "file":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                           "line":  84,
+                           "text":  "Text(\"上下滑标记不会立刻删除：先进入待删除清单，点「全部移到最近删除」时 iOS 弹一次系统确认（每批一次，不是每张一次）。照片进入系统「最近删除」保留 30 天，本 App 不提供永久删除。\")",
+                           "reason":  "豁免：否定句/说明语境"
+                       },
+                       {
+                           "check":  "forbiddenCopy",
+                           "file":  "PhotoDesk/Features/Settings/PrivacyView.swift",
+                           "line":  33,
+                           "text":  "detail: \"所有「删除」都是移入系统「最近删除」，由系统保留 30 天后清除，本 App 不提供永久删除。\")",
+                           "reason":  "豁免：否定句/说明语境"
+                       }
+                   ],
+    "p0_1a":  {
+                  "viewForZooming":  {
+
+                                     },
+                  "scrollDelegate":  {
+
+                                     },
+                  "zoomScaleApi":  [
+                                       {
+                                           "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                           "line":  34,
+                                           "text":  "view.minimumZoomScale = 1"
+                                       },
+                                       {
+                                           "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                           "line":  35,
+                                           "text":  "view.maximumZoomScale = 1"
+                                       }
+                                   ],
+                  "contentInset":  {
+
+                                   },
+                  "gestureStateAssign":  [
+                                             {
+                                                 "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                 "line":  784,
+                                                 "text":  "guard gesture.state == .began else { return }"
+                                             },
+                                             {
+                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                 "line":  141,
+                                                 "text":  "guard !isAnimating else { gesture.state = .cancelled; return }"
+                                             },
+                                             {
+                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                 "line":  167,
+                                                 "text":  "guard !isAnimating, transform.scale \u003e 1.01 else { gesture.state = .cancelled; return }"
+                                             },
+                                             {
+                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                 "line":  192,
+                                                 "text":  "gesture.state == .ended, !isAnimating else { return }"
+                                             },
+                                             {
+                                                 "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                 "line":  208,
+                                                 "text":  "guard gesture.state == .ended else { return }"
+                                             }
+                                         ],
+                  "animatingGuard":  {
+
+                                     },
+                  "phaseGuardDrop":  {
+
+                                     },
+                  "catransactionWrite":  {
+
+                                         },
+                  "resetOnReuse":  {
+
+                                   },
+                  "policyClamp":  {
+
+                                  }
+              },
+    "p0_1b":  {
+                  "pinchChangedColumn":  {
+
+                                         },
+                  "setColumnsAnimated":  {
+
+                                         },
+                  "setCollectionViewLayout":  {
+
+                                              },
+                  "reloadVisibleItems":  {
+
+                                         },
+                  "scrollToInTransition":  {
+
+                                           },
+                  "pinToVisibleBounds":  {
+
+                                         },
+                  "gestureStateAssign":  {
+
+                                         }
+              },
+    "p0_2":  {
+                 "saveCallSites":  {
+
+                                   },
+                 "storeSchema":  [
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  2,
+                                         "text":  "// v5 = 视觉锚点 assetID + 视口内视觉 y + queryKey + schemaVersion=5；v1–v4 字段保留解码兼容。"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  30,
+                                         "text":  "let schemaVersion: Int"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  42,
+                                         "text":  "schemaVersion: Int = PositionAnchorPolicy.schemaVersion,"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  54,
+                                         "text":  "self.schemaVersion = schemaVersion"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  62,
+                                         "text":  "case contentHeight, viewportHeight, savedAt, schemaVersion"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  81,
+                                         "text":  "schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  97,
+                                         "text":  "try c.encode(schemaVersion, forKey: .schemaVersion)"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  112,
+                                         "text":  "schemaVersion: schemaVersion)"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
+                                         "line":  3,
+                                         "text":  "// { \"schemaVersion\": 5, \"entries\": { \"\u003cqueryKey\u003e\": LibraryPosition } }。"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
+                                         "line":  12,
+                                         "text":  "static let schemaVersion = 5"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
+                                         "line":  16,
+                                         "text":  "var schemaVersion: Int = PositionFileStore.schemaVersion"
+                                     }
+                                 ],
+                 "restoreEntries":  {
+
+                                    },
+                 "settledGate":  [
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  2,
+                                         "text":  "// 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV5 门禁：canSave 只在 settled"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  5,
+                                         "text":  "// → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  26,
+                                         "text":  "let isIndexComplete: Bool"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  71,
+                                         "text":  "// MARK: - 保存（I1/I2：canSave 只在 settled）"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  120,
+                                         "text":  "/// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  162,
+                                         "text":  "indexComplete: context.isIndexComplete,"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  169,
+                                         "text":  "indexComplete: context.isIndexComplete,"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  247,
+                                         "text":  "case .settled:"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  2,
+                                         "text":  "// idle → restoring → applying → verifying → settled / fallback；"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  4,
+                                         "text":  "// canSave 只在 settled（I1：恢复完成前任何保存都不得写盘）；verify 失败只重试一次，两次仍失败"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  5,
+                                         "text":  "// → settled（调用方 DEBUG 记 verify-failed，不阻塞 UI）。纯 Foundation，零 UIKit。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  14,
+                                         "text":  "case settled"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  27,
+                                         "text":  "/// 恢复流程是否进行中（此期间所有保存必须拒绝；settled/fallback 兜底应用也在此列）。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  30,
+                                         "text":  "case .idle, .settled:"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  37,
+                                         "text":  "/// v5 门禁：只有恢复彻底完成（settled）才允许写盘。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  38,
+                                         "text":  "public var canSave: Bool { phase == .settled }"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  40,
+                                         "text":  "/// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 restoring。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  44,
+                                         "text":  "phase = hasAnchor ? .restoring : .settled"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  84,
+                                         "text":  "/// 校验结果：ok → settled；失败累计 attempts，第 1 次失败回 applying 重试（只调 offset），"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  85,
+                                         "text":  "/// 第 2 次仍失败 → settled（优雅放弃，不阻塞 UI）。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  90,
+                                         "text":  "phase = .settled"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  94,
+                                         "text":  "phase = attempts \u003e= 2 ? .settled : .applying"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  102,
+                                         "text":  "phase = .settled"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  107,
+                                         "text":  "/// 用户主动接管（月份跳转/回到顶部/手动滚动取消）：立即 settled，此后允许保存。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  111,
+                                         "text":  "phase = .settled"
+                                     }
+                                 ],
+                 "verifyNilBranch":  {
+
+                                     },
+                 "machineVerifyNil":  [
+
+                                      ],
+                 "vmFirstBatchWindow":  {
+
+                                        },
+                 "vmHeadBackfill":  {
+
+                                    }
+             },
+    "p0_3":  {
+                 "marqueeGeometry":  {
+
+                                     },
+                 "stickyHeaderOrigin":  {
+
+                                        },
+                 "visibleTraversal":  {
+
+                                      },
+                 "countGate":  {
+
+                               },
+                 "updateSelectionCount":  {
+
+                                          },
+                 "badgeVisibility":  {
+
+                                     },
+                 "axValueDebugOnly":  {
+
+                                      },
+                 "scopeFromSnapshot":  {
+
+                                       },
+                 "slideScopeProvider":  {
+
+                                        }
+             },
+    "pages":  [
+                  {
+                      "page":  "Albums",
+                      "files":  2,
+                      "entries":  "(none)",
+                      "emptyState":  null,
+                      "errorState":  10,
+                      "buttons":  3
+                  },
+                  {
+                      "page":  "Cleanup",
+                      "files":  2,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  4,
+                      "buttons":  4
+                  },
+                  {
+                      "page":  "Editor",
+                      "files":  4,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  4,
+                      "buttons":  2
+                  },
+                  {
+                      "page":  "Export",
+                      "files":  4,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  7,
+                      "buttons":  0
+                  },
+                  {
+                      "page":  "Library",
+                      "files":  12,
+                      "entries":  "Library-Category, Library-Filter, Library-JumpBanner, Library-MonthJump, Library-RestoreMask, Library-Search, Library-Select, Library-Tools …共12",
+                      "emptyState":  7,
+                      "errorState":  7,
+                      "buttons":  25
+                  },
+                  {
+                      "page":  "Metadata",
+                      "files":  1,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  0,
+                      "buttons":  0
+                  },
+                  {
+                      "page":  "Onboarding",
+                      "files":  2,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  0,
+                      "buttons":  4
+                  },
+                  {
+                      "page":  "Search",
+                      "files":  2,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  0,
+                      "buttons":  3
+                  },
+                  {
+                      "page":  "Session",
+                      "files":  2,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  4,
+                      "buttons":  5
+                  },
+                  {
+                      "page":  "Settings",
+                      "files":  8,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  5,
+                      "buttons":  4
+                  },
+                  {
+                      "page":  "Vault",
+                      "files":  3,
+                      "entries":  "(none)",
+                      "emptyState":  0,
+                      "errorState":  6,
+                      "buttons":  8
+                  },
+                  {
+                      "page":  "Viewer",
+                      "files":  11,
+                      "entries":  "SessionBadge, Viewer-Close, Viewer-Debug, ViewerRoot, Viewer-ZoomScrollView",
+                      "emptyState":  0,
+                      "errorState":  12,
+                      "buttons":  11
+                  }
+              ],
+    "pageDetails":  [
+                        {
+                            "page":  "Albums",
+                            "files":  [
+                                          "PhotoDesk/Features/Albums/AlbumDetailView.swift",
+                                          "PhotoDesk/Features/Albums/AlbumsView.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+                                              "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                              "line":  30,
+                                              "text":  "Text(\"暂无相簿，点右上角 + 新建\")"
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumDetailView.swift",
+                                                  "line":  132,
+                                                  "text":  "message = \"移出失败：\\(error.localizedDescription)\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  15,
+                                                  "text":  "/// 新建/重命名/删除失败的中文提示（禁止 try? 静默吞掉写操作错误）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  16,
+                                                  "text":  "@State private var errorMessage: String?"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  91,
+                                                  "text":  ".alert(\"操作失败\", isPresented: Binding("
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  92,
+                                                  "text":  "get: { errorMessage != nil },"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  93,
+                                                  "text":  "set: { if !$0 { errorMessage = nil } }"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  96,
+                                                  "text":  "Button(\"好\", role: .destructive) { errorMessage = nil }"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  98,
+                                                  "text":  "Text(errorMessage ?? \"\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  159,
+                                                  "text":  "errorMessage = \"保存相簿失败：\\(error.localizedDescription)\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                  "line":  170,
+                                                  "text":  "errorMessage = \"删除相簿失败：\\(error.localizedDescription)\""
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Albums/AlbumDetailView.swift",
+                                                   "line":  27,
+                                                   "text":  "Image(systemName: \"photo.on.rectangle.angled\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                   "line":  76,
+                                                   "text":  "Image(systemName: \"plus\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Albums/AlbumsView.swift",
+                                                   "line":  191,
+                                                   "text":  "Image(systemName: \"photo\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Cleanup",
+                            "files":  [
+                                          "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                          "PhotoDesk/Features/Cleanup/CleanupViewModel.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                  "line":  46,
+                                                  "text":  "Text(\"扫描失败：\\(message)\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                  "line":  54,
+                                                  "text":  "UIPasteboard.general.string = \"扫描失败：\\(message)\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                  "line":  56,
+                                                  "text":  "Label(\"复制失败原因\", systemImage: \"doc.on.doc\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Cleanup/CleanupViewModel.swift",
+                                                  "line":  78,
+                                                  "text":  "// 系统确认取消/失败：队列保留（docs/09 D16 §5.4 不丢数据），清单计数保持"
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                   "line":  43,
+                                                   "text":  "Image(systemName: \"exclamationmark.triangle\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                   "line":  73,
+                                                   "text":  "Image(systemName: \"sparkles\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                   "line":  224,
+                                                   "text":  "Image(systemName: icon)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Cleanup/CleanupView.swift",
+                                                   "line":  237,
+                                                   "text":  "Image(systemName: \"chevron.right\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Editor",
+                            "files":  [
+                                          "PhotoDesk/Features/Editor/Adjustments.swift",
+                                          "PhotoDesk/Features/Editor/CropOverlayView.swift",
+                                          "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                          "PhotoDesk/Features/Editor/EditorViewModel.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                  "line":  287,
+                                                  "text":  "presentError(error)"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                  "line":  308,
+                                                  "text":  "self.presentError(error)"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                  "line":  335,
+                                                  "text":  "private func presentError(_ error: Error) {"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                  "line":  336,
+                                                  "text":  "let alert = UIAlertController(title: \"操作失败\","
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                   "line":  110,
+                                                   "text":  "rotateButton.setImage(UIImage(systemName: \"rotate.right\"), for: .normal)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Editor/EditorViewController.swift",
+                                                   "line":  116,
+                                                   "text":  "flipButton.setImage(UIImage(systemName: \"arrow.left.and.right.righttriangle.left.righttriangle.right.fill\"),"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Export",
+                            "files":  [
+                                          "PhotoDesk/Features/Export/ExportView.swift",
+                                          "PhotoDesk/Features/Export/ExportViewModel.swift",
+                                          "PhotoDesk/Features/Export/StorageStatsView.swift",
+                                          "PhotoDesk/Features/Export/StorageStatsViewModel.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportView.swift",
+                                                  "line":  104,
+                                                  "text":  "if let error = viewModel.errorMessage {"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportView.swift",
+                                                  "line":  111,
+                                                  "text":  "viewModel.errorMessage = nil"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportViewModel.swift",
+                                                  "line":  19,
+                                                  "text":  "@Published var errorMessage: String?"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportViewModel.swift",
+                                                  "line":  89,
+                                                  "text":  "/// 以可取消任务执行导出动作（保存/分享共用）。取消/失败统一在此收口："
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportViewModel.swift",
+                                                  "line":  90,
+                                                  "text":  "/// CancellationError → 清理临时文件不报错；其余错误 → errorMessage。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/ExportViewModel.swift",
+                                                  "line":  98,
+                                                  "text":  "self?.errorMessage = error.localizedDescription"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Export/StorageStatsView.swift",
+                                                  "line":  133,
+                                                  "text":  "Text(\"\\(viewModel.summary.unknownCount) 项大小未知（iCloud 原件未下载或读取失败）\")"
+                                              }
+                                          ],
+                            "buttonHits":  {
+
+                                           }
+                        },
+                        {
+                            "page":  "Library",
+                            "files":  [
+                                          "PhotoDesk/Features/Library/LibraryCategoryMenuBuilder.swift",
+                                          "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                          "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                                          "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                          "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                          "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                                          "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                          "PhotoDesk/Features/Library/MonthIndexBar.swift",
+                                          "PhotoDesk/Features/Library/MonthJumpSheet.swift",
+                                          "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                                          "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
+                                          "PhotoDesk/Features/Library/SlideSelectGestureController.swift"
+                                      ],
+                            "entryIds":  [
+                                             "Library-Category",
+                                             "Library-Filter",
+                                             "Library-JumpBanner",
+                                             "Library-MonthJump",
+                                             "Library-RestoreMask",
+                                             "Library-Search",
+                                             "Library-Select",
+                                             "Library-Tools",
+                                             "MonthHeader-Menu-\\(sectionID)",
+                                             "MonthIndexBar",
+                                             "Selection-Count",
+                                             "SessionBadge"
+                                         ],
+                            "emptyHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                                  "line":  58,
+                                                  "text":  "DSEmptyState(kind: .loading)"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                                  "line":  60,
+                                                  "text":  "DSEmptyState(kind: .empty)"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                                  "line":  90,
+                                                  "text":  "filterEmptyState"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                                  "line":  224,
+                                                  "text":  "private var filterEmptyState: some View {"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                  "line":  489,
+                                                  "text":  "viewModel.requestManageLimitedPhotos()   // .limited：接上 DSEmptyState.limited 对应的系统选择器"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                                                  "line":  22,
+                                                  "text":  "/// 网格视图状态（驱动 DSEmptyState / 引导页 / 网格）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                                                  "line":  285,
+                                                  "text":  "// 空库也要监听变更：第一张照片加入时增量同步并切出空态"
+                                              }
+                                          ],
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                                  "line":  5,
+                                                  "text":  "// → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                                  "line":  179,
+                                                  "text":  "return   // restoring：等待索引/布局，不失败（I4）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                                  "line":  232,
+                                                  "text":  "/// §5.5 校验：offset 误差 ≤ 0.5pt 且锚点视觉 y 误差 ≤ 0.5pt；失败只调 offset 重试一次。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                  "line":  1385,
+                                                  "text":  "// §5.4：遮罩最长显示 1.5s；消失不代表恢复失败，恢复可在后台继续"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                                                  "line":  145,
+                                                  "text":  "/// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
+                                                  "line":  233,
+                                                  "text":  "failed \u003e 0 ? \"已完成 \\(succeeded) 项；\\(failed) 项失败\" : \"已完成 \\(succeeded) 项\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/SlideSelectGestureController.swift",
+                                                  "line":  249,
+                                                  "text":  "/// 结束/取消/失败统一收尾：恢复点选、清快照/displayLink。"
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryContainer.swift",
+                                                   "line":  226,
+                                                   "text":  "Image(systemName: \"line.3.horizontal.decrease.circle\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                                                   "line":  182,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                                                   "line":  212,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                                                   "line":  235,
+                                                   "text":  "Image(systemName: \"chevron.right\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
+                                                   "line":  299,
+                                                   "text":  "Image(systemName: \"chevron.down\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  413,
+                                                   "text":  "let tools = UIBarButtonItem(image: UIImage(systemName: \"wrench.and.screwdriver\","
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  424,
+                                                   "text":  "let session = UIBarButtonItem(image: UIImage(systemName: \"tray\"),"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  429,
+                                                   "text":  "let select = UIBarButtonItem(image: UIImage(systemName: \"checkmark.circle\","
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  434,
+                                                   "text":  "let search = UIBarButtonItem(image: UIImage(systemName: \"magnifyingglass\","
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  439,
+                                                   "text":  "let month = UIBarButtonItem(image: UIImage(systemName: \"calendar\","
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  444,
+                                                   "text":  "let filter = UIBarButtonItem(image: UIImage(systemName: \"line.3.horizontal.decrease.circle\","
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  710,
+                                                   "text":  "button.setImage(UIImage(systemName: symbol), for: .normal)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  1841,
+                                                   "text":  "button.setImage(UIImage(systemName: \"ellipsis.circle\"), for: .normal)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  1888,
+                                                   "text":  "UIAction(title: \"选择本月全部\", image: UIImage(systemName: \"checkmark.circle\")) { [weak self] _ in"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                                   "line":  1891,
+                                                   "text":  "UIAction(title: \"跳到本月\", image: UIImage(systemName: \"arrow.down.right\")) { [weak self] _ in"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                                   "line":  38,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                                   "line":  53,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                                   "line":  68,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                                   "line":  86,
+                                                   "text":  "Image(systemName: \"mappin.circle.fill\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
+                                                   "line":  99,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                                                   "line":  22,
+                                                   "text":  "let view = UIImageView(image: UIImage(systemName: \"icloud\"))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                                                   "line":  41,
+                                                   "text":  "let view = UIImageView(image: UIImage(systemName: \"livephoto\"))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                                                   "line":  48,
+                                                   "text":  "let view = UIImageView(image: UIImage(systemName: \"camera.viewfinder\"))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/PhotoGridCell.swift",
+                                                   "line":  59,
+                                                   "text":  "let view = UIImageView(image: UIImage(systemName: \"checkmark.circle.fill\"))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Library/RecentlyDeletedView.swift",
+                                                   "line":  16,
+                                                   "text":  "Image(systemName: \"trash.circle\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Metadata",
+                            "files":  [
+                                          "PhotoDesk/Features/Metadata/MetadataView.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  {
+
+                                          },
+                            "buttonHits":  {
+
+                                           }
+                        },
+                        {
+                            "page":  "Onboarding",
+                            "files":  [
+                                          "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
+                                          "PhotoDesk/Features/Onboarding/PermissionIntroView.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  {
+
+                                          },
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
+                                                   "line":  59,
+                                                   "text":  "Image(systemName: \"hand.draw\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
+                                                   "line":  123,
+                                                   "text":  "Image(systemName: icon)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Onboarding/GestureTutorialView.swift",
+                                                   "line":  127,
+                                                   "text":  "Image(systemName: direction == .up ? \"arrow.up\" : \"arrow.down\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Onboarding/PermissionIntroView.swift",
+                                                   "line":  21,
+                                                   "text":  "Image(systemName: \"photo.stack\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Search",
+                            "files":  [
+                                          "PhotoDesk/Features/Search/SearchView.swift",
+                                          "PhotoDesk/Features/Search/SearchViewModel.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  {
+
+                                          },
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Search/SearchView.swift",
+                                                   "line":  97,
+                                                   "text":  "Image(systemName: \"xmark.circle.fill\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Search/SearchView.swift",
+                                                   "line":  184,
+                                                   "text":  "Image(systemName: \"chevron.down\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Search/SearchView.swift",
+                                                   "line":  235,
+                                                   "text":  "Image(systemName: \"magnifyingglass\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Session",
+                            "files":  [
+                                          "PhotoDesk/Features/Session/SessionBadgeView.swift",
+                                          "PhotoDesk/Features/Session/SessionReviewView.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                  "line":  3,
+                                                  "text":  "// 「全部隐藏」、继续整理（关闭）。提交成功清空队列并回显结果；失败/取消队列保留。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                  "line":  151,
+                                                  "text":  ".accessibilityLabel(\"复制结果信息（含失败原因）\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                  "line":  186,
+                                                  "text":  "// 提交结果（队列清空后仍回显——docs/09 D16：成功 Toast / 失败保留说明）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                  "line":  219,
+                                                  "text":  "? \"隐藏提交失败，\\(session.pendingHideCount) 张仍在待隐藏\""
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Session/SessionBadgeView.swift",
+                                                   "line":  18,
+                                                   "text":  "Image(systemName: \"tray.full\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                   "line":  98,
+                                                   "text":  "Image(systemName: \"trash\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                   "line":  116,
+                                                   "text":  "Image(systemName: \"eye.slash\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                   "line":  147,
+                                                   "text":  "Image(systemName: \"doc.on.doc\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Session/SessionReviewView.swift",
+                                                   "line":  179,
+                                                   "text":  "Image(systemName: \"checkmark.seal\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Settings",
+                            "files":  [
+                                          "PhotoDesk/Features/Settings/ActionPickerView.swift",
+                                          "PhotoDesk/Features/Settings/AppearanceSettingsView.swift",
+                                          "PhotoDesk/Features/Settings/CacheManagerView.swift",
+                                          "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                          "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                                          "PhotoDesk/Features/Settings/PrivacyView.swift",
+                                          "PhotoDesk/Features/Settings/SecuritySettingsView.swift",
+                                          "PhotoDesk/Features/Settings/SettingsView.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                                  "line":  20,
+                                                  "text":  "@State private var errorMessage: String?"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                                  "line":  48,
+                                                  "text":  "if let errorMessage {"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                                  "line":  49,
+                                                  "text":  "Text(errorMessage)"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                                  "line":  106,
+                                                  "text":  "errorMessage = nil"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Settings/DiagnosticsView.swift",
+                                                  "line":  110,
+                                                  "text":  "errorMessage = \"导出失败：无法写入临时文件\""
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Settings/ActionPickerView.swift",
+                                                   "line":  38,
+                                                   "text":  "Image(systemName: ActionOverlayView.symbol(for: action))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Settings/ActionPickerView.swift",
+                                                   "line":  50,
+                                                   "text":  "Image(systemName: \"checkmark\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                                                   "line":  42,
+                                                   "text":  "Image(systemName: \"arrow.up\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Settings/GestureSettingsView.swift",
+                                                   "line":  49,
+                                                   "text":  "Image(systemName: \"arrow.down\")"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Vault",
+                            "files":  [
+                                          "PhotoDesk/Features/Vault/VaultGridView.swift",
+                                          "PhotoDesk/Features/Vault/VaultView.swift",
+                                          "PhotoDesk/Features/Vault/VaultViewModel.swift"
+                                      ],
+                            "entryIds":  [
+
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                  "line":  176,
+                                                  "text":  "// MARK: - 失败 / 不可用"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                  "line":  210,
+                                                  "text":  "actionMessage = \"失败原因已复制\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                  "line":  212,
+                                                  "text":  "Label(\"复制失败原因\", systemImage: \"doc.on.doc\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                  "line":  163,
+                                                  "text":  "/// 取消隐藏：立即写库；失败恢复 item 并提示"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                  "line":  176,
+                                                  "text":  "return \"取消隐藏失败：\\(error.localizedDescription)\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                  "line":  202,
+                                                  "text":  "return \"操作失败：\\(error.localizedDescription)\""
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                   "line":  78,
+                                                   "text":  "Image(systemName: viewModel.phase == .unlocking ? \"faceid\" : \"lock.fill\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                   "line":  146,
+                                                   "text":  "Image(systemName: \"eye.slash\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                   "line":  163,
+                                                   "text":  "Image(systemName: \"exclamationmark.triangle\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                   "line":  180,
+                                                   "text":  "Image(systemName: \"faceid\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultView.swift",
+                                                   "line":  223,
+                                                   "text":  "Image(systemName: \"exclamationmark.shield\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                   "line":  214,
+                                                   "text":  "image: UIImage(systemName: \"heart\")) { [weak self] _ in"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                   "line":  218,
+                                                   "text":  "image: UIImage(systemName: \"eye\")) { [weak self] _ in"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Vault/VaultViewModel.swift",
+                                                   "line":  222,
+                                                   "text":  "image: UIImage(systemName: \"trash\"),"
+                                               }
+                                           ]
+                        },
+                        {
+                            "page":  "Viewer",
+                            "files":  [
+                                          "PhotoDesk/Features/Viewer/ActionOverlayView.swift",
+                                          "PhotoDesk/Features/Viewer/FilmStripView.swift",
+                                          "PhotoDesk/Features/Viewer/SwipeGestureEngine.swift",
+                                          "PhotoDesk/Features/Viewer/VideoCell.swift",
+                                          "PhotoDesk/Features/Viewer/ViewerContainer.swift",
+                                          "PhotoDesk/Features/Viewer/ViewerContext.swift",
+                                          "PhotoDesk/Features/Viewer/ViewerGesturePolicy.swift",
+                                          "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                          "PhotoDesk/Features/Viewer/ViewerViewModel.swift",
+                                          "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                          "PhotoDesk/Features/Viewer/ZoomInteractionController.swift"
+                                      ],
+                            "entryIds":  [
+                                             "SessionBadge",
+                                             "Viewer-Close",
+                                             "Viewer-Debug",
+                                             "ViewerRoot",
+                                             "Viewer-ZoomScrollView"
+                                         ],
+                            "emptyHits":  {
+
+                                          },
+                            "errorHits":  [
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                  "line":  770,
+                                                  "text":  "/// cell 视口单击（ZoomInteractionController.tap / VideoCell.tapGesture，双击失败后触发）："
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                  "line":  945,
+                                                  "text":  "self.showToast(text: \"操作失败：\\(error.localizedDescription)\","
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                  "line":  1087,
+                                                  "text":  "cell.showFailurePlaceholder { [weak self, weak cell] in"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                  "line":  1172,
+                                                  "text":  "// 仍未拿到（下载失败/仍受限）：保持占位态，用户可重试"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewModel.swift",
+                                                  "line":  150,
+                                                  "text":  "/// 阶段 3 · rollback：入队失败/取消时恢复 item 原位（零 PhotoKit 写）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ViewerViewModel.swift",
+                                                  "line":  218,
+                                                  "text":  "return .rejected(\"操作失败：\\(error.localizedDescription)\")"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                  "line":  201,
+                                                  "text":  "/// 单击（双击失败后）落在视口：查看器 chrome 切换/视频播放切换的唯一入口。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                  "line":  331,
+                                                  "text":  "/// 大图加载失败（非 iCloud）：占位 + 中文重试（docs/22 Phase 4 查看器）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                  "line":  332,
+                                                  "text":  "func showFailurePlaceholder(onRetry: @escaping () -\u003e Void) {"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                  "line":  335,
+                                                  "text":  "cloudLabel.text = \"加载失败，请检查照片是否仍在本机\""
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                  "line":  31,
+                                                  "text":  "/// 单击（双击失败后）落在视口：chrome 切换/视频播放的唯一入口（同 view require，无跨 view 互斥）。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
+                                                  "line":  289,
+                                                  "text":  "/// 放大平移时要求外层 pan 失败（cell pan 优先）。"
+                                              }
+                                          ],
+                            "buttonHits":  [
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ActionOverlayView.swift",
+                                                   "line":  73,
+                                                   "text":  "iconView.image = UIImage(systemName: Self.symbol(for: action))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  320,
+                                                   "text":  "let close = UIBarButtonItem(image: UIImage(systemName: \"xmark\"),"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  330,
+                                                   "text":  "favoriteButton = UIBarButtonItem(image: UIImage(systemName: favoriteIconName),"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  334,
+                                                   "text":  "let info = UIBarButtonItem(image: UIImage(systemName: \"info.circle\"),"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  337,
+                                                   "text":  "let more = UIBarButtonItem(image: UIImage(systemName: \"ellipsis.circle\"),"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  389,
+                                                   "text":  "config.image = UIImage(systemName: symbol)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ViewerViewController.swift",
+                                                   "line":  860,
+                                                   "text":  "favoriteButton.image = UIImage(systemName: favoriteIconName)"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                   "line":  55,
+                                                   "text":  "private let cloudIcon = UIImageView(image: UIImage(systemName: \"icloud\"))"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                   "line":  305,
+                                                   "text":  "cloudIcon.image = UIImage(systemName: \"icloud\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                   "line":  323,
+                                                   "text":  "cloudIcon.image = UIImage(systemName: \"icloud\")"
+                                               },
+                                               {
+                                                   "file":  "PhotoDesk/Features/Viewer/ZoomableImageCell.swift",
+                                                   "line":  334,
+                                                   "text":  "cloudIcon.image = UIImage(systemName: \"exclamationmark.triangle\")"
+                                               }
+                                           ]
+                        }
+                    ],
+    "tests":  {
+                  "coreClasses":  28,
+                  "coreTests":  338,
+                  "iosClasses":  30,
+                  "iosTests":  223,
+                  "uiClasses":  9,
+                  "uiTests":  67
+              }
+}

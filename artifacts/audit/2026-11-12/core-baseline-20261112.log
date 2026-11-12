@@ -1,0 +1,776 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/2] Write swift-version-24593BA9C3E375BF.txt
+Build complete! (2.07s)
+Test Suite 'All tests' started at 2026-11-12 16:40:19.015
+Test Suite 'debug.xctest' started at 2026-11-12 16:40:19.033
+Test Suite 'BatchCommitPlannerTests' started at 2026-11-12 16:40:19.033
+Test Case 'BatchCommitPlannerTests.testBatchesSplitAboveLimit' started at 2026-11-12 16:40:19.033
+Test Case 'BatchCommitPlannerTests.testBatchesSplitAboveLimit' passed (0.007 seconds)
+Test Case 'BatchCommitPlannerTests.testBatchesSplitAtExactLimit' started at 2026-11-12 16:40:19.040
+Test Case 'BatchCommitPlannerTests.testBatchesSplitAtExactLimit' passed (0.102 seconds)
+Test Case 'BatchCommitPlannerTests.testBatchesUnderLimit' started at 2026-11-12 16:40:19.142
+Test Case 'BatchCommitPlannerTests.testBatchesUnderLimit' passed (0.002 seconds)
+Test Case 'BatchCommitPlannerTests.testCustomBatchSize' started at 2026-11-12 16:40:19.144
+Test Case 'BatchCommitPlannerTests.testCustomBatchSize' passed (0.0 seconds)
+Test Case 'BatchCommitPlannerTests.testEmptyInput' started at 2026-11-12 16:40:19.144
+Test Case 'BatchCommitPlannerTests.testEmptyInput' passed (0.0 seconds)
+Test Case 'BatchCommitPlannerTests.testPartitionAllMissing' started at 2026-11-12 16:40:19.144
+Test Case 'BatchCommitPlannerTests.testPartitionAllMissing' passed (0.0 seconds)
+Test Case 'BatchCommitPlannerTests.testPartitionSeparatesMissing' started at 2026-11-12 16:40:19.145
+Test Case 'BatchCommitPlannerTests.testPartitionSeparatesMissing' passed (0.0 seconds)
+Test Case 'BatchCommitPlannerTests.testReconcileAfterInterruption' started at 2026-11-12 16:40:19.145
+Test Case 'BatchCommitPlannerTests.testReconcileAfterInterruption' passed (0.0 seconds)
+Test Case 'BatchCommitPlannerTests.testReconcileKeepsAllWhenNothingCommitted' started at 2026-11-12 16:40:19.145
+Test Case 'BatchCommitPlannerTests.testReconcileKeepsAllWhenNothingCommitted' passed (0.0 seconds)
+Test Suite 'BatchCommitPlannerTests' passed at 2026-11-12 16:40:19.145
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.112 (0.112) seconds
+Test Suite 'DateSectionizerTests' started at 2026-11-12 16:40:19.145
+Test Case 'DateSectionizerTests.testAscendingKeepsUnknownSectionAtEnd' started at 2026-11-12 16:40:19.145
+Test Case 'DateSectionizerTests.testAscendingKeepsUnknownSectionAtEnd' passed (0.003 seconds)
+Test Case 'DateSectionizerTests.testAscendingSectionOrder' started at 2026-11-12 16:40:19.148
+Test Case 'DateSectionizerTests.testAscendingSectionOrder' passed (0.001 seconds)
+Test Case 'DateSectionizerTests.testDayGranularity' started at 2026-11-12 16:40:19.149
+Test Case 'DateSectionizerTests.testDayGranularity' passed (0.0 seconds)
+Test Case 'DateSectionizerTests.testEmptyInput' started at 2026-11-12 16:40:19.150
+Test Case 'DateSectionizerTests.testEmptyInput' passed (0.0 seconds)
+Test Case 'DateSectionizerTests.testMonthGroupingAcrossYears' started at 2026-11-12 16:40:19.150
+Test Case 'DateSectionizerTests.testMonthGroupingAcrossYears' passed (0.001 seconds)
+Test Case 'DateSectionizerTests.testNilDatesGoToUnknownSectionAtEnd' started at 2026-11-12 16:40:19.151
+Test Case 'DateSectionizerTests.testNilDatesGoToUnknownSectionAtEnd' passed (0.0 seconds)
+Test Case 'DateSectionizerTests.testSingleItemWithDate' started at 2026-11-12 16:40:19.152
+Test Case 'DateSectionizerTests.testSingleItemWithDate' passed (0.0 seconds)
+Test Case 'DateSectionizerTests.testTimezoneRespected' started at 2026-11-12 16:40:19.152
+Test Case 'DateSectionizerTests.testTimezoneRespected' passed (0.001 seconds)
+Test Case 'DateSectionizerTests.testYearGranularity' started at 2026-11-12 16:40:19.153
+Test Case 'DateSectionizerTests.testYearGranularity' passed (0.001 seconds)
+Test Suite 'DateSectionizerTests' passed at 2026-11-12 16:40:19.154
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.008 (0.008) seconds
+Test Suite 'DuplicateGrouperTests' started at 2026-11-12 16:40:19.154
+Test Case 'DuplicateGrouperTests.testAspectRatioExcluded' started at 2026-11-12 16:40:19.154
+Test Case 'DuplicateGrouperTests.testAspectRatioExcluded' passed (0.001 seconds)
+Test Case 'DuplicateGrouperTests.testChainGroupingTransitivity' started at 2026-11-12 16:40:19.155
+Test Case 'DuplicateGrouperTests.testChainGroupingTransitivity' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testDistanceThresholdBoundary' started at 2026-11-12 16:40:19.156
+Test Case 'DuplicateGrouperTests.testDistanceThresholdBoundary' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testGroupsNearDuplicatesWithinTimeWindow' started at 2026-11-12 16:40:19.156
+Test Case 'DuplicateGrouperTests.testGroupsNearDuplicatesWithinTimeWindow' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testHammingDistance' started at 2026-11-12 16:40:19.156
+Test Case 'DuplicateGrouperTests.testHammingDistance' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testHighConfidenceBadge' started at 2026-11-12 16:40:19.156
+Test Case 'DuplicateGrouperTests.testHighConfidenceBadge' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testRecommendPrefersLargerArea' started at 2026-11-12 16:40:19.156
+Test Case 'DuplicateGrouperTests.testRecommendPrefersLargerArea' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testRecommendPrefersLatestModification' started at 2026-11-12 16:40:19.157
+Test Case 'DuplicateGrouperTests.testRecommendPrefersLatestModification' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testRecommendPrefersOriginalOverEdited' started at 2026-11-12 16:40:19.157
+Test Case 'DuplicateGrouperTests.testRecommendPrefersOriginalOverEdited' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testSingleAndEmptyInput' started at 2026-11-12 16:40:19.157
+Test Case 'DuplicateGrouperTests.testSingleAndEmptyInput' passed (0.0 seconds)
+Test Case 'DuplicateGrouperTests.testTimeWindowExcluded' started at 2026-11-12 16:40:19.157
+Test Case 'DuplicateGrouperTests.testTimeWindowExcluded' passed (0.0 seconds)
+Test Suite 'DuplicateGrouperTests' passed at 2026-11-12 16:40:19.157
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'EditorTransformTests' started at 2026-11-12 16:40:19.157
+Test Case 'EditorTransformTests.testAspectCropTallTarget' started at 2026-11-12 16:40:19.158
+Test Case 'EditorTransformTests.testAspectCropTallTarget' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testAspectCropWideTarget' started at 2026-11-12 16:40:19.158
+Test Case 'EditorTransformTests.testAspectCropWideTarget' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testCropRectPixels' started at 2026-11-12 16:40:19.158
+Test Case 'EditorTransformTests.testCropRectPixels' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testCropRectPixelsAfterRotation' started at 2026-11-12 16:40:19.158
+Test Case 'EditorTransformTests.testCropRectPixelsAfterRotation' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testDefaultIsNeutral' started at 2026-11-12 16:40:19.158
+Test Case 'EditorTransformTests.testDefaultIsNeutral' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testDisplayedSizeSwapsOnOddTurns' started at 2026-11-12 16:40:19.159
+Test Case 'EditorTransformTests.testDisplayedSizeSwapsOnOddTurns' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testFlipRemapsCropRect' started at 2026-11-12 16:40:19.159
+Test Case 'EditorTransformTests.testFlipRemapsCropRect' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testFreeAndOriginalGiveFullRect' started at 2026-11-12 16:40:19.159
+Test Case 'EditorTransformTests.testFreeAndOriginalGiveFullRect' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testQuarterTurnsNormalized' started at 2026-11-12 16:40:19.159
+Test Case 'EditorTransformTests.testQuarterTurnsNormalized' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testRotateFourTimesReturnsToOriginal' started at 2026-11-12 16:40:19.159
+Test Case 'EditorTransformTests.testRotateFourTimesReturnsToOriginal' passed (0.0 seconds)
+Test Case 'EditorTransformTests.testRotateRemapsCropRect' started at 2026-11-12 16:40:19.160
+Test Case 'EditorTransformTests.testRotateRemapsCropRect' passed (0.0 seconds)
+Test Suite 'EditorTransformTests' passed at 2026-11-12 16:40:19.160
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'ExportOptionsTests' started at 2026-11-12 16:40:19.160
+Test Case 'ExportOptionsTests.testDefaults' started at 2026-11-12 16:40:19.160
+Test Case 'ExportOptionsTests.testDefaults' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testFileTypeMapping' started at 2026-11-12 16:40:19.160
+Test Case 'ExportOptionsTests.testFileTypeMapping' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testLandscapeDownscaleTo2048' started at 2026-11-12 16:40:19.160
+Test Case 'ExportOptionsTests.testLandscapeDownscaleTo2048' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testMinimumOnePixel' started at 2026-11-12 16:40:19.161
+Test Case 'ExportOptionsTests.testMinimumOnePixel' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testNeverUpscales' started at 2026-11-12 16:40:19.161
+Test Case 'ExportOptionsTests.testNeverUpscales' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testOriginalLongEdgeKeepsSize' started at 2026-11-12 16:40:19.161
+Test Case 'ExportOptionsTests.testOriginalLongEdgeKeepsSize' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testPortraitDownscaleKeepsAspect' started at 2026-11-12 16:40:19.161
+Test Case 'ExportOptionsTests.testPortraitDownscaleKeepsAspect' passed (0.0 seconds)
+Test Case 'ExportOptionsTests.testQualityClamped' started at 2026-11-12 16:40:19.161
+Test Case 'ExportOptionsTests.testQualityClamped' passed (0.0 seconds)
+Test Suite 'ExportOptionsTests' passed at 2026-11-12 16:40:19.162
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'FingerprintServiceTests' started at 2026-11-12 16:40:19.162
+Test Case 'FingerprintServiceTests.testBlurThresholdAdjustable' started at 2026-11-12 16:40:19.162
+Test Case 'FingerprintServiceTests.testBlurThresholdAdjustable' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testDHashDeterministicSameImageDistanceZero' started at 2026-11-12 16:40:19.162
+Test Case 'FingerprintServiceTests.testDHashDeterministicSameImageDistanceZero' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testDHashNoiseKeepsDistanceSmall' started at 2026-11-12 16:40:19.162
+Test Case 'FingerprintServiceTests.testDHashNoiseKeepsDistanceSmall' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testDHashRejectsWrongSize' started at 2026-11-12 16:40:19.163
+Test Case 'FingerprintServiceTests.testDHashRejectsWrongSize' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testDHashRotationChangesBitsButStaysWithinNoiseRange' started at 2026-11-12 16:40:19.163
+Test Case 'FingerprintServiceTests.testDHashRotationChangesBitsButStaysWithinNoiseRange' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testLaplacianRejectsWrongSize' started at 2026-11-12 16:40:19.163
+Test Case 'FingerprintServiceTests.testLaplacianRejectsWrongSize' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testPHashDeterministicAndNoiseTolerant' started at 2026-11-12 16:40:19.164
+Test Case 'FingerprintServiceTests.testPHashDeterministicAndNoiseTolerant' passed (0.007 seconds)
+Test Case 'FingerprintServiceTests.testPHashDistinctImagesDiffer' started at 2026-11-12 16:40:19.171
+Test Case 'FingerprintServiceTests.testPHashDistinctImagesDiffer' passed (0.007 seconds)
+Test Case 'FingerprintServiceTests.testPHashRejectsWrongSize' started at 2026-11-12 16:40:19.178
+Test Case 'FingerprintServiceTests.testPHashRejectsWrongSize' passed (0.0 seconds)
+Test Case 'FingerprintServiceTests.testSharpImageHasHighVariance' started at 2026-11-12 16:40:19.178
+Test Case 'FingerprintServiceTests.testSharpImageHasHighVariance' passed (0.011 seconds)
+Test Case 'FingerprintServiceTests.testSmoothGradientIsBlurry' started at 2026-11-12 16:40:19.189
+Test Case 'FingerprintServiceTests.testSmoothGradientIsBlurry' passed (0.007 seconds)
+Test Suite 'FingerprintServiceTests' passed at 2026-11-12 16:40:19.196
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.034 (0.034) seconds
+Test Suite 'GeoFilterTests' started at 2026-11-12 16:40:19.196
+Test Case 'GeoFilterTests.testClusterDefaultCellIsQuarterDegree' started at 2026-11-12 16:40:19.197
+Test Case 'GeoFilterTests.testClusterDefaultCellIsQuarterDegree' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testClusterEmptyInput' started at 2026-11-12 16:40:19.198
+Test Case 'GeoFilterTests.testClusterEmptyInput' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testClusterGroupsWithinCell' started at 2026-11-12 16:40:19.198
+Test Case 'GeoFilterTests.testClusterGroupsWithinCell' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testClusterSortedByCountDesc' started at 2026-11-12 16:40:19.198
+Test Case 'GeoFilterTests.testClusterSortedByCountDesc' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testDistanceAcrossDateLine' started at 2026-11-12 16:40:19.198
+Test Case 'GeoFilterTests.testDistanceAcrossDateLine' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testDistanceAlongEquator' started at 2026-11-12 16:40:19.199
+Test Case 'GeoFilterTests.testDistanceAlongEquator' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testDistanceNearPole' started at 2026-11-12 16:40:19.199
+Test Case 'GeoFilterTests.testDistanceNearPole' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testRegionAcrossDateLine' started at 2026-11-12 16:40:19.199
+Test Case 'GeoFilterTests.testRegionAcrossDateLine' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testRegionBoundaryInclusive' started at 2026-11-12 16:40:19.200
+Test Case 'GeoFilterTests.testRegionBoundaryInclusive' passed (0.0 seconds)
+Test Case 'GeoFilterTests.testSamePointDistanceZero' started at 2026-11-12 16:40:19.200
+Test Case 'GeoFilterTests.testSamePointDistanceZero' passed (0.0 seconds)
+Test Suite 'GeoFilterTests' passed at 2026-11-12 16:40:19.200
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'GridHitRegionTests' started at 2026-11-12 16:40:19.200
+Test Case 'GridHitRegionTests.testCrossSectionCellsHitByGeometry' started at 2026-11-12 16:40:19.200
+Test Case 'GridHitRegionTests.testCrossSectionCellsHitByGeometry' passed (0.002 seconds)
+Test Case 'GridHitRegionTests.testEmptyCellListHitsNothing' started at 2026-11-12 16:40:19.202
+Test Case 'GridHitRegionTests.testEmptyCellListHitsNothing' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testFourColumnLayout' started at 2026-11-12 16:40:19.202
+Test Case 'GridHitRegionTests.testFourColumnLayout' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testFullyCoveringRectHitsAllCells' started at 2026-11-12 16:40:19.203
+Test Case 'GridHitRegionTests.testFullyCoveringRectHitsAllCells' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testInfiniteThresholdClamped' started at 2026-11-12 16:40:19.203
+Test Case 'GridHitRegionTests.testInfiniteThresholdClamped' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testMergedSelectionReselectOnSecondPass' started at 2026-11-12 16:40:19.203
+Test Case 'GridHitRegionTests.testMergedSelectionReselectOnSecondPass' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testMergedSelectionSubtractWhenAnchorWasSelected' started at 2026-11-12 16:40:19.203
+Test Case 'GridHitRegionTests.testMergedSelectionSubtractWhenAnchorWasSelected' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testMergedSelectionUnionWhenAnchorWasUnselected' started at 2026-11-12 16:40:19.203
+Test Case 'GridHitRegionTests.testMergedSelectionUnionWhenAnchorWasUnselected' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testNaNCellSkippedSafely' started at 2026-11-12 16:40:19.204
+Test Case 'GridHitRegionTests.testNaNCellSkippedSafely' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testNaNRectHitsNothing' started at 2026-11-12 16:40:19.204
+Test Case 'GridHitRegionTests.testNaNRectHitsNothing' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testOverlappingCellsBothHitAndDeduplicated' started at 2026-11-12 16:40:19.204
+Test Case 'GridHitRegionTests.testOverlappingCellsBothHitAndDeduplicated' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testShrinkingRectShrinksHitSet' started at 2026-11-12 16:40:19.204
+Test Case 'GridHitRegionTests.testShrinkingRectShrinksHitSet' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testTwoColumnLayout' started at 2026-11-12 16:40:19.205
+Test Case 'GridHitRegionTests.testTwoColumnLayout' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testUnorderedCellsHitCorrectly' started at 2026-11-12 16:40:19.205
+Test Case 'GridHitRegionTests.testUnorderedCellsHitCorrectly' passed (0.0 seconds)
+Test Case 'GridHitRegionTests.testZeroSizeRectHitsNothing' started at 2026-11-12 16:40:19.205
+Test Case 'GridHitRegionTests.testZeroSizeRectHitsNothing' passed (0.101 seconds)
+Test Suite 'GridHitRegionTests' passed at 2026-11-12 16:40:19.306
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.105 (0.105) seconds
+Test Suite 'MarqueeModeTests' started at 2026-11-12 16:40:19.306
+Test Case 'MarqueeModeTests.testDeselectCanEmptyBase' started at 2026-11-12 16:40:19.306
+Test Case 'MarqueeModeTests.testDeselectCanEmptyBase' passed (0.001 seconds)
+Test Case 'MarqueeModeTests.testDeselectMixedBaseOnlyRemovesHits' started at 2026-11-12 16:40:19.307
+Test Case 'MarqueeModeTests.testDeselectMixedBaseOnlyRemovesHits' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testDeselectModeSubtracts' started at 2026-11-12 16:40:19.307
+Test Case 'MarqueeModeTests.testDeselectModeSubtracts' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testEmptyHitKeepsBase' started at 2026-11-12 16:40:19.307
+Test Case 'MarqueeModeTests.testEmptyHitKeepsBase' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testModeSelectionByAnchorSelectionState' started at 2026-11-12 16:40:19.307
+Test Case 'MarqueeModeTests.testModeSelectionByAnchorSelectionState' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testScopeFiltersHitsInDeselectMode' started at 2026-11-12 16:40:19.308
+Test Case 'MarqueeModeTests.testScopeFiltersHitsInDeselectMode' passed (0.1 seconds)
+Test Case 'MarqueeModeTests.testScopeFiltersHitsInSelectMode' started at 2026-11-12 16:40:19.408
+Test Case 'MarqueeModeTests.testScopeFiltersHitsInSelectMode' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testSelectModeIsIdempotent' started at 2026-11-12 16:40:19.408
+Test Case 'MarqueeModeTests.testSelectModeIsIdempotent' passed (0.0 seconds)
+Test Case 'MarqueeModeTests.testSelectModeUnions' started at 2026-11-12 16:40:19.409
+Test Case 'MarqueeModeTests.testSelectModeUnions' passed (0.0 seconds)
+Test Suite 'MarqueeModeTests' passed at 2026-11-12 16:40:19.409
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.103 (0.103) seconds
+Test Suite 'MarqueeSelectionPolicyTests' started at 2026-11-12 16:40:19.409
+Test Case 'MarqueeSelectionPolicyTests.testDiagonalMarqueePartialColumns' started at 2026-11-12 16:40:19.409
+Test Case 'MarqueeSelectionPolicyTests.testDiagonalMarqueePartialColumns' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testDiagonalMarqueeSelectsRectangle' started at 2026-11-12 16:40:19.409
+Test Case 'MarqueeSelectionPolicyTests.testDiagonalMarqueeSelectsRectangle' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testDragBackShrinkYieldsSubset' started at 2026-11-12 16:40:19.409
+Test Case 'MarqueeSelectionPolicyTests.testDragBackShrinkYieldsSubset' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testFiveColumnsVerticalDragSelectsOnlyOneColumn' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testFiveColumnsVerticalDragSelectsOnlyOneColumn' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testInfiniteRectReturnsEmpty' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testInfiniteRectReturnsEmpty' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testLastRowNotFullIsClamped' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testLastRowNotFullIsClamped' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testLeftColumnVerticalDragSelectsOnlyLeftColumn' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testLeftColumnVerticalDragSelectsOnlyLeftColumn' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testNaNRectReturnsEmpty' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testNaNRectReturnsEmpty' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testNegativeRectClampsToFirstCells' started at 2026-11-12 16:40:19.410
+Test Case 'MarqueeSelectionPolicyTests.testNegativeRectClampsToFirstCells' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testOriginCountMismatchReturnsEmpty' started at 2026-11-12 16:40:19.411
+Test Case 'MarqueeSelectionPolicyTests.testOriginCountMismatchReturnsEmpty' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testRectFullyInsideGapHitsNothing' started at 2026-11-12 16:40:19.411
+Test Case 'MarqueeSelectionPolicyTests.testRectFullyInsideGapHitsNothing' passed (0.1 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testRectSpansMultipleSections' started at 2026-11-12 16:40:19.511
+Test Case 'MarqueeSelectionPolicyTests.testRectSpansMultipleSections' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testRightColumnVerticalDragSelectsOnlyRightColumn' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testRightColumnVerticalDragSelectsOnlyRightColumn' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testTouchingEdgesCountAsIntersection' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testTouchingEdgesCountAsIntersection' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testZeroColumnsReturnsEmpty' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testZeroColumnsReturnsEmpty' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testZeroHeightHorizontalDragHitsRow' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testZeroHeightHorizontalDragHitsRow' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testZeroItemSizeReturnsEmpty' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testZeroItemSizeReturnsEmpty' passed (0.0 seconds)
+Test Case 'MarqueeSelectionPolicyTests.testZeroWidthRectExpandsToOnePoint' started at 2026-11-12 16:40:19.512
+Test Case 'MarqueeSelectionPolicyTests.testZeroWidthRectExpandsToOnePoint' passed (0.0 seconds)
+Test Suite 'MarqueeSelectionPolicyTests' passed at 2026-11-12 16:40:19.512
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.103 (0.103) seconds
+Test Suite 'MonthNavigatorTests' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsDeduplicatesRepeatedSections' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsDeduplicatesRepeatedSections' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testDescriptorsEmptyInput' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsEmptyInput' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testDescriptorsKeepsDescendingOrder' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsKeepsDescendingOrder' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testDescriptorsMalformedIdSkipped' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsMalformedIdSkipped' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testDescriptorsParsesIdsAndCounts' started at 2026-11-12 16:40:19.513
+Test Case 'MonthNavigatorTests.testDescriptorsParsesIdsAndCounts' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testDescriptorsSkipsUnknown' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testDescriptorsSkipsUnknown' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testLeapYearFebruaryParses' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testLeapYearFebruaryParses' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testMonthIDClampsMonth' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testMonthIDClampsMonth' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testMonthIDFormatting' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testMonthIDFormatting' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testMonthIDInvalidYearIsUnknown' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testMonthIDInvalidYearIsUnknown' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexEmptyReturnsNil' started at 2026-11-12 16:40:19.514
+Test Case 'MonthNavigatorTests.testNearestIndexEmptyReturnsNil' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexExactMatch' started at 2026-11-12 16:40:19.515
+Test Case 'MonthNavigatorTests.testNearestIndexExactMatch' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexNearestMonth' started at 2026-11-12 16:40:19.515
+Test Case 'MonthNavigatorTests.testNearestIndexNearestMonth' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexSkipsUnknownIds' started at 2026-11-12 16:40:19.515
+Test Case 'MonthNavigatorTests.testNearestIndexSkipsUnknownIds' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexTieTakesFirst' started at 2026-11-12 16:40:19.515
+Test Case 'MonthNavigatorTests.testNearestIndexTieTakesFirst' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testNearestIndexUnknownTargetReturnsNil' started at 2026-11-12 16:40:19.515
+Test Case 'MonthNavigatorTests.testNearestIndexUnknownTargetReturnsNil' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testYearGroupsCrossYear' started at 2026-11-12 16:40:19.516
+Test Case 'MonthNavigatorTests.testYearGroupsCrossYear' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testYearGroupsEmpty' started at 2026-11-12 16:40:19.516
+Test Case 'MonthNavigatorTests.testYearGroupsEmpty' passed (0.0 seconds)
+Test Case 'MonthNavigatorTests.testYearGroupsSingleYearMultipleMonths' started at 2026-11-12 16:40:19.516
+Test Case 'MonthNavigatorTests.testYearGroupsSingleYearMultipleMonths' passed (0.0 seconds)
+Test Suite 'MonthNavigatorTests' passed at 2026-11-12 16:40:19.516
+	 Executed 19 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'PositionAnchorPolicyV5Tests' started at 2026-11-12 16:40:19.516
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetLowerBoundIsNegativeAdjustedTop' started at 2026-11-12 16:40:19.516
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetLowerBoundIsNegativeAdjustedTop' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetNonFiniteOrZeroBoundsIsSafe' started at 2026-11-12 16:40:19.516
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetNonFiniteOrZeroBoundsIsSafe' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetStaysWithinLegalRange' started at 2026-11-12 16:40:19.517
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetStaysWithinLegalRange' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetUpperBoundIsContentBottom' started at 2026-11-12 16:40:19.517
+Test Case 'PositionAnchorPolicyV5Tests.testClampedTargetUpperBoundIsContentBottom' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testRatioFallbackClampsRatioToOne' started at 2026-11-12 16:40:19.517
+Test Case 'PositionAnchorPolicyV5Tests.testRatioFallbackClampsRatioToOne' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testRatioFallbackNaNIsSafe' started at 2026-11-12 16:40:19.517
+Test Case 'PositionAnchorPolicyV5Tests.testRatioFallbackNaNIsSafe' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testResolveFallsBackToRatioWhenBothMissing' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testResolveFallsBackToRatioWhenBothMissing' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testResolveFallsBackToSectionWhenAssetMissing' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testResolveFallsBackToSectionWhenAssetMissing' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testResolvePrefersAssetAnchor' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testResolvePrefersAssetAnchor' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testResolveReturnsNoneForEmptyAnchor' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testResolveReturnsNoneForEmptyAnchor' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testTargetOffsetNonFiniteVisualYFallsBackToCellMinY' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testTargetOffsetNonFiniteVisualYFallsBackToCellMinY' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testTargetOffsetPreservesNegativeVisualY' started at 2026-11-12 16:40:19.518
+Test Case 'PositionAnchorPolicyV5Tests.testTargetOffsetPreservesNegativeVisualY' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYNegativeForPartiallyVisibleCell' started at 2026-11-12 16:40:19.519
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYNegativeForPartiallyVisibleCell' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYNonFiniteIsSafe' started at 2026-11-12 16:40:19.519
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYNonFiniteIsSafe' passed (0.0 seconds)
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYPositiveForCellBelowTop' started at 2026-11-12 16:40:19.519
+Test Case 'PositionAnchorPolicyV5Tests.testVisualYPositiveForCellBelowTop' passed (0.0 seconds)
+Test Suite 'PositionAnchorPolicyV5Tests' passed at 2026-11-12 16:40:19.519
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'PositionAnchorSelectorTests' started at 2026-11-12 16:40:19.519
+Test Case 'PositionAnchorSelectorTests.testBoundaryEffectiveTopMinusHalfPointIsAccepted' started at 2026-11-12 16:40:19.519
+Test Case 'PositionAnchorSelectorTests.testBoundaryEffectiveTopMinusHalfPointIsAccepted' passed (0.001 seconds)
+Test Case 'PositionAnchorSelectorTests.testCellBelowViewportIsIgnoredForFullyVisible' started at 2026-11-12 16:40:19.520
+Test Case 'PositionAnchorSelectorTests.testCellBelowViewportIsIgnoredForFullyVisible' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testCrossSectionSortsBySectionThenItem' started at 2026-11-12 16:40:19.520
+Test Case 'PositionAnchorSelectorTests.testCrossSectionSortsBySectionThenItem' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testEmptyCellsReturnsNil' started at 2026-11-12 16:40:19.521
+Test Case 'PositionAnchorSelectorTests.testEmptyCellsReturnsNil' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testFallsBackToFirstPartiallyVisibleCell' started at 2026-11-12 16:40:19.521
+Test Case 'PositionAnchorSelectorTests.testFallsBackToFirstPartiallyVisibleCell' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testHalfOccludedCellIsSkipped' started at 2026-11-12 16:40:19.521
+Test Case 'PositionAnchorSelectorTests.testHalfOccludedCellIsSkipped' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testNonFiniteOrInvertedViewportReturnsNil' started at 2026-11-12 16:40:19.521
+Test Case 'PositionAnchorSelectorTests.testNonFiniteOrInvertedViewportReturnsNil' passed (0.0 seconds)
+Test Case 'PositionAnchorSelectorTests.testSelectsFirstFullyVisibleCell' started at 2026-11-12 16:40:19.521
+Test Case 'PositionAnchorSelectorTests.testSelectsFirstFullyVisibleCell' passed (0.0 seconds)
+Test Suite 'PositionAnchorSelectorTests' passed at 2026-11-12 16:40:19.522
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'PositionAnchorV3Tests' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testCurrentSchemaVersionIsFour' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testCurrentSchemaVersionIsFour' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testEmptyAnchorHasNoRestoreWork' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testEmptyAnchorHasNoRestoreWork' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testFinishRequiresLayoutSnapshotAndOffsetApplied' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testFinishRequiresLayoutSnapshotAndOffsetApplied' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testMissingAssetFallsBackToSectionThenRatio' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testMissingAssetFallsBackToSectionThenRatio' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testNoWritebackDuringRestoreInFlight' started at 2026-11-12 16:40:19.522
+Test Case 'PositionAnchorV3Tests.testNoWritebackDuringRestoreInFlight' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testNonFiniteAnchorOffsetIsSafe' started at 2026-11-12 16:40:19.523
+Test Case 'PositionAnchorV3Tests.testNonFiniteAnchorOffsetIsSafe' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testRestoreUsesPixelOffsetNotCentered' started at 2026-11-12 16:40:19.523
+Test Case 'PositionAnchorV3Tests.testRestoreUsesPixelOffsetNotCentered' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testTargetOffsetIsClampedToValidRange' started at 2026-11-12 16:40:19.523
+Test Case 'PositionAnchorV3Tests.testTargetOffsetIsClampedToValidRange' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testV1DecodeUsesSafeDefaults' started at 2026-11-12 16:40:19.523
+Test Case 'PositionAnchorV3Tests.testV1DecodeUsesSafeDefaults' passed (0.001 seconds)
+Test Case 'PositionAnchorV3Tests.testV2DecodeFallsBackToLegacyAssetFields' started at 2026-11-12 16:40:19.524
+Test Case 'PositionAnchorV3Tests.testV2DecodeFallsBackToLegacyAssetFields' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testV3DecodeKeepsLegacyFieldsWithZeroNewFields' started at 2026-11-12 16:40:19.524
+Test Case 'PositionAnchorV3Tests.testV3DecodeKeepsLegacyFieldsWithZeroNewFields' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testV4EncodeDecodeRoundTripPreservesAnchor' started at 2026-11-12 16:40:19.525
+Test Case 'PositionAnchorV3Tests.testV4EncodeDecodeRoundTripPreservesAnchor' passed (0.0 seconds)
+Test Case 'PositionAnchorV3Tests.testVisualYIsCellMinYMinusContentOffset' started at 2026-11-12 16:40:19.525
+Test Case 'PositionAnchorV3Tests.testVisualYIsCellMinYMinusContentOffset' passed (0.0 seconds)
+Test Suite 'PositionAnchorV3Tests' passed at 2026-11-12 16:40:19.526
+	 Executed 13 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'PositionRestoreMachineV5Tests' started at 2026-11-12 16:40:19.526
+Test Case 'PositionRestoreMachineV5Tests.testAnchorMissingKeepsRestoringWhileIndexIncomplete' started at 2026-11-12 16:40:19.526
+Test Case 'PositionRestoreMachineV5Tests.testAnchorMissingKeepsRestoringWhileIndexIncomplete' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testAnchorMissingWithCompleteIndexFallsBack' started at 2026-11-12 16:40:19.526
+Test Case 'PositionRestoreMachineV5Tests.testAnchorMissingWithCompleteIndexFallsBack' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testAnchorPresentMovesToApplying' started at 2026-11-12 16:40:19.526
+Test Case 'PositionRestoreMachineV5Tests.testAnchorPresentMovesToApplying' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testAppliedMovesToVerifying' started at 2026-11-12 16:40:19.526
+Test Case 'PositionRestoreMachineV5Tests.testAppliedMovesToVerifying' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testBeginWithAnchorRestoringBlocksSave' started at 2026-11-12 16:40:19.527
+Test Case 'PositionRestoreMachineV5Tests.testBeginWithAnchorRestoringBlocksSave' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testBeginWithoutAnchorSettlesImmediately' started at 2026-11-12 16:40:19.527
+Test Case 'PositionRestoreMachineV5Tests.testBeginWithoutAnchorSettlesImmediately' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testBoundsNotReadyKeepsRestoring' started at 2026-11-12 16:40:19.527
+Test Case 'PositionRestoreMachineV5Tests.testBoundsNotReadyKeepsRestoring' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testCancelFromRestoringSettles' started at 2026-11-12 16:40:19.527
+Test Case 'PositionRestoreMachineV5Tests.testCancelFromRestoringSettles' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testFallbackSettlesAfterAppliedAndVerified' started at 2026-11-12 16:40:19.528
+Test Case 'PositionRestoreMachineV5Tests.testFallbackSettlesAfterAppliedAndVerified' passed (0.001 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testInitialPhaseIdleAndCannotSave' started at 2026-11-12 16:40:19.529
+Test Case 'PositionRestoreMachineV5Tests.testInitialPhaseIdleAndCannotSave' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testRepeatedBeginOnlyFromIdleSemantics' started at 2026-11-12 16:40:19.529
+Test Case 'PositionRestoreMachineV5Tests.testRepeatedBeginOnlyFromIdleSemantics' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testSecondVerifyFailureSettlesGracefully' started at 2026-11-12 16:40:19.529
+Test Case 'PositionRestoreMachineV5Tests.testSecondVerifyFailureSettlesGracefully' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testSettleFallbackCompletes' started at 2026-11-12 16:40:19.529
+Test Case 'PositionRestoreMachineV5Tests.testSettleFallbackCompletes' passed (0.001 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testVerifiedOkSettles' started at 2026-11-12 16:40:19.530
+Test Case 'PositionRestoreMachineV5Tests.testVerifiedOkSettles' passed (0.0 seconds)
+Test Case 'PositionRestoreMachineV5Tests.testVerifyFailureRetriesOnce' started at 2026-11-12 16:40:19.530
+Test Case 'PositionRestoreMachineV5Tests.testVerifyFailureRetriesOnce' passed (0.0 seconds)
+Test Suite 'PositionRestoreMachineV5Tests' passed at 2026-11-12 16:40:19.530
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'ReplacementPlannerTests' started at 2026-11-12 16:40:19.530
+Test Case 'ReplacementPlannerTests.testConsecutiveRemovalPlanIsStateless' started at 2026-11-12 16:40:19.530
+Test Case 'ReplacementPlannerTests.testConsecutiveRemovalPlanIsStateless' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testDefensiveClampWhenNoNeighbors' started at 2026-11-12 16:40:19.531
+Test Case 'ReplacementPlannerTests.testDefensiveClampWhenNoNeighbors' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testEmptyListClosesViewer' started at 2026-11-12 16:40:19.531
+Test Case 'ReplacementPlannerTests.testEmptyListClosesViewer' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testRemoveFirstItem' started at 2026-11-12 16:40:19.531
+Test Case 'ReplacementPlannerTests.testRemoveFirstItem' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testSwipeDownAtEndRollsBackWithBottomEntry' started at 2026-11-12 16:40:19.532
+Test Case 'ReplacementPlannerTests.testSwipeDownAtEndRollsBackWithBottomEntry' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testSwipeDownEntryFromTop' started at 2026-11-12 16:40:19.532
+Test Case 'ReplacementPlannerTests.testSwipeDownEntryFromTop' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testSwipeUpAtEndRollsBackWithTopEntry' started at 2026-11-12 16:40:19.532
+Test Case 'ReplacementPlannerTests.testSwipeUpAtEndRollsBackWithTopEntry' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testSwipeUpEntryFromBottom' started at 2026-11-12 16:40:19.532
+Test Case 'ReplacementPlannerTests.testSwipeUpEntryFromBottom' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testToolbarAtEndRollsBackWithDefaultBottom' started at 2026-11-12 16:40:19.533
+Test Case 'ReplacementPlannerTests.testToolbarAtEndRollsBackWithDefaultBottom' passed (0.0 seconds)
+Test Case 'ReplacementPlannerTests.testToolbarDeleteDefaultsToBottom' started at 2026-11-12 16:40:19.533
+Test Case 'ReplacementPlannerTests.testToolbarDeleteDefaultsToBottom' passed (0.0 seconds)
+Test Suite 'ReplacementPlannerTests' passed at 2026-11-12 16:40:19.533
+	 Executed 10 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'ReviewSessionTests' started at 2026-11-12 16:40:19.533
+Test Case 'ReviewSessionTests.testCodableRoundTrip' started at 2026-11-12 16:40:19.533
+Test Case 'ReviewSessionTests.testCodableRoundTrip' passed (0.001 seconds)
+Test Case 'ReviewSessionTests.testMarkDeleteKeepsEnqueueOrder' started at 2026-11-12 16:40:19.534
+Test Case 'ReviewSessionTests.testMarkDeleteKeepsEnqueueOrder' passed (0.0 seconds)
+Test Case 'ReviewSessionTests.testMarkDuplicateIsNoopOnOrder' started at 2026-11-12 16:40:19.534
+Test Case 'ReviewSessionTests.testMarkDuplicateIsNoopOnOrder' passed (0.0 seconds)
+Test Case 'ReviewSessionTests.testMarkHideSeparateQueue' started at 2026-11-12 16:40:19.534
+Test Case 'ReviewSessionTests.testMarkHideSeparateQueue' passed (0.0 seconds)
+Test Case 'ReviewSessionTests.testMarkSwitchKindReplacesEntry' started at 2026-11-12 16:40:19.535
+Test Case 'ReviewSessionTests.testMarkSwitchKindReplacesEntry' passed (0.0 seconds)
+Test Case 'ReviewSessionTests.testMaxEntriesEnforced' started at 2026-11-12 16:40:19.535
+Test Case 'ReviewSessionTests.testMaxEntriesEnforced' passed (3.642 seconds)
+Test Case 'ReviewSessionTests.testRemoveCommitted' started at 2026-11-12 16:40:23.177
+Test Case 'ReviewSessionTests.testRemoveCommitted' passed (0.0 seconds)
+Test Case 'ReviewSessionTests.testUnmark' started at 2026-11-12 16:40:23.177
+Test Case 'ReviewSessionTests.testUnmark' passed (0.0 seconds)
+Test Suite 'ReviewSessionTests' passed at 2026-11-12 16:40:23.177
+	 Executed 8 tests, with 0 failures (0 unexpected) in 3.644 (3.644) seconds
+Test Suite 'SelectionPolicyTests' started at 2026-11-12 16:40:23.177
+Test Case 'SelectionPolicyTests.testApplyRangeAndApplyDelta' started at 2026-11-12 16:40:23.177
+Test Case 'SelectionPolicyTests.testApplyRangeAndApplyDelta' passed (0.001 seconds)
+Test Case 'SelectionPolicyTests.testBatchSelectPreservesOrderAndSkipsOutsideScope' started at 2026-11-12 16:40:23.178
+Test Case 'SelectionPolicyTests.testBatchSelectPreservesOrderAndSkipsOutsideScope' passed (0.001 seconds)
+Test Case 'SelectionPolicyTests.testBeginIgnoresInitialOutsideScope' started at 2026-11-12 16:40:23.179
+Test Case 'SelectionPolicyTests.testBeginIgnoresInitialOutsideScope' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testBeginStoresScopeID' started at 2026-11-12 16:40:23.179
+Test Case 'SelectionPolicyTests.testBeginStoresScopeID' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testBeginWithInitial' started at 2026-11-12 16:40:23.179
+Test Case 'SelectionPolicyTests.testBeginWithInitial' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testDefaultScopeIDIsNil' started at 2026-11-12 16:40:23.179
+Test Case 'SelectionPolicyTests.testDefaultScopeIDIsNil' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testDeselectAll' started at 2026-11-12 16:40:23.179
+Test Case 'SelectionPolicyTests.testDeselectAll' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testIntersectScopeEmptySelectionStays' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testIntersectScopeEmptySelectionStays' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testIntersectScopeOnFilterChange' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testIntersectScopeOnFilterChange' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testInvert' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testInvert' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testRebeginResetsScopeID' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testRebeginResetsScopeID' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testRemoveAllAfterCommit' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testRemoveAllAfterCommit' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testRemoveOnlyOneID' started at 2026-11-12 16:40:23.180
+Test Case 'SelectionPolicyTests.testRemoveOnlyOneID' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testReplaceSelectionFiltersAndDedupes' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testReplaceSelectionFiltersAndDedupes' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testReplaceSelectionWithEmptyListClears' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testReplaceSelectionWithEmptyListClears' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectAllAndAllSelected' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testSelectAllAndAllSelected' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectOnlyAdds' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testSelectOnlyAdds' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectRangeForward' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testSelectRangeForward' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectRangeIgnoresOutOfScopeIds' started at 2026-11-12 16:40:23.181
+Test Case 'SelectionPolicyTests.testSelectRangeIgnoresOutOfScopeIds' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectRangeMergesWithExistingSelection' started at 2026-11-12 16:40:23.182
+Test Case 'SelectionPolicyTests.testSelectRangeMergesWithExistingSelection' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectRangeMissingAnchorIsNoOp' started at 2026-11-12 16:40:23.182
+Test Case 'SelectionPolicyTests.testSelectRangeMissingAnchorIsNoOp' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectRangeReverseKeepsListOrder' started at 2026-11-12 16:40:23.182
+Test Case 'SelectionPolicyTests.testSelectRangeReverseKeepsListOrder' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testSelectedSetCacheMatchesArrayAfterRandomOps' started at 2026-11-12 16:40:23.182
+Test Case 'SelectionPolicyTests.testSelectedSetCacheMatchesArrayAfterRandomOps' passed (0.072 seconds)
+Test Case 'SelectionPolicyTests.testToggle' started at 2026-11-12 16:40:23.254
+Test Case 'SelectionPolicyTests.testToggle' passed (0.0 seconds)
+Test Case 'SelectionPolicyTests.testToggleIgnoresOutsideScope' started at 2026-11-12 16:40:23.255
+Test Case 'SelectionPolicyTests.testToggleIgnoresOutsideScope' passed (0.0 seconds)
+Test Suite 'SelectionPolicyTests' passed at 2026-11-12 16:40:23.255
+	 Executed 25 tests, with 0 failures (0 unexpected) in 0.077 (0.077) seconds
+Test Suite 'SelectionRangeTests' started at 2026-11-12 16:40:23.255
+Test Case 'SelectionRangeTests.testAdjacentElementsReturnTwo' started at 2026-11-12 16:40:23.255
+Test Case 'SelectionRangeTests.testAdjacentElementsReturnTwo' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testDuplicatesInListAreDeduped' started at 2026-11-12 16:40:23.255
+Test Case 'SelectionRangeTests.testDuplicatesInListAreDeduped' passed (0.1 seconds)
+Test Case 'SelectionRangeTests.testEmptyListReturnsEmpty' started at 2026-11-12 16:40:23.355
+Test Case 'SelectionRangeTests.testEmptyListReturnsEmpty' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testForwardRange' started at 2026-11-12 16:40:23.356
+Test Case 'SelectionRangeTests.testForwardRange' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testLargeListWithin10ms' started at 2026-11-12 16:40:23.356
+Test Case 'SelectionRangeTests.testLargeListWithin10ms' passed (0.006 seconds)
+Test Case 'SelectionRangeTests.testMissingAnchorReturnsEmpty' started at 2026-11-12 16:40:23.362
+Test Case 'SelectionRangeTests.testMissingAnchorReturnsEmpty' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testMissingTargetReturnsEmpty' started at 2026-11-12 16:40:23.362
+Test Case 'SelectionRangeTests.testMissingTargetReturnsEmpty' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testRangeKeepsListOrderNotSelectionOrder' started at 2026-11-12 16:40:23.363
+Test Case 'SelectionRangeTests.testRangeKeepsListOrderNotSelectionOrder' passed (0.1 seconds)
+Test Case 'SelectionRangeTests.testReverseRange' started at 2026-11-12 16:40:23.463
+Test Case 'SelectionRangeTests.testReverseRange' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testSameAnchorAndTargetReturnsSingle' started at 2026-11-12 16:40:23.463
+Test Case 'SelectionRangeTests.testSameAnchorAndTargetReturnsSingle' passed (0.0 seconds)
+Test Case 'SelectionRangeTests.testWholeListRange' started at 2026-11-12 16:40:23.464
+Test Case 'SelectionRangeTests.testWholeListRange' passed (0.0 seconds)
+Test Suite 'SelectionRangeTests' passed at 2026-11-12 16:40:23.464
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.209 (0.209) seconds
+Test Suite 'SlideSelectPolicyTests' started at 2026-11-12 16:40:23.464
+Test Case 'SlideSelectPolicyTests.testBottomEdgeVelocityIsPositiveAndProportional' started at 2026-11-12 16:40:23.464
+Test Case 'SlideSelectPolicyTests.testBottomEdgeVelocityIsPositiveAndProportional' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testClampedOffsetHandlesReversedAndNonFiniteInputs' started at 2026-11-12 16:40:23.464
+Test Case 'SlideSelectPolicyTests.testClampedOffsetHandlesReversedAndNonFiniteInputs' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testClampedOffsetKeepsBounds' started at 2026-11-12 16:40:23.464
+Test Case 'SlideSelectPolicyTests.testClampedOffsetKeepsBounds' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testDeduplicatedKeepsConsecutiveOrderOnly' started at 2026-11-12 16:40:23.465
+Test Case 'SlideSelectPolicyTests.testDeduplicatedKeepsConsecutiveOrderOnly' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testEmptyVisitedHasNoSelectionWrites' started at 2026-11-12 16:40:23.465
+Test Case 'SlideSelectPolicyTests.testEmptyVisitedHasNoSelectionWrites' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testHorizontalWinsOnlyWhenStrictlyGreater' started at 2026-11-12 16:40:23.465
+Test Case 'SlideSelectPolicyTests.testHorizontalWinsOnlyWhenStrictlyGreater' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testInvalidBufferOrStepsReturnZero' started at 2026-11-12 16:40:23.465
+Test Case 'SlideSelectPolicyTests.testInvalidBufferOrStepsReturnZero' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testOriginallySelectedCellsAreNeverCleared' started at 2026-11-12 16:40:23.466
+Test Case 'SlideSelectPolicyTests.testOriginallySelectedCellsAreNeverCleared' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testOutsideBufferHasZeroVelocity' started at 2026-11-12 16:40:23.466
+Test Case 'SlideSelectPolicyTests.testOutsideBufferHasZeroVelocity' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testSlidingBackRestoresSnapshotForUnselectedCells' started at 2026-11-12 16:40:23.466
+Test Case 'SlideSelectPolicyTests.testSlidingBackRestoresSnapshotForUnselectedCells' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testThirdPassSelectsAgain' started at 2026-11-12 16:40:23.467
+Test Case 'SlideSelectPolicyTests.testThirdPassSelectsAgain' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testTopEdgeVelocityIsNegativeAndProportional' started at 2026-11-12 16:40:23.467
+Test Case 'SlideSelectPolicyTests.testTopEdgeVelocityIsNegativeAndProportional' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testVerticalLockNeverReactivatesInSameGesture' started at 2026-11-12 16:40:23.467
+Test Case 'SlideSelectPolicyTests.testVerticalLockNeverReactivatesInSameGesture' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testVisitedCellsBecomeSelected' started at 2026-11-12 16:40:23.467
+Test Case 'SlideSelectPolicyTests.testVisitedCellsBecomeSelected' passed (0.0 seconds)
+Test Case 'SlideSelectPolicyTests.testZeroAndNonFiniteNeverActivate' started at 2026-11-12 16:40:23.468
+Test Case 'SlideSelectPolicyTests.testZeroAndNonFiniteNeverActivate' passed (0.0 seconds)
+Test Suite 'SlideSelectPolicyTests' passed at 2026-11-12 16:40:23.468
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'SmokeTests' started at 2026-11-12 16:40:23.468
+Test Case 'SmokeTests.testPackageImportsAndAllPlaceholdersLink' started at 2026-11-12 16:40:23.468
+Test Case 'SmokeTests.testPackageImportsAndAllPlaceholdersLink' passed (0.0 seconds)
+Test Suite 'SmokeTests' passed at 2026-11-12 16:40:23.468
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'StorageMathTests' started at 2026-11-12 16:40:23.468
+Test Case 'StorageMathTests.testPercent' started at 2026-11-12 16:40:23.468
+Test Case 'StorageMathTests.testPercent' passed (0.0 seconds)
+Test Case 'StorageMathTests.testSummarizeByType' started at 2026-11-12 16:40:23.469
+Test Case 'StorageMathTests.testSummarizeByType' passed (0.0 seconds)
+Test Case 'StorageMathTests.testSummarizeByYear' started at 2026-11-12 16:40:23.469
+Test Case 'StorageMathTests.testSummarizeByYear' passed (0.0 seconds)
+Test Case 'StorageMathTests.testSummarizeEmpty' started at 2026-11-12 16:40:23.469
+Test Case 'StorageMathTests.testSummarizeEmpty' passed (0.0 seconds)
+Test Case 'StorageMathTests.testSummarizePerformance10k' started at 2026-11-12 16:40:23.469
+Test Case 'StorageMathTests.testSummarizePerformance10k' passed (0.005 seconds)
+Test Case 'StorageMathTests.testSummarizeUnknownSizes' started at 2026-11-12 16:40:23.474
+Test Case 'StorageMathTests.testSummarizeUnknownSizes' passed (0.0 seconds)
+Test Suite 'StorageMathTests' passed at 2026-11-12 16:40:23.474
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+Test Suite 'SwipeResolverTests' started at 2026-11-12 16:40:23.474
+Test Case 'SwipeResolverTests.testConservativeRequiresLongerDistance' started at 2026-11-12 16:40:23.474
+Test Case 'SwipeResolverTests.testConservativeRequiresLongerDistance' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testDirectionBoundaryExactlyOneAndHalf' started at 2026-11-12 16:40:23.474
+Test Case 'SwipeResolverTests.testDirectionBoundaryExactlyOneAndHalf' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testDirectionHorizontalReturnsNil' started at 2026-11-12 16:40:23.475
+Test Case 'SwipeResolverTests.testDirectionHorizontalReturnsNil' passed (0.101 seconds)
+Test Case 'SwipeResolverTests.testDirectionJustPastBoundary' started at 2026-11-12 16:40:23.575
+Test Case 'SwipeResolverTests.testDirectionJustPastBoundary' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testDirectionPureVertical' started at 2026-11-12 16:40:23.575
+Test Case 'SwipeResolverTests.testDirectionPureVertical' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testDirectionSmallTranslationAmbiguous' started at 2026-11-12 16:40:23.576
+Test Case 'SwipeResolverTests.testDirectionSmallTranslationAmbiguous' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testLockedByDistance' started at 2026-11-12 16:40:23.576
+Test Case 'SwipeResolverTests.testLockedByDistance' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testLockedByVelocity' started at 2026-11-12 16:40:23.576
+Test Case 'SwipeResolverTests.testLockedByVelocity' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testLockedUsesVerticalAxisOnly' started at 2026-11-12 16:40:23.576
+Test Case 'SwipeResolverTests.testLockedUsesVerticalAxisOnly' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testProgressLinear' started at 2026-11-12 16:40:23.576
+Test Case 'SwipeResolverTests.testProgressLinear' passed (0.0 seconds)
+Test Case 'SwipeResolverTests.testSensitivityPresets' started at 2026-11-12 16:40:23.577
+Test Case 'SwipeResolverTests.testSensitivityPresets' passed (0.0 seconds)
+Test Suite 'SwipeResolverTests' passed at 2026-11-12 16:40:23.577
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.102 (0.102) seconds
+Test Suite 'TrashPolicyTests' started at 2026-11-12 16:40:23.577
+Test Case 'TrashPolicyTests.testEmptyInput' started at 2026-11-12 16:40:23.577
+Test Case 'TrashPolicyTests.testEmptyInput' passed (0.001 seconds)
+Test Case 'TrashPolicyTests.testEvictsMultipleWhenNeeded' started at 2026-11-12 16:40:23.578
+Test Case 'TrashPolicyTests.testEvictsMultipleWhenNeeded' passed (0.0 seconds)
+Test Case 'TrashPolicyTests.testEvictsOldestFirst' started at 2026-11-12 16:40:23.578
+Test Case 'TrashPolicyTests.testEvictsOldestFirst' passed (0.0 seconds)
+Test Case 'TrashPolicyTests.testExactlyAtLimitNoEviction' started at 2026-11-12 16:40:23.578
+Test Case 'TrashPolicyTests.testExactlyAtLimitNoEviction' passed (0.0 seconds)
+Test Case 'TrashPolicyTests.testNoEvictionUnderLimit' started at 2026-11-12 16:40:23.578
+Test Case 'TrashPolicyTests.testNoEvictionUnderLimit' passed (0.0 seconds)
+Test Suite 'TrashPolicyTests' passed at 2026-11-12 16:40:23.578
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'UndoPolicyTests' started at 2026-11-12 16:40:23.578
+Test Case 'UndoPolicyTests.testAlternativeWindows' started at 2026-11-12 16:40:23.578
+Test Case 'UndoPolicyTests.testAlternativeWindows' passed (0.0 seconds)
+Test Case 'UndoPolicyTests.testExpiredJustPastBoundary' started at 2026-11-12 16:40:23.579
+Test Case 'UndoPolicyTests.testExpiredJustPastBoundary' passed (0.0 seconds)
+Test Case 'UndoPolicyTests.testIsWithinWindowWithInjectedClock' started at 2026-11-12 16:40:23.579
+Test Case 'UndoPolicyTests.testIsWithinWindowWithInjectedClock' passed (0.0 seconds)
+Test Case 'UndoPolicyTests.testSystemClockReturnsCurrentTime' started at 2026-11-12 16:40:23.579
+Test Case 'UndoPolicyTests.testSystemClockReturnsCurrentTime' passed (0.0 seconds)
+Test Case 'UndoPolicyTests.testWithinWindowAtExactBoundary' started at 2026-11-12 16:40:23.579
+Test Case 'UndoPolicyTests.testWithinWindowAtExactBoundary' passed (0.0 seconds)
+Test Suite 'UndoPolicyTests' passed at 2026-11-12 16:40:23.579
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'ZoomGeometryTests' started at 2026-11-12 16:40:23.579
+Test Case 'ZoomGeometryTests.testAspectFitInfiniteReturnsZero' started at 2026-11-12 16:40:23.579
+Test Case 'ZoomGeometryTests.testAspectFitInfiniteReturnsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitNaNReturnsZero' started at 2026-11-12 16:40:23.579
+Test Case 'ZoomGeometryTests.testAspectFitNaNReturnsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitNegativeViewportReturnsZero' started at 2026-11-12 16:40:23.579
+Test Case 'ZoomGeometryTests.testAspectFitNegativeViewportReturnsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitSquareInSquare' started at 2026-11-12 16:40:23.580
+Test Case 'ZoomGeometryTests.testAspectFitSquareInSquare' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitTallImageInWideViewportFitsHeight' started at 2026-11-12 16:40:23.580
+Test Case 'ZoomGeometryTests.testAspectFitTallImageInWideViewportFitsHeight' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitWideImageInTallViewportFitsWidth' started at 2026-11-12 16:40:23.580
+Test Case 'ZoomGeometryTests.testAspectFitWideImageInTallViewportFitsWidth' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testAspectFitZeroImageReturnsZero' started at 2026-11-12 16:40:23.580
+Test Case 'ZoomGeometryTests.testAspectFitZeroImageReturnsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testCenteredInsetNaNZoomFallsBackToMinScale' started at 2026-11-12 16:40:23.581
+Test Case 'ZoomGeometryTests.testCenteredInsetNaNZoomFallsBackToMinScale' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testCenteredInsetNegativeContentIsZero' started at 2026-11-12 16:40:23.581
+Test Case 'ZoomGeometryTests.testCenteredInsetNegativeContentIsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testCenteredInsetSmallerThanViewport' started at 2026-11-12 16:40:23.581
+Test Case 'ZoomGeometryTests.testCenteredInsetSmallerThanViewport' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testCenteredInsetZoomedLargerThanViewportIsZero' started at 2026-11-12 16:40:23.581
+Test Case 'ZoomGeometryTests.testCenteredInsetZoomedLargerThanViewportIsZero' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectCentersOnFocus' started at 2026-11-12 16:40:23.581
+Test Case 'ZoomGeometryTests.testClampedZoomRectCentersOnFocus' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectClampsAtEdges' started at 2026-11-12 16:40:23.582
+Test Case 'ZoomGeometryTests.testClampedZoomRectClampsAtEdges' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectFocusAtXZeroReturnsRect' started at 2026-11-12 16:40:23.582
+Test Case 'ZoomGeometryTests.testClampedZoomRectFocusAtXZeroReturnsRect' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectFocusAtYZeroReturnsRect' started at 2026-11-12 16:40:23.582
+Test Case 'ZoomGeometryTests.testClampedZoomRectFocusAtYZeroReturnsRect' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectInfiniteZoomClampedToMax' started at 2026-11-12 16:40:23.582
+Test Case 'ZoomGeometryTests.testClampedZoomRectInfiniteZoomClampedToMax' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectNaNFocusReturnsNil' started at 2026-11-12 16:40:23.583
+Test Case 'ZoomGeometryTests.testClampedZoomRectNaNFocusReturnsNil' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectRectCannotExceedImage' started at 2026-11-12 16:40:23.583
+Test Case 'ZoomGeometryTests.testClampedZoomRectRectCannotExceedImage' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectStillRejectsNegativeOrNaNFocus' started at 2026-11-12 16:40:23.584
+Test Case 'ZoomGeometryTests.testClampedZoomRectStillRejectsNegativeOrNaNFocus' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testClampedZoomRectZeroViewportReturnsNil' started at 2026-11-12 16:40:23.584
+Test Case 'ZoomGeometryTests.testClampedZoomRectZeroViewportReturnsNil' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testSanitizedScaleClamps' started at 2026-11-12 16:40:23.584
+Test Case 'ZoomGeometryTests.testSanitizedScaleClamps' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testSanitizedScaleCustomBounds' started at 2026-11-12 16:40:23.584
+Test Case 'ZoomGeometryTests.testSanitizedScaleCustomBounds' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testSanitizedScaleNaNAndInfinity' started at 2026-11-12 16:40:23.585
+Test Case 'ZoomGeometryTests.testSanitizedScaleNaNAndInfinity' passed (0.0 seconds)
+Test Case 'ZoomGeometryTests.testSanitizedScalePassThrough' started at 2026-11-12 16:40:23.585
+Test Case 'ZoomGeometryTests.testSanitizedScalePassThrough' passed (0.0 seconds)
+Test Suite 'ZoomGeometryTests' passed at 2026-11-12 16:40:23.585
+	 Executed 24 tests, with 0 failures (0 unexpected) in 0.005 (0.005) seconds
+Test Suite 'ZoomGeometryTransactionTests' started at 2026-11-12 16:40:23.585
+Test Case 'ZoomGeometryTransactionTests.testActivePendingGeometryCoalescesIntoSingleCommit' started at 2026-11-12 16:40:23.585
+Test Case 'ZoomGeometryTransactionTests.testActivePendingGeometryCoalescesIntoSingleCommit' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testCenteringInsetIsNotDoubledByZoomScale' started at 2026-11-12 16:40:23.586
+Test Case 'ZoomGeometryTransactionTests.testCenteringInsetIsNotDoubledByZoomScale' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testCenteringInsetUsesUntransformedBoundsOnly' started at 2026-11-12 16:40:23.586
+Test Case 'ZoomGeometryTransactionTests.testCenteringInsetUsesUntransformedBoundsOnly' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testEmptyPendingReturnsEmpty' started at 2026-11-12 16:40:23.586
+Test Case 'ZoomGeometryTransactionTests.testEmptyPendingReturnsEmpty' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testInvalidPendingDoesNotHideEarlierValidCommit' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testInvalidPendingDoesNotHideEarlierValidCommit' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testLastValidCommitWins' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testLastValidCommitWins' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testNonFinitePendingIsDiscarded' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testNonFinitePendingIsDiscarded' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testSanitizedKeepsFullyValidCommit' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testSanitizedKeepsFullyValidCommit' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testSanitizedRejectsNegativeOrNonFiniteInsets' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testSanitizedRejectsNegativeOrNonFiniteInsets' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testSanitizedRejectsZeroOrNegativeScale' started at 2026-11-12 16:40:23.587
+Test Case 'ZoomGeometryTransactionTests.testSanitizedRejectsZeroOrNegativeScale' passed (0.0 seconds)
+Test Case 'ZoomGeometryTransactionTests.testZeroOrNegativeSizePendingIsDiscarded' started at 2026-11-12 16:40:23.588
+Test Case 'ZoomGeometryTransactionTests.testZeroOrNegativeSizePendingIsDiscarded' passed (0.0 seconds)
+Test Suite 'ZoomGeometryTransactionTests' passed at 2026-11-12 16:40:23.588
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'ZoomTransformPolicyTests' started at 2026-11-12 16:40:23.588
+Test Case 'ZoomTransformPolicyTests.testDoubleTapCycleReturnsToIdentity' started at 2026-11-12 16:40:23.588
+Test Case 'ZoomTransformPolicyTests.testDoubleTapCycleReturnsToIdentity' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testDoubleTapNaNPointIsSafe' started at 2026-11-12 16:40:23.588
+Test Case 'ZoomTransformPolicyTests.testDoubleTapNaNPointIsSafe' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testDoubleTapZoomsInAtTapPoint' started at 2026-11-12 16:40:23.588
+Test Case 'ZoomTransformPolicyTests.testDoubleTapZoomsInAtTapPoint' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testDoubleTapZoomsOutToOne' started at 2026-11-12 16:40:23.589
+Test Case 'ZoomTransformPolicyTests.testDoubleTapZoomsOutToOne' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPanNaNDeltaIsNoOp' started at 2026-11-12 16:40:23.589
+Test Case 'ZoomTransformPolicyTests.testPanNaNDeltaIsNoOp' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPanNeverExposesWhiteEdges' started at 2026-11-12 16:40:23.589
+Test Case 'ZoomTransformPolicyTests.testPanNeverExposesWhiteEdges' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPanSmallerThanViewportAxisIsCentered' started at 2026-11-12 16:40:23.589
+Test Case 'ZoomTransformPolicyTests.testPanSmallerThanViewportAxisIsCentered' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorAtViewportOriginClampsSafely' started at 2026-11-12 16:40:23.589
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorAtViewportOriginClampsSafely' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceBottomRightAtMaxScale' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceBottomRightAtMaxScale' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceCenter' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceCenter' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceFromAlreadyZoomed' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceFromAlreadyZoomed' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceHorizontalOffCenter' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceHorizontalOffCenter' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceVerticalOffCenter' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorInvarianceVerticalOffCenter' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorOutsideViewportStaysFinite' started at 2026-11-12 16:40:23.590
+Test Case 'ZoomTransformPolicyTests.testPinchAnchorOutsideViewportStaysFinite' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchInfiniteScaleIsSafe' started at 2026-11-12 16:40:23.591
+Test Case 'ZoomTransformPolicyTests.testPinchInfiniteScaleIsSafe' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchNaNScaleIsSafe' started at 2026-11-12 16:40:23.591
+Test Case 'ZoomTransformPolicyTests.testPinchNaNScaleIsSafe' passed (0.1 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchNonFiniteContentIsSafe' started at 2026-11-12 16:40:23.691
+Test Case 'ZoomTransformPolicyTests.testPinchNonFiniteContentIsSafe' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchPanPinchSequenceStaysConsistent' started at 2026-11-12 16:40:23.691
+Test Case 'ZoomTransformPolicyTests.testPinchPanPinchSequenceStaysConsistent' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchScaleClampedToMax' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testPinchScaleClampedToMax' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testPinchScaleClampedToMin' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testPinchScaleClampedToMin' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testRelayoutClampsToNewViewport' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testRelayoutClampsToNewViewport' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testRelayoutKeepsCenterContentCentered' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testRelayoutKeepsCenterContentCentered' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testRelayoutZeroOldViewportIsSafe' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testRelayoutZeroOldViewportIsSafe' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testZeroOrNegativeContentIsSafe' started at 2026-11-12 16:40:23.692
+Test Case 'ZoomTransformPolicyTests.testZeroOrNegativeContentIsSafe' passed (0.0 seconds)
+Test Case 'ZoomTransformPolicyTests.testZeroViewportIsSafe' started at 2026-11-12 16:40:23.693
+Test Case 'ZoomTransformPolicyTests.testZeroViewportIsSafe' passed (0.0 seconds)
+Test Suite 'ZoomTransformPolicyTests' passed at 2026-11-12 16:40:23.693
+	 Executed 25 tests, with 0 failures (0 unexpected) in 0.104 (0.104) seconds
+Test Suite 'debug.xctest' passed at 2026-11-12 16:40:23.693
+	 Executed 338 tests, with 0 failures (0 unexpected) in 4.649 (4.649) seconds
+Test Suite 'All tests' passed at 2026-11-12 16:40:23.693
+	 Executed 338 tests, with 0 failures (0 unexpected) in 4.649 (4.649) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.0.3 (18c42c19cac3faf)
+✔ Test run with 0 tests passed after 0.001 seconds.
+[OK] PhotoDeskCore swift test 通过
