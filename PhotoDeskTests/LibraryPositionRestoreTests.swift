@@ -154,6 +154,26 @@ final class LibraryPositionRestoreTests: XCTestCase {
         MonthSection(id: id, title: title, count: count)
     }
 
+    /// v6 位置构造助手（M16 T03：store 只收 LibraryPositionV6）
+    private func makeV6Position(assetID: String,
+                                sectionID: String = "2024-05",
+                                itemIndex: Int = 0,
+                                visualY: Double = 0,
+                                contentHeight: Double = 5_000) -> LibraryPositionV6 {
+        LibraryPositionV6(queryKey: "",
+                          anchorAssetID: assetID,
+                          anchorGlobalIndex: nil,
+                          anchorSectionID: sectionID,
+                          anchorSectionItemIndex: itemIndex,
+                          anchorVisualY: visualY,
+                          anchorContentOffsetY: 0,
+                          gridColumns: 3,
+                          contentInsetTop: 0,
+                          contentHeight: contentHeight,
+                          viewportHeight: 844,
+                          savedAt: Date())
+    }
+
     // MARK: - R03：锚点窗口首屏
 
     /// 深月份锚点必须落在首批窗口内（以锚点为中心前后各半批）——旧版固定「最新 500」→ 两阶段跳转
@@ -162,11 +182,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let store = LibraryPositionStore(defaults: testDefaults)
         let viewModel = makeViewModel(repository: FakeAnchorRepository(items), store: store)
         let queryKey = viewModel.query.key
-        store.save(LibraryPosition(assetID: "id-1200",
-                                   sectionID: "2024-05",
-                                   itemIndexInSection: 0,
-                                   offsetRatio: 0,
-                                   savedAt: Date()),
+        store.save(makeV6Position(assetID: "id-1200", sectionID: "2024-05"),
                    queryKey: queryKey)
 
         await viewModel.start()
@@ -185,11 +201,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let store = LibraryPositionStore(defaults: testDefaults)
         let viewModel = makeViewModel(repository: FakeAnchorRepository(items), store: store)
         let queryKey = viewModel.query.key
-        store.save(LibraryPosition(assetID: "deleted-asset",
-                                   sectionID: "2024-05",
-                                   itemIndexInSection: 0,
-                                   offsetRatio: 0,
-                                   savedAt: Date()),
+        store.save(makeV6Position(assetID: "deleted-asset", sectionID: "2024-05"),
                    queryKey: queryKey)
 
         await viewModel.start()
@@ -207,16 +219,12 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let store = LibraryPositionStore(defaults: testDefaults)
         let viewModel = makeViewModel(repository: FakeAnchorRepository([]), store: store)
         let queryKey = viewModel.query.key
-        store.save(LibraryPosition(anchorVisualY: 54,
-                                   assetID: "a-target",
-                                   sectionID: "2026-11",
-                                   itemIndexInSection: 5,
-                                   offsetRatio: 0,
-                                   // contentHeight 给极小值：本用例验证保存门禁语义，contentHeight
-                                   // 门禁（估算布局未收齐等待）在无布局 pass 的单测环境里必须直接放行
-                                   contentHeight: 10,
-                                   viewportHeight: 844,
-                                   savedAt: Date()),
+        // contentHeight 给极小值：本用例验证保存门禁语义（v6 由状态机门禁承担，无布局 pass 也直接放行）
+        store.save(makeV6Position(assetID: "a-target",
+                                  sectionID: "2026-11",
+                                  itemIndex: 5,
+                                  visualY: 54,
+                                  contentHeight: 10),
                    queryKey: queryKey)
         let controller = makeViewController(viewModel: viewModel, store: store)
         controller.loadViewIfNeeded()
@@ -232,7 +240,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
 
         // 模拟恢复期间的回写触发点（0.3s Timer / didEndDragging 都汇聚到 savePositionNow）
         controller.savePositionNow(reason: "intermediate")
-        XCTAssertEqual(store.load(queryKey: queryKey)?.assetID, "a-target",
+        XCTAssertEqual(store.load(queryKey: queryKey)?.anchorAssetID, "a-target",
                        "R03：恢复期间的中间位置绝不能覆盖锚点（旧版会写 b-0）")
 
         // 阶段 2：快照含锚点 + 索引完成 → 立即定位、解除遮罩
@@ -246,7 +254,7 @@ final class LibraryPositionRestoreTests: XCTestCase {
         XCTAssertTrue(restored, "锚点可见后必须立即按 assetID 定位：\(viewModel.debugRestoreNote)")
         let maskHidden = await waitUntil { controller.test_restoreMask.alpha == 0 }
         XCTAssertTrue(maskHidden, "定位完成后遮罩必须移除")
-        XCTAssertEqual(store.load(queryKey: queryKey)?.assetID, "a-target",
+        XCTAssertEqual(store.load(queryKey: queryKey)?.anchorAssetID, "a-target",
                        "恢复后锚点不被覆盖")
     }
 
@@ -255,11 +263,9 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let store = LibraryPositionStore(defaults: testDefaults)
         let viewModel = makeViewModel(repository: FakeAnchorRepository([]), store: store)
         let queryKey = viewModel.query.key
-        store.save(LibraryPosition(assetID: "missing-asset",
-                                   sectionID: "2024-05",
-                                   itemIndexInSection: 3,
-                                   offsetRatio: 0.5,
-                                   savedAt: Date()),
+        store.save(makeV6Position(assetID: "missing-asset",
+                                  sectionID: "2024-05",
+                                  itemIndex: 3),
                    queryKey: queryKey)
         let controller = makeViewController(viewModel: viewModel, store: store)
         controller.loadViewIfNeeded()
@@ -283,20 +289,12 @@ final class LibraryPositionRestoreTests: XCTestCase {
         let keyFav = LibraryQuery.stableKey(scope: .favorites, filter: .default, sortAscending: false)
         XCTAssertNotEqual(keyAll, keyFav, "scope 不同 → 查询键必须不同")
         let store = LibraryPositionStore(defaults: testDefaults)
-        store.save(LibraryPosition(assetID: "pos-all",
-                                   sectionID: "s",
-                                   itemIndexInSection: 0,
-                                   offsetRatio: 0,
-                                   savedAt: Date()),
+        store.save(makeV6Position(assetID: "pos-all", sectionID: "s"),
                    queryKey: keyAll)
-        store.save(LibraryPosition(assetID: "pos-fav",
-                                   sectionID: "s",
-                                   itemIndexInSection: 0,
-                                   offsetRatio: 0,
-                                   savedAt: Date()),
+        store.save(makeV6Position(assetID: "pos-fav", sectionID: "s"),
                    queryKey: keyFav)
-        XCTAssertEqual(store.load(queryKey: keyAll)?.assetID, "pos-all")
-        XCTAssertEqual(store.load(queryKey: keyFav)?.assetID, "pos-fav")
+        XCTAssertEqual(store.load(queryKey: keyAll)?.anchorAssetID, "pos-all")
+        XCTAssertEqual(store.load(queryKey: keyFav)?.anchorAssetID, "pos-fav")
     }
     // MARK: - M13 P2：v3 视觉锚点与精确恢复
 

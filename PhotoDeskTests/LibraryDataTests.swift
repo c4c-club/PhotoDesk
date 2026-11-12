@@ -114,12 +114,26 @@ final class LibraryDataTests: XCTestCase {
         return LibraryPositionStore(defaults: defaults)
     }
 
+    /// v6 位置构造助手（M16 T03：store 只收 LibraryPositionV6；offsetRatio 语义折算进 offset）
+    private func makePosition(assetID: String, sectionID: String, offsetRatio: Double, savedAt: Date) -> LibraryPositionV6 {
+        LibraryPositionV6(queryKey: "",
+                          anchorAssetID: assetID,
+                          anchorSectionID: sectionID,
+                          anchorSectionItemIndex: 0,
+                          anchorVisualY: 0,
+                          anchorContentOffsetY: offsetRatio * 4_000,
+                          gridColumns: 3,
+                          contentHeight: 5_000,
+                          viewportHeight: 844,
+                          savedAt: savedAt)
+    }
+
     func testPositionStoreSaveLoad() {
         let store = makeStore()
-        let position = LibraryPosition(assetID: "asset-1",
-                                       sectionID: "2024-05",
-                                       offsetRatio: 0.42,
-                                       savedAt: Date())
+        let position = makePosition(assetID: "asset-1",
+                                    sectionID: "2024-05",
+                                    offsetRatio: 0.42,
+                                    savedAt: Date())
         store.save(position, queryKey: "abc123")
         // I5：load 出的条目 queryKey 必须等于存储键（save 负责盖章，与传入对象无关）
         var expected = position
@@ -129,8 +143,8 @@ final class LibraryDataTests: XCTestCase {
 
     func testPositionStorePerQueryKeys() {
         let store = makeStore()
-        let p1 = LibraryPosition(assetID: "a", sectionID: "s", offsetRatio: 0.1, savedAt: Date())
-        let p2 = LibraryPosition(assetID: "b", sectionID: "s", offsetRatio: 0.2, savedAt: Date())
+        let p1 = makePosition(assetID: "a", sectionID: "s", offsetRatio: 0.1, savedAt: Date())
+        let p2 = makePosition(assetID: "b", sectionID: "s", offsetRatio: 0.2, savedAt: Date())
         store.save(p1, queryKey: "key1")
         store.save(p2, queryKey: "key2")
         var e1 = p1
@@ -146,14 +160,14 @@ final class LibraryDataTests: XCTestCase {
     func testPositionStoreDisabledBySwitch() {
         let store = makeStore()
         store.isEnabled = false
-        let position = LibraryPosition(assetID: "a", sectionID: "s", offsetRatio: 0, savedAt: Date())
+        let position = makePosition(assetID: "a", sectionID: "s", offsetRatio: 0, savedAt: Date())
         store.save(position, queryKey: "k")
         XCTAssertNil(store.load(queryKey: "k"), "「记住上次整理位置」关闭后不读写")
     }
 
     func testPositionStoreClearAll() {
         let store = makeStore()
-        let position = LibraryPosition(assetID: "a", sectionID: "s", offsetRatio: 0, savedAt: Date())
+        let position = makePosition(assetID: "a", sectionID: "s", offsetRatio: 0, savedAt: Date())
         store.save(position, queryKey: "k1")
         store.save(position, queryKey: "k2")
         store.clearAll()

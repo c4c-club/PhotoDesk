@@ -1148,6 +1148,11 @@ final class LibraryViewController: UIViewController {
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
 
+        // v6 head 批次补偿基线（docs/28 §5.5 步骤 4）：记录 apply 前的 contentHeight 与代际，
+        // completion 里若代际推进（本 apply 携带 head 批次），按 delta 平移 offset。
+        let headApplyBaselineHeight = Double(collectionView.contentSize.height)
+        let headApplyBaselineGeneration = viewModel.headInsertGeneration
+
         // R03 前插补偿 v2（绿14 实锤：completion 期一次性补偿读到的 exactMinY 仍是过渡态布局，
         // 过冲 ~2700pt → 视口漂到 15 个月之外）。改为登记「锚点保持」任务：只记录首可见 asset
         // 及其视觉 y，viewDidLayoutSubviews 每个布局 pass 按该 asset 的真实 minY 重校
@@ -1184,6 +1189,26 @@ final class LibraryViewController: UIViewController {
             if let keep = headInsertAnchor {
                 pendingHeadInsertAnchor = HeadInsertAnchor(assetID: keep.assetID,
                                                            visualY: keep.visualY)
+            }
+            // v6 head 批次补偿（docs/28 §5.5 步骤 4）：恢复等待头部回填（waitingForHead）时，
+            // 本 apply 携带 head 批次（代际推进）→ 按 contentHeight delta 平移 offset，
+            // 锚点视觉位置在多批前插中保持不动（旧语义恢复期禁登记补偿 → 漂移根因之一）。
+            if viewModel.headInsertGeneration != headApplyBaselineGeneration {
+                let afterHeight = Double(self.collectionView.contentSize.height)
+                let dy = self.positionCoordinator.headBatchDelta(
+                    contentHeightBefore: headApplyBaselineHeight,
+                    contentHeightAfter: afterHeight,
+                    currentOffsetY: Double(self.collectionView.contentOffset.y),
+                    maxOffsetY: max(0, afterHeight - Double(self.collectionView.bounds.height)))
+                if abs(dy) > 0.01 {
+                    self.isRestoringPosition = true
+                    self.collectionView.setContentOffset(
+                        CGPoint(x: self.collectionView.contentOffset.x,
+                                y: self.collectionView.contentOffset.y + CGFloat(dy)),
+                        animated: false)
+                    self.isRestoringPosition = false
+                    ViewerTrace.log("position.head-comp dy=\(Int(dy)) gen=\(viewModel.headInsertGeneration)")
+                }
             }
             // M12 R06/R07：快照变化后刷新分类菜单（scope 勾选 + 异步计数）与待处理徽标
             self.refreshSessionBadge()
@@ -1299,8 +1324,9 @@ final class LibraryViewController: UIViewController {
     }
 
     /// 主线程抓取几何快照：PositionAnchorSelector 选第一条完整可见、不被粘性头遮挡的 cell。
+    /// 多选中禁止保存（§5.6 触发矩阵）：快照直接返 nil，所有 saveNow/scheduleSave 自然丢弃。
     private func makePositionSnapshot() -> LibraryPositionSnapshot? {
-        guard !isRestoringPosition,
+        guard !isRestoringPosition, !isSelecting,
               positionStore.isEnabled,
               let queryKey = currentSnapshotQueryKey,
               !currentSections.isEmpty, !currentItemsBySection.isEmpty,
@@ -1330,7 +1356,10 @@ final class LibraryViewController: UIViewController {
                                        anchorItemIndex: anchor.item,
                                        contentOffsetY: offsetY,
                                        contentHeight: Double(collectionView.contentSize.height),
-                                       viewportHeight: Double(collectionView.bounds.height))
+                                       viewportHeight: Double(collectionView.bounds.height),
+                                       anchorGlobalIndex: viewModel.globalIndex(ofAssetID: item.id),
+                                       gridColumns: LibraryPositionStore.currentGridColumns(defaults: .standard),
+                                       contentInsetTop: adjustedTop)
     }
 
     /// 可视 cell 的合法增量重配（M16 T02）：Diffable 数据源下禁用 UICollectionView 直改 API，
@@ -1393,14 +1422,16 @@ final class LibraryViewController: UIViewController {
             },
             layoutNow: { [weak self] in
                 self?.collectionView.layoutIfNeeded()
-            }
+            },
+            firstBatchWindowStart: viewModel.firstBatchWindowStart,
+            headInsertGeneration: viewModel.headInsertGeneration
         )
         positionCoordinator.attemptRestore(context: context)
     }
 
-    private func handlePositionPhase(_ phase: PositionRestorePhaseV5) {
+    private func handlePositionPhase(_ phase: PositionRestorePhaseV6) {
         switch phase {
-        case .restoring, .applying, .verifying, .fallback:
+        case .loading, .waitingForWindow, .waitingForHead, .applying, .verifying, .fallback:
             showRestoreMaskIfNeeded()
         case .settled:
             hideRestoreMask()
@@ -1408,7 +1439,8 @@ final class LibraryViewController: UIViewController {
             // 否则旧 visualY 会在恢复后把精确恢复的位置拖走（M15 冷启动 −520pt 实锤）。
             pendingHeadInsertAnchor = nil
             viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)" +
-                (positionCoordinator.lastRestoreDiagnostics.isEmpty ? "" : " | \(positionCoordinator.lastRestoreDiagnostics)")
+                (positionCoordinator.lastRestoreDiagnostics.isEmpty ? "" : " | \(positionCoordinator.lastRestoreDiagnostics)") +
+                " rej=\(positionCoordinator.rejectedSaveRequests)"
             refreshDebugScrollNote()
         case .idle:
             break

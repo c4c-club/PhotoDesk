@@ -51,16 +51,18 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
                             anchor: String = "target",
                             visualY: Double = 40,
                             queryKey: String = "scope.all") {
-        store.save(LibraryPosition(anchorAssetID: anchor,
-                                   anchorVisualY: visualY,
-                                   anchorContentOffsetY: 900,
-                                   assetID: anchor,
-                                   sectionID: "2026-11",
-                                   itemIndexInSection: 3,
-                                   offsetRatio: 0.2,
-                                   contentHeight: 5_000,
-                                   viewportHeight: 844,
-                                   savedAt: Date()),
+        store.save(LibraryPositionV6(queryKey: "",
+                                     anchorAssetID: anchor,
+                                     anchorGlobalIndex: nil,
+                                     anchorSectionID: "2026-11",
+                                     anchorSectionItemIndex: 3,
+                                     anchorVisualY: visualY,
+                                     anchorContentOffsetY: 831.2,
+                                     gridColumns: 3,
+                                     contentInsetTop: 0,
+                                     contentHeight: 5_000,
+                                     viewportHeight: 844,
+                                     savedAt: Date()),
                    queryKey: queryKey)
     }
 
@@ -108,7 +110,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
 
     /// 异步恢复链（applyOffset → async verify）在测试 runloop 里收敛。
     private func runUntil(_ coordinator: LibraryPositionCoordinator,
-                          phase: PositionRestorePhaseV5,
+                          phase: PositionRestorePhaseV6,
                           timeout: TimeInterval = 3) {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline, coordinator.phase != phase {
@@ -202,7 +204,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         coordinator.beginRestore(queryKey: "scope.all")
         coordinator.cancelRestore(reason: "test")
         coordinator.beginRestore(queryKey: "scope.favorites")
-        XCTAssertEqual(coordinator.phase, .restoring, "queryKey 变化 → 新一轮恢复")
+        XCTAssertEqual(coordinator.phase, .loading, "queryKey 变化 → 新一轮恢复（v6 先 loading 等窗口）")
     }
 
     // MARK: - 恢复：bounds / asset / verify
@@ -214,7 +216,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         let coordinator = LibraryPositionCoordinator(store: store)
         coordinator.beginRestore(queryKey: "scope.all")
         coordinator.attemptRestore(context: recorder.context(bounds: .zero))
-        XCTAssertEqual(coordinator.phase, .restoring, "bounds=0 必须保持等待，不得失败/回顶")
+        XCTAssertEqual(coordinator.phase, .waitingForWindow, "bounds=0 必须保持等待，不得失败/回顶")
         XCTAssertTrue(recorder.appliedOffsets.isEmpty, "bounds=0 不得写 offset")
     }
 
@@ -330,7 +332,9 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         let coordinator = LibraryPositionCoordinator(store: store)
         coordinator.beginRestore(queryKey: "scope.all")
         coordinator.attemptRestore(context: recorder.context(isIndexComplete: false, anchorInData: false))
-        XCTAssertEqual(coordinator.phase, .restoring, "I4：锚点未到 + 索引未完成 → 保持等待，不失败")
+        // v6：锚点缺失 + 索引未完成 → 停在 applying 门禁态（不写 offset、保存被拒），
+        // 索引完成后 attemptRestore 再入即降级 fallback
+        XCTAssertEqual(coordinator.phase, .applying, "I4：锚点未到 + 索引未完成 → 保持等待，不失败")
         XCTAssertTrue(recorder.appliedOffsets.isEmpty)
         coordinator.saveNow(reason: "waiting", snapshot: snapshot("should-be-rejected"))
         XCTAssertEqual(store.load(queryKey: "scope.all")?.anchorAssetID, "not-yet-fetched",

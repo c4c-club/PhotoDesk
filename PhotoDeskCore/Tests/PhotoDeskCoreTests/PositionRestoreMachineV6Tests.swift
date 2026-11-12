@@ -159,6 +159,15 @@ final class PositionRestoreMachineV6Tests: XCTestCase {
         XCTAssertEqual(machine.settleFallback(), .settled)
     }
 
+    func testForceFallbackFromLoadingSkipsAssetPath() {
+        var machine = PositionRestoreMachineV6()
+        machine.begin(hasAnchor: true)
+        XCTAssertEqual(machine.forceFallback(), .fallback, "§5.3 无效记录 → 跳过 asset 精确路径直接 fallback")
+        XCTAssertFalse(machine.canSave)
+        XCTAssertEqual(machine.settleFallback(), .settled)
+        XCTAssertTrue(machine.canSave)
+    }
+
     func testCancelFromWaitingForHeadSettlesImmediately() {
         var machine = PositionRestoreMachineV6()
         machine.begin(hasAnchor: true)

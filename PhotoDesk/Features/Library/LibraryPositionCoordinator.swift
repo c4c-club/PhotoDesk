@@ -1,9 +1,9 @@
-// MARK: - 职责说明：位置记忆 v5 单一协调器（docs/25 §5.4–5.7 / M15 P0-2）——
-// 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV5 门禁：canSave 只在 settled
-// （I1 恢复完成前零写盘）；滚动防抖 0.5s（只 tracking），拖动结束/切后台立即保存 + flush。
-// 恢复算法（§5.5）：indexPath 查数据 → scrollToItem(.top) + layoutIfNeeded → target = minY - anchorVisualY
-// → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。
-// 锚点不在数据且索引未完成 → 保持 restoring 等待（I4：无硬超时）；索引完成仍缺 → section/ratio fallback。
+// MARK: - 职责说明：位置记忆 v6 单一协调器（docs/28 §5.4–5.6 / M16 T03）——
+// 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV6 门禁：canSave 只在 settled
+//（I1 恢复完成前零写盘）；滚动静止防抖 1.5s（§5.6），拖动结束/切后台立即保存 + flush；
+// 恢复流程：loading → waitingForWindow（windowStart>0 → waitingForHead，head 批次逐批 delta
+// 补偿）→ applying（一次）→ verifying（真实 attributes；nil = 失败，v5 默认通过是假 settled 根因）
+// → settled；verify 失败重试一次，两次 → fallback（锚点 cell 顶部 / section / ratio，绝不假 settled）。
 
 import UIKit
 import PhotoDeskCore
@@ -18,9 +18,13 @@ struct LibraryPositionSnapshot {
     let contentOffsetY: Double
     let contentHeight: Double
     let viewportHeight: Double
+    /// v6 取证字段：全量索引位置（未知 nil）/ 保存时列数 / adjustedContentInset.top
+    var anchorGlobalIndex: Int? = nil
+    var gridColumns: Int = 3
+    var contentInsetTop: Double = 0
 }
 
-/// 恢复时 VC 提供的实时几何与执行能力（v5：数据存在性 / scrollToItem / 布局刷新分开注入）。
+/// 恢复时 VC 提供的实时几何与执行能力（v6：窗口/代际注入 + 真实 attributes 闭包）。
 struct LibraryPositionRestoreContext {
     let bounds: CGSize
     let isIndexComplete: Bool
@@ -30,7 +34,7 @@ struct LibraryPositionRestoreContext {
     let bottomInset: Double
     /// 锚点是否在当前数据索引里（查 currentItemsBySection，与布局物化无关）
     let anchorInData: (String) -> Bool
-    /// 锚点 cell 当前布局 minY（content 坐标；未物化/未布局返回 nil）
+    /// 锚点 cell 当前布局 minY（content 坐标；未物化/未布局返回 nil——verify 视为失败）
     let anchorMinY: (String) -> Double?
     /// sectionID + itemIndex 的 minY（fallback 用）
     let sectionMinY: (String, Int) -> Double?
@@ -41,38 +45,49 @@ struct LibraryPositionRestoreContext {
     let actualOffsetY: () -> Double
     /// 强制当前布局收敛（viewDidLayoutSubviews 之外的入口需要）
     let layoutNow: () -> Void
+    /// 首批窗口起始 offset（v6 waitingForHead 判定：> 0 必等 head 回填）
+    var firstBatchWindowStart: Int = 0
+    /// head 回填代际（连续两轮不变 + 索引完成 → applying）
+    var headInsertGeneration: Int = 0
 }
 
 @MainActor
 final class LibraryPositionCoordinator {
     private let store: LibraryPositionStore
-    private var machine = PositionRestoreMachineV5()
-    private var pendingAnchor: LibraryPosition?
+    private var machine = PositionRestoreMachineV6()
+    private var pendingAnchor: LibraryPositionV6?
+    /// 记录无效（isSane == false，§5.3）→ 跳过 asset 精确路径，直接 section/ratio
+    private var pendingAnchorIsInsane = false
     private var pendingSave: DispatchWorkItem?
     private var lastRestoredQueryKey: String?
     private var targetOffsetY: Double = 0
-    private var contentWaitAttempts = 0
 
     /// 最近一次恢复采用的策略（asset / section / ratio / none），供调试汇总。
     private(set) var lastStrategy: PositionRestoreStrategy = .none
-    /// 最近一次恢复/等待的诊断串（目标值/钳制值/保存与当前 contentHeight/尝试次数），供 UI 取证。
+    /// 最近一次恢复/等待的诊断串，供 UI 取证。
     private(set) var lastRestoreDiagnostics = ""
+    /// DEBUG 取证：恢复期间被 I1 门禁拒绝的保存请求数（写盘次数恒 0）。
+    private(set) var rejectedSaveRequests = 0
     /// 阶段变化回调（VC 用于遮罩开关；不参与几何写入）。
-    var onPhaseChange: ((PositionRestorePhaseV5) -> Void)?
+    var onPhaseChange: ((PositionRestorePhaseV6) -> Void)?
 
     init(store: LibraryPositionStore) {
         self.store = store
     }
 
-    var phase: PositionRestorePhaseV5 { machine.phase }
+    var phase: PositionRestorePhaseV6 { machine.phase }
     var isRestoreInFlight: Bool { machine.isInFlight }
     var restoreAttempts: Int { machine.attempts }
 
-    // MARK: - 保存（I1/I2：canSave 只在 settled）
+    // MARK: - 保存（I1/I2：canSave 只在 settled；§5.6 触发矩阵）
 
-    /// 滚动防抖保存（0.5s，只在 tracking 时由 VC 调用）。恢复未完成 / 快照缺失 → 丢弃。
-    func scheduleSave(reason: String, snapshot: LibraryPositionSnapshot?, debounce: TimeInterval = 0.5) {
-        guard store.isEnabled, machine.canSave, let snapshot else { return }
+    /// 滚动静止防抖保存（1.5s，只在 tracking 时由 VC 调用）。恢复未完成 / 快照缺失 → 丢弃。
+    func scheduleSave(reason: String, snapshot: LibraryPositionSnapshot?, debounce: TimeInterval = 1.5) {
+        guard store.isEnabled, let snapshot else { return }
+        guard machine.canSave else {
+            rejectedSaveRequests += 1
+            return
+        }
         pendingSave?.cancel()
         let work = DispatchWorkItem { [weak self] in
             self?.commitSave(reason: reason, snapshot: snapshot)
@@ -84,7 +99,11 @@ final class LibraryPositionCoordinator {
     /// 立即保存（拖动结束 / 切后台 / 退出 / 月跳 / 回顶）并 flush：
     /// 文件原子写走串行队列，flush 等待队列排空，保证进程被杀的最后一笔一定落盘。
     func saveNow(reason: String, snapshot: LibraryPositionSnapshot?) {
-        guard store.isEnabled, machine.canSave, let snapshot else { return }
+        guard store.isEnabled, let snapshot else { return }
+        guard machine.canSave else {
+            rejectedSaveRequests += 1
+            return
+        }
         pendingSave?.cancel()
         pendingSave = nil
         commitSave(reason: reason, snapshot: snapshot)
@@ -99,20 +118,26 @@ final class LibraryPositionCoordinator {
     private func commitSave(reason: String, snapshot: LibraryPositionSnapshot) {
         guard store.isEnabled, machine.canSave else { return }
         let scrollable = max(1, snapshot.contentHeight - snapshot.viewportHeight)
-        let position = LibraryPosition(anchorAssetID: snapshot.anchorAssetID,
-                                       anchorVisualY: snapshot.anchorVisualY,
-                                       anchorContentOffsetY: snapshot.contentOffsetY,
-                                       assetID: snapshot.anchorAssetID,
-                                       sectionID: snapshot.anchorSectionID,
-                                       itemIndexInSection: snapshot.anchorItemIndex,
-                                       offsetRatio: min(1, max(0, snapshot.contentOffsetY / scrollable)),
-                                       contentHeight: snapshot.contentHeight,
-                                       viewportHeight: snapshot.viewportHeight,
-                                       savedAt: Date(),
-                                       queryKey: snapshot.queryKey)
+        // §5.3：visualY 超出 [0, viewport) 视为无效——保存侧防御性钳制，绝不写坏数据
+        let visualY = min(max(snapshot.anchorVisualY, 0), max(0, snapshot.viewportHeight - 1))
+        let position = LibraryPositionV6(queryKey: snapshot.queryKey,
+                                         anchorAssetID: snapshot.anchorAssetID,
+                                         anchorGlobalIndex: snapshot.anchorGlobalIndex,
+                                         anchorSectionID: snapshot.anchorSectionID,
+                                         anchorSectionItemIndex: snapshot.anchorItemIndex,
+                                         anchorVisualY: visualY,
+                                         anchorContentOffsetY: snapshot.contentOffsetY,
+                                         gridColumns: snapshot.gridColumns,
+                                         contentInsetTop: snapshot.contentInsetTop,
+                                         contentHeight: snapshot.contentHeight,
+                                         viewportHeight: snapshot.viewportHeight,
+                                         savedAt: Date())
         store.save(position, queryKey: snapshot.queryKey)
-        ViewerTrace.log("position.save.v5 \(reason) anchor=\(position.anchorAssetID.prefix(8)) " +
-                        "visualY=\(Int(position.anchorVisualY)) off=\(Int(position.anchorContentOffsetY))")
+        let ratio = min(1, max(0, snapshot.contentOffsetY / Double(scrollable)))
+        ViewerTrace.log("position.save.v6 \(reason) anchor=\(position.anchorAssetID.prefix(8)) " +
+                        "idx=\(position.anchorGlobalIndex.map(String.init) ?? "-") " +
+                        "visualY=\(Int(position.anchorVisualY)) off=\(Int(position.anchorContentOffsetY)) " +
+                        "ratio=\(String(format: "%.2f", ratio))")
     }
 
     // MARK: - 恢复（I2：同一 queryKey 一次启动只恢复一次）
@@ -122,16 +147,26 @@ final class LibraryPositionCoordinator {
         guard queryKey != lastRestoredQueryKey else { return }
         lastRestoredQueryKey = queryKey
         cancelPendingSaves()
-        contentWaitAttempts = 0
-        pendingAnchor = store.isEnabled ? store.load(queryKey: queryKey) : nil
-        let phase = machine.begin(hasAnchor: pendingAnchor != nil)
-        if pendingAnchor == nil {
-            ViewerTrace.log("position.restore.v5 skip query=\(queryKey.prefix(8)) reason=no-anchor")
-        } else {
-            ViewerTrace.log("position.restore.v5 begin query=\(queryKey.prefix(8)) " +
-                            "anchor=\(pendingAnchor?.anchorAssetID.prefix(8) ?? "-")")
+        rejectedSaveRequests = 0
+        let loaded = store.isEnabled ? store.load(queryKey: queryKey) : nil
+        pendingAnchor = loaded
+        pendingAnchorIsInsane = loaded.map { !$0.isSane } ?? false
+        if pendingAnchorIsInsane {
+            ViewerTrace.log("position.restore.v6 insane-record query=\(queryKey.prefix(8)) → fallback-only")
         }
-        onPhaseChange?(phase)
+        let hasAnchor = pendingAnchor != nil
+        let phase = machine.begin(hasAnchor: hasAnchor)
+        if pendingAnchorIsInsane {
+            machine.forceFallback()
+        }
+        if !hasAnchor {
+            ViewerTrace.log("position.restore.v6 skip query=\(queryKey.prefix(8)) reason=no-anchor")
+        } else {
+            ViewerTrace.log("position.restore.v6 begin query=\(queryKey.prefix(8)) " +
+                            "anchor=\(pendingAnchor?.anchorAssetID.prefix(8) ?? "-") " +
+                            "idx=\(pendingAnchor?.anchorGlobalIndex.map(String.init) ?? "-")")
+        }
+        onPhaseChange?(machine.phase)
     }
 
     /// 用户主动跳转/接管时取消恢复：清除锚点、收起遮罩，后续滚动可正常保存。
@@ -139,52 +174,71 @@ final class LibraryPositionCoordinator {
         guard machine.isInFlight else { return }
         pendingAnchor = nil
         machine.cancel()
-        ViewerTrace.log("position.restore.v5 cancel reason=\(reason)")
+        ViewerTrace.log("position.restore.v6 cancel reason=\(reason)")
         onPhaseChange?(machine.phase)
     }
 
     /// applySnapshot completion / viewDidLayoutSubviews / viewDidAppear 都调用；可重入。
     func attemptRestore(context: LibraryPositionRestoreContext) {
         guard machine.isInFlight, let anchor = pendingAnchor else { return }
-        if machine.phase == .verifying {
-            verify(context: context, anchor: anchor)
-            return
-        }
-        let assetInData = context.anchorInData(anchor.anchorAssetID)
-        // contentHeight 门禁：估算布局未收齐时 anchorMinY 是估算值，落地必漂（M15 冷启动 −520pt 实锤）。
-        // 有界等待：30 个布局 pass 后放行（钳制兜底），避免极端情况下永久等待。
-        let savedContentHeight = anchor.contentHeight
-        if contentWaitAttempts < 30, savedContentHeight > 0,
-           context.contentHeight + 2 < savedContentHeight {
-            contentWaitAttempts += 1
-            lastRestoreDiagnostics = "wait ch cur=\(Int(context.contentHeight)) saved=\(Int(savedContentHeight)) n=\(contentWaitAttempts)"
-            let phase = machine.dataAvailable(anchorPresent: assetInData,
-                                              indexComplete: context.isIndexComplete,
-                                              boundsReady: context.bounds.width > 0 && context.bounds.height > 0,
-                                              contentHeightReady: false)
+        switch machine.phase {
+        case .loading, .waitingForWindow:
+            let phase = machine.windowResolved(windowStart: context.firstBatchWindowStart,
+                                               boundsReady: context.bounds.width > 0
+                                                            && context.bounds.height > 0
+                                                            && context.contentHeight > 0)
             onPhaseChange?(phase)
-            return
-        }
-        let phase = machine.dataAvailable(anchorPresent: assetInData,
-                                          indexComplete: context.isIndexComplete,
-                                          boundsReady: context.bounds.width > 0 && context.bounds.height > 0,
-                                          contentHeightReady: true)
-        onPhaseChange?(phase)
-        switch phase {
-        case .applying:
-            applyAnchor(context: context, anchor: anchor)
+            attemptReadyPath(context: context, anchor: anchor)
+        case .waitingForHead, .applying:
+            attemptReadyPath(context: context, anchor: anchor)
+        case .verifying:
+            verify(context: context, anchor: anchor)
         case .fallback:
             applyFallback(context: context, anchor: anchor)
-        default:
-            return   // restoring：等待索引/布局，不失败（I4）
+        case .idle, .settled:
+            break
         }
     }
 
-    /// §5.5 主路径：scrollToItem(.top)（UICollectionView 自己算目标 offset）→ 一次像素修正。
-    private func applyAnchor(context: LibraryPositionRestoreContext, anchor: LibraryPosition) {
-        guard context.scrollToAnchorTop(anchor.anchorAssetID) else { return }   // 保持 restoring
+    /// applying/waitingForHead 的统一推进：先查锚点在数据（缺 → 等/降级），
+    /// waitingForHead 里推代际；只有真正进入 applying 才允许写几何。
+    private func attemptReadyPath(context: LibraryPositionRestoreContext, anchor: LibraryPositionV6) {
+        if !context.anchorInData(anchor.anchorAssetID) {
+            // 锚点暂不在数据：索引未完成保持等待（I4 无硬超时）；完成 → fallback
+            let phase = machine.anchorMissing(indexComplete: context.isIndexComplete)
+            onPhaseChange?(phase)
+            if phase == .fallback {
+                applyFallback(context: context, anchor: anchor)
+            }
+            return
+        }
+        if machine.phase == .waitingForHead {
+            let phase = machine.headProgress(generation: context.headInsertGeneration,
+                                             indexComplete: context.isIndexComplete)
+            onPhaseChange?(phase)
+            guard machine.phase == .applying else { return }
+        }
+        guard machine.phase == .applying else { return }   // waitingForWindow / 仍在等待 → 不写几何
+        applyAnchor(context: context, anchor: anchor)
+    }
+
+    /// §5.5 步骤 5：scrollToItem(.top) → 真实 attributes minY → target = minY − visualY → 钳制 → 写入。
+    private func applyAnchor(context: LibraryPositionRestoreContext, anchor: LibraryPositionV6) {
+        machine.apply()   // v6：入口只允许一次（重复调用直接返回）
+        guard context.scrollToAnchorTop(anchor.anchorAssetID) else {
+            // 数据在但布局异常：等下一轮布局 pass
+            return
+        }
         context.layoutNow()
-        guard let minY = context.anchorMinY(anchor.anchorAssetID) else { return }
+        guard let minY = context.anchorMinY(anchor.anchorAssetID) else {
+            // 真实 attributes 缺失：索引完成 → fallback；未完成 → 等待
+            if context.isIndexComplete {
+                let phase = machine.anchorMissing(indexComplete: true)
+                onPhaseChange?(phase)
+                applyFallback(context: context, anchor: anchor)
+            }
+            return
+        }
         let target = PositionAnchorPolicy.targetOffsetY(cellMinY: minY, anchorVisualY: anchor.anchorVisualY)
         targetOffsetY = PositionAnchorPolicy.clampedTargetOffsetY(target,
                                                                   contentHeight: context.contentHeight,
@@ -193,7 +247,7 @@ final class LibraryPositionCoordinator {
                                                                   bottomInset: context.bottomInset)
         lastStrategy = .asset
         lastRestoreDiagnostics = "asset minY=\(Int(minY)) target=\(Int(target)) clamped=\(Int(targetOffsetY)) " +
-            "savedCH=\(Int(anchor.contentHeight)) curCH=\(Int(context.contentHeight)) att=\(machine.attempts)"
+            "savedCH=\(Int(anchor.contentHeight)) curCH=\(Int(context.contentHeight))"
         machine.applied()
         context.applyOffset(targetOffsetY)
         onPhaseChange?(machine.phase)
@@ -202,47 +256,40 @@ final class LibraryPositionCoordinator {
         }
     }
 
-    /// fallback：锚点不在数据且索引已完成 → sectionID+itemIndex → ratio（resolve 逐级退化）。
-    private func applyFallback(context: LibraryPositionRestoreContext, anchor: LibraryPosition) {
-        let sectionMinY = context.sectionMinY(anchor.sectionID, anchor.itemIndexInSection)
-        let resolved = PositionAnchorPolicy.resolve(anchor: anchor.toCoreAnchor,
-                                                    assetCellMinY: nil,
-                                                    sectionCellMinY: sectionMinY,
-                                                    contentHeight: context.contentHeight,
-                                                    viewportHeight: context.viewportHeight,
-                                                    adjustedTop: context.adjustedTop,
-                                                    bottomInset: context.bottomInset)
-        lastStrategy = resolved.strategy
-        guard resolved.strategy != .none else {
-            machine.settleFallback()
-            finish(reason: "no-anchor")
-            return
-        }
-        targetOffsetY = resolved.offsetY
-        lastRestoreDiagnostics = "\(resolved.strategy.rawValue) offset=\(Int(resolved.offsetY)) " +
-            "savedCH=\(Int(anchor.contentHeight)) curCH=\(Int(context.contentHeight))"
-        machine.applied()
-        context.applyOffset(resolved.offsetY)
-        onPhaseChange?(machine.phase)
-        DispatchQueue.main.async { [weak self] in
-            self?.attemptRestore(context: context)
-        }
+    /// head 批次 contentHeight delta（§5.5 步骤 4）：waitingForHead 期间由 VC 在 apply completion 调用，
+    /// 返回需要平移的 dy（0 = 不调整）；offset 写入由 VC 执行。
+    func headBatchDelta(contentHeightBefore: Double,
+                        contentHeightAfter: Double,
+                        currentOffsetY: Double,
+                        maxOffsetY: Double) -> Double {
+        guard machine.phase == .waitingForHead else { return 0 }
+        let adjusted = HeadInsertCompensationPolicy.adjustedOffsetY(
+            beforeY: currentOffsetY,
+            contentHeightBefore: contentHeightBefore,
+            contentHeightAfter: contentHeightAfter,
+            insertedAboveAnchor: true,   // head 批次全部位于锚点窗口之前（上方）
+            maxOffsetY: maxOffsetY)
+        return adjusted - currentOffsetY
     }
 
-    /// §5.5 校验：offset 误差 ≤ 0.5pt 且锚点视觉 y 误差 ≤ 0.5pt；失败只调 offset 重试一次。
-    private func verify(context: LibraryPositionRestoreContext, anchor: LibraryPosition) {
+    /// §5.5 步骤 6 校验：真实 attributes 的视觉 y 误差 ≤ 2pt 且 offset ≤ 2pt；
+    /// attributes 缺失 = 失败（v6 硬化：不得默认通过）。
+    private func verify(context: LibraryPositionRestoreContext, anchor: LibraryPositionV6) {
         context.layoutNow()
         let actual = context.actualOffsetY()
-        let offsetOK = abs(actual - targetOffsetY) <= 0.5
-        var visualOK = true
+        let offsetOK = abs(actual - targetOffsetY) <= 2.0
+        var visualOK = false
+        var actualVisualYText = "nil"
         if let minY = context.anchorMinY(anchor.anchorAssetID) {
-            visualOK = abs((minY - actual) - anchor.anchorVisualY) <= 0.5
+            let actualVisualY = minY - actual
+            actualVisualYText = String(Int(actualVisualY))
+            visualOK = abs(actualVisualY - anchor.anchorVisualY) <= 2.0
         }
         let ok = offsetOK && visualOK
         let phase = machine.verified(ok: ok)
         onPhaseChange?(phase)
         lastRestoreDiagnostics += " verify actual=\(Int(actual)) target=\(Int(targetOffsetY)) " +
-            "visualY=\(Int(anchor.anchorVisualY)) ok=\(ok) att=\(machine.attempts)"
+            "vY=\(actualVisualYText) ok=\(ok) att=\(machine.attempts)"
         switch phase {
         case .settled:
             finish(reason: machine.attempts > 0 ? "verify-failed" : lastStrategy.rawValue)
@@ -258,17 +305,64 @@ final class LibraryPositionCoordinator {
             }
             machine.applied()
             context.applyOffset(targetOffsetY)
+            onPhaseChange?(machine.phase)
             DispatchQueue.main.async { [weak self] in
                 self?.attemptRestore(context: context)
             }
+        case .fallback:
+            // v6：两次 verify 仍失败 → 锚点 cell 顶部兜底（不假 settled）
+            applyFallback(context: context, anchor: anchor)
         default:
             break
         }
     }
 
+    /// v6 fallback（§5.5 步骤 6 + §5.3）：锚点在数据 → cell 顶部兜底（同一张照片仍可见）；
+    /// 不在 → sectionID+index → ratio 逐级退化。全部直接收敛 settled，不再进 verify。
+    private func applyFallback(context: LibraryPositionRestoreContext, anchor: LibraryPositionV6) {
+        if context.anchorInData(anchor.anchorAssetID),
+           context.scrollToAnchorTop(anchor.anchorAssetID) {
+            context.layoutNow()
+            if let minY = context.anchorMinY(anchor.anchorAssetID) {
+                let offset = PositionAnchorPolicy.clampedTargetOffsetY(minY,
+                                                                       contentHeight: context.contentHeight,
+                                                                       viewportHeight: context.viewportHeight,
+                                                                       adjustedTop: context.adjustedTop,
+                                                                       bottomInset: context.bottomInset)
+                lastStrategy = .asset
+                lastRestoreDiagnostics += " fallback anchorTop=\(Int(offset))"
+                context.applyOffset(offset)
+            }
+            machine.settleFallback()
+            finish(reason: "fallback-anchor-top")
+            onPhaseChange?(machine.phase)
+            return
+        }
+        let sectionMinY = context.sectionMinY(anchor.anchorSectionID, anchor.anchorSectionItemIndex)
+        let resolved = PositionAnchorPolicy.resolve(anchor: anchor.toCoreAnchor,
+                                                    assetCellMinY: nil,
+                                                    sectionCellMinY: sectionMinY,
+                                                    contentHeight: context.contentHeight,
+                                                    viewportHeight: context.viewportHeight,
+                                                    adjustedTop: context.adjustedTop,
+                                                    bottomInset: context.bottomInset)
+        guard resolved.strategy != .none else {
+            machine.settleFallback()
+            finish(reason: "no-anchor")
+            onPhaseChange?(machine.phase)
+            return
+        }
+        lastStrategy = resolved.strategy
+        lastRestoreDiagnostics += " fallback \(resolved.strategy.rawValue) offset=\(Int(resolved.offsetY))"
+        context.applyOffset(resolved.offsetY)
+        machine.settleFallback()
+        finish(reason: "fallback-\(resolved.strategy.rawValue)")
+        onPhaseChange?(machine.phase)
+    }
+
     private func finish(reason: String) {
         pendingAnchor = nil
-        ViewerTrace.log("position.restore.v5 \(machine.phase.rawValue) reason=\(reason) " +
-                        "strategy=\(lastStrategy.rawValue)")
+        ViewerTrace.log("position.restore.v6 \(machine.phase.rawValue) reason=\(reason) " +
+                        "strategy=\(lastStrategy.rawValue) rej=\(rejectedSaveRequests)")
     }
 }
