@@ -31,11 +31,12 @@ final class PinchColumnReducerTests: XCTestCase {
         XCTAssertFalse(r.isBusy)
     }
 
-    func testInfinityScaleResolvesToMinimumColumns() {
-        // +∞ 刻度 → raw = 0 → 下限列（决策表固化：极端拉开 = 最少列）
+    func testInfinityScaleYieldsNoChange() {
+        // 非有限刻度一律拒绝（与 ZoomTransform.sanitizedTransform 同口径），不产生 pending
         var r = PinchColumnReducer(startColumns: 3)
         r.begin(startColumns: 3, scale: 1)
-        XCTAssertEqual(r.changed(scale: .infinity), 2)
+        XCTAssertNil(r.changed(scale: .infinity))
+        XCTAssertFalse(r.isBusy)
     }
 
     // MARK: - 边界与钳制
@@ -131,7 +132,10 @@ final class PinchColumnReducerTests: XCTestCase {
         _ = r.changed(scale: 0.5)
         XCTAssertEqual(r.transitionFinished(), 5, "链式 pending 接续")
         XCTAssertEqual(r.currentColumns, 5)
+        XCTAssertEqual(r.inFlightColumns, 5, "接续的过渡立即进入在途（单飞链）")
+        _ = r.transitionFinished()
         XCTAssertNil(r.inFlightColumns)
+        XCTAssertFalse(r.isBusy)
     }
 
     func testTransitionFinishedWithoutPendingReturnsNil() {
