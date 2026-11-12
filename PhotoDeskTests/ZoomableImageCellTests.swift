@@ -150,4 +150,87 @@ final class ZoomableImageCellTests: XCTestCase {
         cell.prepareForReuse()
         XCTAssertNil(cell.itemID)
     }
+
+    // MARK: - M16 T01 P0-1A：事务边界（docs/28 §4.2/§4.4.2）
+
+    /// 非有限 transform 必须被写入层消毒拒绝并复位 identity（旧实现直接写 CALayer → 行为红）
+    func testNonFiniteTransformResetsToIdentity() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_applyTransform(scale: 2.5, translationX: 30, translationY: 30)
+        cell.test_zoomController.applyRelayout(ZoomTransform(scale: .nan, translationX: .infinity, translationY: 0))
+        XCTAssertEqual(cell.test_imageView.transform.a, 1, accuracy: 1e-9,
+                       "NaN scale 写入必须被拒绝并复位 identity")
+        XCTAssertEqual(cell.test_imageView.transform.d, 1, accuracy: 1e-9)
+        XCTAssertEqual(cell.zoomScale, 1, accuracy: 1e-9, "消毒后诊断 scale 必须回 1")
+    }
+
+    /// 零 bounds（未布局）：写入被拒绝，诊断不更新（锁定契约）
+    func testZeroBoundsTransformIsRejected() {
+        let cell = ZoomableImageCell(frame: .zero)
+        cell.configure(item: makeItem(), image: makeImage())
+        cell.test_applyTransform(scale: 2.5, translationX: 0, translationY: 0)
+        XCTAssertEqual(cell.zoomScale, ZoomableImageCell.minZoomScale,
+                       "零 bounds 视口不得写入 transform")
+    }
+
+    /// 几何事务态由实际 phase 派生：动画期 settling、结束回 idle（旧实现硬编码 .idle → 行为红）
+    func testGeometryStateDerivedFromControllerPhase() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_applyTransform(scale: 2, translationX: 0, translationY: 0)
+        cell.test_zoomController.reset(animated: true)
+        XCTAssertEqual(cell.zoomState.geometryState, .settling,
+                       "动画中的 geometryState 必须是 settling")
+        let exp = expectation(description: "animation settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { exp.fulfill() }
+        wait(for: [exp], timeout: 2)
+        XCTAssertEqual(cell.zoomState.geometryState, .idle, "动画完成后 geometryState 回 idle")
+    }
+
+    /// 动画代际 token：复用（invalidated）后 token 归零（旧实现无 token → 编译红）
+    func testReuseClearsTransactionToken() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_applyTransform(scale: 2, translationX: 0, translationY: 0)
+        cell.test_zoomController.reset(animated: true)
+        XCTAssertGreaterThan(cell.test_zoomController.test_transactionToken, 0,
+                             "开启动画后 token 必须大于 0")
+        cell.prepareForReuse()
+        XCTAssertEqual(cell.test_zoomController.test_transactionToken, 0,
+                       "复用必须清零事务 token（旧 completion 一律失效）")
+        XCTAssertEqual(cell.test_imageView.transform, .identity)
+    }
+
+    /// 复位动画期间复用：等动画 completion 窗口后 transform 不得被旧动画改写
+    func testStaleCompletionDoesNotRewriteTransformAfterReuse() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_applyTransform(scale: 2.5, translationX: 10, translationY: 10)
+        cell.test_zoomController.reset(animated: true)
+        cell.prepareForReuse()
+        let exp = expectation(description: "completion window")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { exp.fulfill() }
+        wait(for: [exp], timeout: 2)
+        XCTAssertEqual(cell.test_imageView.transform.a, 1, accuracy: 1e-9,
+                       "复用后旧动画 completion 不得改写几何")
+    }
+
+    /// 批量更新前的 settle 入口：缩放中调用后几何事务立即 settled（VC reload/dismiss 门禁依赖）
+    func testSettleForBatchUpdateResetsTransaction() {
+        let cell = ZoomableImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.configure(item: makeItem(), image: makeImage())
+        layoutInWindow(cell, frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        cell.test_applyTransform(scale: 2, translationX: 0, translationY: 0)
+        cell.test_zoomController.reset(animated: true)
+        cell.settleForBatchUpdate()
+        XCTAssertEqual(cell.zoomState.geometryState, .idle)
+        XCTAssertEqual(cell.test_imageView.transform, .identity)
+        XCTAssertFalse(ViewerGesturePolicy.isZoomTransactionActive(cell.zoomState),
+                       "settle 后删除/批量更新事务必须放行")
+    }
 }

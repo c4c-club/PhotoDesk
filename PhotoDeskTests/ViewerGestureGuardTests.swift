@@ -121,4 +121,12 @@ final class ViewerGestureGuardTests: XCTestCase {
         let settling = state(isZooming: false, zoomScale: 1, sinceActivity: 10, geometryState: .settling)
         XCTAssertFalse(ViewerGesturePolicy.allowsRemovalTransaction(cell: settling))
     }
+
+    /// M16 T01：三指同样不属于单指 pan（XCUITest 无法合成三指触摸，物理场景列入手动清单）
+    func testPanDisabledWithThreeTouches() {
+        XCTAssertFalse(ViewerGesturePolicy.shouldPanBegin(
+            gesturesEnabled: true, numberOfTouches: 3,
+            cell: state(isZooming: false, zoomScale: 1.0, sinceActivity: 10)),
+            "三指触摸不属于单指 pan：不得开始")
+    }
 }

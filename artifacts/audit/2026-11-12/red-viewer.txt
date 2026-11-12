@@ -1,0 +1,31 @@
+# red-viewer.txt — T01 P0-1A 红测试证据（2026-11-13）
+
+## 红测试 1：PhotoDeskCore ZoomTransformTransactionBoundaryTests（28 条）
+
+新增测试文件 PhotoDeskCore/Tests/PhotoDeskCoreTests/ZoomTransformTransactionBoundaryTests.swift，
+引用尚未实现的 ZoomTransformTransaction / ZoomTransactionSnapshot 纯类型。
+在旧实现（commit 864af86 + T00 三提交）上 swift test 编译失败 = 红。
+
+环境：Docker swift:6.0-noble（scripts/test-core.ps1），基线 338/338 全绿。
+
+Docker 实测失败输出（节选）：
+
+    /workspace/Tests/PhotoDeskCoreTests/ZoomTransformTransactionBoundaryTests.swift:214:24: error: cannot find 'ZoomTransformTransaction' in scope
+    error: fatalError
+    [X] swift test 失败（exit 1）
+
+结论：红测试在旧实现上无法编译（编译红），证据成立。
+
+## 红测试 2：iOS ZoomableImageCellTests 扩展（非法 transform 复位 / reuse 复位 / 动画 token / 零 bounds）
+
+本机为 Windows，无 iOS 工具链，无法本地运行 iOS 单测（AGENTS.md §1 约束）。
+红证明方式：
+- 行为红（旧 API 可编译）：注入 NaN transform 后 imageView.transform 必须复位 identity——
+  旧实现 applyTransform 无 isFinite 守卫，直接写 CALayer，断言失败。
+- 编译红（新 API）：动画 token 观测钩子 test_resetAnimated / transactionToken 在旧实现不存在。
+实际红/绿以 CI 定向测试（PhotoDeskTests + ZoomStabilityUITests）为准，run id 记录于 progress.md。
+
+## 三指手势说明
+
+XCUITest 无法合成三指触摸事件。三指守卫逻辑（numberOfTouches >= 2 拒绝 pan）由
+ViewerGestureGuardTests 单测锁定；物理三指列入手动验证清单（真机 BLOCKED 项）。

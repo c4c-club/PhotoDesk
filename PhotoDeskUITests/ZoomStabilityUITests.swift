@@ -430,4 +430,70 @@ final class ZoomStabilityUITests: XCTestCase {
         assertAlive(app, "1× 翻页后")
         snap(app, "m15-one-x-pan")
     }
+
+    // MARK: - M16 T01：动画窗口 / 极限 / 前后台（docs/28 §4.4.4）
+
+    /// 双击放大动画进行中立即捏合：事务边界拒绝手势但不崩（旧实现 gesture.state 赋值 → 崩溃路径）
+    func testPinchDuringDoubleTapAnimation() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        _ = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        let inner = currentViewport(app)
+        XCTAssertTrue(inner.waitForExistence(timeout: 8), "内层 scrollView 未出现\n\(hierarchy(app))")
+        for round in 0..<20 {
+            inner.doubleTap()
+            inner.pinch(withScale: 0.45, velocity: -1.4)
+            inner.pinch(withScale: 2.2, velocity: 1.4)
+            if round % 5 == 4 { assertAlive(app, "双击动画中捏合第 \(round + 1) 轮后") }
+        }
+        assertAlive(app, "20 轮双击动画中捏合后")
+        let label = banner.label.lowercased()
+        XCTAssertFalse(label.contains("nan"), "横幅出现 NaN：\(banner.label)")
+        XCTAssertEqual(Self.parseField(label, "traceNonFinite"), 0, "viewer-trace 不得出现 non-finite：\(banner.label)")
+        snap(app, "m16-pinch-during-double-tap")
+    }
+
+    /// 极限缩放：贴 1× 下限与 5× 上限的连续捏合（写入层消毒 + Policy 钳制契约）
+    func testPinchAtScaleLimits() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        _ = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        let inner = currentViewport(app)
+        XCTAssertTrue(inner.waitForExistence(timeout: 8), "内层 scrollView 未出现\n\(hierarchy(app))")
+        for _ in 0..<8 { inner.pinch(withScale: 0.4, velocity: -2) }
+        assertAlive(app, "贴 1× 下限后")
+        for _ in 0..<8 { inner.pinch(withScale: 2.5, velocity: 2) }
+        assertAlive(app, "贴 5× 上限后")
+        let label = banner.label.lowercased()
+        XCTAssertFalse(label.contains("nan"), "横幅出现 NaN：\(banner.label)")
+        XCTAssertGreaterThan(Self.parseDoubleField(banner.label, "frameW"), 0,
+                             "极限缩放后 imageView 仍有效：\(banner.label)")
+        snap(app, "m16-pinch-scale-limits")
+    }
+
+    /// 前后台切换后捏合：视图重挂 + 事务复位后手势链路存活
+    func testPinchAfterBackgrounding() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        _ = openViewer(app, startIndex: 7)
+        let banner = viewerBanner(app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "查看器 DEBUG 横幅未出现\n\(hierarchy(app))")
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 1.0)
+        app.activate()
+        XCTAssertEqual(app.state, .runningForeground, "回前台失败")
+        Thread.sleep(forTimeInterval: 0.5)
+        let inner = currentViewport(app)
+        XCTAssertTrue(inner.waitForExistence(timeout: 8), "回前台后内层 scrollView 未出现\n\(hierarchy(app))")
+        inner.pinch(withScale: 0.45, velocity: -1.4)
+        inner.pinch(withScale: 2.2, velocity: 1.4)
+        inner.doubleTap()
+        assertAlive(app, "前后台切换 + 捏合后")
+        XCTAssertTrue(banner.label.contains("img=ok"), "回前台后当前图未加载：\(banner.label)")
+        snap(app, "m16-pinch-after-backgrounding")
+    }
 }
