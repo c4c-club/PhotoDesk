@@ -118,11 +118,13 @@ final class LibraryDataTests: XCTestCase {
     private func makePosition(assetID: String, sectionID: String, offsetRatio: Double, savedAt: Date) -> LibraryPositionV6 {
         LibraryPositionV6(queryKey: "",
                           anchorAssetID: assetID,
+                          anchorGlobalIndex: nil,
                           anchorSectionID: sectionID,
                           anchorSectionItemIndex: 0,
                           anchorVisualY: 0,
                           anchorContentOffsetY: offsetRatio * 4_000,
                           gridColumns: 3,
+                          contentInsetTop: 104,
                           contentHeight: 5_000,
                           viewportHeight: 844,
                           savedAt: savedAt)
