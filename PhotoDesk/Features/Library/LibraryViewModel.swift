@@ -324,7 +324,13 @@ final class LibraryViewModel: ObservableObject {
             // v6：优先落盘的 anchorGlobalIndex（仅用于窗口定位，非身份；陈旧值钳制进结果范围），
             // 缺失再回退实时全量查询
             let savedIndex = anchor.anchorGlobalIndex
-            let resolved = savedIndex ?? await repository.globalIndex(of: anchor.anchorAssetID, scope: query.scope)
+            // ?? 右侧不能挂 await（autoclosure 限制），拆成 if/else
+            let resolved: Int?
+            if let savedIndex {
+                resolved = savedIndex
+            } else {
+                resolved = await repository.globalIndex(of: anchor.anchorAssetID, scope: query.scope)
+            }
             if let anchorIndex = resolved {
                 let clampedIndex = min(max(anchorIndex, 0), max(0, totalCount - 1))
                 windowStart = max(0, clampedIndex - batchSize / 2)

@@ -8,6 +8,90 @@
 import Foundation
 import PhotoDeskCore
 
+// MARK: - v5 位置记忆（迁移/旧数据解码源，只读）
+/// schemaVersion 1–5 兼容解码；新数据一律走 LibraryPositionV6。
+struct LibraryPosition: Codable, Equatable {
+    var queryKey: String
+    let anchorAssetID: String
+    let anchorVisualY: Double
+    let anchorContentOffsetY: Double
+    let assetID: String
+    let sectionID: String
+    let itemIndexInSection: Int
+    let offsetRatio: Double
+    let contentHeight: Double
+    let viewportHeight: Double
+    let savedAt: Date
+    let schemaVersion: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case queryKey, anchorAssetID, anchorVisualY, anchorContentOffsetY
+        case assetID, sectionID, itemIndexInSection
+        case offsetRatio, contentHeight, viewportHeight, savedAt, schemaVersion
+    }
+
+    /// v1–v4 兼容：queryKey 缺失补空串、锚点回退 assetID、数值缺省 0、版本缺省 1。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        queryKey = (try? c.decode(String.self, forKey: .queryKey)) ?? ""
+        anchorAssetID = (try? c.decode(String.self, forKey: .anchorAssetID))
+            ?? ((try? c.decode(String.self, forKey: .assetID)) ?? "")
+        anchorVisualY = (try? c.decode(Double.self, forKey: .anchorVisualY)) ?? 0
+        anchorContentOffsetY = (try? c.decode(Double.self, forKey: .anchorContentOffsetY)) ?? 0
+        assetID = (try? c.decode(String.self, forKey: .assetID)) ?? ""
+        sectionID = (try? c.decode(String.self, forKey: .sectionID)) ?? ""
+        itemIndexInSection = (try? c.decode(Int.self, forKey: .itemIndexInSection)) ?? 0
+        offsetRatio = (try? c.decode(Double.self, forKey: .offsetRatio)) ?? 0
+        contentHeight = (try? c.decode(Double.self, forKey: .contentHeight)) ?? 0
+        viewportHeight = (try? c.decode(Double.self, forKey: .viewportHeight)) ?? 0
+        savedAt = (try? c.decode(Date.self, forKey: .savedAt)) ?? Date(timeIntervalSince1970: 0)
+        schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(queryKey, forKey: .queryKey)
+        try c.encode(anchorAssetID, forKey: .anchorAssetID)
+        try c.encode(anchorVisualY, forKey: .anchorVisualY)
+        try c.encode(anchorContentOffsetY, forKey: .anchorContentOffsetY)
+        try c.encode(assetID, forKey: .assetID)
+        try c.encode(sectionID, forKey: .sectionID)
+        try c.encode(itemIndexInSection, forKey: .itemIndexInSection)
+        try c.encode(offsetRatio, forKey: .offsetRatio)
+        try c.encode(contentHeight, forKey: .contentHeight)
+        try c.encode(viewportHeight, forKey: .viewportHeight)
+        try c.encode(savedAt, forKey: .savedAt)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+    }
+
+    /// 显式全参构造（迁移测试与手工种子用；queryKey 置尾便于默认省略）。
+    init(anchorAssetID: String,
+         anchorVisualY: Double,
+         anchorContentOffsetY: Double,
+         assetID: String,
+         sectionID: String,
+         itemIndexInSection: Int,
+         offsetRatio: Double,
+         contentHeight: Double,
+         viewportHeight: Double,
+         savedAt: Date,
+         schemaVersion: Int,
+         queryKey: String) {
+        self.queryKey = queryKey
+        self.anchorAssetID = anchorAssetID
+        self.anchorVisualY = anchorVisualY
+        self.anchorContentOffsetY = anchorContentOffsetY
+        self.assetID = assetID
+        self.sectionID = sectionID
+        self.itemIndexInSection = itemIndexInSection
+        self.offsetRatio = offsetRatio
+        self.contentHeight = contentHeight
+        self.viewportHeight = viewportHeight
+        self.savedAt = savedAt
+        self.schemaVersion = schemaVersion
+    }
+}
+
 /// 一条位置记忆（v6，docs/28 §5.3 字段表）
 struct LibraryPositionV6: Codable, Equatable {
     var queryKey: String
