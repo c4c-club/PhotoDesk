@@ -36,6 +36,10 @@ final class GridPinchUITests: XCTestCase {
         return tree.count > 8000 ? String(tree.prefix(8000)) + "…(截断)" : tree
     }
 
+    private func anyElement(_ app: XCUIApplication, identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
     private func assertAlive(_ app: XCUIApplication, _ message: String) {
         XCTAssertEqual(app.state, .runningForeground,
                        "\(message)（app.state=\(app.state.rawValue)）\n\(hierarchy(app))")
