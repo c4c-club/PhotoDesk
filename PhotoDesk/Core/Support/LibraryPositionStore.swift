@@ -76,7 +76,7 @@ struct LibraryPosition: Codable, Equatable {
          viewportHeight: Double,
          savedAt: Date,
          schemaVersion: Int,
-         queryKey: String) {
+         queryKey: String = "") {
         self.queryKey = queryKey
         self.anchorAssetID = anchorAssetID
         self.anchorVisualY = anchorVisualY
