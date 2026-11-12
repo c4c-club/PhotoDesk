@@ -1,6 +1,6 @@
 // MARK: - 职责说明：上次整理位置存取 v6（docs/28 §5.3 / M16 T03）——
 // v6 = 锚点 assetID 最终身份 + anchorGlobalIndex（仅用于首批窗口定位，非身份）
-+ gridColumns/contentInsetTop 取证字段；文件 anchors-v6.json（见 PositionFileStore）。
+// + gridColumns/contentInsetTop 取证字段；文件 anchors-v6.json（见 PositionFileStore）。
 // 视觉 y 语义沿用 v5：anchorVisualY = cell 未变换 frame.minY − contentOffset.y（±2pt 恢复口径），
 // 迁移记录因此保持像素级一致；inset 变化由恢复钳制 + 一次重试吸收。
 // v5 结构体保留为迁移/旧数据解码源（只读）；v1–v4 UserDefaults 键一次性迁入 v6 文件。
