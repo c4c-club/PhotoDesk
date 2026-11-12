@@ -1,0 +1,16 @@
+/workspace/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift:11:9: error: cannot find 'HeadInsertCompensationPolicy' in scope
+   |         `- error: cannot find 'HeadInsertCompensationPolicy' in scope
+/workspace/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift:64:22: error: cannot find 'HeadInsertCompensationPolicy' in scope
+   |                      `- error: cannot find 'HeadInsertCompensationPolicy' in scope
+/workspace/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift:72:22: error: cannot find 'HeadInsertCompensationPolicy' in scope
+   |                      `- error: cannot find 'HeadInsertCompensationPolicy' in scope
+/workspace/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift:75:31: error: cannot infer contextual base in reference to member 'nan'
+   |                               `- error: cannot infer contextual base in reference to member 'nan'
+
+--- 完整日志要点 ---
+红测试（先于实现提交）：
+- PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionRestoreMachineV6Tests.swift（18 条，docs/28 §5.4）
+- PhotoDeskCore/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift（13 条，docs/28 §5.5 步骤4）
+- PhotoDeskTests/PositionStoreV6Tests.swift（12 条，docs/28 §5.3/§5.7；App 侧在 CI 上编译红：LibraryPositionV6 不存在）
+- Core 编译红根因：PositionRestoreMachineV6 / HeadInsertCompensationPolicy / LibraryPositionV6 尚未实现（cannot find in scope，swift test exit 1）
+- 本地 Docker 无法编译 App 侧测试，App 红以 CI 首轮编译失败为准
