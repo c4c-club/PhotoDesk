@@ -25,6 +25,6 @@ GridPinchUITests.testGridPinch200Cycles 要求 200 次捏合全程存活；
 修复提交后 CI 首跑绿即为红→绿最小证据。
 
 [4] 红测试清单（docs/28 §4.4.4 口径）
-- Core PinchColumnReducerTests：20 条（消毒 4 / 边界钳制 3 / 滞回 3 / 单飞链式 5 / 回弹 4 / 中断重置 3；docs/28 下限 12）
+- Core PinchColumnReducerTests：22 条（消毒 4 / 边界钳制 3 / 滞回 3 / 单飞链式 5 / 回弹 4 / 中断重置 3；docs/28 下限 12）
 - App LibraryGridPinchTests：8 条（200 次快速变更 / 在途互斥 / 锚点不可变 / 回弹立即 / 回弹挂链 / 生命周期 / 刻度消毒×2）
 - UI GridPinchUITests：4 条（200 轮 / 跨月锚点+滚动不跳 / 粘性头 / 重启列数保持）

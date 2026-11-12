@@ -249,40 +249,100 @@ final class LibraryViewController: UIViewController {
         view.addSubview(collectionView)
     }
 
-    // MARK: - 捏合列数（docs/09 D14：2–5 列吸附、锚点保持、触觉、持久化、首次提示）
+    // MARK: - 捏合列数（docs/09 D14：2–5 列吸附、锚点保持、触觉、持久化、首次提示；
+    // docs/28 §4.4.3：单飞事务 + assetID 锚点，M16 T02）
 
-    private var pinchStartColumns = 3
-    private var pinchTargetColumns = 3
-    private var pinchAnchorIndexPath: IndexPath?
+    /// 网格捏合事务：锚点以 assetID 定格，提交决策全部来自 Core PinchColumnReducer
+    private var gridPinch = GridPinchTransaction()
+    /// 布局过渡在途标志：过渡期间冻结下拉刷新、快照排空与滑选手势
+    private var isGridLayoutTransition = false
 
     @objc private func onPinch(_ gesture: UIPinchGestureRecognizer) {
         switch gesture.state {
         case .began:
-            pinchStartColumns = columns
-            pinchTargetColumns = columns
-            pinchAnchorIndexPath = collectionView.indexPathForItem(at: gesture.location(in: collectionView))
+            // 上一个事务未收尾（在途过渡/挂起回弹）时不开新事务：单飞语义，防布局过渡重入
+            guard !gridPinch.isBusy, !isGridLayoutTransition else { return }
+            let assetID = collectionView.indexPathForItem(at: gesture.location(in: collectionView))
+                .flatMap { assetIDForItem(at: $0) }
+            gridPinch.begin(anchorAssetID: assetID, startColumns: columns, scale: Double(gesture.scale))
 
         case .changed:
-            guard gesture.scale > 0 else { return }
-            let target = max(2, min(5, Int((CGFloat(pinchStartColumns) / gesture.scale).rounded())))
-            guard target != pinchTargetColumns else { return }
-            pinchTargetColumns = target
-            setColumns(target, animated: true, anchor: pinchAnchorIndexPath)
-            if settings.hapticsEnabled {
-                UISelectionFeedbackGenerator().selectionChanged()
+            // docs/28 §4.4.3.1：changed 只更新事务 pending，绝不直接 setCollectionViewLayout
+            if gridPinch.changed(scale: Double(gesture.scale)) != nil {
+                if settings.hapticsEnabled {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                showPinchHintOnce()
+                if let target = gridPinch.markInFlight() {
+                    commitGridPinchTarget(target)
+                }
             }
-            showPinchHintOnce()
 
         case .ended, .cancelled:
-            // 松手：scale 接近 1 回弹到起始列数；否则持久化（docs/09 D14）
-            if abs(gesture.scale - 1) < 0.08, pinchStartColumns != columns {
-                setColumns(pinchStartColumns, animated: true, anchor: pinchAnchorIndexPath)
+            // 松手：scale 接近 1 回弹到起始列数（docs/09 D14）；否则持久化当前列数
+            if let target = gridPinch.ended(scale: Double(gesture.scale)) {
+                commitGridPinchTarget(target)
+            }
+            if !gridPinch.isBusy {
+                gridPinch.end()
             }
             settings.gridColumns = columns
-            pinchAnchorIndexPath = nil
 
         default:
             break
+        }
+    }
+
+    /// IndexPath → assetID（跨布局身份）；越界/空段返回 nil
+    private func assetIDForItem(at indexPath: IndexPath) -> String? {
+        currentItemsBySection[safe: indexPath.section]?[safe: indexPath.item]?.id
+    }
+
+    /// assetID → 当前 IndexPath（docs/28 §4.4.3.2：过渡完成后按 assetID 重新解析）
+    private func currentIndexPath(forAssetID assetID: String?) -> IndexPath? {
+        guard let assetID, !assetID.isEmpty else { return nil }
+        for sectionIndex in 0..<currentItemsBySection.count {
+            if let itemIndex = currentItemsBySection[sectionIndex].firstIndex(where: { $0.id == assetID }) {
+                return IndexPath(item: itemIndex, section: sectionIndex)
+            }
+        }
+        return nil
+    }
+
+    /// 单飞提交：一次布局过渡，completion 统一走过渡收尾
+    private func commitGridPinchTarget(_ target: Int) {
+        let clamped = max(2, min(5, target))
+        if clamped == columns {
+            onGridColumnsTransitionFinished()
+            return
+        }
+        isGridLayoutTransition = true
+        // docs/28 §4.4.3.3：列数过渡期间冻结下拉刷新
+        collectionView.refreshControl?.isEnabled = false
+        setColumns(clamped, animated: true) { [weak self] in
+            self?.onGridColumnsTransitionFinished()
+        }
+    }
+
+    /// 过渡收尾（docs/28 §4.4.3.2）：清标志 → 按 assetID 一次滚动 → 消费链式 pending → 恢复冻结
+    private func onGridColumnsTransitionFinished() {
+        isGridLayoutTransition = false
+        collectionView.refreshControl?.isEnabled = true
+        if let anchor = currentIndexPath(forAssetID: gridPinch.anchorAssetID),
+           anchor.section < collectionView.numberOfSections,
+           anchor.item < collectionView.numberOfItems(inSection: anchor.section) {
+            collectionView.scrollToItem(at: anchor, at: .centeredVertically, animated: false)
+        }
+        let next = gridPinch.transitionFinished()
+        if !gridPinch.isBusy {
+            gridPinch.end()
+        }
+        if let next {
+            commitGridPinchTarget(next)
+        } else {
+            // 过渡全部结束：恢复筛选重载（有 pending 快照才生效）并持久化最终列数
+            drainPendingSnapshot()
+            settings.gridColumns = columns
         }
     }
 
@@ -1075,6 +1135,8 @@ final class LibraryViewController: UIViewController {
 
     private func drainPendingSnapshot() {
         guard let pending = pendingSnapshot else { return }
+        // docs/28 §4.4.3.3：列数过渡期间冻结快照排空（pending 保留，过渡收尾后统一排空）
+        guard !isGridLayoutTransition else { return }
         // M12（验证轮 15 实锤）：集合视图未完成初次布局（0 sections、零宽）时应用
         // 「空 → 多 section」快照，iOS 15 diffable 批更新以 NSInternalInconsistencyException
         //（「request for number of items in section 0 when there are only 0 sections」）崩溃。
@@ -1573,37 +1635,24 @@ final class LibraryViewController: UIViewController {
 
     // MARK: - 列数切换（docs/09 D14：设置 Stepper 与捏合手势统一入口；锚点保持）
 
-    func setColumns(_ newColumns: Int, animated: Bool = false, anchor: IndexPath? = nil) {
+    /// 单飞布局切换入口（docs/28 §4.4.3.2）：同一时刻最多一个过渡；completion 由调用方决定
+    /// （捏合走事务收尾）。cell 取图尺寸重配由 viewDidLayoutSubviews 的像素尺寸路径负责
+    /// （M12 通道）——此处不再 reloadItems：绕过 Diffable 的更新与 dataSource.apply 撞车即 abort
+    /// （M12 实锤，docs/28 §4.3）；锚点滚动不再走旧 IndexPath（docs/28 §6）。
+    func setColumns(_ newColumns: Int, animated: Bool = false, completion: (() -> Void)? = nil) {
         let clamped = max(2, min(5, newColumns))
-        guard clamped != columns else { return }
-        columns = clamped
-        let finish = { [weak self] in
-            guard let self else { return }
-            // 列宽变化 → cell 内取图尺寸变化 → 重载可视 cell（缓存键含尺寸）。
-            // M12：apply 窗口内推迟（绕过 Diffable 的更新与 dataSource.apply 撞车 = abort）
-            let applyReload = { [weak self] in
-                guard let self else { return }
-                self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
-                if let anchor, anchor.section < self.currentSections.count {
-                    self.collectionView.scrollToItem(at: anchor, at: .centeredVertically, animated: false)
-                }
-            }
-            if self.isApplyingSnapshot {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, !self.isApplyingSnapshot else { return }
-                    applyReload()
-                }
-            } else {
-                applyReload()
-            }
+        guard clamped != columns else {
+            completion?()
+            return
         }
+        columns = clamped
         if animated && usesMotion {
             collectionView.setCollectionViewLayout(makeLayout(columns: clamped), animated: true) { _ in
-                finish()
+                completion?()
             }
         } else {
             collectionView.collectionViewLayout = makeLayout(columns: clamped)
-            finish()
+            completion?()
         }
     }
 
@@ -1670,7 +1719,7 @@ final class LibraryViewController: UIViewController {
         // v4：viewDidLayoutSubviews 是 bounds=0 竞态的唯一重试入口（不再只依赖 apply completion）
         attemptPositionRestore()
         // M12：集合视图完成初次布局后排空挂起的快照（见 drainPendingSnapshot 布局守卫）
-        if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot {
+        if collectionView.bounds.width > 0, pendingSnapshot != nil, !isApplyingSnapshot, !isGridLayoutTransition {
             drainPendingSnapshot()
         }
     }
@@ -1808,6 +1857,8 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
 extension LibraryViewController: UIGestureRecognizerDelegate {
     /// docs/22 §5.5：单指 pan 只在起点位于 cell 上时让滑选手势开始；双指交给 collectionView。
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // docs/28 §4.4.3.3：列数过渡期间冻结滑选（批量编辑入口）
+        if isGridLayoutTransition, gestureRecognizer === slideSelectPan { return false }
         guard gestureRecognizer === slideSelectPan else { return true }
         guard isSelecting else { return false }
         guard gestureRecognizer.numberOfTouches <= 1,
