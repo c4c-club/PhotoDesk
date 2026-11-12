@@ -28,3 +28,15 @@ GridPinchUITests.testGridPinch200Cycles 要求 200 次捏合全程存活；
 - Core PinchColumnReducerTests：22 条（消毒 4 / 边界钳制 3 / 滞回 3 / 单飞链式 5 / 回弹 4 / 中断重置 3；docs/28 下限 12）
 - App LibraryGridPinchTests：8 条（200 次快速变更 / 在途互斥 / 锚点不可变 / 回弹立即 / 回弹挂链 / 生命周期 / 刻度消毒×2）
 - UI GridPinchUITests：4 条（200 轮 / 跨月锚点+滚动不跳 / 粘性头 / 重启列数保持）
+
+[5] CI 三轮实锤的存量缺陷（2026-11-13，run 43293001331 崩溃取证）
+200 轮网格捏合中 App 意外终止（t=267.81s，SIGABRT / NSInternalInconsistencyException）：
+「UICollectionView must be updated via the UICollectionViewDiffableDataSource APIs when
+acting as the UICollectionView's dataSource: please do not call mutation APIs directly」
+崩溃栈：-[UICollectionView reloadItemsAtIndexPaths:] ← LibraryViewController.viewDidLayoutSubviews
+像素尺寸重配路径（M12 遗留，含 apply 窗口内推迟分支）。该直改 API 在 iOS 16 + Diffable
+数据源下一律非法；此前无网格捏合 UI 测试，列数切换路径从未被 CI 触发（R4 假绿）。
+修复：viewDidLayoutSubviews 重配改走 snapshot.reconfigureItems（合法增量），
+setColumns 的 finish() reloadItems 已随单飞事务一并删除。
+另取证：合成双指在网格上可能被误投为 cell 点按（viewer-trace：open items=173 idx=7）
+→ 测试钩子 -uiTestingGridNoSelection 禁点选 + closeViewerIfOpen 恢复。

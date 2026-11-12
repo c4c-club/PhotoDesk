@@ -1,5 +1,6 @@
 // MARK: - 职责说明：UI 测试钩子集中解析（docs/09 Phase 0）——
 // 仅 #if DEBUG 编译；由启动参数驱动（-uiTestingViewerStartIndex / -uiTestingSelectMode /
+// -uiTestingGridNoSelection【网格捏合 UI 测试禁 cell 点选：合成双指易误投成点按打开查看器】/
 // -uiTestingStorageMock / -uiTestingSessionMock / -uiTestingFaceIDBypass / -uiTestingFaceIDFailure /
 // -uiTestingAppLock / -uiTestingDatedPhotos / -uiTestingDisableAnimations【docs/13 Phase 0：
 // 关闭全 App 动画，稳定坐标点击用，不是修复手段】/ -uiTestingOpenFilterSheet /

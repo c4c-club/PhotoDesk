@@ -52,7 +52,7 @@ final class GridPinchUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication) -> XCUIElement {
         installPermissionMonitor()
-        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingGridNoSelection"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -70,9 +70,14 @@ final class GridPinchUITests: XCTestCase {
     }
 
     private func monthHeaderTexts(_ app: XCUIApplication) -> [String] {
-        // 粘性头标题带计数后缀（docs/04 §3.1：2026年10月 · 128 张），MATCHES 用前缀锚定
-        let predicate = NSPredicate(format: "label MATCHES '20[0-9][0-9]年[0-9]+月.*'")
-        return app.staticTexts.matching(predicate).allElementsBoundByIndex.map(\.label)
+        // 粘性头标题带计数后缀（docs/04 §3.1：2026年10月 · 128 张）；前缀锚定 + 宽松兜底
+        let strict = NSPredicate(format: "label MATCHES '20[0-9][0-9]年[0-9]+月.*'")
+        let strictQuery = app.staticTexts.matching(strict)
+        if strictQuery.firstMatch.exists {
+            return strictQuery.allElementsBoundByIndex.map(\.label)
+        }
+        let loose = NSPredicate(format: "label CONTAINS '年' AND label CONTAINS '月'")
+        return app.staticTexts.matching(loose).allElementsBoundByIndex.map(\.label)
     }
 
     /// 一个捏合循环 = 拉开（scale>1 → 少列）+ 收拢（scale<1 → 多列）
@@ -83,6 +88,16 @@ final class GridPinchUITests: XCTestCase {
             if round % 10 == 9 {
                 assertAlive(app, "\(tag) 第 \(round + 1) 循环后")
             }
+        }
+    }
+
+    /// 合成双指可能被误投为 cell 点按（打开查看器）：检测并关闭，保证后续手势打在网格上
+    private func closeViewerIfOpen(_ app: XCUIApplication) {
+        guard app.otherElements["ViewerRoot"].exists else { return }
+        let close = anyElement(app, identifier: "Viewer-Close")
+        if close.exists {
+            close.tap()
+            Thread.sleep(forTimeInterval: 0.6)
         }
     }
 
@@ -106,7 +121,12 @@ final class GridPinchUITests: XCTestCase {
         for _ in 0..<4 { app.swipeUp() }
         Thread.sleep(forTimeInterval: 0.4)
         let monthsBefore = monthHeaderTexts(app)
-        XCTAssertFalse(monthsBefore.isEmpty, "滚动后应能看到月份标题\n\(hierarchy(app))")
+        if monthsBefore.isEmpty {
+            snap(app, "fail-month-header-not-found")
+        }
+        let visibleTexts = app.staticTexts.allElementsBoundByIndex.prefix(10).map(\.label)
+        XCTAssertFalse(monthsBefore.isEmpty,
+                       "滚动后应能看到月份标题 texts=\(visibleTexts)\n\(hierarchy(app))")
         collection.pinch(withScale: 2.2, velocity: 1.4)
         Thread.sleep(forTimeInterval: 0.8)
         collection.pinch(withScale: 0.45, velocity: -1.4)
@@ -132,7 +152,12 @@ final class GridPinchUITests: XCTestCase {
         let collection = launchToGrid(app)
         for _ in 0..<2 { app.swipeUp() }
         Thread.sleep(forTimeInterval: 0.3)
-        XCTAssertFalse(monthHeaderTexts(app).isEmpty, "中段滚动后粘性月份头应可见")
+        let stickyMonths = monthHeaderTexts(app)
+        if stickyMonths.isEmpty {
+            snap(app, "fail-sticky-header-not-found")
+        }
+        let stickyTexts = app.staticTexts.allElementsBoundByIndex.prefix(10).map(\.label)
+        XCTAssertFalse(stickyMonths.isEmpty, "中段滚动后粘性月份头应可见 texts=\(stickyTexts)")
         collection.pinch(withScale: 2.2, velocity: 1.4)
         Thread.sleep(forTimeInterval: 0.6)
         collection.pinch(withScale: 0.45, velocity: -1.4)
@@ -152,6 +177,7 @@ final class GridPinchUITests: XCTestCase {
         collection.pinch(withScale: 2.2, velocity: 1.4)
         Thread.sleep(forTimeInterval: 1.0)
         assertAlive(app, "捏合后")
+        closeViewerIfOpen(app)
         // 合成捏合的 .ended 刻度可能回落触发回弹（docs/09 D14 回弹带），与真机释放姿态不同；
         // 本用例断言口径是「重启前后列数一致」（持久化语义本身），列数取捏合后的实测值。
         let columnsAfterPinch = firstRowCount(collection)

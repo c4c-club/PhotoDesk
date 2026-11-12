@@ -238,7 +238,8 @@ final class LibraryViewController: UIViewController {
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         collectionView.backgroundColor = .clear
         collectionView.delegate = self
-        collectionView.allowsSelection = true
+        // docs/09 Phase 0：UI 测试网格捏合时禁 cell 点选（合成双指易误投成点按→打开查看器）
+        collectionView.allowsSelection = !ProcessInfo.processInfo.arguments.contains("-uiTestingGridNoSelection")
         // 下拉刷新（docs/09 D15）：保留当前筛选与位置
         refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
         collectionView.refreshControl = refreshControl
@@ -1332,6 +1333,18 @@ final class LibraryViewController: UIViewController {
                                        viewportHeight: Double(collectionView.bounds.height))
     }
 
+    /// 可视 cell 的合法增量重配（M16 T02）：Diffable 数据源下禁用 UICollectionView 直改 API，
+    /// 统一走 snapshot.reconfigureItems。列数切换/像素尺寸变化后 cell 取图尺寸随之变化（缓存键含尺寸）。
+    private func reconfigureVisibleItems() {
+        let visible = collectionView.indexPathsForVisibleItems
+        guard !visible.isEmpty else { return }
+        var snapshot = dataSource.snapshot()
+        let items = visible.compactMap { dataSource.itemIdentifier(for: $0) }
+        guard !items.isEmpty else { return }
+        snapshot.reconfigureItems(items)
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
     private func attemptPositionRestore() {
         guard positionCoordinator.isRestoreInFlight else { return }
         // 确保 anchorMinY / contentSize 取自本次真实布局，而不是上一次的估算值。
@@ -1700,15 +1713,18 @@ final class LibraryViewController: UIViewController {
         // 撞车即触发 _existingNumberOfItemsInSection abort；apply 窗口内推迟到下一轮主循环。
         let pixel = cellPixelSize
         if lastConfiguredPixelSize != .zero, pixel != lastConfiguredPixelSize {
+            // M16 T02（CI 三轮 .ips 实锤）：reloadItems 直接打在 Diffable 数据源上，
+            // iOS 16 一律 NSInternalInconsistencyException（「must be updated via the
+            // UICollectionViewDiffableDataSource APIs」）——列数切换即崩（此前无网格捏合
+            // UI 测试，该路径从未被执行过 = R4 假绿）。改走 snapshot.reconfigureItems
+            // 的合法增量重配；apply 窗口内仍推迟到下一轮主循环（M12 通道不变）。
             if isApplyingSnapshot {
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, !self.isApplyingSnapshot,
-                          let layout = self.collectionView.collectionViewLayout as? UICollectionViewCompositionalLayout
-                    else { return }
-                    self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+                    guard let self, !self.isApplyingSnapshot else { return }
+                    self.reconfigureVisibleItems()
                 }
             } else {
-                collectionView.reloadItems(at: collectionView.indexPathsForVisibleItems)
+                reconfigureVisibleItems()
             }
         }
         lastConfiguredPixelSize = pixel
