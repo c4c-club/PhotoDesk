@@ -1830,6 +1830,11 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         onOpenViewer?(item)
     }
 
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        // §5.5 用户接管：恢复期间用户拖动 → 立即取消恢复（settled），恢复让位于用户滚动
+        positionCoordinator.cancelRestore(reason: "userDrag")
+    }
+
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateIndexBarHighlight()
         // 位置记忆 v5：0.5s 防抖且只在用户 tracking 时（程序化 offset 不保存），coordinator 门禁兜底。

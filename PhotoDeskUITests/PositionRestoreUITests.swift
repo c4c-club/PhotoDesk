@@ -29,7 +29,7 @@ final class PositionRestoreUITests: XCTestCase {
     }
 
     @discardableResult
-    private func launchToGrid(_ app: XCUIApplication) -> XCUIElement {
+    private func launchToGrid(_ app: XCUIApplication, readyTimeout: TimeInterval = 30) -> XCUIElement {
         installPermissionMonitor()
         app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
         app.launch()
@@ -39,7 +39,7 @@ final class PositionRestoreUITests: XCTestCase {
             app.tap()
         }
         let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.waitForExistence(timeout: readyTimeout), "照片网格未出现\n\(hierarchy(app))")
         let cellReady = collection.cells.firstMatch.waitForExistence(timeout: 15)
         if !cellReady {
             snap(app, "fail-grid-no-cells")
@@ -351,5 +351,124 @@ final class PositionRestoreUITests: XCTestCase {
                       "跳转后重启未回到 2024年5月（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
         assertAlive(app, "月份跳转重启后")
         snap(app, "m15-position-month-jump-persist")
+    }
+
+    // MARK: - M16 T03（docs/28 §5.7）：v6 恢复硬化与深锚点
+
+    /// 恢复诊断解析：by=策略 / verify ok=true|false / rej=恢复期被拒保存请求数。
+    private func parseRestoreDiagnostics(_ label: String) -> (by: String, verifyOK: Bool?) {
+        let by = Self.parseStringField(label, "by") ?? ""
+        let okRaw = Self.parseStringField(label, "ok")
+        return (by, okRaw.map { $0 == "true" })
+    }
+
+    /// 20 次冷启动 ≥19 次同 assetID ±2pt；0 次假 settled（asset 主路径 verify ok=false 却无 fallback）。
+    func testColdLaunchRestoresSamePixelPosition20Times() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
+        let collection = app.collectionViews.firstMatch
+        var pixelMisses = 0
+        var fakeSettled = 0
+        for round in 0..<20 {
+            _ = debugSnapshotAfterRestore(app)
+            if round > 0 {
+                swipeUpOnce(in: collection)
+                Thread.sleep(forTimeInterval: 0.6)
+                if round % 3 == 0 {
+                    swipeUpOnce(in: collection)
+                    Thread.sleep(forTimeInterval: 0.6)
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.5)
+            guard let before = debugSnapshotAfterRestore(app) else {
+                return XCTFail("轮 \(round + 1)：Library-DebugSummary 必须暴露 off/anchor/visualY raw=\(rawSummary(app))")
+            }
+            Thread.sleep(forTimeInterval: 1.6)
+            app.terminate()
+            _ = launchToGrid(app)
+            guard let after = debugSnapshotAfterRestore(app) else {
+                return XCTFail("轮 \(round + 1)：重启后必须能读取位置快照 raw=\(rawSummary(app))")
+            }
+            if after.anchor != before.anchor || abs(after.off - before.off) > 2.0 {
+                pixelMisses += 1
+            }
+            let raw = rawSummary(app)
+            let diagnostics = parseRestoreDiagnostics(raw)
+            if diagnostics.verifyOK == false, diagnostics.by == "asset",
+               !raw.contains("fallback"), raw.contains("restore=ok") {
+                fakeSettled += 1
+            }
+            assertAlive(app, "轮 \(round + 1) 冷启动恢复后")
+            if round == 19 {
+                snap(app, "m16-position-20x")
+            }
+        }
+        XCTAssertLessThanOrEqual(pixelMisses, 1,
+                                 "20 次冷启动至少 19 次同 assetID ±2pt（miss=\(pixelMisses)）")
+        XCTAssertEqual(fakeSettled, 0, "0 次假 settled（docs/28 §5.4：verify 必须真实 attributes）")
+    }
+
+    /// 锚点 globalIndex > 500 + 跨月窗口：深库（519 张）月跳最旧月 2002-01（锚点 idx≈518）→
+    /// 滚一屏存锚点 → 冷启动走 v6 waitingForHead 逐批 head 补偿 → 同 assetID ±2pt、
+    /// by=asset、不得降级 fallback（§5.5 步骤 4 补偿正确性的端到端实证）。
+    func testDeepAnchorRestoresThroughHeadBackfill() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingSeedDeepLibrary"]
+        launchWithMonthJump(app, sectionID: "2002-01", headerText: "2002年1月")
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
+        let collection = app.collectionViews.firstMatch
+        swipeUpOnce(in: collection)
+        Thread.sleep(forTimeInterval: 0.8)
+        guard let before = debugSnapshotAfterRestore(app) else {
+            return XCTFail("深锚点场景必须能读取位置快照 raw=\(rawSummary(app))")
+        }
+        Thread.sleep(forTimeInterval: 1.6)
+        app.terminate()
+        _ = launchToGrid(app, readyTimeout: 60)
+        guard let after = debugSnapshotAfterRestore(app, timeout: 40) else {
+            return XCTFail("深锚点冷启动必须恢复 raw=\(rawSummary(app))")
+        }
+        XCTAssertEqual(after.anchor, before.anchor, "深锚点（globalIndex>500）恢复 assetID 必须一致")
+        XCTAssertLessThanOrEqual(abs(after.off - before.off), 2.0,
+                                 "深锚点冷启动像素差必须 ≤2pt（before=\(before.off) after=\(after.off)）")
+        let raw = rawSummary(app)
+        XCTAssertTrue(raw.contains("by=asset"), "v6 主路径必须 asset 精确落地 raw=\(raw)")
+        XCTAssertFalse(raw.contains("fallback"), "head 回填补偿后不得降级 fallback raw=\(raw)")
+        assertAlive(app, "深锚点恢复后")
+        snap(app, "m16-position-deep-anchor")
+    }
+
+    /// 恢复中强制滚动：用户拖动接管（§5.5）→ cancelRestore → 恢复让位，最终存活、
+    /// 快照可读、用户滚动位置保留（不被恢复重新拉回）。
+    func testUserScrollDuringRestoreTakesOver() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
+        let collection = app.collectionViews.firstMatch
+        swipeUpOnce(in: collection)
+        Thread.sleep(forTimeInterval: 0.8)
+        guard let before = debugSnapshotAfterRestore(app) else {
+            return XCTFail("必须能读取位置快照 raw=\(rawSummary(app))")
+        }
+        Thread.sleep(forTimeInterval: 1.6)
+        app.terminate()
+        _ = launchToGrid(app)
+        // 冷启动恢复进行中立即抢滚两屏：用户滚动优先于恢复定位
+        collection.swipeUp()
+        collection.swipeUp()
+        Thread.sleep(forTimeInterval: 2.5)
+        assertAlive(app, "恢复中强制滚动后")
+        guard let after = debugSnapshotAfterRestore(app, timeout: 20) else {
+            return XCTFail("接管后必须能读取位置快照 raw=\(rawSummary(app))")
+        }
+        XCTAssertGreaterThanOrEqual(after.off, before.off + 100,
+                                    "用户接管的滚动位置必须保留，不得被恢复拉回（before=\(before.off) after=\(after.off)）")
+        snap(app, "m16-position-restore-takeover")
     }
 }

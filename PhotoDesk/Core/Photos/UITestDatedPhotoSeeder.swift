@@ -1,4 +1,4 @@
-// MARK: - 职责说明：UI 测试日期种子（docs/19 §5 / M13 审计）——
+// MARK: - 职责说明：UI 测试日期种子（docs/19 §5 / M13 审计 / M16 T03 深库扩展）——
 // DEBUG-only：simctl addmedia 不保证把 EXIF DateTimeOriginal 映射成 PHAsset.creationDate，
 // 这里改为 PHAssetCreationRequest 显式写入 creationDate，保证 2020–2026 每月数据在筛选/月份/位置测试里稳定可复现。
 // 性能约束（docs/21 §6 绿轮教训）：seeding 在 viewState 进入 .ready 前阻塞 loadIfNeeded，
@@ -6,6 +6,8 @@
 // 因此必须单张小图 + 单批事务，把总耗时压到秒级。
 // 正确性约束（绿5 实测 167 请求只落 23 张）：多个 creation 请求不得共享同一个临时文件——
 // Photos 对同一 URL 的并发拷贝会互相失败；逐文件落盘（96×96 小图 ≈1s 总量）后单批事务稳定。
+// 深库种子（-uiTestingSeedDeepLibrary，M16 T03）：2002–2019 每月 2 张共 432 张，
+// 让「锚点 globalIndex > 500」的位置恢复测试有真实深锚点（总量 519）；分批事务 150/批 + 幂等补种。
 // 只使用系统 Photos API、零网络、零第三方依赖；不带 -uiTestingSeedDatedPhotos 时完全惰性不写库。
 
 #if DEBUG
@@ -15,6 +17,7 @@ import UIKit
 
 enum UITestDatedPhotoSeeder {
     private static let didSeedKey = "uitest.datedPhotos.seeded.v1"
+    private static let didDeepSeedKey = "uitest.datedPhotos.deep.seeded.v1"
 
     enum SeedError: Error { case photoLibraryRejected, seedImageUnavailable }
 
@@ -24,8 +27,16 @@ enum UITestDatedPhotoSeeder {
     static func seedIfNeeded() async {
         guard UITestHooks.enabled("-uiTestingSeedDatedPhotos") else { return }
         let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: didSeedKey) else { return }
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return }
+        if !defaults.bool(forKey: didSeedKey) {
+            await seedBasePhotos(defaults: defaults)
+        }
+        await seedDeepLibraryIfNeeded(defaults: defaults)
+    }
+
+    /// 基础种子：2020–2026 每月 2 张 + 3 张极端比例（docs/19 §5）。
+    @MainActor
+    private static func seedBasePhotos(defaults: UserDefaults) async {
         let wanted = Set(makeDates())
         // 绿9 实锤：performChanges 可能部分成功（库内已插入部分种子）后整体抛错——
         // didSeedKey 未落盘会让下次启动整批重插，库从 341 涨到 468/500（重复月份 4 张）。
@@ -50,6 +61,31 @@ enum UITestDatedPhotoSeeder {
                 }
             }
         }
+    }
+
+    /// 深库种子：分批幂等补种（每批 150、至多 12 轮），完成后落 didDeepSeedKey（只执行一次）。
+    @MainActor
+    private static func seedDeepLibraryIfNeeded(defaults: UserDefaults) async {
+        guard UITestHooks.enabled("-uiTestingSeedDeepLibrary"),
+              !defaults.bool(forKey: didDeepSeedKey) else { return }
+        let wanted = Set(makeDeepDates())
+        var rounds = 0
+        while rounds < 12 {
+            let missing = missingSeedDates(wanted: wanted)
+            if missing.isEmpty {
+                defaults.set(true, forKey: didDeepSeedKey)
+                ViewerTrace.log("deep-seed done wanted=\(wanted.count) rounds=\(rounds)")
+                return
+            }
+            let chunk = Array(missing.prefix(150))
+            do {
+                try await performChanges(dates: chunk)
+            } catch {
+                ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) error=\(error)")
+            }
+            rounds += 1
+        }
+        ViewerTrace.log("deep-seed incomplete after 12 rounds")
     }
 
     /// 幂等去重：枚举现有图片资产的 creationDate（元数据级查询，几百张毫秒级），
@@ -81,6 +117,22 @@ enum UITestDatedPhotoSeeder {
         for index in 0..<3 {
             let components = DateComponents(year: 2026, month: 10, day: 18 + index, hour: 12)
             if let date = calendar.date(from: components) { result.append(date) }
+        }
+        return result
+    }
+
+    /// 深库日期：2002–2019 每月 2 张（432 张；与基础种子不重叠）。
+    private static func makeDeepDates() -> [Date] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        var result: [Date] = []
+        for year in 2002...2019 {
+            for month in 1...12 {
+                for day in [3, 17] {
+                    let components = DateComponents(year: year, month: month, day: day, hour: 12)
+                    if let date = calendar.date(from: components) { result.append(date) }
+                }
+            }
         }
         return result
     }
