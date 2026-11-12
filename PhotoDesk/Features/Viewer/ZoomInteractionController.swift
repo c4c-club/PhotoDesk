@@ -150,6 +150,8 @@ final class ZoomInteractionController: NSObject {
     /// invalidated 决策入口：复用/旋转/布局/程序性复位。
     /// 取消动画代际（旧 completion 失配）并立即回 identity；程序性复位属于一次"事务结束"：
     /// 必须发 didEnd（VC 串行 drain 依赖该信号）。
+    /// 程序性复位同时耗尽回弹宽限窗口：宽限只挂在真实用户手势之后
+    /// （docs/26 §5.4——否则翻页/复用/批量更新后删除队列会被宽限卡 1 秒）。
     func invalidateTransaction() {
         let wasInteracting = phase != .idle
         let wasTransformed = transform != .identity
@@ -160,6 +162,7 @@ final class ZoomInteractionController: NSObject {
         if wasInteracting {
             onInteractionStateChanged?(false)
         }
+        lastActivity = CACurrentMediaTime() - DSMotion.zoomActivityGrace
         onInteractionDidEnd?()
     }
 
