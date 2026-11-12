@@ -1,0 +1,30 @@
+M16 T02 红→绿实录（docs/30 T02 §3.3：确认新测试在旧实现上失败或无法编译）
+
+分支：fix/m16-20261112　时间：2026-11-13　本文件随 test(library) 提交入库
+
+[1] Core 编译红（Docker swift:6.0-noble，scripts/test-core.ps1，exit 1，实录）
+PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift:14:17: error: cannot find 'PinchColumnReducer' in scope
+PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift:21:17: error: cannot find 'PinchColumnReducer' in scope
+PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift:28:17: error: cannot find 'PinchColumnReducer' in scope
+PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift:36:17: error: cannot find 'PinchColumnReducer' in scope
+PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift:44:17: error: cannot find 'PinchColumnReducer' in scope
+（全部 20 用例依赖 PinchColumnReducer / PinchColumnConfig，未实现即无法编译）
+
+[2] App 单测编译红（静态实证：本机无 iOS 工具链，与 T01 red-viewer.txt 同口径）
+PhotoDeskTests/LibraryGridPinchTests.swift 引用 GridPinchTransaction（锚点 assetID 事务壳）；
+提交时点全仓无该类型定义 → xcodebuild 编译必然失败。
+验证：git show <fix 提交> --stat 应包含 PhotoDesk/Features/Library/GridPinchTransaction.swift。
+
+[3] UI 语义红（静态实证）
+GridPinchUITests.testGridPinch200Cycles 要求 200 次捏合全程存活；
+旧实现（864af86 起未变）LibraryViewController.swift:
+  :265-274  每个 .changed 跨阈值即调 setColumns(target, animated: true, anchor:)
+  :1601     每次都 collectionView.setCollectionViewLayout(makeLayout(columns:), animated: true)
+  :1586     completion 里 reloadItems(at: indexPathsForVisibleItems)（M12 已实锤绕过 Diffable 会 abort）
+→ 连续捏合叠加多个布局过渡（docs/28 §4.3 R1），200 轮快速捏合按预期崩溃/错乱；
+修复提交后 CI 首跑绿即为红→绿最小证据。
+
+[4] 红测试清单（docs/28 §4.4.4 口径）
+- Core PinchColumnReducerTests：20 条（消毒 4 / 边界钳制 3 / 滞回 3 / 单飞链式 5 / 回弹 4 / 中断重置 3；docs/28 下限 12）
+- App LibraryGridPinchTests：8 条（200 次快速变更 / 在途互斥 / 锚点不可变 / 回弹立即 / 回弹挂链 / 生命周期 / 刻度消毒×2）
+- UI GridPinchUITests：4 条（200 轮 / 跨月锚点+滚动不跳 / 粘性头 / 重启列数保持）
