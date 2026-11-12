@@ -73,15 +73,13 @@ final class GridPinchUITests: XCTestCase {
         return collection
     }
 
-    private func monthHeaderTexts(_ app: XCUIApplication) -> [String] {
-        // 粘性头标题带计数后缀（docs/04 §3.1：2026年10月 · 128 张）；前缀锚定 + 宽松兜底
-        let strict = NSPredicate(format: "label MATCHES '20[0-9][0-9]年[0-9]+月.*'")
-        let strictQuery = app.staticTexts.matching(strict)
-        if strictQuery.firstMatch.exists {
-            return strictQuery.allElementsBoundByIndex.map(\.label)
-        }
-        let loose = NSPredicate(format: "label CONTAINS '年' AND label CONTAINS '月'")
-        return app.staticTexts.matching(loose).allElementsBoundByIndex.map(\.label)
+    /// 可见粘性头的 sectionID 集合（docs/13 S10 锚点：MonthHeader-Menu-<sectionID>）。
+    /// 注意：compositional 补充视图里的 UILabel 不一定进 XCUITest staticTexts 树（CI 五轮实锤），
+    /// 但 menuButton 的 accessibilityIdentifier 永远可达——锚定它而不是标题文本。
+    private func monthSectionIDs(_ app: XCUIApplication) -> [String] {
+        let predicate = NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'")
+        return app.buttons.matching(predicate).allElementsBoundByIndex
+            .compactMap { $0.identifier.replacingOccurrences(of: "MonthHeader-Menu-", with: "") }
     }
 
     /// 一个捏合循环 = 拉开（scale>1 → 少列）+ 收拢（scale<1 → 多列）
@@ -124,28 +122,28 @@ final class GridPinchUITests: XCTestCase {
         // 滚到较后的月份（种子跨 2020–2026，多月份分组）
         for _ in 0..<4 { app.swipeUp() }
         Thread.sleep(forTimeInterval: 0.4)
-        let monthsBefore = monthHeaderTexts(app)
+        let monthsBefore = monthSectionIDs(app)
         if monthsBefore.isEmpty {
             snap(app, "fail-month-header-not-found")
         }
         let visibleTexts = app.staticTexts.allElementsBoundByIndex.prefix(10).map(\.label)
         XCTAssertFalse(monthsBefore.isEmpty,
-                       "滚动后应能看到月份标题 texts=\(visibleTexts)\n\(hierarchy(app))")
+                       "滚动后应能看到粘性月份头（锚点按钮） texts=\(visibleTexts)\n\(hierarchy(app))")
         collection.pinch(withScale: 2.2, velocity: 1.4)
         Thread.sleep(forTimeInterval: 0.8)
         collection.pinch(withScale: 0.45, velocity: -1.4)
         Thread.sleep(forTimeInterval: 0.8)
         assertAlive(app, "跨月捏合后")
-        let monthsAfter = monthHeaderTexts(app)
-        XCTAssertFalse(monthsAfter.isEmpty, "捏合后月份标题应仍在\n\(hierarchy(app))")
+        let monthsAfter = monthSectionIDs(app)
+        XCTAssertFalse(monthsAfter.isEmpty, "捏合后粘性月份头应仍在\n\(hierarchy(app))")
         // 锚点不漂移的粗粒度等价断言：捏合前后可见月份必须有交集（±1 cell 高度口径）
         let overlap = Set(monthsBefore).intersection(monthsAfter)
         XCTAssertFalse(overlap.isEmpty,
                        "捏合后可见月份应与捏合前有交集 before=\(monthsBefore) after=\(monthsAfter)")
-        // 滚动不跳：再滚一屏，月份标题应仍存在（不弹回顶部/黑屏）
+        // 滚动不跳：再滚一屏，月份头应仍存在（不弹回顶部/黑屏）
         app.swipeUp()
         Thread.sleep(forTimeInterval: 0.4)
-        XCTAssertFalse(monthHeaderTexts(app).isEmpty, "捏合后继续滚动月份标题不应消失")
+        XCTAssertFalse(monthSectionIDs(app).isEmpty, "捏合后继续滚动月份头不应消失")
         snap(app, "m16-grid-pinch-cross-month")
     }
 
@@ -156,12 +154,12 @@ final class GridPinchUITests: XCTestCase {
         let collection = launchToGrid(app)
         for _ in 0..<2 { app.swipeUp() }
         Thread.sleep(forTimeInterval: 0.3)
-        let stickyMonths = monthHeaderTexts(app)
+        let stickyMonths = monthSectionIDs(app)
         if stickyMonths.isEmpty {
             snap(app, "fail-sticky-header-not-found")
         }
-        let stickyTexts = app.staticTexts.allElementsBoundByIndex.prefix(10).map(\.label)
-        XCTAssertFalse(stickyMonths.isEmpty, "中段滚动后粘性月份头应可见 texts=\(stickyTexts)")
+        XCTAssertFalse(stickyMonths.isEmpty,
+                       "中段滚动后粘性月份头应可见（锚点按钮） ids=\(stickyMonths)")
         collection.pinch(withScale: 2.2, velocity: 1.4)
         Thread.sleep(forTimeInterval: 0.6)
         collection.pinch(withScale: 0.45, velocity: -1.4)
