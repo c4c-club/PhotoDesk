@@ -1145,6 +1145,11 @@ final class LibraryViewController: UIViewController {
         //（applySnapshot 语义不变：新快照仍覆盖 pending，最新者胜）。
         guard collectionView.window != nil, collectionView.bounds.width > 0 else { return }
         pendingSnapshot = nil
+        // §5.6 / CI 五轮 .ips 实锤：queryKey 变化（筛选/年份/全库切换）= 新投影，
+        // 进行中的恢复锚点属旧投影，必须立即取消（防越界滚动崩溃与跨 scope 锚点泄漏）。
+        if pending.queryKey != currentSnapshotQueryKey, positionCoordinator.isRestoreInFlight {
+            positionCoordinator.cancelRestore(reason: "scopeChange")
+        }
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
 
@@ -1375,8 +1380,9 @@ final class LibraryViewController: UIViewController {
     }
 
     private func attemptPositionRestore() {
-        guard positionCoordinator.isRestoreInFlight else { return }
-        // 确保 anchorMinY / contentSize 取自本次真实布局，而不是上一次的估算值。
+        guard positionCoordinator.isRestoreInFlight, !isApplyingSnapshot else { return }
+        // apply 提交窗口内 currentItemsBySection 还是旧投影（completion 才更新），
+        // 此时构建的 context 是新旧混合态——等 completion 的重试入口。
         collectionView.layoutIfNeeded()
         let context = LibraryPositionRestoreContext(
             bounds: collectionView.bounds.size,
@@ -1398,6 +1404,10 @@ final class LibraryViewController: UIViewController {
             },
             scrollToAnchorTop: { [weak self] id in
                 guard let self, let path = self.indexPath(forAssetID: id) else { return false }
+                // CI 五轮 .ips 实锤：apply 提交与 currentItemsBySection 更新之间有窗口，
+                // 路径可能指向已不存在的 section——滚动前必须对集合真实 section 数校验。
+                guard path.section < self.collectionView.numberOfSections,
+                      self.collectionView.numberOfItems(inSection: path.section) > 0 else { return false }
                 // §5.5：scrollToItem(.top) 让 UICollectionView 自己算目标 offset（知道全部 header 几何）
                 self.isRestoringPosition = true
                 self.collectionView.scrollToItem(at: path, at: .top, animated: false)
@@ -1424,7 +1434,8 @@ final class LibraryViewController: UIViewController {
                 self?.collectionView.layoutIfNeeded()
             },
             firstBatchWindowStart: viewModel.firstBatchWindowStart,
-            headInsertGeneration: viewModel.headInsertGeneration
+            headInsertGeneration: viewModel.headInsertGeneration,
+            currentQueryKey: { [weak self] in self?.viewModel.query.key ?? "" }
         )
         positionCoordinator.attemptRestore(context: context)
     }
