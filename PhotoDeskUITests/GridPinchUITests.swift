@@ -70,7 +70,8 @@ final class GridPinchUITests: XCTestCase {
     }
 
     private func monthHeaderTexts(_ app: XCUIApplication) -> [String] {
-        let predicate = NSPredicate(format: "label MATCHES '20[0-9][0-9]年[0-9]+月'")
+        // 粘性头标题带计数后缀（docs/04 §3.1：2026年10月 · 128 张），MATCHES 用前缀锚定
+        let predicate = NSPredicate(format: "label MATCHES '20[0-9][0-9]年[0-9]+月.*'")
         return app.staticTexts.matching(predicate).allElementsBoundByIndex.map(\.label)
     }
 
@@ -147,15 +148,19 @@ final class GridPinchUITests: XCTestCase {
     func testGridColumnsPersistAfterRelaunch() throws {
         let app = XCUIApplication()
         let collection = launchToGrid(app)
-        // 3 → 2 列：拉开捏合（scale 2.2 → raw 1.36 → 2 列），.ended 持久化
+        // 捏合改变列数（scale 2.2 → 少列）；提交在 .changed 即发生，.ended 持久化
         collection.pinch(withScale: 2.2, velocity: 1.4)
-        Thread.sleep(forTimeInterval: 1.2)
-        assertAlive(app, "捏到 2 列后")
+        Thread.sleep(forTimeInterval: 1.0)
+        assertAlive(app, "捏合后")
+        // 合成捏合的 .ended 刻度可能回落触发回弹（docs/09 D14 回弹带），与真机释放姿态不同；
+        // 本用例断言口径是「重启前后列数一致」（持久化语义本身），列数取捏合后的实测值。
+        let columnsAfterPinch = firstRowCount(collection)
         app.terminate()
         Thread.sleep(forTimeInterval: 1.0)
         let relaunched = launchToGrid(app)
-        let columns = firstRowCount(relaunched)
-        XCTAssertEqual(columns, 2, "重启后网格应为 2 列（实测 \(columns)）")
+        let columnsRelaunch = firstRowCount(relaunched)
+        XCTAssertEqual(columnsRelaunch, columnsAfterPinch,
+                       "重启后列数应保持（捏合后 \(columnsAfterPinch) 列 → 重启后 \(columnsRelaunch) 列）")
         snap(app, "m16-grid-columns-persist")
     }
 

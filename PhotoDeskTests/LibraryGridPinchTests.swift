@@ -59,7 +59,9 @@ final class LibraryGridPinchTests: XCTestCase {
         if let chained {
             XCTAssertTrue((2...5).contains(chained), "消费结果必须在 2...5")
             XCTAssertEqual(tx.currentColumns, chained)
+            XCTAssertEqual(tx.inFlightColumns, chained, "接续的过渡立即进入在途（单飞链）")
         }
+        _ = tx.transitionFinished()
         XCTAssertFalse(tx.isBusy)
     }
 
@@ -103,7 +105,9 @@ final class LibraryGridPinchTests: XCTestCase {
         _ = tx.changed(scale: 0.5)
         XCTAssertNil(tx.ended(scale: 1.03), "在途回弹只挂链")
         XCTAssertEqual(tx.pendingTarget, 3, "最新者胜：回弹目标覆盖挂起")
-        XCTAssertEqual(tx.transitionFinished(), 3)
+        XCTAssertEqual(tx.transitionFinished(), 3, "回弹目标接续为在途")
+        XCTAssertEqual(tx.inFlightColumns, 3, "接续的回弹过渡立即进入在途（单飞链）")
+        _ = tx.transitionFinished()
         XCTAssertFalse(tx.isBusy)
     }
 
