@@ -76,7 +76,8 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
 
         func context(bounds: CGSize = CGSize(width: 390, height: 844),
                      isIndexComplete: Bool = true,
-                     anchorInData: Bool = true) -> LibraryPositionRestoreContext {
+                     anchorInData: Bool = true,
+                     currentQueryKey: (() -> String)? = nil) -> LibraryPositionRestoreContext {
             LibraryPositionRestoreContext(
                 bounds: bounds,
                 isIndexComplete: isIndexComplete,
@@ -103,7 +104,8 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
                     }
                     return appliedOffsets.last ?? 0
                 },
-                layoutNow: { }
+                layoutNow: { },
+                currentQueryKey: currentQueryKey
             )
         }
     }
@@ -144,6 +146,25 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         coordinator.saveNow(reason: "intermediate", snapshot: snapshot("new-position"))
         XCTAssertEqual(store.load(queryKey: "scope.all")?.anchorAssetID, "saved-anchor",
                        "I1：恢复完成前任何保存都必须被拒绝")
+    }
+
+    /// CI 五轮 .ips 实锤（NSInternalInconsistencyException，scrollToItem 越界 section 30/12）：
+    /// 筛选切换（queryKey 变化）后，机器仍持旧投影锚点对新数据集 attempt → 越界滚动崩溃。
+    /// §5.6：queryKey 已变 → 立即取消恢复；新投影由下一次 apply completion 重 begin。
+    func testAttemptRestoreCancelsWhenQueryKeyChanged() {
+        let store = makeStore()
+        saveAnchor(store, anchor: "stale-anchor", queryKey: "scope.all")
+        let recorder = ContextRecorder()
+        let coordinator = LibraryPositionCoordinator(store: store)
+        coordinator.beginRestore(queryKey: "scope.all")
+        XCTAssertTrue(coordinator.isRestoreInFlight)
+        // 实时 queryKey 已切到年份投影（与 begin 时的 scope.all 不同）
+        coordinator.attemptRestore(context: recorder.context(currentQueryKey: { "scope.year2023" }))
+        XCTAssertFalse(coordinator.isRestoreInFlight,
+                       "queryKey 已切换必须立即取消恢复（旧投影锚点对新投影无效）")
+        XCTAssertEqual(coordinator.phase, .idle, "取消后机器回 idle，等新投影重 begin")
+        XCTAssertTrue(recorder.scrollCalls.isEmpty, "取消前不得执行任何滚动（越界崩溃根因）")
+        XCTAssertTrue(recorder.appliedOffsets.isEmpty, "取消前不得写入任何几何")
     }
 
     func testSaveAllowedAfterSettle() {

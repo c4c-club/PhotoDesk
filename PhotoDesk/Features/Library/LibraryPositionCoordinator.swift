@@ -49,6 +49,8 @@ struct LibraryPositionRestoreContext {
     var firstBatchWindowStart: Int = 0
     /// head 回填代际（连续两轮不变 + 索引完成 → applying）
     var headInsertGeneration: Int = 0
+    /// 当前 queryKey 实时读取（筛选/年份切换即变；nil = 调用方不参与该守卫，测试用）
+    var currentQueryKey: (() -> String)? = nil
 }
 
 @MainActor
