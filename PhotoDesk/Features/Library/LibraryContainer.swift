@@ -44,13 +44,6 @@ struct LibraryRootView: View {
     var body: some View {
         Group {
             switch viewModel.viewState {
-            #if DEBUG
-            case .notDetermined where UITestHooks.enabled("-uiTestingSkipIntro"):
-                // CI 八轮实锤：intro 按钮在首启转场中瞬时消失，XCUITest 元素级点按必竞态——
-                // 测试钩子直接走 requestAccess（等价 intro 按钮语义；系统弹窗由 monitor 自动授予）
-                DSEmptyState(kind: .loading)
-                    .onAppear { Task { await viewModel.requestAccess() } }
-            #endif
             case .notDetermined:
                 PermissionIntroView(mode: .intro) {
                     Task { await viewModel.requestAccess() }

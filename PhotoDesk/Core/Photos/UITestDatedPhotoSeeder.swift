@@ -34,7 +34,11 @@ enum UITestDatedPhotoSeeder {
         if !defaults.bool(forKey: didSeedKey) {
             await seedBasePhotos(defaults: defaults)
         }
-        await seedDeepLibraryIfNeeded(defaults: defaults)
+        // CI 九轮实锤：深种子同步阻塞 .ready 使首启 App 长时间不可交互（intro 点按竞态、
+        // onAppear 自动授权的权限弹窗挂主屏）——改为 fire-and-forget：授权后网格立现，
+        // 深库后台补种（didDeepSeedKey 幂等；进程被杀由下次启动续补）。
+        // deep 测试用 Library-DebugSummary 的 all= 轮询等待就绪。
+        Task { await seedDeepLibraryIfNeeded(defaults: defaults) }
     }
 
     /// 基础种子：2020–2026 每月 2 张 + 3 张极端比例（docs/19 §5）。
