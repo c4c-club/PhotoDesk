@@ -91,6 +91,8 @@ enum UITestDatedPhotoSeeder {
                 ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) code=\(nsError.code) " +
                                 "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
                                 "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
+                // CI 八轮实锤：瞬时连发 14 轮全 -1（Photos daemon 忙），轮间喘息后再试
+                do { try await Task.sleep(nanoseconds: 400_000_000) } catch { }
             }
             rounds += 1
         }
