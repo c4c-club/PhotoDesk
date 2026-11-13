@@ -86,13 +86,14 @@ final class PositionRestoreUITests: XCTestCase {
     }
 
     /// 月份跳转启动（等价月份面板点卡片）；面板渲染验证轮 + 跳转轮分离（绿10 同款规避）
-    private func launchWithMonthJump(_ app: XCUIApplication, sectionID: String, headerText: String) {
+    private func launchWithMonthJump(_ app: XCUIApplication, sectionID: String, headerText: String,
+                                     readyTimeout: TimeInterval = 30) {
         app.launchArguments += ["-uiTestingOpenMonthJump"]
-        _ = launchToGrid(app)
+        _ = launchToGrid(app, readyTimeout: readyTimeout)
         app.terminate()
         app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         app.launchArguments += ["-uiTestingMonthJump", sectionID]
-        _ = launchToGrid(app)
+        _ = launchToGrid(app, readyTimeout: readyTimeout)
         XCTAssertTrue(waitTopHeaderContains(app, headerText, timeout: 15),
                       "月份跳转后顶部应为 \(headerText)（顶部：\(topHeaderText(app))）\n\(hierarchy(app))")
         Thread.sleep(forTimeInterval: 1.2)
@@ -411,13 +412,17 @@ final class PositionRestoreUITests: XCTestCase {
         XCTAssertEqual(fakeSettled, 0, "0 次假 settled（docs/28 §5.4：verify 必须真实 attributes）")
     }
 
-    /// 锚点 globalIndex > 500 + 跨月窗口：深库（519 张）月跳最旧月 2002-01（锚点 idx≈518）→
+    /// 锚点 globalIndex > 500 + 跨月窗口：深库（519 张）月跳 2002-06（锚点 idx≈507）→
     /// 滚一屏存锚点 → 冷启动走 v6 waitingForHead 逐批 head 补偿 → 同 assetID ±2pt、
     /// by=asset、不得降级 fallback（§5.5 步骤 4 补偿正确性的端到端实证）。
+    /// 目标月不选最旧月 2002-01：最末 section 之下内容不足一屏，maxOffsetY 钳制下
+    /// 永不可钉顶（CI 五轮实证：复核 5 次重校正后 give-up）；2002-06 之下有
+    /// 2002-01…05 共 10 张 + 5 个月头 ≈ 890pt > 视口 763pt，可钉顶断言成立。
+    /// readyTimeout 90：深种子 11 批 40/张阻塞 .ready（CI 五轮 150/批全败教训）。
     func testDeepAnchorRestoresThroughHeadBackfill() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingSeedDeepLibrary"]
-        launchWithMonthJump(app, sectionID: "2002-01", headerText: "2002年1月")
+        launchWithMonthJump(app, sectionID: "2002-06", headerText: "2002年6月", readyTimeout: 90)
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         let collection = app.collectionViews.firstMatch

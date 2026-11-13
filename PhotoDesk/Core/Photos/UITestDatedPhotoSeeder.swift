@@ -7,7 +7,9 @@
 // 正确性约束（绿5 实测 167 请求只落 23 张）：多个 creation 请求不得共享同一个临时文件——
 // Photos 对同一 URL 的并发拷贝会互相失败；逐文件落盘（96×96 小图 ≈1s 总量）后单批事务稳定。
 // 深库种子（-uiTestingSeedDeepLibrary，M16 T03）：2002–2019 每月 2 张共 432 张，
-// 让「锚点 globalIndex > 500」的位置恢复测试有真实深锚点（总量 519）；分批事务 150/批 + 幂等补种。
+// 让「锚点 globalIndex > 500」的位置恢复测试有真实深锚点（总量 519）；分批事务 40/批 + 幂等补种。
+// CI 五轮实锤：150/批 大事务整体报 PHPhotosErrorDomain -1（部分成功后整批回滚），12 轮全败；
+// 基础种子 40/批多年绿轮，深库沿用同规格（432/40=11 批 ≤ 14 轮上限）。
 // 只使用系统 Photos API、零网络、零第三方依赖；不带 -uiTestingSeedDatedPhotos 时完全惰性不写库。
 
 #if DEBUG
@@ -63,21 +65,21 @@ enum UITestDatedPhotoSeeder {
         }
     }
 
-    /// 深库种子：分批幂等补种（每批 150、至多 12 轮），完成后落 didDeepSeedKey（只执行一次）。
+    /// 深库种子：分批幂等补种（每批 40、至多 14 轮），完成后落 didDeepSeedKey（只执行一次）。
     @MainActor
     private static func seedDeepLibraryIfNeeded(defaults: UserDefaults) async {
         guard UITestHooks.enabled("-uiTestingSeedDeepLibrary"),
               !defaults.bool(forKey: didDeepSeedKey) else { return }
         let wanted = Set(makeDeepDates())
         var rounds = 0
-        while rounds < 12 {
+        while rounds < 14 {
             let missing = missingSeedDates(wanted: wanted)
             if missing.isEmpty {
                 defaults.set(true, forKey: didDeepSeedKey)
                 ViewerTrace.log("deep-seed done wanted=\(wanted.count) rounds=\(rounds)")
                 return
             }
-            let chunk = Array(missing.prefix(150))
+            let chunk = Array(missing.prefix(40))
             do {
                 try await performChanges(dates: chunk)
             } catch {
@@ -85,7 +87,7 @@ enum UITestDatedPhotoSeeder {
             }
             rounds += 1
         }
-        ViewerTrace.log("deep-seed incomplete after 12 rounds")
+        ViewerTrace.log("deep-seed incomplete after 14 rounds")
     }
 
     /// 幂等去重：枚举现有图片资产的 creationDate（元数据级查询，几百张毫秒级），
