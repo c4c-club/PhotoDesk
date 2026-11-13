@@ -1,6 +1,6 @@
 ﻿# M16 根因取证（fresh audit，仅当前源码证据）
 
-> 生成：audit-m16.ps1（generatedAt 2026-11-13T01:04:45+08:00）。证据全部来自本轮对当前源码的扫描（同轮 audit.json 可交叉核对）；不引用 docs/25/27 的任何历史结论。
+> 生成：audit-m16.ps1（generatedAt 2026-11-14T04:36:50+08:00）。证据全部来自本轮对当前源码的扫描（同轮 audit.json 可交叉核对）；不引用 docs/25/27 的任何历史结论。
 
 ## P0-1A 查看器缩放（入口 A）
 
@@ -11,8 +11,8 @@
 | 文件:行 | 代码 |
 |---|---|
 | PhotoDesk/Features/Viewer/ViewerViewController.swift:791 | guard gesture.state == .began else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:227 | gesture.state == .ended, |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:245 | guard gesture.state == .ended else { return } |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:230 | gesture.state == .ended, |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:248 | guard gesture.state == .ended else { return } |
 
 **触发条件**：动画/收敛窗口（Phase = animating 或 settling）内再次捏合——handlePinch 的 .began 命中 guard !isAnimating 直接置 gesture.state = .cancelled（被取消手势的后续触摸事件仍会到达）；随后 UIKit 送达的 .changed/.ended 被 guard phase == .pinching 丢弃，状态机停在非 idle 窗口；动画块内 imageView.transform/center 持续改写，与 cell 复用/翻页 zoomController.reset 竞态。
 
@@ -35,42 +35,47 @@
 
 | 文件:行 | 代码 |
 |---|---|
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:2 | // v5 = 视觉锚点 assetID + 视口内视觉 y + queryKey + schemaVersion=5；v1–v4 字段保留解码兼容。 |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:30 | let schemaVersion: Int |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:42 | schemaVersion: Int = PositionAnchorPolicy.schemaVersion, |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:54 | self.schemaVersion = schemaVersion |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:62 | case contentHeight, viewportHeight, savedAt, schemaVersion |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:81 | schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1 |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:97 | try c.encode(schemaVersion, forKey: .schemaVersion) |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:112 | schemaVersion: schemaVersion) |
-| PhotoDesk/Core/Support/PositionFileStore.swift:3 | // { "schemaVersion": 5, "entries": { "<queryKey>": LibraryPosition } }。 |
-| PhotoDesk/Core/Support/PositionFileStore.swift:12 | static let schemaVersion = 5 |
-| PhotoDesk/Core/Support/PositionFileStore.swift:16 | var schemaVersion: Int = PositionFileStore.schemaVersion |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:2 | // 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV5 门禁：canSave 只在 settled |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:5 | // → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。 |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:26 | let isIndexComplete: Bool |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:71 | // MARK: - 保存（I1/I2：canSave 只在 settled） |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:120 | /// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。 |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:162 | indexComplete: context.isIndexComplete, |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:169 | indexComplete: context.isIndexComplete, |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:247 | case .settled: |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:2 | // idle → restoring → applying → verifying → settled / fallback； |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:4 | // canSave 只在 settled（I1：恢复完成前任何保存都不得写盘）；verify 失败只重试一次，两次仍失败 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:5 | // → settled（调用方 DEBUG 记 verify-failed，不阻塞 UI）。纯 Foundation，零 UIKit。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:14 | case settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:27 | /// 恢复流程是否进行中（此期间所有保存必须拒绝；settled/fallback 兜底应用也在此列）。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:30 | case .idle, .settled: |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:37 | /// v5 门禁：只有恢复彻底完成（settled）才允许写盘。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:38 | public var canSave: Bool { phase == .settled } |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:40 | /// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 restoring。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:44 | phase = hasAnchor ? .restoring : .settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:84 | /// 校验结果：ok → settled；失败累计 attempts，第 1 次失败回 applying 重试（只调 offset）， |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:85 | /// 第 2 次仍失败 → settled（优雅放弃，不阻塞 UI）。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:90 | phase = .settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:94 | phase = attempts >= 2 ? .settled : .applying |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:102 | phase = .settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:107 | /// 用户主动接管（月份跳转/回到顶部/手动滚动取消）：立即 settled，此后允许保存。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:111 | phase = .settled |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:12 | /// schemaVersion 1–5 兼容解码；新数据一律走 LibraryPositionV6。 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:25 | let schemaVersion: Int |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:30 | case offsetRatio, contentHeight, viewportHeight, savedAt, schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:48 | schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:64 | try c.encode(schemaVersion, forKey: .schemaVersion) |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:78 | schemaVersion: Int, |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:91 | self.schemaVersion = schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:116 | let schemaVersion: Int |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:130 | schemaVersion: Int = 6) { |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:143 | self.schemaVersion = schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:149 | schemaVersion == 6 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:175 | schemaVersion: schemaVersion) |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:194 | schemaVersion: 6) |
+| PhotoDesk/Core/Support/PositionFileStore.swift:3 | // { "schemaVersion": 6, "entries": { "<queryKey>": LibraryPositionV6 } }。 |
+| PhotoDesk/Core/Support/PositionFileStore.swift:13 | static let schemaVersion = 6 |
+| PhotoDesk/Core/Support/PositionFileStore.swift:17 | var schemaVersion: Int = PositionFileStore.schemaVersion |
+| PhotoDesk/Core/Support/PositionFileStore.swift:23 | var schemaVersion: Int = 5 |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:2 | // 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV6 门禁：canSave 只在 settled |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:5 | // 补偿）→ applying（一次）→ verifying（真实 attributes；nil = 失败，v5 默认通过是假 settled 根因） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:6 | // → settled；verify 失败重试一次，两次 → fallback（锚点 cell 顶部 / section / ratio，绝不假 settled）。 |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:30 | let isIndexComplete: Bool |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:84 | // MARK: - 保存（I1/I2：canSave 只在 settled；§5.6 触发矩阵） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:147 | /// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。 |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:207 | case .idle, .settled: |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:217 | let phase = machine.anchorMissing(indexComplete: context.isIndexComplete) |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:226 | indexComplete: context.isIndexComplete) |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:244 | if context.isIndexComplete { |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:303 | case .settled: |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:322 | // v6：两次 verify 仍失败 → 锚点 cell 顶部兜底（不假 settled） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:330 | /// 不在 → sectionID+index → ratio 逐级退化。全部直接收敛 settled，不再进 verify。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:2 | // idle → loading → waitingForWindow → waitingForHead → applying → verifying → settled； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:5 | // ② waitingForHead 结束条件 = isIndexComplete && headInsertGeneration 连续两轮不变； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:6 | // ③ applying 只允许一次，重复调用直接返回；④ verify 两次失败 → fallback（绝不假 settled）； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:8 | // canSave 仍只在 settled。纯 Foundation，零 UIKit。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:19 | case settled |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:42 | case .idle, .settled: |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:49 | /// v6 门禁：只有恢复彻底完成（settled）才允许写盘。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:50 | public var canSave: Bool { phase == .settled } |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:52 | /// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 loading（等首批窗口）。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:59 | phase = hasAnchor ? .loading : .settled |
+| … |（其余 6 条见 audit.json） |
 
 **触发条件**：三条链各自带概率——① 保存链：makePositionSnapshot 在无完整可见 cell（恢复遮罩期间、索引未完成、刚切查询）返回 nil，保存静默丢失；② 首批窗口链：fetchFirstBatch 以锚点为中心截断（windowStart = anchorIndex − batchSize/2），尾部/头部索引由后台补齐，恢复时 isIndexComplete 未就绪则 anchorMinY 走估算 layoutAttributes，scrollToItem 落点偏移；③ 回填链：头部回填 allItems = freshHead + allItems 前插后，contentOffset 依赖 enforceHeadInsertAnchor 逐布局 pass 收敛，收敛期间任何一次保存（scroll 防抖、dragging/decelerating/rest/resignActive）都会把脏 offset 写盘，下次冷启动按脏值恢复。
 

@@ -1,6 +1,6 @@
 ﻿# M16 测试缺口与红测试计划（fresh audit）
 
-> 生成：audit-m16.ps1（generatedAt 2026-11-13T01:04:45+08:00）。基线 = 864af86。计划类名以本文件为准；后续任务卡执行时若与类名有出入，以任务卡为准并在 docs/31 验收记录对齐。
+> 生成：audit-m16.ps1（generatedAt 2026-11-14T04:36:50+08:00）。基线 = 864af86。计划类名以本文件为准；后续任务卡执行时若与类名有出入，以任务卡为准并在 docs/31 验收记录对齐。
 
 ## P0 缺口（红测试先行）
 
@@ -42,7 +42,7 @@
 
 | 层 | 类数 | test 函数数 |
 |---|---:|---:|
-| PhotoDeskCore/Tests | 29 | 366 |
-| PhotoDeskTests | 30 | 230 |
-| PhotoDeskUITests | 9 | 70 |
+| PhotoDeskCore/Tests | 31 | 405 |
+| PhotoDeskTests | 32 | 250 |
+| PhotoDeskUITests | 10 | 77 |
 

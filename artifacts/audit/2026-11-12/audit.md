@@ -1,12 +1,12 @@
-﻿# PhotoDesk M16 基线审查（generatedAt 2026-11-13T01:04:45+08:00）
+﻿# PhotoDesk M16 基线审查（generatedAt 2026-11-14T04:36:50+08:00）
 
 ## 1. 基线
 
 | 项 | 值 |
 |---|---|
 | 分支 | fix/m16-20261112 |
-| HEAD | a803265cd2bad50fef1f93466531f3f2f97a2f53 |
-| 最后提交 | a803265cd2bad50fef1f93466531f3f2f97a2f53 2026-11-13 00:46:37 +0800 docs(m16): 回填 T00 进度与证据路径 |
+| HEAD | f7267c27971310dfdea446be5484dcf83d5725e4 |
+| 最后提交 | f7267c27971310dfdea446be5484dcf83d5725e4 2026-11-14 02:55:33 +0800 test(position): deep 测试轮询 all≥500 等深库就绪 |
 | 扫描器 | rg |
 
 ### 版本
@@ -22,11 +22,11 @@
 
 | 目录 | Swift 文件 | 行数 |
 |---|---:|---:|
-| PhotoDesk | 110 | 19241 |
-| PhotoDeskCore/Sources | 31 | 2757 |
-| PhotoDeskCore/Tests | 27 | 3563 |
-| PhotoDeskTests | 30 | 4636 |
-| PhotoDeskUITests | 9 | 2889 |
+| PhotoDesk | 111 | 19782 |
+| PhotoDeskCore/Sources | 33 | 2990 |
+| PhotoDeskCore/Tests | 29 | 3913 |
+| PhotoDeskTests | 32 | 5054 |
+| PhotoDeskUITests | 10 | 3251 |
 
 ## 2. 红线（命中 6 · 违规 0）
 
@@ -96,8 +96,8 @@
 | 文件:行 | 代码 |
 |---|---|
 | PhotoDesk/Features/Viewer/ViewerViewController.swift:791 | guard gesture.state == .began else { return } |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:227 | gesture.state == .ended, |
-| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:245 | guard gesture.state == .ended else { return } |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:230 | gesture.state == .ended, |
+| PhotoDesk/Features/Viewer/ZoomInteractionController.swift:248 | guard gesture.state == .ended else { return } |
 
 ### 3.animatingGuard（0 处）
 
@@ -168,52 +168,58 @@
 | 文件:行 | 代码 |
 |---|---|
 
-### 5.storeSchema（11 处）
+### 5.storeSchema（17 处）
 
 | 文件:行 | 代码 |
 |---|---|
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:2 | // v5 = 视觉锚点 assetID + 视口内视觉 y + queryKey + schemaVersion=5；v1–v4 字段保留解码兼容。 |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:30 | let schemaVersion: Int |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:42 | schemaVersion: Int = PositionAnchorPolicy.schemaVersion, |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:54 | self.schemaVersion = schemaVersion |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:62 | case contentHeight, viewportHeight, savedAt, schemaVersion |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:81 | schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1 |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:97 | try c.encode(schemaVersion, forKey: .schemaVersion) |
-| PhotoDesk/Core/Support/LibraryPositionStore.swift:112 | schemaVersion: schemaVersion) |
-| PhotoDesk/Core/Support/PositionFileStore.swift:3 | // { "schemaVersion": 5, "entries": { "<queryKey>": LibraryPosition } }。 |
-| PhotoDesk/Core/Support/PositionFileStore.swift:12 | static let schemaVersion = 5 |
-| PhotoDesk/Core/Support/PositionFileStore.swift:16 | var schemaVersion: Int = PositionFileStore.schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:12 | /// schemaVersion 1–5 兼容解码；新数据一律走 LibraryPositionV6。 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:25 | let schemaVersion: Int |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:30 | case offsetRatio, contentHeight, viewportHeight, savedAt, schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:48 | schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:64 | try c.encode(schemaVersion, forKey: .schemaVersion) |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:78 | schemaVersion: Int, |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:91 | self.schemaVersion = schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:116 | let schemaVersion: Int |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:130 | schemaVersion: Int = 6) { |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:143 | self.schemaVersion = schemaVersion |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:149 | schemaVersion == 6 |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:175 | schemaVersion: schemaVersion) |
+| PhotoDesk/Core/Support/LibraryPositionStore.swift:194 | schemaVersion: 6) |
+| PhotoDesk/Core/Support/PositionFileStore.swift:3 | // { "schemaVersion": 6, "entries": { "<queryKey>": LibraryPositionV6 } }。 |
+| PhotoDesk/Core/Support/PositionFileStore.swift:13 | static let schemaVersion = 6 |
+| PhotoDesk/Core/Support/PositionFileStore.swift:17 | var schemaVersion: Int = PositionFileStore.schemaVersion |
+| PhotoDesk/Core/Support/PositionFileStore.swift:23 | var schemaVersion: Int = 5 |
 
 ### 5.restoreEntries（0 处）
 
 | 文件:行 | 代码 |
 |---|---|
 
-### 5.settledGate（25 处）
+### 5.settledGate（29 处）
 
 | 文件:行 | 代码 |
 |---|---|
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:2 | // 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV5 门禁：canSave 只在 settled |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:5 | // → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。 |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:26 | let isIndexComplete: Bool |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:71 | // MARK: - 保存（I1/I2：canSave 只在 settled） |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:120 | /// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。 |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:162 | indexComplete: context.isIndexComplete, |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:169 | indexComplete: context.isIndexComplete, |
-| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:247 | case .settled: |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:2 | // idle → restoring → applying → verifying → settled / fallback； |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:4 | // canSave 只在 settled（I1：恢复完成前任何保存都不得写盘）；verify 失败只重试一次，两次仍失败 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:5 | // → settled（调用方 DEBUG 记 verify-failed，不阻塞 UI）。纯 Foundation，零 UIKit。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:14 | case settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:27 | /// 恢复流程是否进行中（此期间所有保存必须拒绝；settled/fallback 兜底应用也在此列）。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:30 | case .idle, .settled: |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:37 | /// v5 门禁：只有恢复彻底完成（settled）才允许写盘。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:38 | public var canSave: Bool { phase == .settled } |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:40 | /// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 restoring。 |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:44 | phase = hasAnchor ? .restoring : .settled |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:84 | /// 校验结果：ok → settled；失败累计 attempts，第 1 次失败回 applying 重试（只调 offset）， |
-| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:85 | /// 第 2 次仍失败 → settled（优雅放弃，不阻塞 UI）。 |
-| … |（其余 5 条见 audit.json） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:2 | // 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV6 门禁：canSave 只在 settled |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:5 | // 补偿）→ applying（一次）→ verifying（真实 attributes；nil = 失败，v5 默认通过是假 settled 根因） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:6 | // → settled；verify 失败重试一次，两次 → fallback（锚点 cell 顶部 / section / ratio，绝不假 settled）。 |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:30 | let isIndexComplete: Bool |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:84 | // MARK: - 保存（I1/I2：canSave 只在 settled；§5.6 触发矩阵） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:147 | /// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。 |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:207 | case .idle, .settled: |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:217 | let phase = machine.anchorMissing(indexComplete: context.isIndexComplete) |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:226 | indexComplete: context.isIndexComplete) |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:244 | if context.isIndexComplete { |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:303 | case .settled: |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:322 | // v6：两次 verify 仍失败 → 锚点 cell 顶部兜底（不假 settled） |
+| PhotoDesk/Features/Library/LibraryPositionCoordinator.swift:330 | /// 不在 → sectionID+index → ratio 逐级退化。全部直接收敛 settled，不再进 verify。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:2 | // idle → loading → waitingForWindow → waitingForHead → applying → verifying → settled； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:5 | // ② waitingForHead 结束条件 = isIndexComplete && headInsertGeneration 连续两轮不变； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:6 | // ③ applying 只允许一次，重复调用直接返回；④ verify 两次失败 → fallback（绝不假 settled）； |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:8 | // canSave 仍只在 settled。纯 Foundation，零 UIKit。 |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:19 | case settled |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:42 | case .idle, .settled: |
+| PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift:49 | /// v6 门禁：只有恢复彻底完成（settled）才允许写盘。 |
+| … |（其余 9 条见 audit.json） |
 
 ### 5.verifyNilBranch（0 处）
 
@@ -290,7 +296,7 @@
 | Cleanup | 2 | (none) | 0 | 4 | 4 |
 | Editor | 4 | (none) | 0 | 4 | 2 |
 | Export | 4 | (none) | 0 | 7 | 0 |
-| Library | 12 | Library-Category, Library-Filter, Library-JumpBanner, Library-MonthJump, Library-RestoreMask, Library-Search, Library-Select, Library-Tools …共12 | 7 | 7 | 25 |
+| Library | 13 | Library-Category, Library-Filter, Library-JumpBanner, Library-MonthJump, Library-RestoreMask, Library-Search, Library-Select, Library-Tools …共12 | 7 | 9 | 25 |
 | Metadata | 1 | (none) | 0 | 0 | 0 |
 | Onboarding | 2 | (none) | 0 | 0 | 4 |
 | Search | 2 | (none) | 0 | 0 | 3 |
@@ -303,9 +309,9 @@
 
 | 层 | 类数 | test 函数数 |
 |---|---:|---:|
-| PhotoDeskCore/Tests | 29 | 366 |
-| PhotoDeskTests | 30 | 230 |
-| PhotoDeskUITests | 9 | 70 |
+| PhotoDeskCore/Tests | 31 | 405 |
+| PhotoDeskTests | 32 | 250 |
+| PhotoDeskUITests | 10 | 77 |
 
 ## 9. 输出文件
 

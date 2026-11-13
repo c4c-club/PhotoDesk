@@ -1,9 +1,9 @@
 ﻿{
-    "generatedAt":  "2026-11-13T01:04:45+08:00",
+    "generatedAt":  "2026-11-14T04:36:50+08:00",
     "repo":  "C:\\Users\\RuiZh\\Desktop\\photo_manager",
     "branch":  "fix/m16-20261112",
-    "head":  "a803265cd2bad50fef1f93466531f3f2f97a2f53",
-    "lastCommit":  "a803265cd2bad50fef1f93466531f3f2f97a2f53 2026-11-13 00:46:37 +0800 docs(m16): 回填 T00 进度与证据路径",
+    "head":  "f7267c27971310dfdea446be5484dcf83d5725e4",
+    "lastCommit":  "f7267c27971310dfdea446be5484dcf83d5725e4 2026-11-14 02:55:33 +0800 test(position): deep 测试轮询 all≥500 等深库就绪",
     "scanner":  "rg",
     "versions":  {
                      "MARKETING_VERSION":  "1.5.0",
@@ -13,24 +13,24 @@
                  },
     "scale":  {
                   "PhotoDesk":  {
-                                    "files":  110,
-                                    "lines":  19241
+                                    "files":  111,
+                                    "lines":  19782
                                 },
                   "PhotoDeskCore/Sources":  {
-                                                "files":  31,
-                                                "lines":  2757
+                                                "files":  33,
+                                                "lines":  2990
                                             },
                   "PhotoDeskCore/Tests":  {
-                                              "files":  27,
-                                              "lines":  3563
+                                              "files":  29,
+                                              "lines":  3913
                                           },
                   "PhotoDeskTests":  {
-                                         "files":  30,
-                                         "lines":  4636
+                                         "files":  32,
+                                         "lines":  5054
                                      },
                   "PhotoDeskUITests":  {
-                                           "files":  9,
-                                           "lines":  2889
+                                           "files":  10,
+                                           "lines":  3251
                                        }
               },
     "fileInventory":  [
@@ -56,7 +56,7 @@
                           },
                           {
                               "file":  "PhotoDesk/App/UITestHooks.swift",
-                              "lines":  38
+                              "lines":  39
                           },
                           {
                               "file":  "PhotoDesk/Core/Analysis/FingerprintService.swift",
@@ -148,7 +148,7 @@
                           },
                           {
                               "file":  "PhotoDesk/Core/Photos/UITestDatedPhotoSeeder.swift",
-                              "lines":  145
+                              "lines":  212
                           },
                           {
                               "file":  "PhotoDesk/Core/Routing/Router.swift",
@@ -176,7 +176,7 @@
                           },
                           {
                               "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                              "lines":  194
+                              "lines":  281
                           },
                           {
                               "file":  "PhotoDesk/Core/Support/LibraryQuery.swift",
@@ -192,7 +192,7 @@
                           },
                           {
                               "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
-                              "lines":  142
+                              "lines":  186
                           },
                           {
                               "file":  "PhotoDesk/Core/Support/ReviewSessionController.swift",
@@ -279,6 +279,10 @@
                               "lines":  128
                           },
                           {
+                              "file":  "PhotoDesk/Features/Library/GridPinchTransaction.swift",
+                              "lines":  78
+                          },
+                          {
                               "file":  "PhotoDesk/Features/Library/LibraryCategoryMenuBuilder.swift",
                               "lines":  67
                           },
@@ -292,15 +296,15 @@
                           },
                           {
                               "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                              "lines":  274
+                              "lines":  377
                           },
                           {
                               "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                              "lines":  1908
+                              "lines":  2035
                           },
                           {
                               "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
-                              "lines":  627
+                              "lines":  658
                           },
                           {
                               "file":  "PhotoDesk/Features/Library/LocationFilterView.swift",
@@ -440,7 +444,7 @@
                           },
                           {
                               "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                              "lines":  352
+                              "lines":  355
                           },
                           {
                               "file":  "PhotoDesk/UI/Bridges/ActivityViewWrapper.swift",
@@ -519,6 +523,10 @@
                               "lines":  63
                           },
                           {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/HeadInsertCompensation.swift",
+                              "lines":  54
+                          },
+                          {
                               "file":  "PhotoDeskCore/Sources/PhotoDeskCore/MarqueeSelectionPolicy.swift",
                               "lines":  140
                           },
@@ -531,6 +539,10 @@
                               "lines":  8
                           },
                           {
+                              "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PinchColumnReducer.swift",
+                              "lines":  131
+                          },
+                          {
                               "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionAnchorSelector.swift",
                               "lines":  52
                           },
@@ -540,7 +552,7 @@
                           },
                           {
                               "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                              "lines":  115
+                              "lines":  163
                           },
                           {
                               "file":  "PhotoDeskCore/Sources/PhotoDeskCore/ReplacementPlanner.swift",
@@ -631,12 +643,20 @@
                               "lines":  147
                           },
                           {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/HeadInsertCompensationTests.swift",
+                              "lines":  90
+                          },
+                          {
                               "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/MarqueeSelectionPolicyTests.swift",
                               "lines":  239
                           },
                           {
                               "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/MonthNavigatorTests.swift",
                               "lines":  130
+                          },
+                          {
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PinchColumnReducerTests.swift",
+                              "lines":  223
                           },
                           {
                               "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionAnchorPolicyV5Tests.swift",
@@ -651,8 +671,8 @@
                               "lines":  191
                           },
                           {
-                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionRestoreMachineV5Tests.swift",
-                              "lines":  141
+                              "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/PositionRestoreMachineV6Tests.swift",
+                              "lines":  178
                           },
                           {
                               "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/ReplacementPlannerTests.swift",
@@ -744,19 +764,23 @@
                           },
                           {
                               "file":  "PhotoDeskTests/LibraryDataTests.swift",
-                              "lines":  163
+                              "lines":  179
+                          },
+                          {
+                              "file":  "PhotoDeskTests/LibraryGridPinchTests.swift",
+                              "lines":  142
                           },
                           {
                               "file":  "PhotoDeskTests/LibraryPositionCoordinatorTests.swift",
-                              "lines":  355
+                              "lines":  380
                           },
                           {
                               "file":  "PhotoDeskTests/LibraryPositionRestoreTests.swift",
-                              "lines":  401
+                              "lines":  399
                           },
                           {
                               "file":  "PhotoDeskTests/LibraryPositionStoreTests.swift",
-                              "lines":  179
+                              "lines":  182
                           },
                           {
                               "file":  "PhotoDeskTests/LibraryViewModelTests.swift",
@@ -776,7 +800,11 @@
                           },
                           {
                               "file":  "PhotoDeskTests/PositionFileStoreTests.swift",
-                              "lines":  148
+                              "lines":  147
+                          },
+                          {
+                              "file":  "PhotoDeskTests/PositionStoreV6Tests.swift",
+                              "lines":  235
                           },
                           {
                               "file":  "PhotoDeskTests/ReviewSessionControllerTests.swift",
@@ -835,6 +863,10 @@
                               "lines":  80
                           },
                           {
+                              "file":  "PhotoDeskUITests/GridPinchUITests.swift",
+                              "lines":  214
+                          },
+                          {
                               "file":  "PhotoDeskUITests/LaunchUITests.swift",
                               "lines":  36
                           },
@@ -852,7 +884,7 @@
                           },
                           {
                               "file":  "PhotoDeskUITests/PositionRestoreUITests.swift",
-                              "lines":  355
+                              "lines":  503
                           },
                           {
                               "file":  "PhotoDeskUITests/StabilityUITests.swift",
@@ -982,12 +1014,12 @@
                                              },
                                              {
                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  227,
+                                                 "line":  230,
                                                  "text":  "gesture.state == .ended,"
                                              },
                                              {
                                                  "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                 "line":  245,
+                                                 "line":  248,
                                                  "text":  "guard gesture.state == .ended else { return }"
                                              }
                                          ],
@@ -1037,58 +1069,88 @@
                  "storeSchema":  [
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  2,
-                                         "text":  "// v5 = 视觉锚点 assetID + 视口内视觉 y + queryKey + schemaVersion=5；v1–v4 字段保留解码兼容。"
+                                         "line":  12,
+                                         "text":  "/// schemaVersion 1–5 兼容解码；新数据一律走 LibraryPositionV6。"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  30,
+                                         "line":  25,
                                          "text":  "let schemaVersion: Int"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  42,
-                                         "text":  "schemaVersion: Int = PositionAnchorPolicy.schemaVersion,"
+                                         "line":  30,
+                                         "text":  "case offsetRatio, contentHeight, viewportHeight, savedAt, schemaVersion"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  54,
-                                         "text":  "self.schemaVersion = schemaVersion"
+                                         "line":  48,
+                                         "text":  "schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  62,
-                                         "text":  "case contentHeight, viewportHeight, savedAt, schemaVersion"
-                                     },
-                                     {
-                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  81,
-                                         "text":  "schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1"
-                                     },
-                                     {
-                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  97,
+                                         "line":  64,
                                          "text":  "try c.encode(schemaVersion, forKey: .schemaVersion)"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
-                                         "line":  112,
+                                         "line":  78,
+                                         "text":  "schemaVersion: Int,"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  91,
+                                         "text":  "self.schemaVersion = schemaVersion"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  116,
+                                         "text":  "let schemaVersion: Int"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  130,
+                                         "text":  "schemaVersion: Int = 6) {"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  143,
+                                         "text":  "self.schemaVersion = schemaVersion"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  149,
+                                         "text":  "schemaVersion == 6"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  175,
                                          "text":  "schemaVersion: schemaVersion)"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/LibraryPositionStore.swift",
+                                         "line":  194,
+                                         "text":  "schemaVersion: 6)"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
                                          "line":  3,
-                                         "text":  "// { \"schemaVersion\": 5, \"entries\": { \"\u003cqueryKey\u003e\": LibraryPosition } }。"
+                                         "text":  "// { \"schemaVersion\": 6, \"entries\": { \"\u003cqueryKey\u003e\": LibraryPositionV6 } }。"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
-                                         "line":  12,
-                                         "text":  "static let schemaVersion = 5"
+                                         "line":  13,
+                                         "text":  "static let schemaVersion = 6"
                                      },
                                      {
                                          "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
-                                         "line":  16,
+                                         "line":  17,
                                          "text":  "var schemaVersion: Int = PositionFileStore.schemaVersion"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Core/Support/PositionFileStore.swift",
+                                         "line":  23,
+                                         "text":  "var schemaVersion: Int = 5"
                                      }
                                  ],
                  "restoreEntries":  {
@@ -1098,126 +1160,146 @@
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
                                          "line":  2,
-                                         "text":  "// 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV5 门禁：canSave 只在 settled"
+                                         "text":  "// 唯一 save/restore 入口。保存由 Core PositionRestoreMachineV6 门禁：canSave 只在 settled"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
                                          "line":  5,
-                                         "text":  "// → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。"
+                                         "text":  "// 补偿）→ applying（一次）→ verifying（真实 attributes；nil = 失败，v5 默认通过是假 settled 根因）"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  26,
+                                         "line":  6,
+                                         "text":  "// → settled；verify 失败重试一次，两次 → fallback（锚点 cell 顶部 / section / ratio，绝不假 settled）。"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  30,
                                          "text":  "let isIndexComplete: Bool"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  71,
-                                         "text":  "// MARK: - 保存（I1/I2：canSave 只在 settled）"
+                                         "line":  84,
+                                         "text":  "// MARK: - 保存（I1/I2：canSave 只在 settled；§5.6 触发矩阵）"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  120,
+                                         "line":  147,
                                          "text":  "/// 只 load 一次锚点；queryKey 变化才重置状态机。无锚点直接 settled（不遮罩、可保存）。"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  162,
-                                         "text":  "indexComplete: context.isIndexComplete,"
+                                         "line":  207,
+                                         "text":  "case .idle, .settled:"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  169,
-                                         "text":  "indexComplete: context.isIndexComplete,"
+                                         "line":  217,
+                                         "text":  "let phase = machine.anchorMissing(indexComplete: context.isIndexComplete)"
                                      },
                                      {
                                          "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                         "line":  247,
+                                         "line":  226,
+                                         "text":  "indexComplete: context.isIndexComplete)"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  244,
+                                         "text":  "if context.isIndexComplete {"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  303,
                                          "text":  "case .settled:"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  322,
+                                         "text":  "// v6：两次 verify 仍失败 → 锚点 cell 顶部兜底（不假 settled）"
+                                     },
+                                     {
+                                         "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                         "line":  330,
+                                         "text":  "/// 不在 → sectionID+index → ratio 逐级退化。全部直接收敛 settled，不再进 verify。"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
                                          "line":  2,
-                                         "text":  "// idle → restoring → applying → verifying → settled / fallback；"
-                                     },
-                                     {
-                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  4,
-                                         "text":  "// canSave 只在 settled（I1：恢复完成前任何保存都不得写盘）；verify 失败只重试一次，两次仍失败"
+                                         "text":  "// idle → loading → waitingForWindow → waitingForHead → applying → verifying → settled；"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
                                          "line":  5,
-                                         "text":  "// → settled（调用方 DEBUG 记 verify-failed，不阻塞 UI）。纯 Foundation，零 UIKit。"
+                                         "text":  "// ② waitingForHead 结束条件 = isIndexComplete \u0026\u0026 headInsertGeneration 连续两轮不变；"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  14,
+                                         "line":  6,
+                                         "text":  "// ③ applying 只允许一次，重复调用直接返回；④ verify 两次失败 → fallback（绝不假 settled）；"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  8,
+                                         "text":  "// canSave 仍只在 settled。纯 Foundation，零 UIKit。"
+                                     },
+                                     {
+                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
+                                         "line":  19,
                                          "text":  "case settled"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  27,
-                                         "text":  "/// 恢复流程是否进行中（此期间所有保存必须拒绝；settled/fallback 兜底应用也在此列）。"
-                                     },
-                                     {
-                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  30,
+                                         "line":  42,
                                          "text":  "case .idle, .settled:"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  37,
-                                         "text":  "/// v5 门禁：只有恢复彻底完成（settled）才允许写盘。"
+                                         "line":  49,
+                                         "text":  "/// v6 门禁：只有恢复彻底完成（settled）才允许写盘。"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  38,
+                                         "line":  50,
                                          "text":  "public var canSave: Bool { phase == .settled }"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  40,
-                                         "text":  "/// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 restoring。"
+                                         "line":  52,
+                                         "text":  "/// 开始恢复：无锚点直接 settled(top)（允许保存）；有锚点进入 loading（等首批窗口）。"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  44,
-                                         "text":  "phase = hasAnchor ? .restoring : .settled"
+                                         "line":  59,
+                                         "text":  "phase = hasAnchor ? .loading : .settled"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  84,
+                                         "line":  132,
                                          "text":  "/// 校验结果：ok → settled；失败累计 attempts，第 1 次失败回 applying 重试（只调 offset），"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  85,
-                                         "text":  "/// 第 2 次仍失败 → settled（优雅放弃，不阻塞 UI）。"
+                                         "line":  133,
+                                         "text":  "/// 第 2 次仍失败 → fallback（v6 硬化：绝不假 settled，docs/28 §5.5 步骤 6）。"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  90,
+                                         "line":  138,
                                          "text":  "phase = .settled"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  94,
-                                         "text":  "phase = attempts \u003e= 2 ? .settled : .applying"
-                                     },
-                                     {
-                                         "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  102,
+                                         "line":  150,
                                          "text":  "phase = .settled"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  107,
+                                         "line":  155,
                                          "text":  "/// 用户主动接管（月份跳转/回到顶部/手动滚动取消）：立即 settled，此后允许保存。"
                                      },
                                      {
                                          "file":  "PhotoDeskCore/Sources/PhotoDeskCore/PositionRestoreMachine.swift",
-                                         "line":  111,
+                                         "line":  159,
                                          "text":  "phase = .settled"
                                      }
                                  ],
@@ -1298,10 +1380,10 @@
                   },
                   {
                       "page":  "Library",
-                      "files":  12,
+                      "files":  13,
                       "entries":  "Library-Category, Library-Filter, Library-JumpBanner, Library-MonthJump, Library-RestoreMask, Library-Search, Library-Select, Library-Tools …共12",
                       "emptyState":  7,
-                      "errorState":  7,
+                      "errorState":  9,
                       "buttons":  25
                   },
                   {
@@ -1610,6 +1692,7 @@
                         {
                             "page":  "Library",
                             "files":  [
+                                          "PhotoDesk/Features/Library/GridPinchTransaction.swift",
                                           "PhotoDesk/Features/Library/LibraryCategoryMenuBuilder.swift",
                                           "PhotoDesk/Features/Library/LibraryContainer.swift",
                                           "PhotoDesk/Features/Library/LibraryFilterSheet.swift",
@@ -1660,7 +1743,7 @@
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                  "line":  489,
+                                                  "line":  554,
                                                   "text":  "viewModel.requestManageLimitedPhotos()   // .limited：接上 DSEmptyState.limited 对应的系统选择器"
                                               },
                                               {
@@ -1670,7 +1753,7 @@
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
-                                                  "line":  285,
+                                                  "line":  294,
                                                   "text":  "// 空库也要监听变更：第一张照片加入时增量同步并切出空态"
                                               }
                                           ],
@@ -1678,31 +1761,41 @@
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
                                                   "line":  5,
-                                                  "text":  "// → 钳制 → setContentOffset → verify ±0.5pt → 失败只调 offset 重试一次 → 两次仍失败 settled（不阻塞 UI）。"
+                                                  "text":  "// 补偿）→ applying（一次）→ verifying（真实 attributes；nil = 失败，v5 默认通过是假 settled 根因）"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                                  "line":  179,
-                                                  "text":  "return   // restoring：等待索引/布局，不失败（I4）"
+                                                  "line":  6,
+                                                  "text":  "// → settled；verify 失败重试一次，两次 → fallback（锚点 cell 顶部 / section / ratio，绝不假 settled）。"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
-                                                  "line":  232,
-                                                  "text":  "/// §5.5 校验：offset 误差 ≤ 0.5pt 且锚点视觉 y 误差 ≤ 0.5pt；失败只调 offset 重试一次。"
+                                                  "line":  37,
+                                                  "text":  "/// 锚点 cell 当前布局 minY（content 坐标；未物化/未布局返回 nil——verify 视为失败）"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                                  "line":  285,
+                                                  "text":  "/// attributes 缺失 = 失败（v6 硬化：不得默认通过）。"
+                                              },
+                                              {
+                                                  "file":  "PhotoDesk/Features/Library/LibraryPositionCoordinator.swift",
+                                                  "line":  322,
+                                                  "text":  "// v6：两次 verify 仍失败 → 锚点 cell 顶部兜底（不假 settled）"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                  "line":  1385,
+                                                  "line":  1511,
                                                   "text":  "// §5.4：遮罩最长显示 1.5s；消失不代表恢复失败，恢复可在后台继续"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
-                                                  "line":  145,
+                                                  "line":  154,
                                                   "text":  "/// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）"
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Library/LibraryViewModel.swift",
-                                                  "line":  233,
+                                                  "line":  242,
                                                   "text":  "failed \u003e 0 ? \"已完成 \\(succeeded) 项；\\(failed) 项失败\" : \"已完成 \\(succeeded) 项\""
                                               },
                                               {
@@ -1739,52 +1832,52 @@
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  413,
+                                                   "line":  478,
                                                    "text":  "let tools = UIBarButtonItem(image: UIImage(systemName: \"wrench.and.screwdriver\","
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  424,
+                                                   "line":  489,
                                                    "text":  "let session = UIBarButtonItem(image: UIImage(systemName: \"tray\"),"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  429,
+                                                   "line":  494,
                                                    "text":  "let select = UIBarButtonItem(image: UIImage(systemName: \"checkmark.circle\","
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  434,
+                                                   "line":  499,
                                                    "text":  "let search = UIBarButtonItem(image: UIImage(systemName: \"magnifyingglass\","
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  439,
+                                                   "line":  504,
                                                    "text":  "let month = UIBarButtonItem(image: UIImage(systemName: \"calendar\","
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  444,
+                                                   "line":  509,
                                                    "text":  "let filter = UIBarButtonItem(image: UIImage(systemName: \"line.3.horizontal.decrease.circle\","
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  710,
+                                                   "line":  775,
                                                    "text":  "button.setImage(UIImage(systemName: symbol), for: .normal)"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  1841,
+                                                   "line":  1968,
                                                    "text":  "button.setImage(UIImage(systemName: \"ellipsis.circle\"), for: .normal)"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  1888,
+                                                   "line":  2015,
                                                    "text":  "UIAction(title: \"选择本月全部\", image: UIImage(systemName: \"checkmark.circle\")) { [weak self] _ in"
                                                },
                                                {
                                                    "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
-                                                   "line":  1891,
+                                                   "line":  2018,
                                                    "text":  "UIAction(title: \"跳到本月\", image: UIImage(systemName: \"arrow.down.right\")) { [weak self] _ in"
                                                },
                                                {
@@ -2229,7 +2322,7 @@
                                               },
                                               {
                                                   "file":  "PhotoDesk/Features/Viewer/ZoomInteractionController.swift",
-                                                  "line":  337,
+                                                  "line":  340,
                                                   "text":  "/// 放大平移时要求外层 pan 失败（cell pan 优先）。"
                                               }
                                           ],
@@ -2293,11 +2386,11 @@
                         }
                     ],
     "tests":  {
-                  "coreClasses":  29,
-                  "coreTests":  366,
-                  "iosClasses":  30,
-                  "iosTests":  230,
-                  "uiClasses":  9,
-                  "uiTests":  70
+                  "coreClasses":  31,
+                  "coreTests":  405,
+                  "iosClasses":  32,
+                  "iosTests":  250,
+                  "uiClasses":  10,
+                  "uiTests":  77
               }
 }

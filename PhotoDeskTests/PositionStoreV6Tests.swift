@@ -177,7 +177,7 @@ final class PositionStoreV6Tests: XCTestCase {
                      "v6 文件已存在 → 迁移只执行一次，不得把旧 v5 再灌进来")
     }
 
-    func testLegacyUserDefaultsMigrationProducesV6Entry() {
+    func testLegacyUserDefaultsMigrationProducesV6Entry() throws {
         let v4 = LibraryPosition(anchorAssetID: "legacy-4",
                                  anchorVisualY: 66,
                                  anchorContentOffsetY: 1_300,
@@ -189,7 +189,7 @@ final class PositionStoreV6Tests: XCTestCase {
                                  viewportHeight: 844,
                                  savedAt: Date(timeIntervalSince1970: 600_000_000),
                                  schemaVersion: 4)
-        let encoded = try! JSONEncoder().encode(v4)
+        let encoded = try JSONEncoder().encode(v4)
         defaults.set(encoded, forKey: "library.lastPosition.v2.q1")
         let appStore = LibraryPositionStore(fileStore: PositionFileStore(directory: dir),
                                             defaults: defaults)
