@@ -293,4 +293,104 @@ final class MarqueeSelectionUITests: XCTestCase {
         assertAlive(app, "跨 section 框选后")
         snap(app, "m15-marquee-cross-section")
     }
+
+    // MARK: - M17 T01 红测试（docs/31 §2.3 G13/G16、§2.1 G1；验收锚点，先红后绿）
+
+    /// 不带 -uiTestingSelectMode 的普通网格（清位置 + 年份筛选清空，首屏几何确定）
+    private func launchPlainGrid(_ app: XCUIApplication) -> XCUIElement {
+        installPermissionMonitor()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
+                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
+        app.launch()
+        let intro = app.buttons["允许访问照片"]
+        if intro.waitForExistence(timeout: 10) {
+            intro.tap()
+            app.tap()
+        }
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        return collection
+    }
+
+    /// Library-DebugSummary → off=（contentOffset.y 整数 pt；DEBUG 横幅，didScroll 逐次刷新）
+    private static func parseDoubleField(_ label: String, _ key: String) -> Double? {
+        let escaped = NSRegularExpression.escapedPattern(for: key)
+        let pattern = escaped + "=(-?[0-9]+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
+              match.numberOfRanges >= 2,
+              let range = Range(match.range(at: 1), in: label) else { return nil }
+        return Double(label[range])
+    }
+
+    private func readOffsetY(_ app: XCUIApplication) -> Double? {
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        guard banner.exists else { return nil }
+        let raw = ((banner.value as? String) ?? banner.label)
+        return Self.parseDoubleField(raw, "off")
+    }
+
+    /// 轮询直到取证横幅出现并给出 off（DEBUG 横幅常驻，正常秒回）
+    private func waitForOffsetY(_ app: XCUIApplication, timeout: TimeInterval = 10) -> Double? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let value = readOffsetY(app) { return value }
+            usleep(100_000)
+        }
+        return readOffsetY(app)
+    }
+
+    /// 轮询 off 增量达标（滚动是连续事件，松手后还有减速余量）
+    private func waitForOffsetIncrease(_ app: XCUIApplication, from baseline: Double,
+                                       atLeast threshold: Double, timeout: TimeInterval = 5) -> Double {
+        let deadline = Date().addingTimeInterval(timeout)
+        var value = readOffsetY(app) ?? baseline
+        while Date() < deadline {
+            value = readOffsetY(app) ?? baseline
+            if value - baseline >= threshold { return value }
+            usleep(100_000)
+        }
+        return value
+    }
+
+    /// 红锚点（docs/31 G13/G16）：不点工具栏、不走 -uiTestingSelectMode，直接长按首格
+    /// 必须进入多选且该格入选（Selection-Count == 1）。当前全仓无长按识别器
+    /// （audit-m17 A04/A14 FAIL）→ 必失败；长按进入接线后转绿。
+    func testLongPressEntersSelection() throws {
+        let app = XCUIApplication()
+        let collection = launchPlainGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.press(forDuration: 0.4)
+        let count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
+        XCTAssertEqual(count, 1,
+                       "长按首格必须进入多选且该格入选（docs/31 G13：无长按路径，count=\(count)）")
+        snap(app, "m17-longpress-enter")
+    }
+
+    /// 红锚点（docs/31 G1）：-uiTestingSelectMode 进多选后单指上滑必须正常滚动
+    /// （contentOffset.y 增量 > 200pt）。当前多选把 pan 改成双指专属
+    /// （LibraryViewController.swift:802/:832，audit-m17 A05 FAIL）→ 单指滑动被框选
+    /// 接管、offset 不变 → 必失败；单指滚动规则接线后转绿。
+    func testSingleFingerScrollInSelectionMode() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        guard let startY = waitForOffsetY(app) else {
+            return XCTFail("Library-DebugSummary 必须暴露 off=\n\(hierarchy(app))")
+        }
+        // 终点 dy 0.25（≈211pt 距顶）避开 60pt 边缘自动滚动区（SlideSelectConfig.edgeBuffer）
+        collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo: collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        let endY = waitForOffsetIncrease(app, from: startY, atLeast: 200, timeout: 5)
+        XCTContext.runActivity(named: "单指滚动取证") { activity in
+            let attachment = XCTAttachment(string:
+                "startOff=\(startY) endOff=\(endY) delta=\(endY - startY)")
+            attachment.name = "m17-single-finger-scroll"
+            activity.add(attachment)
+        }
+        XCTAssertGreaterThan(endY - startY, 200,
+                             "多选模式单指上滑必须滚动（docs/31 G1：双指规则劫持单指）start=\(startY) end=\(endY)")
+        snap(app, "m17-selectmode-single-finger-scroll")
+    }
 }
