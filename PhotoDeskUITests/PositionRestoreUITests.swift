@@ -31,7 +31,7 @@ final class PositionRestoreUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication, readyTimeout: TimeInterval = 30) -> XCUIElement {
         installPermissionMonitor()
-        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingSeedDeepLibrary"]
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingSeedDeepLibrary", "-uiTestingSkipIntro"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -442,8 +442,13 @@ final class PositionRestoreUITests: XCTestCase {
             return XCTFail("深锚点冷启动必须恢复 raw=\(rawSummary(app))")
         }
         XCTAssertEqual(after.anchor, before.anchor, "深锚点（globalIndex>500）恢复 assetID 必须一致")
-        XCTAssertLessThanOrEqual(abs(after.off - before.off), 2.0,
-                                 "深锚点冷启动像素差必须 ≤2pt（before=\(before.off) after=\(after.off)）")
+        // CI 八轮实证：种子进行中库几何在变（32 张前插使锚点 minY 平移 +3560pt），
+        // 绝对 offset 必然平移——视觉锚定口径（锚点视觉位 ±2pt）才是恢复语义的正确断言。
+        guard let bv = before.visualY, let av = after.visualY else {
+            return XCTFail("深锚点快照必须含 visualY（before=\(fmt(before.visualY)) after=\(fmt(after.visualY))）")
+        }
+        XCTAssertLessThanOrEqual(abs(av - bv), 2.0,
+                                 "深锚点恢复必须视觉锚定 ±2pt（before.visualY=\(bv) after.visualY=\(av)）")
         let raw = rawSummary(app)
         XCTAssertTrue(raw.contains("by=asset"), "v6 主路径必须 asset 精确落地 raw=\(raw)")
         XCTAssertFalse(raw.contains("fallback"), "head 回填补偿后不得降级 fallback raw=\(raw)")
