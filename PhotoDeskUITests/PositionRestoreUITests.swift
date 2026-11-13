@@ -31,11 +31,12 @@ final class PositionRestoreUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication, readyTimeout: TimeInterval = 30) -> XCUIElement {
         installPermissionMonitor()
-        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingSeedDeepLibrary"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
-            intro.tap()
+            // 坐标点按不重解析查询：intro 按钮在首启转场中可能瞬时消失（CI 七轮 no-matches 实锤）
+            intro.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             app.tap()
         }
         let collection = app.collectionViews.firstMatch
@@ -179,7 +180,10 @@ final class PositionRestoreUITests: XCTestCase {
     func testColdLaunchRestoresSamePixelPosition10Times() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
-        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月")
+        // 全套件首次启动在此发生：基础种子 + 深库种子（launchToGrid 统一携带 deep flag）
+        // 一并完成（约 13 批 40/张，阻塞 .ready）——CI 七轮实锤：深种子在 15+ 次启动后
+        // 才执行必报 PHPhotosErrorDomain -1 全败，首启动与基础种子同窗口执行则成功。
+        launchWithMonthJump(app, sectionID: "2024-05", headerText: "2024年5月", readyTimeout: 90)
         // 后续冷启动验证纯位置恢复，摘掉跳转 flag（同一实例参数跨轮累积）
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }

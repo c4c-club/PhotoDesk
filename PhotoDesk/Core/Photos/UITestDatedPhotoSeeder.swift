@@ -8,8 +8,9 @@
 // Photos 对同一 URL 的并发拷贝会互相失败；逐文件落盘（96×96 小图 ≈1s 总量）后单批事务稳定。
 // 深库种子（-uiTestingSeedDeepLibrary，M16 T03）：2002–2019 每月 2 张共 432 张，
 // 让「锚点 globalIndex > 500」的位置恢复测试有真实深锚点（总量 519）；分批事务 40/批 + 幂等补种。
-// CI 五轮实锤：150/批 大事务整体报 PHPhotosErrorDomain -1（部分成功后整批回滚），12 轮全败；
-// 基础种子 40/批多年绿轮，深库沿用同规格（432/40=11 批 ≤ 14 轮上限）。
+// CI 五/七轮实锤：150/批 大事务与「15+ 次启动后才执行」都会整体报 PHPhotosErrorDomain -1；
+// 唯一稳定窗口 = 套件首次启动（与基础种子同窗口，UI 测试 launchToGrid 统一携带 deep flag，
+// didDeepSeedKey 幂等只执行一次）。40/批 × 14 轮上限。
 // 只使用系统 Photos API、零网络、零第三方依赖；不带 -uiTestingSeedDatedPhotos 时完全惰性不写库。
 
 #if DEBUG
@@ -57,7 +58,10 @@ enum UITestDatedPhotoSeeder {
                 }
                 return
             } catch {
-                ViewerTrace.log("seed failed count=\(missing.count) attempt=\(attempt) error=\(error)")
+                let nsError = error as NSError
+                ViewerTrace.log("seed failed count=\(missing.count) attempt=\(attempt) code=\(nsError.code) " +
+                                "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
+                                "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
                 if attempt == 1 {
                     do { try await Task.sleep(nanoseconds: 500_000_000) } catch { /* 睡眠失败直接重试 */ }
                 }
@@ -83,7 +87,10 @@ enum UITestDatedPhotoSeeder {
             do {
                 try await performChanges(dates: chunk)
             } catch {
-                ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) error=\(error)")
+                let nsError = error as NSError
+                ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) code=\(nsError.code) " +
+                                "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
+                                "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
             }
             rounds += 1
         }
