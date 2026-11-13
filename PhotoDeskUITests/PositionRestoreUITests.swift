@@ -31,7 +31,7 @@ final class PositionRestoreUITests: XCTestCase {
     @discardableResult
     private func launchToGrid(_ app: XCUIApplication, readyTimeout: TimeInterval = 30) -> XCUIElement {
         installPermissionMonitor()
-        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingSeedDeepLibrary", "-uiTestingSkipIntro"]
+        app.launchArguments += ["-uiTestingKeepChrome", "-uiTestingFilterYear", "0", "-uiTestingSeedDeepLibrary"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -360,6 +360,17 @@ final class PositionRestoreUITests: XCTestCase {
 
     // MARK: - M16 T03（docs/28 §5.7）：v6 恢复硬化与深锚点
 
+    /// 深库种子异步化后：轮询 Library-DebugSummary 的 all= 计数直到 ≥ 目标（深照片全部入库）。
+    private func waitTotalCountAtLeast(_ app: XCUIApplication, target: Int, timeout: TimeInterval = 150) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let raw = rawSummary(app)
+            if let all = Self.parseDoubleField(raw, "all"), all >= Double(target) { return true }
+            usleep(1_000_000)
+        }
+        return false
+    }
+
     /// 恢复诊断解析：by=策略 / verify ok=true|false / rej=恢复期被拒保存请求数。
     private func parseRestoreDiagnostics(_ label: String) -> (by: String, verifyOK: Bool?) {
         let by = Self.parseStringField(label, "by") ?? ""
@@ -426,7 +437,11 @@ final class PositionRestoreUITests: XCTestCase {
     func testDeepAnchorRestoresThroughHeadBackfill() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingSeedDeepLibrary"]
-        launchWithMonthJump(app, sectionID: "2002-06", headerText: "2002年6月", readyTimeout: 90)
+        // 首启：授权后网格立现（深种子后台补种），先等 all≥500 再跳月（深锚点才可用）
+        _ = launchToGrid(app, readyTimeout: 90)
+        XCTAssertTrue(waitTotalCountAtLeast(app, target: 500, timeout: 150),
+                      "深库种子必须就绪（all≥500） raw=\(rawSummary(app))")
+        launchWithMonthJump(app, sectionID: "2002-06", headerText: "2002年6月")
         app.launchArguments.removeAll { $0 == "-uiTestingMonthJump" }
         app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
         let collection = app.collectionViews.firstMatch
