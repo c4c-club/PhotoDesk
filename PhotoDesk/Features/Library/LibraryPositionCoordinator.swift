@@ -185,7 +185,7 @@ final class LibraryPositionCoordinator {
         // §5.6 / CI 五轮 .ips 实锤：queryKey 已切换（筛选/年份）时机器持的是旧投影锚点，
         // 对新投影无效——立即取消，不得对新数据集写几何（越界滚动崩溃根因）；
         // 新投影由下一次 apply completion 以新 key 重 begin。
-        if let current = context.currentQueryKey(), current != lastRestoredQueryKey {
+        if let current = context.currentQueryKey?(), current != lastRestoredQueryKey {
             cancelRestore(reason: "queryChanged")
             return
         }
