@@ -162,7 +162,7 @@ final class LibraryPositionCoordinatorTests: XCTestCase {
         coordinator.attemptRestore(context: recorder.context(currentQueryKey: { "scope.year2023" }))
         XCTAssertFalse(coordinator.isRestoreInFlight,
                        "queryKey 已切换必须立即取消恢复（旧投影锚点对新投影无效）")
-        XCTAssertEqual(coordinator.phase, .idle, "取消后机器回 idle，等新投影重 begin")
+        XCTAssertEqual(coordinator.phase, .settled, "v6 取消语义 = settled（门禁解除、等新投影重 begin）")
         XCTAssertTrue(recorder.scrollCalls.isEmpty, "取消前不得执行任何滚动（越界崩溃根因）")
         XCTAssertTrue(recorder.appliedOffsets.isEmpty, "取消前不得写入任何几何")
     }

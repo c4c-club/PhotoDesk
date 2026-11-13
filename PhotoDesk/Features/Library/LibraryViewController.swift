@@ -73,6 +73,10 @@ final class LibraryViewController: UIViewController {
         let visualY: CGFloat
     }
     private var pendingHeadInsertAnchor: HeadInsertAnchor?
+    /// 滚动权威代际：恢复/月跳/拖动/取消任一生命周期事件即失效——
+    /// apply 登记的锚点保持任务安装时必须代际一致（CI 七轮实锤：apply#1 期间登记、
+    /// 月跳完成后安装，陈旧 visualY 以 dy=-10356 把视口拽回顶部）。
+    private var scrollAuthorityGeneration = 0
     /// 减速静止补存（拖动结束且将减速时安排 +1.5s 重新抓快照保存）
     private var restSaveWorkItem: DispatchWorkItem?
     /// 网格点击 → 打开全屏浏览器（ViewerContext：当前筛选结果 + 被点条目，docs/09 D01）
@@ -1149,6 +1153,7 @@ final class LibraryViewController: UIViewController {
         // 进行中的恢复锚点属旧投影，必须立即取消（防越界滚动崩溃与跨 scope 锚点泄漏）。
         if pending.queryKey != currentSnapshotQueryKey, positionCoordinator.isRestoreInFlight {
             positionCoordinator.cancelRestore(reason: "scopeChange")
+            scrollAuthorityGeneration += 1   // scope 切换 → 旧登记失效
         }
         isApplyingSnapshot = true
         indexBar.isUserInteractionEnabled = false   // S03：apply 期间禁用索引条（防越界 scrollToItem）
@@ -1163,14 +1168,14 @@ final class LibraryViewController: UIViewController {
         // 及其视觉 y，viewDidLayoutSubviews 每个布局 pass 按该 asset 的真实 minY 重校
         // contentOffset，直到视觉 y 复位（≤0.5pt）或用户接管。仅同 query 的纯前插启用
         //（筛选变化是不同投影，不算漂移）。
-        var headInsertAnchor: (assetID: String, visualY: CGFloat)?
+        var headInsertAnchor: (assetID: String, visualY: CGFloat, gen: Int)?
         if pending.queryKey == currentSnapshotQueryKey,
            !collectionView.isTracking, !collectionView.isDecelerating,
            // M15 实锤：恢复进行中打的位置快照是恢复前落点，登记下去会在恢复 settle 后
            // 把已精确恢复的位置拖走（冷启动 −520pt 实锤）——恢复期间绝不登记补偿。
            !isRestoringPosition, !positionCoordinator.isRestoreInFlight,
            let snapshot = makePositionSnapshot() {
-            headInsertAnchor = (snapshot.anchorAssetID, CGFloat(snapshot.anchorVisualY))
+            headInsertAnchor = (snapshot.anchorAssetID, CGFloat(snapshot.anchorVisualY), scrollAuthorityGeneration)
         }
 
         var diffable = NSDiffableDataSourceSnapshot<MonthSection, PhotoItem>()
@@ -1190,8 +1195,9 @@ final class LibraryViewController: UIViewController {
             self.isApplyingSnapshot = false
             self.indexBar.isUserInteractionEnabled = true
             self.syncIndexBar()
-            // v4 前插补偿：登记锚点保持任务（enforceHeadInsertAnchor 在布局 pass 里收敛）
-            if let keep = headInsertAnchor {
+            // v4 前插补偿：登记锚点保持任务（enforceHeadInsertAnchor 在布局 pass 里收敛）；
+            // 安装前必须代际一致——apply 期间若发生恢复/月跳/拖动，登记已陈旧（CI 七轮 dy=-10356 实锤）
+            if let keep = headInsertAnchor, keep.gen == scrollAuthorityGeneration {
                 pendingHeadInsertAnchor = HeadInsertAnchor(assetID: keep.assetID,
                                                            visualY: keep.visualY)
             }
@@ -1234,6 +1240,7 @@ final class LibraryViewController: UIViewController {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.isViewLoaded else { return }
                 // 位置记忆恢复 v4（docs/22 §4.4.4）：beginRestore 只 load 一次；attempt 可重入
+                self.scrollAuthorityGeneration += 1   // 恢复开始 → 旧登记全部失效
                 self.positionCoordinator.beginRestore(queryKey: pending.queryKey)
                 self.attemptPositionRestore()
                 #if DEBUG
@@ -1449,6 +1456,7 @@ final class LibraryViewController: UIViewController {
             // 恢复是权威定位：恢复 settle 时丢弃恢复期间登记（或登记后未消费）的前插补偿，
             // 否则旧 visualY 会在恢复后把精确恢复的位置拖走（M15 冷启动 −520pt 实锤）。
             pendingHeadInsertAnchor = nil
+            scrollAuthorityGeneration += 1
             viewModel.debugRestoreNote = "restore=ok by=\(positionCoordinator.lastStrategy.rawValue)" +
                 (positionCoordinator.lastRestoreDiagnostics.isEmpty ? "" : " | \(positionCoordinator.lastRestoreDiagnostics)") +
                 " rej=\(positionCoordinator.rejectedSaveRequests)"
@@ -1521,6 +1529,8 @@ final class LibraryViewController: UIViewController {
     func scrollToSection(_ index: Int) -> Bool {
         // 用户主动月份跳转优先于跨进程恢复：取消恢复并收起遮罩，避免异步 restore 覆盖跳转落点。
         positionCoordinator.cancelRestore(reason: "monthJump")
+        scrollAuthorityGeneration += 1   // 月跳接管 → 旧登记失效
+        pendingHeadInsertAnchor = nil
         // S03 修复：校验 collectionView 实际 section/item 数（apply 未提交时 currentSections 已是新值）
         guard index < currentSections.count,
               index < collectionView.numberOfSections,
@@ -1844,6 +1854,8 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         // §5.5 用户接管：恢复期间用户拖动 → 立即取消恢复（settled），恢复让位于用户滚动
         positionCoordinator.cancelRestore(reason: "userDrag")
+        scrollAuthorityGeneration += 1   // 用户接管 → 旧登记失效
+        pendingHeadInsertAnchor = nil
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
