@@ -1,0 +1,1 @@
+startOff=-44.0 endOff=-44.0 delta=0.0
