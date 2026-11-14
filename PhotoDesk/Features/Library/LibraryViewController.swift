@@ -45,9 +45,8 @@ final class LibraryViewController: UIViewController {
     /// 底部 Toast 约束（R04：约束引用切换——safeArea / selectionBar 顶部二选一）
     private var toastSafeAreaConstraint: NSLayoutConstraint?
     private var toastAboveSelectionConstraint: NSLayoutConstraint?
-    /// M13 P3：单指滑选编排器（Core 纯策略 + UIKit 映射；长按二维框选整条移除）。
-    private var slideSelectController: SlideSelectGestureController?
-    private var slideSelectPan: UIPanGestureRecognizer?
+    /// M17 T05：多选手势编排器（SelectionGestureMachine 全权判定 + UIKit 映射，docs/32 §2.3）。
+    private var selectionController: LibrarySelectionController?
     /// M17 T04：框选命中测试器（真实 layoutAttributes；缓存随快照/列数/布局 pass 失效）
     private var gridHitTester: GridHitTester?
     // MARK: - 快照缓存
@@ -752,13 +751,17 @@ final class LibraryViewController: UIViewController {
             actionStack.heightAnchor.constraint(equalTo: actionRow.frameLayoutGuide.heightAnchor),
         ])
 
-        // M13 P3 ①：单指滑选 pan；delegate 两方法在 UIGestureRecognizerDelegate 扩展内实现。
-        let controller = SlideSelectGestureController(collectionView: collectionView)
-        controller.attachDelegate(self)
+        // M17 T05：多选手势编排（长按/框选 pan/TouchDownObserver 由控制器组装）。
+        let controller = LibrarySelectionController(collectionView: collectionView)
         controller.isSelectionMode = { [weak self] in self?.isSelecting ?? false }
         controller.selectedIDsProvider = { [weak self] in self?.selectionState.selectedSet ?? [] }
-        controller.itemIDProvider = { [weak self] indexPath in
-            self?.dataSource.itemIdentifier(for: indexPath)?.id
+        controller.hitIDAtContentPoint = { [weak self] point in
+            guard let self,
+                  let indexPath = self.collectionView.indexPathForItem(at: point) else { return nil }
+            return self.dataSource.itemIdentifier(for: indexPath)?.id
+        }
+        controller.onSelectionEntered = { [weak self] anchorID in
+            self?.enterSelectionMode(selecting: anchorID)
         }
         controller.applyTargetIDs = { [weak self] ids in
             self?.applySlideSelection(ids: ids)
@@ -775,8 +778,15 @@ final class LibraryViewController: UIViewController {
             }
             return ids
         }
-        slideSelectController = controller
-        slideSelectPan = controller.pan
+        controller.onMarqueeRectChanged = { [weak self] rect in
+            // T06 在此挂框选覆盖层；T05 仅记录（DEBUG 取证）
+            #if DEBUG
+            if let rect {
+                LibrarySelectionDebugState.lastMarqueeRect = rect
+            }
+            #endif
+        }
+        selectionController = controller
     }
 
     private func barButton(symbol: String, label: String, identifier: String,
@@ -808,8 +818,7 @@ final class LibraryViewController: UIViewController {
         selectionState.begin(scope: scope, initial: id)
         selectionBar.isHidden = false
         indexBar.isHidden = true
-        // 单指选择 / 双指滚动（docs/22 §5.5）：选择模式下 collectionView pan 至少两指。
-        collectionView.panGestureRecognizer.minimumNumberOfTouches = 2
+        // M17 T05：不再修改 minimumNumberOfTouches（永远 1）——纵向单指滚动由方向锁让位（docs/32 §2.3）
         reloadSelectionBadges()
         updateSelectionCount()
         updateToastPosition()   // docs/13 S05：Toast 上移到 selectionBar 之上
@@ -822,7 +831,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "在照片上拖动可框选；从已选照片起拖可取消；双指滚动", duration: 2)
+        showTopBanner(text: "长按照片可框选；从已选照片起拖可取消；单指滑动仍可滚动", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -839,7 +848,6 @@ final class LibraryViewController: UIViewController {
         selectionScopeTitle = currentSections[section].title
         selectionBar.isHidden = false
         indexBar.isHidden = true
-        collectionView.panGestureRecognizer.minimumNumberOfTouches = 2
         if selectAll {
             selectionState.selectAll()
         }
@@ -854,13 +862,12 @@ final class LibraryViewController: UIViewController {
     }
 
     private func exitSelectionMode() {
-        slideSelectController?.finishSlideSelection()
+        selectionController?.finishSelection()
         isSelecting = false
         selectionState = SelectionState()
         selectionScopeTitle = nil
         selectionBar.isHidden = true
         indexBar.isHidden = false
-        collectionView.panGestureRecognizer.minimumNumberOfTouches = 1
         reloadSelectionBadges()
         updateSelectionCount()
         refreshDebugScrollNote()
@@ -1299,7 +1306,8 @@ final class LibraryViewController: UIViewController {
             " anchor=" + anchor + " visualY=" + String(visualY) +
             " sec=" + sections + " cells=" + cells +
             " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches) +
-            " slide=" + SlideSelectGestureController.lastSessionDiagnostics
+            " slide=ticks=" + String(selectionController?.debugAutoScrollTicks ?? -1) +
+            " state=" + (selectionController?.debugStateName ?? "none")
         #endif
     }
 
@@ -1794,8 +1802,8 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         // docs/13 §3.7：一律经 dataSource 取 item（apply 窗口内数组下标不可信）
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
         if isSelecting {
-            // M13：拖选进行中的 touch-up 穿透不得再触发点选切换（allowsSelection 已关，双保险）
-            if slideSelectController?.isDragSelecting == true { return }
+            // M17 T05：长按/框选已消费本次触摸（armed 起 + 抬手 0.3s 内）→ touch-up 不重复 toggle
+            if selectionController?.isConsumingTouch == true { return }
             toggleSelection(id: item.id)
             return
         }
@@ -1804,6 +1812,8 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        // M17 T05：滚动接管 → 机器 scrollStarted（pressing/armed 让位，选中集保留）
+        selectionController?.handleScrollStarted()
         // §5.5 用户接管：恢复期间用户拖动 → 立即取消恢复（settled），恢复让位于用户滚动
         positionCoordinator.cancelRestore(reason: "userDrag")
         scrollAuthorityGeneration += 1   // 用户接管 → 旧登记失效
@@ -1880,25 +1890,38 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 }
 
-// MARK: - 手势代理（捏合与滚动同时识别，docs/09 D14）
+// MARK: - 手势代理（M17 T05，docs/32 §2.3：长按/框选 pan 只在命中 cell 时起步；
+// 多选 pan ↔ 滚动 pan ↔ 长按允许同时识别，方向归属由机器判定 + .failed；捏合保持排他）
 
 extension LibraryViewController: UIGestureRecognizerDelegate {
-    /// docs/22 §5.5：单指 pan 只在起点位于 cell 上时让滑选手势开始；双指交给 collectionView。
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        // docs/28 §4.4.3.3：列数过渡期间冻结滑选（批量编辑入口）
-        if isGridLayoutTransition, gestureRecognizer === slideSelectPan { return false }
-        guard gestureRecognizer === slideSelectPan else { return true }
-        guard isSelecting else { return false }
-        guard gestureRecognizer.numberOfTouches <= 1,
-              let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
-        let point = pan.location(in: collectionView)
+        guard let selectionController,
+              gestureRecognizer === selectionController.touchDownObserver
+                  || gestureRecognizer === selectionController.longPressRecognizer
+                  || gestureRecognizer === selectionController.marqueePan else { return true }
+        // docs/28 §4.4.3.3：列数过渡期间冻结框选（批量编辑入口）
+        if isGridLayoutTransition { return false }
+        // docs/32 §2.3：长按/pan 只在「命中 cell」时允许（空白处让位滚动）
+        if gestureRecognizer === selectionController.marqueePan,
+           gestureRecognizer.numberOfTouches > 1 { return false }
+        let point = gestureRecognizer.location(in: collectionView)
         return collectionView.indexPathForItem(at: point) != nil
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        // 滑选 pan 不与 collectionView 滚动/捏合同时识别（单指已由 minimumNumberOfTouches=2 分离）。
-        if gestureRecognizer === slideSelectPan || other === slideSelectPan { return false }
+        // 捏合与框选识别器互斥（列数过渡由 shouldBegin 冻结兜底）；其余组合全部允许
+        let ours = selectionController.map {
+            gestureRecognizer === $0.touchDownObserver
+                || gestureRecognizer === $0.longPressRecognizer
+                || gestureRecognizer === $0.marqueePan
+                || other === $0.touchDownObserver
+                || other === $0.longPressRecognizer
+                || other === $0.marqueePan
+        } ?? false
+        if ours, gestureRecognizer is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer {
+            return false
+        }
         return true
     }
 }
