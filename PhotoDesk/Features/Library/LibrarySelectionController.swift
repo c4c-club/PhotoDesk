@@ -117,6 +117,10 @@ final class LibrarySelectionController: NSObject {
     #if DEBUG
     /// UI 取证：自动滚动 tick 计数（M15 边缘滚动通道等价物）与机器状态名。
     private(set) var debugAutoScrollTicks = 0
+    /// UI 取证：最近一次边缘判定（-1 顶 / +1 底 / 0 区外）与指尖视口 y、视口几何。
+    private(set) var debugLastEdgeDirection = 0
+    private(set) var debugLastFingerViewportY: Double = -1
+    private(set) var debugViewportBottom: Double = -1
     var debugStateName: String { "\(machine.state)" }
     #endif
 
@@ -403,6 +407,9 @@ final class LibrarySelectionController: NSObject {
             return
         }
         let direction = edgeDirection()
+        #if DEBUG
+        debugLastEdgeDirection = direction
+        #endif
         guard direction != currentEdgeDirection else { return }
         if currentEdgeDirection != 0 {
             feed(.edgeExited)
@@ -419,6 +426,10 @@ final class LibrarySelectionController: NSObject {
         let viewportY = Double(content.y - collectionView.contentOffset.y)
         let top = Double(collectionView.adjustedContentInset.top)
         let bottom = Double(collectionView.bounds.height - collectionView.adjustedContentInset.bottom)
+        #if DEBUG
+        debugLastFingerViewportY = viewportY
+        debugViewportBottom = bottom
+        #endif
         if viewportY <= top + SlideSelectConfig.edgeBuffer { return -1 }
         if viewportY >= bottom - SlideSelectConfig.edgeBuffer { return 1 }
         return 0

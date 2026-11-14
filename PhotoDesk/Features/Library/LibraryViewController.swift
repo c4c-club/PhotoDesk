@@ -1312,6 +1312,9 @@ final class LibraryViewController: UIViewController {
             " sec=" + sections + " cells=" + cells +
             " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches) +
             " slide=ticks=" + String(selectionController?.debugAutoScrollTicks ?? -1) +
+            " edge=" + String(selectionController?.debugLastEdgeDirection ?? 9) +
+            " vy=" + String(Int(selectionController?.debugLastFingerViewportY ?? -1)) +
+            " vB=" + String(Int(selectionController?.debugViewportBottom ?? -1)) +
             " state=" + (selectionController?.debugStateName ?? "none")
         #endif
     }

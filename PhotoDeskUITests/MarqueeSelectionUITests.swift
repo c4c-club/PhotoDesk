@@ -271,11 +271,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         // 长按首格 → 拖到底缘（dy 0.97，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集
         let start = collection.cells.element(boundBy: 0)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.97))
+        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.99))
         start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
         let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
+        let banner = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
         XCTAssertGreaterThanOrEqual(count, 6,
-                                    "底缘拖 2s 必须自动滚动并选入屏外 cell（count=\(count)）")
+                                    "底缘拖 2s 必须自动滚动并选入屏外 cell（count=\(count) banner=\(banner)）")
         let selected = selectedVisibleIDs(collection)
         let offscreen = selected.subtracting(preDragIDs)
         XCTAssertFalse(offscreen.isEmpty,
