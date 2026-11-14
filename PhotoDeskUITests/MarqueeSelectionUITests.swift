@@ -561,42 +561,23 @@ final class MarqueeSelectionUITests: XCTestCase {
     }
 
     /// 取消模式（锚点已选 → 拖）覆盖层必须 danger 红。
-    /// 种子图块含 danger 色系（红/橙块），绝对红色计数不可用作判别——改为两阶段对照：
-    /// 先未选锚点拖（选择模式，tint 描边）取 danger 基线，再点选拖（取消模式，danger 描边），
-    /// 断言 danger 像素显著增加（≥500）。底色两阶段相同，差值即描边贡献，对图块色免疫。
+    /// 设计约束：cell 8 所在列（col 2）条带内无 danger 色系种子图块 → 精确色匹配的红色计数
+    /// 即描边本身（≥500）。对角拖（col 2 行 0 → col 1 行 2）保证矩形有实际宽度。
+    /// 合成触控偶发整手势未达 App——有界重试 2 次，连拍与计数检查逐轮进行，取成功轮连拍。
+    /// 注意：本测试必须单阶段（一次启动内完成）——任何未武装滚动都会使 boundBy 索引指向别格。
     func testDeselectModeShowsDangerTint() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         let anchorCell = collection.cells.element(boundBy: 8)
         XCTAssertTrue(anchorCell.waitForExistence(timeout: 10), "网格无 cell")
-        // 两阶段共用 cell 8 列条带：该列无 danger 色系图块；阶段 A 描边在 col 0 不入带 → 基线≈0
         let strip = strokeStrip(of: anchorCell)
 
-        // 阶段 A：选择模式拖（锚点 cell 0 未选）——tint 描边基线
-        let burstA = BurstShots()
-        burstA.start(delay: 0.8)
-        longPressDrag(in: collection, fromIndex: 0, toIndex: 6, hold: 1.2)
-        let shotsA = burstA.finish()
-        XCTAssertGreaterThanOrEqual(shotsA.count, 3, "阶段 A 连拍必须覆盖拖动窗口")
-        var bestRedA = 0
-        var bestBlueA = 0
-        for shot in shotsA {
-            let counts = dominantStrokePixels(in: shot, region: strip)
-            bestRedA = max(bestRedA, counts.red)
-            bestBlueA = max(bestBlueA, counts.blue)
-        }
-        XCTAssertLessThanOrEqual(bestRedA, 300,
-                                 "选择模式条带内不得出现 danger 描边（red ≤ 300，got \(bestRedA)）")
-
-        // 阶段 B：点选锚点（8/11）→ 取消模式拖（8→14）——danger 描边
+        // 点选锚点（8/11）：起手已选 → 取消模式（docs/25 §6.1）
         collection.cells.element(boundBy: 8).tap()
         collection.cells.element(boundBy: 11).tap()
-        // 阶段 A 已框选 0/3/6（count=3）→ 点选 8/11 后计数=5
-        let preCount = waitForSelectionCountEqual(app, to: 5, timeout: 5)
-        let preBanner = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
-        XCTAssertEqual(preCount, 5, "点选 8/11 后计数必须为 5（count=\(preCount) banner=\(preBanner)）")
-        // 对角拖（col 2 行 0 → col 1 行 2）：矩形有实际宽度，描边面积可判；框选仍只覆盖 8/11（已选）。
-        // 合成触控偶发整手势未达 App——有界重试 2 次，连拍与计数检查逐轮进行，取成功轮连拍。
+        let preCount = waitForSelectionCountEqual(app, to: 2, timeout: 5)
+        XCTAssertEqual(preCount, 2, "点选 8/11 后计数必须为 2（count=\(preCount)）")
+
         var shotsB: [UIImage] = []
         var postCount = -1
         for attempt in 1...2 {
@@ -604,15 +585,15 @@ final class MarqueeSelectionUITests: XCTestCase {
             burstB.start(delay: 0.8)
             longPressDrag(in: collection, fromIndex: 8, toIndex: 16, hold: 1.2)
             shotsB = burstB.finish()
-            postCount = waitForSelectionCountEqual(app, to: 3, timeout: 8)
-            if postCount == 3 { break }
+            postCount = waitForSelectionCountEqual(app, to: 0, timeout: 8)
+            if postCount == 0 { break }
             if attempt == 1 { usleep(500_000) }
         }
-        XCTAssertGreaterThanOrEqual(shotsB.count, 3, "阶段 B 连拍必须覆盖拖动窗口")
-        // 功能断言：框过 8/11/16 区域 → 已选 8/11 全部取消（0/3/6 不受影响）→ 计数 5→3（取消模式语义）
+        XCTAssertGreaterThanOrEqual(shotsB.count, 3, "连拍必须覆盖拖动窗口")
+        // 功能断言：框过 8/11/16 区域 → 已选 8/11 全部取消 → 计数 2→0（取消模式语义）
         let bannerAfter = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
-        XCTAssertEqual(postCount, 3, "取消模式框选必须清掉锚选且不误伤其余（count=\(postCount) banner=\(bannerAfter)）")
-        // 取证：横幅（计数变化触发刷新，读到 armed 时刻模式与覆盖层描边色/位置）
+        XCTAssertEqual(postCount, 0, "取消模式框选必须清掉锚选（count=\(postCount) banner=\(bannerAfter)）")
+        // 像素判别：条带内 danger 精确色匹配 ≥ 500（该列底色不含 danger 色系，红色即描边）
         var bestRedB = 0
         var perShot = ""
         var bestShot: UIImage? = shotsB.first
@@ -630,8 +611,8 @@ final class MarqueeSelectionUITests: XCTestCase {
             att.lifetime = .keepAlways
             add(att)
         }
-        XCTAssertGreaterThanOrEqual(bestRedB - bestRedA, 500,
-                                    "取消模式 danger 描边必须显著高于选择模式基线（delta=\(bestRedB - bestRedA)，" +
-                                    "A=\(bestRedA) B=\(bestRedB)，shots: \(perShot)，banner: \(bannerAfter)）")
+        XCTAssertGreaterThanOrEqual(bestRedB, 500,
+                                    "取消模式描边必须 danger 红（精确色匹配 ≥ 500，got \(bestRedB)，" +
+                                    "shots: \(perShot)，banner: \(bannerAfter)）")
     }
 }
