@@ -45,6 +45,11 @@ final class ExportViewModelTests: XCTestCase {
         } catch {
             // 期待路径：cannotLoadImage
         }
+        // 主队列 FIFO 收尾：进度写入与复位都在主队列，排水后终态必为 nil
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, vm.downloadProgress != nil {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
         XCTAssertNil(vm.downloadProgress,
                      "失败路径 downloadProgress 必须复位（X05：进度条卡死缺陷），got \(String(describing: vm.downloadProgress))")
     }

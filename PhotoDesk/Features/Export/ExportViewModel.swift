@@ -23,6 +23,8 @@ final class ExportViewModel: ObservableObject {
     private let settings: SettingsStore
     /// 当前导出任务句柄（cancelExport 用；取消 → Task cancellation + 删临时文件）
     private var activeTask: Task<Void, Never>?
+    /// 取件代际：复位后的迟到进度回调丢弃（X05 收口：失败路径终态恒为 nil）
+    private var downloadEpoch = 0
 
     init(item: PhotoItem, pipeline: ImagePipelineProtocol,
          writer: PhotoWriterProtocol, settings: SettingsStore) {
@@ -42,11 +44,18 @@ final class ExportViewModel: ObservableObject {
     /// X05（M17 T08）：defer 复位下载进度——失败/取消路径不再卡进度条；
     /// A10：取件下沉 PhotoWriter（Feature 层零 PhotoKit 类型）。
     func requestSourceURL() async throws -> URL {
-        defer { downloadProgress = nil }
+        downloadEpoch += 1
+        let epoch = downloadEpoch
+        // 复位走主队列（进度写入同队列 FIFO：迟到的进度永不晚于复位，失败终态恒 nil）
+        defer { DispatchQueue.main.async { [weak self] in
+            guard let self, self.downloadEpoch == epoch else { return }
+            self.downloadProgress = nil
+        } }
         if item.isCloudOnly {
             let image = await pipeline.fullImage(for: item.id, progress: { [weak self] fraction in
                 DispatchQueue.main.async {
-                    self?.downloadProgress = fraction
+                    guard let self, self.downloadEpoch == epoch else { return }
+                    self.downloadProgress = fraction
                 }
             }, allowNetwork: true)
             guard image != nil else { throw ExportError.cannotLoadImage }
