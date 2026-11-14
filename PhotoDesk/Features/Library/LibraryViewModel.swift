@@ -474,7 +474,7 @@ final class LibraryViewModel: ObservableObject {
             return changeSet.insertedIndexes.map { ($0, repository.map(newResult.object(at: $0))) }
         }()
         allItems = Self.mergedItems(current: allItems,
-                                    removedIndexes: changeSet.removedIndexes,
+                                    removedIndexes: Array(changeSet.removedIndexes),
                                     changedPairs: changedPairs,
                                     insertedPairs: insertedPairs,
                                     indexComplete: isIndexComplete)

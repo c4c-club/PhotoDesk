@@ -19,12 +19,12 @@ struct AlbumsView: View {
     var body: some View {
         List {
             Section("我的相簿") {
-                if userAlbums.isEmpty {
+                if viewModel.userAlbums.isEmpty {
                     Text("暂无相簿，点右上角 + 新建")
                         .font(.subheadline)
                         .foregroundColor(Color(ds: DSColor.textSecondary))
                 }
-                ForEach(userAlbums) { album in
+                ForEach(viewModel.userAlbums) { album in
                     NavigationLink {
                         AlbumDetailView(album: album)
                     } label: {
@@ -48,7 +48,7 @@ struct AlbumsView: View {
                 }
             }
             Section("智能相簿") {
-                ForEach(smartAlbums) { album in
+                ForEach(viewModel.smartAlbums) { album in
                     NavigationLink {
                         AlbumDetailView(album: album)
                     } label: {
