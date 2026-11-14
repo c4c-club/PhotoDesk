@@ -144,7 +144,9 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         }
     }
 
-    /// 真实 LibraryGridLayout + 390 宽 + 40 段 × 50 item（docs/32 §4.2 ①）
+    /// 真实 LibraryGridLayout + 390 宽 + 40 段 × 50 item（docs/32 §4.2 ①）。
+    /// 注意：UICollectionView.dataSource 是弱引用——调用方必须保活返回的 dataSource，
+    /// 否则网格退化为 0 段，命中断言空对空假绿（CI 43549332935 实锤）。
     private func makeParamGrid(columns: Int) -> (collectionView: UICollectionView,
                                                  layout: UICollectionViewCompositionalLayout,
                                                  dataSource: ParamGridDataSource) {
@@ -164,7 +166,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     /// 必须与逐 item layoutAttributesForItem 暴力求交一致（含粘性头底边钳制语义）。
     func testHitTesterMatchesBruteForceAcrossColumnsAndOffsets() throws {
         for columns in [2, 3, 4, 5] {
-            let (cv, layout, _) = makeParamGrid(columns: columns)
+            let (cv, layout, gridData) = makeParamGrid(columns: columns)
             let tester = GridHitTester(collectionView: cv)
             cv.layoutIfNeeded()
             for offset in [0, 2000, 8000, 20000] {
@@ -201,7 +203,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     func testItemWidthMatchesParameterFormulaAllColumns() throws {
         let spacing = CGFloat(DSSpacing.gridSpacing)
         for columns in [2, 3, 4, 5] {
-            let (cv, layout, _) = makeParamGrid(columns: columns)
+            let (cv, layout, gridData) = makeParamGrid(columns: columns)
             cv.layoutIfNeeded()
             cv.setContentOffset(.zero, animated: false)
             cv.collectionViewLayout.invalidateLayout()
@@ -217,7 +219,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     /// docs/32 §4.2 映射回归锁：严格落在 a3-7 内部的矩形只命中 a3-7，不命中相邻 a3-6
     /// （旧参数推算的 pitch/origin 误差把邻格算进同一命中带，docs/31 G7/G9）。
     func testMarqueeHitSelectsA3_7NotA3_6() throws {
-        let (cv, layout, _) = makeParamGrid(columns: 3)
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
         cv.layoutIfNeeded()
         cv.setContentOffset(.zero, animated: false)
@@ -235,7 +237,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     /// docs/32 §2.4 第 8 步：缓存已热后，同一帧深位置框选 ≤ 60 次 layoutAttributesForItem 查询
     /// （首帧构建缓存不计入断言；O(可见行×列) 复杂度锁，docs/31 A15）。
     func testLastQueryCountBoundedAtDeepOffset() throws {
-        let (cv, _, _) = makeParamGrid(columns: 3)
+        let (cv, _, gridData) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
         cv.layoutIfNeeded()
         cv.setContentOffset(CGPoint(x: 0, y: 8000), animated: false)
