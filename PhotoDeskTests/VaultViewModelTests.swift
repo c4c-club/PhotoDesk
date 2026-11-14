@@ -3,6 +3,7 @@
 // 模拟器测试宿主走 simulatorBypass（无 Face ID 硬件，AGENTS 陷阱表口径）。
 
 import XCTest
+import Photos
 @testable import PhotoDesk
 
 @MainActor
