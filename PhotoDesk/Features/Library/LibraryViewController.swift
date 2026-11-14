@@ -1308,16 +1308,15 @@ final class LibraryViewController: UIViewController {
         let sections = String(sectionCount)
         let cells = sectionCount > 0 ? String(collectionView.numberOfItems(inSection: 0)) : "0"
         let sel = selectionController
-        let slidePart = "slide=ticks=" + String(sel?.debugAutoScrollTicks ?? -1)
-            + " edge=" + String(sel?.debugLastEdgeDirection ?? 9)
-            + " vy=" + String(Int(sel?.debugLastFingerViewportY ?? -1))
-            + " vB=" + String(Int(sel?.debugViewportBottom ?? -1))
-            + " state=" + (sel?.debugStateName ?? "none")
-        viewModel.debugScrollNote = "off=" + off + "/" + maxOffset
-            + " anchor=" + anchor + " visualY=" + String(visualY)
-            + " sec=" + sections + " cells=" + cells
-            + " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches)
-            + " " + slidePart
+        let ticks = sel?.debugAutoScrollTicks ?? -1
+        let edge = sel?.debugLastEdgeDirection ?? 9
+        let vy = Int(sel?.debugLastFingerViewportY ?? -1)
+        let vB = Int(sel?.debugViewportBottom ?? -1)
+        let stateName = sel?.debugStateName ?? "none"
+        let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
+        viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
+            + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
+            + "slide=ticks=\(ticks) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 
