@@ -546,18 +546,31 @@ final class MarqueeSelectionUITests: XCTestCase {
         longPressDrag(in: collection, fromIndex: 1, toIndex: 7, hold: 1.2)
         let shots = burst.finish()
         XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
+        // 功能断言：拖过 1/4/7 三格 → 已选 1/4 全部取消 → 计数 2→0（取消模式语义）
+        let postCount = waitForSelectionCount(app, atMost: 0, timeout: 8)
+        XCTAssertEqual(postCount, 0, "取消模式框选必须清掉锚选（count=\(postCount)）")
         var bestRed = 0
         var blueAtBest = 0
+        var perShot = ""
+        var bestShot: XCUIScreen? = nil
         for shot in shots {
             let counts = dominantStrokePixels(in: shot, region: band)
+            perShot += "(r=\(counts.red) b=\(counts.blue)) "
             if counts.red > bestRed {
                 bestRed = counts.red
                 blueAtBest = counts.blue
+                bestShot = shot
             }
         }
+        if let png = bestShot?.pngData() {
+            let att = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            att.name = "m17-deselect-best"
+            att.lifetime = .keepAlways
+            add(att)
+        }
         XCTAssertGreaterThanOrEqual(bestRed, 25,
-                                    "取消模式描边必须 danger 红（red-dominant ≥ 25，got \(bestRed)）")
+                                    "取消模式描边必须 danger 红（red-dominant ≥ 25，got \(bestRed)，shots: \(perShot)）")
         XCTAssertGreaterThan(bestRed, blueAtBest,
-                             "取消模式描边红色必须压过蓝色（模式判别 red=\(bestRed) blue=\(blueAtBest)）")
+                             "取消模式描边红色必须压过蓝色（模式判别 red=\(bestRed) blue=\(blueAtBest)，shots: \(perShot)）")
     }
 }

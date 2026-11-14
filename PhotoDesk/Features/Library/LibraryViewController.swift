@@ -1338,6 +1338,10 @@ final class LibraryViewController: UIViewController {
         let ticks = sel?.debugAutoScrollTicks ?? -1
         let hap = sel?.debugHapticCount ?? -1
         let ovHidden = sel?.overlayView?.isHidden ?? true
+        let ovm: Int = {
+            guard let sel else { return -1 }
+            return sel.mode == .deselect ? 1 : 0
+        }()
         let edge = sel?.debugLastEdgeDirection ?? 9
         let vy = Int(sel?.debugLastFingerViewportY ?? -1)
         let vB = Int(sel?.debugViewportBottom ?? -1)
@@ -1345,7 +1349,7 @@ final class LibraryViewController: UIViewController {
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 
