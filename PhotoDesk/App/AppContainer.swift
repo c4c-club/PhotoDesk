@@ -15,6 +15,12 @@ final class AppContainer: ObservableObject {
     let assetRepository: AssetRepositoryProtocol
     let imagePipeline: ImagePipelineProtocol
     let photoWriter = PhotoWriter()
+    /// 相簿列表服务（M17 T08 X01/X02）：查询/计数/封面收口 + 库变化监听
+    let albumService: AlbumServiceProtocol = {
+        let service = AlbumService()
+        service.startObservingChanges()
+        return service
+    }()
     /// 资产元数据服务（M17 T08 X06）：字节数/格式/EXIF 解析后台化
     let metadataService: MetadataServiceProtocol = PhotoMetadataService()
     /// 撤销倒计时唯一时钟（docs/16 M12 R04：DSToast 环 + UndoCenter 到期共用）

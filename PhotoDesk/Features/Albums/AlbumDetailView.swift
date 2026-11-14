@@ -6,7 +6,7 @@ import SwiftUI
 import Photos
 
 struct AlbumDetailView: View {
-    let album: AlbumsView.AlbumSummary
+    let album: AlbumSummary
     @State private var items: [PhotoItem] = []
     @State private var viewerContext: ViewerContext?
     @State private var message: String?

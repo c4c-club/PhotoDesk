@@ -1,26 +1,19 @@
 // MARK: - 职责说明：相簿列表（docs/05 M3 任务 3.6 / docs/04 §2 工具页）——
 // 系统相簿分组浏览（用户相簿 / 智能相簿）+ 新建 / 重命名 / 删除（写操作经 PhotoWriter.performChanges）。
+// M17 T08 X01/X02：查询/计数/封面下沉 AlbumService，列表增量刷新；本页只消费 [AlbumSummary]。
 // 相簿内容页复用缩略图组件展示（隐藏资源量级小，LazyVGrid 足够；主库网格管线约束不在此页）。
 
 import SwiftUI
-import Photos
 
 struct AlbumsView: View {
-    @State private var userAlbums: [AlbumSummary] = []
-    @State private var smartAlbums: [AlbumSummary] = []
+    @StateObject private var viewModel: AlbumsViewModel
     @State private var showEditor = false
     @State private var editorTitle = ""
     /// 非 nil = 重命名该相簿；nil = 新建
     @State private var renamingAlbum: AlbumSummary?
-    /// 新建/重命名/删除失败的中文提示（禁止 try? 静默吞掉写操作错误）
-    @State private var errorMessage: String?
 
-    struct AlbumSummary: Identifiable {
-        let id: String       // localIdentifier
-        let title: String
-        let count: Int
-        /// 相簿首张照片的 assetID（封面缩略图；空相簿为 nil）
-        var coverAssetID: String?
+    init() {
+        _viewModel = StateObject(wrappedValue: AlbumsViewModel(service: AppContainer.shared.albumService))
     }
 
     var body: some View {
@@ -66,7 +59,7 @@ struct AlbumsView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("相簿")
-        .refreshable { reload() }
+        .refreshable { await viewModel.reload() }
         .toolbar {
             Button {
                 renamingAlbum = nil
@@ -87,15 +80,15 @@ struct AlbumsView: View {
                 commitEditor()
             }
         )
-        .onAppear(perform: reload)
+        .onAppear { Task { await viewModel.reload() } }
         .alert("操作失败", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
         )) {
-            Button("重试", role: .cancel) { reload() }
-            Button("好", role: .destructive) { errorMessage = nil }
+            Button("重试", role: .cancel) { Task { await viewModel.reload() } }
+            Button("好", role: .destructive) { viewModel.errorMessage = nil }
         } message: {
-            Text(errorMessage ?? "")
+            Text(viewModel.errorMessage ?? "")
         }
     }
 
@@ -113,33 +106,6 @@ struct AlbumsView: View {
         }
     }
 
-    // MARK: - 数据
-
-    private func reload() {
-        userAlbums = fetchSummaries(type: .album)
-        smartAlbums = fetchSummaries(type: .smartAlbum)
-            .filter { $0.count > 0 && $0.title != "Recently Deleted" && $0.title != "最近删除" }
-    }
-
-    private func fetchSummaries(type: PHAssetCollectionType) -> [AlbumSummary] {
-        let result = PHAssetCollection.fetchAssetCollections(with: type, subtype: .any, options: nil)
-        var summaries: [AlbumSummary] = []
-        result.enumerateObjects { collection, _, _ in
-            // 系统空智能相簿（如「个人收藏」空时）PhotoKit 仍返回——count 为 0 的过滤掉
-            let assets = PHAsset.fetchAssets(in: collection, options: nil)
-            // 封面取首张；fetchLimit 1 避免大相簿全量枚举
-            let firstOptions = PHFetchOptions()
-            firstOptions.fetchLimit = 1
-            firstOptions.wantsIncrementalChangeDetails = false
-            let cover = PHAsset.fetchAssets(in: collection, options: firstOptions).firstObject
-            summaries.append(AlbumSummary(id: collection.localIdentifier,
-                                          title: collection.localizedTitle ?? "未命名",
-                                          count: assets.count,
-                                          coverAssetID: cover?.localIdentifier))
-        }
-        return summaries
-    }
-
     // MARK: - 写操作
 
     private func commitEditor() {
@@ -154,9 +120,9 @@ struct AlbumsView: View {
                     _ = try await writer.createAlbum(title: title)
                 }
                 renamingAlbum = nil
-                reload()
+                await viewModel.reload()
             } catch {
-                errorMessage = "保存相簿失败：\(error.localizedDescription)"
+                viewModel.errorMessage = "保存相簿失败：\(error.localizedDescription)"
             }
         }
     }
@@ -165,9 +131,9 @@ struct AlbumsView: View {
         Task { @MainActor in
             do {
                 try await AppContainer.shared.photoWriter.deleteAlbum(localID: album.id)
-                reload()
+                await viewModel.reload()
             } catch {
-                errorMessage = "删除相簿失败：\(error.localizedDescription)"
+                viewModel.errorMessage = "删除相簿失败：\(error.localizedDescription)"
             }
         }
     }
