@@ -444,9 +444,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         private var stopped = false
         private let queue = DispatchQueue(label: "m17-burst")
 
-        func start() {
+        func start(delay: TimeInterval = 0) {
             queue.async { [weak self] in
                 guard let self else { return }
+                if delay > 0 {
+                    Thread.sleep(forTimeInterval: delay)
+                }
                 while !self.isStopped {
                     let shot = XCUIScreen.main.screenshot()
                     self.lock.lock()
@@ -539,10 +542,14 @@ final class MarqueeSelectionUITests: XCTestCase {
         collection.cells.element(boundBy: 4).tap()
         let cell0 = collection.cells.element(boundBy: 1)
         XCTAssertTrue(cell0.waitForExistence(timeout: 10), "网格无 cell")
+        // 预手势取证：两次点选必须使计数=2（取消模式的前提）
+        let preCount = waitForSelectionCountEqual(app, to: 2, timeout: 5)
+        XCTAssertEqual(preCount, 2, "点选 1/4 后计数必须为 2（count=\(preCount)）")
         let frame0 = cell0.frame
         let band = CGRect(x: frame0.minX, y: frame0.midY - 8, width: frame0.width, height: 16)
         let burst = BurstShots()
-        burst.start()
+        // 延迟 0.8s 启动：连拍避开按压相位（0.55s），覆盖层在 hold 阶段仍可见
+        burst.start(delay: 0.8)
         longPressDrag(in: collection, fromIndex: 1, toIndex: 7, hold: 1.2)
         let shots = burst.finish()
         XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
@@ -555,8 +562,8 @@ final class MarqueeSelectionUITests: XCTestCase {
         var blueAtBest = 0
         var perShot = ""
         var bestShot: UIImage? = shots.first
-        if shots.count > 3 {
-            let mid = XCTAttachment(data: shots[3].pngData(), uniformTypeIdentifier: "public.png")
+        if shots.count > 3, let midPng = shots[3].pngData() {
+            let mid = XCTAttachment(data: midPng, uniformTypeIdentifier: "public.png")
             mid.name = "m17-deselect-mid"
             mid.lifetime = .keepAlways
             add(mid)
