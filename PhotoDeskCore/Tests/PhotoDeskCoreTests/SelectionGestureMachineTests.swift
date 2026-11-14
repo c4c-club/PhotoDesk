@@ -170,17 +170,17 @@ final class SelectionGestureMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .armed)
     }
 
-    /// 卡内附加 2：长按后纵向拖 → 仍 armed 不拖框，收到 scrollStarted 后回 idle
-    func testArmedVerticalDragStaysArmedUntilScrollStarted() {
+    /// 状态表第 6 行（T05 修正）：armed + moved 任意方向 ≥ activationDistance → dragging——
+    /// docs/32 §2.2 表第 6 行无方向限定：长按已表达选择意图，「长按后拖到第 5 行」「底缘拖 2s
+    /// 自动滚动」（T05 卡 UI 用例）都依赖纵向拖框。
+    func testArmedVerticalDragBeginsMarqueeAnyDirection() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
-        let effects = machine.handle(.moved(dx: 0, dy: 20), now: 0.35)
-        XCTAssertTrue(effects.isEmpty, "armed 纵向拖不得拖框（让位滚动）")
-        XCTAssertEqual(machine.state, .armed)
-        let scroll = machine.handle(.scrollStarted, now: 0.4)
-        XCTAssertEqual(scroll, [.endMarquee], "滚动接管：隐藏 0 尺寸选框（选中集保留，App 侧语义）")
-        XCTAssertEqual(machine.state, .idle)
+        let effects = machine.handle(.moved(dx: 0, dy: 12), now: 0.35)
+        XCTAssertEqual(effects, [.updateMarquee], "armed 纵向拖 ≥ 6pt 必须开始拖框（表第 6 行无方向限定）")
+        XCTAssertEqual(machine.state, .dragging)
         // 复位后可立即服务下一次手势
+        _ = machine.handle(.ended, now: 0.4)
         let again = press(&machine, id: "b", at: 1.0)
         XCTAssertTrue(again.isEmpty)
         XCTAssertEqual(machine.state, .pressing)
