@@ -54,20 +54,17 @@ final class EditorViewModel: ObservableObject {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
-        guard let asset = assets.firstObject else { return }
-
-        let options = PHContentEditingInputRequestOptions()
-        options.isNetworkAccessAllowed = settings.autoDownloadOriginal
-        let input: PHContentEditingInput? = await withCheckedContinuation { continuation in
-            asset.requestContentEditingInput(with: options) { input, _ in
-                continuation.resume(returning: input)
-            }
+        // M17 T08 A10：取件下沉 PhotoWriter（Feature 层零 PhotoKit 类型）
+        let info: PhotoEditingInfo
+        do {
+            info = try await writer.requestEditingInfo(assetID: item.id,
+                                                       allowNetwork: settings.autoDownloadOriginal)
+        } catch {
+            return
         }
-        guard let input else { return }
-        fullSizeURL = input.fullSizeImageURL
-        creationDate = asset.creationDate
-        canRevert = input.adjustmentData != nil
+        fullSizeURL = info.originalURL
+        creationDate = info.creationDate
+        canRevert = info.hasAdjustmentData
 
         // 预览底图（长边 1400）
         if let url = input.fullSizeImageURL,
