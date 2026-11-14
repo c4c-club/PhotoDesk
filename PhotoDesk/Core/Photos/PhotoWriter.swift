@@ -25,6 +25,16 @@ protocol PhotoWriterProtocol: AnyObject {
     func revertToOriginal(assetID: String) async throws
     /// 分享用原件 URL（iCloud 自动下载；fullSizeImageURL）
     func requestInputURL(assetID: String) async throws -> URL
+    /// 取件入口（M17 T08 A10，docs/31 §3）：Feature 层零 PhotoKit——原件 URL、拍摄日期、
+    /// 是否含编辑调整数据；禁/允网络由调用方控制（导出先经管线下载、元数据一律禁网）。
+    func requestEditingInfo(assetID: String, allowNetwork: Bool) async throws -> PhotoEditingInfo
+}
+
+/// 取件结果快照（值类型；零 PhotoKit 类型外泄）
+struct PhotoEditingInfo {
+    let originalURL: URL
+    let creationDate: Date?
+    let hasAdjustmentData: Bool
 }
 
 @MainActor
@@ -270,21 +280,28 @@ final class PhotoWriter: PhotoWriterProtocol {
 
     /// 分享用原件 URL（iCloud 自动下载；fullSizeImageURL）
     func requestInputURL(assetID: String) async throws -> URL {
+        try await requestEditingInfo(assetID: assetID, allowNetwork: true).originalURL
+    }
+
+    /// 取件入口（M17 T08）：禁/允网络可控；原件缺失或取件拒绝 → cannotLoadImage
+    func requestEditingInfo(assetID: String, allowNetwork: Bool) async throws -> PhotoEditingInfo {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
-        guard let asset = assets.firstObject else { throw PhotoWriterError.albumNotFound }
+        guard let asset = assets.firstObject else { throw PhotoWriterError.cannotLoadImage }
         let options = PHContentEditingInputRequestOptions()
-        options.isNetworkAccessAllowed = true
+        options.isNetworkAccessAllowed = allowNetwork
         let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
             asset.requestContentEditingInput(with: options) { input, info in
                 if let input, let url = input.fullSizeImageURL {
                     continuation.resume(returning: input)
                 } else {
-                    continuation.resume(throwing: PhotoWriterError.changeRejected)
+                    continuation.resume(throwing: PhotoWriterError.cannotLoadImage)
                 }
             }
         }
         guard let url = input.fullSizeImageURL else { throw PhotoWriterError.cannotLoadImage }
-        return url
+        return PhotoEditingInfo(originalURL: url,
+                                creationDate: asset.creationDate,
+                                hasAdjustmentData: input.adjustmentData != nil)
     }
 
     // MARK: - 私有

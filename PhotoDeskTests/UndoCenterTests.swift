@@ -47,6 +47,12 @@ private final class MockPhotoWriter: PhotoWriterProtocol {
     func requestInputURL(assetID: String) async throws -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("mock-\(assetID).jpg")
     }
+
+    func requestEditingInfo(assetID: String, allowNetwork: Bool) async throws -> PhotoEditingInfo {
+        PhotoEditingInfo(originalURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent("mock-\(assetID).jpg"),
+                         creationDate: nil, hasAdjustmentData: false)
+    }
 }
 
 /// 可拨动的假时钟（docs/03 §8）

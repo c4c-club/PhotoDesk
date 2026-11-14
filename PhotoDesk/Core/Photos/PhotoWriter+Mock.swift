@@ -44,5 +44,9 @@ final class MockPhotoWriter: PhotoWriterProtocol {
                                  render: @escaping (URL) async throws -> Void) async throws {}
     func revertToOriginal(assetID: String) async throws {}
     func requestInputURL(assetID: String) async throws -> URL { URL(fileURLWithPath: "/dev/null") }
+    func requestEditingInfo(assetID: String, allowNetwork: Bool) async throws -> PhotoEditingInfo {
+        PhotoEditingInfo(originalURL: URL(fileURLWithPath: "/dev/null"),
+                         creationDate: nil, hasAdjustmentData: false)
+    }
 }
 #endif

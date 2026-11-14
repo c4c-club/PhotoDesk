@@ -1,6 +1,6 @@
 // MARK: - 职责说明：导出 ViewModel（docs/05 M6 任务 6.8 / 任务 4）——
 // 选项（格式/长边/质量/去 GPS）→ 取原件（iCloud 自动下载，进度经 progressHandler）→
-// ExportRenderer 文件渲染 → 保存到相册（PHAssetCreationRequest）或分享（临时 URL → ActivityViewWrapper）。
+// ExportRenderer 文件渲染 → 保存到相册（系统创建请求）或分享（临时 URL → ActivityViewWrapper）。
 
 import Foundation
 import PhotoDeskCore
@@ -38,8 +38,11 @@ final class ExportViewModel: ObservableObject {
     }
 
     /// 取原件 URL。iCloud-only：先经 pipeline.fullImage 下载（真实进度），系统缓存后
-    /// 再以禁网络方式取 input.fullSizeImageURL（保留完整 EXIF）；本地原件直接走 input。
+    /// 再以禁网络方式取原件（保留完整 EXIF）；本地原件直接走取件入口。
+    /// X05（M17 T08）：defer 复位下载进度——失败/取消路径不再卡进度条；
+    /// A10：取件下沉 PhotoWriter（Feature 层零 PhotoKit 类型）。
     func requestSourceURL() async throws -> URL {
+        defer { downloadProgress = nil }
         if item.isCloudOnly {
             let image = await pipeline.fullImage(for: item.id, progress: { [weak self] fraction in
                 DispatchQueue.main.async {
@@ -48,23 +51,8 @@ final class ExportViewModel: ObservableObject {
             }, allowNetwork: true)
             guard image != nil else { throw ExportError.cannotLoadImage }
         }
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
-        guard let asset = assets.firstObject else { throw ExportError.cannotLoadImage }
-
-        let options = PHContentEditingInputRequestOptions()
-        options.isNetworkAccessAllowed = false   // 上一步已确保原件在本地（或本就本地）
-        let input: PHContentEditingInput = try await withCheckedThrowingContinuation { continuation in
-            asset.requestContentEditingInput(with: options) { input, info in
-                if let input {
-                    continuation.resume(returning: input)
-                } else {
-                    continuation.resume(throwing: ExportError.cannotLoadImage)
-                }
-            }
-        }
-        downloadProgress = nil
-        guard let url = input.fullSizeImageURL else { throw ExportError.cannotLoadImage }
-        return url
+        return try await writer.requestEditingInfo(assetID: item.id,
+                                                   allowNetwork: false).originalURL
     }
 
     /// 渲染导出文件（保存与分享共用；协作式取消：await 点后与文件落盘后各检查一次）
@@ -113,7 +101,7 @@ final class ExportViewModel: ObservableObject {
         downloadProgress = nil
     }
 
-    /// 保存到相册（PHAssetCreationRequest；creationDate 沿用原件）
+    /// 保存到相册（系统创建请求；creationDate 沿用原件）
     func saveToLibrary() async throws {
         let url = try await renderExportFile()
         _ = try await writer.saveNewImage(fromFile: url, creationDate: item.creationDate)
