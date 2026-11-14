@@ -15,6 +15,8 @@ final class AppContainer: ObservableObject {
     let assetRepository: AssetRepositoryProtocol
     let imagePipeline: ImagePipelineProtocol
     let photoWriter = PhotoWriter()
+    /// 资产元数据服务（M17 T08 X06）：字节数/格式/EXIF 解析后台化
+    let metadataService: MetadataServiceProtocol = PhotoMetadataService()
     /// 撤销倒计时唯一时钟（docs/16 M12 R04：DSToast 环 + UndoCenter 到期共用）
     let undoCountdownDriver = UndoCountdownDriver()
     let undoCenter: UndoCenter

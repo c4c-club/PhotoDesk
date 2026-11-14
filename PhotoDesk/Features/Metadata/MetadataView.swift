@@ -1,5 +1,5 @@
 // MARK: - 职责说明：信息面板（docs/05 M5 任务 5.6 / docs/04 §4.13）——
-// 尺寸/字节数/格式（PHAssetResource originalFilename 后缀 + UTType）+ EXIF 行
+// 尺寸/字节数/格式（资源 originalFilename 后缀 + UTType）+ EXIF 行
 // （requestContentEditingInput → CGImageSource → MetadataParser）+ GPS 小地图（SwiftUI Map 单针，iOS 14+）。
 // 解析纯逻辑在 MetadataParser（可单测）；本视图只做取图与展示。
 
@@ -188,54 +188,20 @@ struct MetadataView: View {
         return formatter
     }()
 
-    // MARK: - 取图与解析
+    // MARK: - 取图与解析（M17 T08 X06：全部下沉 MetadataService，主线程只赋值）
 
     private func load() async {
-        loadBasics()
-        await loadEXIF()
-    }
-
-    /// 字节数 + 格式（PHAssetResource；fileSize KVC 失败回退 0——M1 KVC 崩溃教训）
-    private func loadBasics() {
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
-        guard let asset = assets.firstObject else { return }
-        let resources = PHAssetResource.assetResources(for: asset)
-        let resource = resources.first { $0.type == .photo }
-            ?? resources.first { $0.type == .fullSizePhoto }
-            ?? resources.first { $0.type == .video }
-            ?? resources.first
-        guard let resource else { return }
-        byteSize = (try? resource.value(forKey: "fileSize") as? Int64) ?? 0
-        filename = resource.originalFilename
-        let filename = resource.originalFilename
-        let ext = (filename as NSString).pathExtension
-        let uti = resource.uniformTypeIdentifier
-        if let type = UTType(uti) {
-            let localized = type.localizedDescription ?? ""
-            formatText = localized.isEmpty ? ext.uppercased() : localized
-        } else if !ext.isEmpty {
-            formatText = ext.uppercased()
+        let service = AppContainer.shared.metadataService
+        if let basics = await service.basics(for: item.id) {
+            byteSize = basics.byteSize
+            filename = basics.filename
+            formatText = basics.formatText
         }
-    }
-
-    /// EXIF：requestContentEditingInput（禁网络）→ CGImageSource 属性 → MetadataParser
-    private func loadEXIF() async {
+        isLoadingEXIF = true
         defer { isLoadingEXIF = false }
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil)
-        guard let asset = assets.firstObject else { return }
-        let options = PHContentEditingInputRequestOptions()
-        options.isNetworkAccessAllowed = false
-        let input: PHContentEditingInput? = await withCheckedContinuation { continuation in
-            asset.requestContentEditingInput(with: options) { input, _ in
-                continuation.resume(returning: input)
-            }
+        if let parsed = await service.exifFields(for: item.id) {
+            fields = parsed
         }
-        guard let url = input?.fullSizeImageURL,
-              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
-            return
-        }
-        fields = MetadataParser.parse(properties: properties)
     }
 }
 
