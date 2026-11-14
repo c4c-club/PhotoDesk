@@ -224,4 +224,25 @@ final class SelectionPolicyTests: XCTestCase {
         XCTAssertTrue(state.contains("7"))
         XCTAssertFalse(state.contains("0"))
     }
+
+    /// M17 T07 验收（A09，docs/32 §2.6）：全选 2 万张拖一帧增量应用 < 4ms（DEBUG p95）。
+    /// 200 帧连续小 delta 总耗 < 100ms——O(delta) 实现实际 µs/帧量级；旧「整表 replace+sort」
+    /// ~3ms/帧（600ms+）必然爆线。scope 外 id 忽略一并覆盖。
+    func testApplyDeltaTwoHundredFramesOnTwentyThousandSelectedIsOdelta() {
+        let ids = (0..<20_000).map { "id-\($0)" }
+        var state = SelectionState()
+        state.begin(scope: Set(ids))
+        state.selectAll()
+        XCTAssertEqual(state.selected.count, 20_000)
+        let start = Date()
+        for frame in 0..<200 {
+            let addID = ids[(frame * 3) % 20_000]
+            let removeID = ids[(frame * 7 + 1) % 20_000]
+            state.applyDelta(add: [addID], remove: [removeID])
+        }
+        let elapsedMs = Date().timeIntervalSince(start) * 1000
+        XCTAssertEqual(state.selectedSet.count, 20_000, "每帧 add/remove 配对：总数守恒")
+        XCTAssertLessThan(elapsedMs, 100,
+                          "2 万选中 × 200 帧增量应用必须 O(delta)（实际 \(elapsedMs)ms）")
+    }
 }
