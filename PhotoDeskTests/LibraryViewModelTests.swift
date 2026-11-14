@@ -353,4 +353,52 @@ final class LibraryViewModelTests: XCTestCase {
         XCTAssertEqual(committed.committed, 0)
         XCTAssertEqual(session.pendingDeleteCount, 3, "失败/取消：队列保留不丢数据")
     }
+
+    // MARK: - M17 T07 选中一致性（docs/32 §2.6）：多选 scope 唯一口径 = filteredItems 全量
+
+    /// A08：全选 scope 必须取 filteredItems（单一事实来源），不得取网格快照
+    /// currentItemsBySection——apply 窗口/索引补齐期间快照滞后于 filteredItems，
+    /// 旧实现全选只覆盖已应用快照（首屏 500）。
+    func testSelectionScopeCoversFullFilteredSetWhileIndexIncomplete() async {
+        let items = (0..<1_100).map { makeItem($0) }
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        XCTAssertEqual(vm.isIndexComplete, false, "前置：索引未完成（首屏 500）")
+        var state = SelectionState()
+        state.begin(scope: vm.selectionScopeIDs, initial: nil)
+        state.selectAll()
+        XCTAssertEqual(state.selected.count, vm.filteredItems.count,
+                       "索引未完成时全选计数 == filteredItems.count")
+        // 补齐后：filteredItems = 1100，旧快照口径全选只有首屏量（≤500）
+        await vm.ensureIndexComplete()
+        XCTAssertEqual(vm.filteredItems.count, 1_100)
+        state = SelectionState()
+        state.begin(scope: vm.selectionScopeIDs, initial: nil)
+        state.selectAll()
+        XCTAssertEqual(state.selected.count, 1_100,
+                       "补齐后全选计数 == filteredItems.count（不是首屏 500）")
+    }
+
+    /// A08「索引补齐丢选中」：快照追加 500（补齐批次）后，已选 id 不得被
+    /// 滞后快照口径的 scope 收敛丢弃。快照回调收敛口径必须与选中 scope 同源
+    /// （filteredItems 全量）。
+    func testSelectionSurvivesSnapshotAppend() async {
+        let items = (0..<1_100).map { makeItem($0) }
+        let vm = makeViewModel(FakeAssetRepository(items))
+        await vm.start()
+        await vm.ensureIndexComplete()
+        // 选「首屏快照不含、补齐后才出现」的 id（模拟 apply 窗口内的滞后快照）
+        let lateID = vm.filteredItems[800].id
+        let firstSnapshotIDs = Set(snapshots.first?.items.flatMap { $0.map(\.id) } ?? [])
+        XCTAssertFalse(firstSnapshotIDs.contains(lateID), "前置：首屏快照不含补齐 id")
+        let state = SelectionState()
+        state.begin(scope: vm.selectionScopeIDs, initial: nil)
+        state.select(lateID)
+        XCTAssertTrue(state.selectedSet.contains(lateID))
+        // 旧实现：快照回调 intersectScope(with: 滞后快照) → 补齐 id 被丢；
+        // 修复后：回调口径取 filteredItems 全量 → 选中不丢
+        state.intersectScope(with: vm.selectionScopeIDs)
+        XCTAssertTrue(state.selectedSet.contains(lateID),
+                      "快照追加 500 后选中不得被滞后 scope 丢弃")
+    }
 }

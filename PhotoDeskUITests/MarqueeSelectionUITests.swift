@@ -627,4 +627,56 @@ final class MarqueeSelectionUITests: XCTestCase {
                                     "取消模式描边必须 danger 红（精确色匹配 ≥ 500，got \(bestRedB)，" +
                                     "shots: \(perShot)，banner: \(bannerAfter)）")
     }
+
+    // MARK: - T07 选中一致性（docs/32 §2.6/§4.3）
+
+    /// 全选必须覆盖 filteredItems 全量：Selection-Count == Filtered-Count（DEBUG 钩子）。
+    /// 旧实现 scope 取网格快照 currentItemsBySection → apply 窗口内计数滞后（A08）。
+    func testSelectAllCoversFullFilteredSet() throws {
+        let app = XCUIApplication()
+        _ = launchSelectableGrid(app)
+        let selectAll = anyElement(app, identifier: "Batch-SelectAll")
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "多选操作行缺全选\n\(hierarchy(app))")
+        let filtered = readFilteredCount(app)
+        XCTAssertGreaterThanOrEqual(filtered, 1,
+                                    "Filtered-Count 钩子必须暴露 viewModel.filteredItems.count\n\(hierarchy(app))")
+        selectAll.tap()
+        let value = waitForSelectionCount(app, atLeast: 1, timeout: 5)
+        XCTAssertEqual(value, filtered,
+                       "全选后计数必须等于 filteredItems.count（Filtered-Count=\(filtered)）")
+        snap(app, "m17-select-all-covers-filtered")
+    }
+
+    /// 退出多选复位（docs/32 §4.3）：多选栏消失、contentOffset 不变、立即单指可滚动。
+    func testExitSelectionResetsState() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let selectAll = anyElement(app, identifier: "Batch-SelectAll")
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "多选操作行缺全选\n\(hierarchy(app))")
+        selectAll.tap()
+        _ = waitForSelectionCount(app, atLeast: 1, timeout: 5)
+        let before = waitForOffsetY(app) ?? -999
+        let done = anyElement(app, identifier: "Batch-Done")
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "缺完成按钮\n\(hierarchy(app))")
+        done.tap()
+        // 多选栏同步消失（「1 帧内」的合成观测口径：2s 轮询）
+        let countLabel = anyElement(app, identifier: "Selection-Count")
+        let goneDeadline = Date().addingTimeInterval(2)
+        while Date() < goneDeadline && countLabel.exists { usleep(100_000) }
+        XCTAssertFalse(countLabel.exists, "退出后多选栏必须消失")
+        let after = waitForOffsetY(app) ?? -998
+        XCTAssertEqual(after, before, "退出多选不得移动网格 before=\(before) after=\(after)")
+        // isScrollEnabled 已同步恢复：立即单指可滚动（纵向让位路径，同 T05 G1）
+        collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo: collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        let endY = waitForOffsetIncrease(app, from: after, atLeast: 150, timeout: 5)
+        XCTAssertGreaterThan(endY - after, 150, "退出后必须立即单指可滚动 start=\(after) end=\(endY)")
+        snap(app, "m17-exit-selection-reset")
+    }
+
+    private func readFilteredCount(_ app: XCUIApplication) -> Int {
+        let label = anyElement(app, identifier: "Filtered-Count")
+        guard label.exists else { return -1 }
+        return Self.parseCount(((label.value as? String) ?? label.label))
+    }
 }
