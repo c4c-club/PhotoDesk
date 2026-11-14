@@ -10,6 +10,7 @@
 | T05 | DONE | c7cd2e7 (test) + b42b9bb (fix) + a29fcd2 (test) + 4cff229 (feat) + 9c9cd9d (refactor) + a92b594/0c949ca/f9e6d11 (fix) + eb3cb13 (fix) | CI run 43569488790 绿：core 442/0 + MarqueeSelectionUITests 10/10 + Performance 4/4；A05==0 | holdElapsed 定时器交付 + 逐帧边缘监视两处接线缺陷根治 |
 | T06 | DONE | 7ad3830 (test) + 57461fd (feat) + 3282246/f39cba9 (fix) + d707089/21b2f6c/ecce878/3dac53b/46b2afc (fix) + 6e53ac7 (fix) + b1549b0/93d5ae0/76426f7/9585327/cc65b08/4599649/8fb5552/8c33727 (fix) + 728f460/409d71b/9057e40/bd7b53b (fix) | CI run 43617711164 绿：core 442/0 + MarqueeSelectionUITests 12/12 + Performance；A07 命中 10 | 角标/压暗/边框单一入口 + 覆盖层坐标补父系偏移（真 bug）+ 精确描边色像素取证 |
 | T07 | DONE | 7fee412 (test) + 601fd0f (fix) + 83879ce (test) + 72b7a7f (fix) | CI run 43622938205 绿：core-linux success + 新单测 2 条 + MarqueeSelectionUITests 14/14 + Performance 4/4；Docker 443/0（性能锁 ~2ms/帧 < 4ms 验收）；A08/A09 PASS | scope 三处取 filteredItems 全量 + applyDelta 增量化 + apply 窗口保留上一帧目标 + 退出同步复位 |
+| T08 | DONE | 32403db (test 红) + 32d2447/86908e4/395a49d/c2aadb2/0c5b7fe (fix X07/X08/X03/X06/X01-02) + fb4548b/87603e8/ca47fa2 (fix X04/X05/A10 下沉) + 7e15ca5/6619074/2d4f648/c8e5f3b (fix 编译残留) | CI run 43633912940 绿：Test 273/0（2 skipped 真库守卫）+ Performance 4/4 + core-linux success；红证据 run 43628732955（红提交 32403db 编译失败）；audit **0 blocking（A10 PASS）** | X01–X10 收口；Feature 层 PHAsset 0 命中 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -165,3 +166,32 @@
 - 耗时上限按「验收值 × 帧数」推导（4ms/帧 × 200 = 800ms），不要拍脑袋 100ms——Docker debug 构建的 O(n) 线性扫描 ~2ms/帧本就达标，先实测再定界。
 - applyDelta 的 remove 路径仍是 O(n) 线性扫描（非严格 O(delta)）：验收口径是「拖一帧 < 4ms」实测达标，不为更优复杂度引入 id→index 反查表（收益不成比例）。
 - 推送前先收 Docker 结果：83879ce 在 Docker 失败确认前已推送，产生一轮必红远端 run（本地 Core 门禁应先于 push 完成）。
+
+## T08 — 其他页面缺陷收口（DONE，2026-11-15）
+
+### 交付物（docs/31 §3 X01–X10，一项一提交；不改滑动多选文件——T02–T07 冻结）
+
+- **X01/X02 相簿**（0c5b7fe）：新建 `AlbumService`（protocol + 实现，Core/Photos）——PHAssetCollection 查询/计数/封面全部收口；服务队列枚举（主线程零 PhotoKit）；计数读 fetchResult.count 不加载对象；封面 fetchLimit 1；PHPhotoLibraryChangeObserver 增量刷新。新建 `AlbumsViewModel`（消费 service + 智能相簿过滤），`AlbumsView` 只读 [AlbumSummary]；AlbumSummary/AlbumListKind 上提为顶层类型。
+- **X03 搜索**（395a49d）：`SearchViewModel(itemsProvider:)` 实时快照源 + `refresh()`（打开/激活时重取重算）+ `apply()` 改 Task.detached 后台 + 代际令牌（过期结果丢弃）；LibraryContainer 传 `{ viewModel.itemsSnapshot }`。
+- **X04 保险箱**（fb4548b）：`favorite(ids:)` 成功后本地 `items[i].withFavorite(true)` 同步 + `onItemsChanged?()`；PhotoItem 新增 withFavorite 副本（id 身份不变，==/hash 不受影响）。
+- **X05 导出**（87603e8）：`requestSourceURL` 改 `defer { downloadProgress = nil }`（失败/取消路径复位）；取件下沉 PhotoWriter（禁网络）。
+- **X06 元数据**（c2aadb2）：新建 `MetadataService`（protocol + 实现）——字节数/格式/EXIF（禁网络取件 → ImageIO → MetadataParser）全部 Task.detached 后台，主线程只赋值；MetadataView 数据层整体删除。
+- **X07 增量插入**（32d2447）：`LibraryViewModel.mergedItems` 纯函数——索引未完成时插入一律 append（allItems 是窗口子集，fetchResult 索引≠数组索引）+ 依赖 rebuildDerived 重排；索引完成保持原位插入。
+- **X08 像素尺寸**（86908e4）：`LibraryGridLayout.itemWidth(for:rowWidth:)` 与 make() 同源；cellPixelSize 改读 collectionView 行宽 + 该公式（旧实现读 root view 宽）。
+- **X09/X10**：核对——SlideSelectGestureController 已随 T05 删除（新控制器无「setContentOffset 后取值且两支相同」类诊断缺陷）；SlideSelectPolicy 死代码已随 T02/T04 删除（A19 audit PASS 0 处）。零代码改动。
+- **A10 收口**（87603e8/ca47fa2）：PhotoWriterProtocol 新增 `requestEditingInfo(assetID:allowNetwork:) -> PhotoEditingInfo`（URL/拍摄日期/是否含编辑数据；PhotoWriter + 两处 Mock + UndoCenterTests 私有 mock 同步实现）；Editor/Export 全部改走该入口。`grep PHAsset PhotoDesk/Features` **0 命中（含注释）**。
+- 测试 12 条新增：Albums 2（透传/过滤 + 库变化自动重载）、Search 2（实时快照 + 后台 apply 口径一致）、Vault 1（收藏本地同步 + 回调，simulatorBypass 装载）、Export 1（失败路径进度复位）、Metadata 2（真库通道，空库 XCTSkip）、X07 2（append 分支/原位插入）、X08 1（itemWidth 公式）。
+
+### 门禁证据
+
+- 红：32403db 红提交（12 条红用例，引用不存在的新 API）——主分支派发 run 43627921202 被推送触发的并发取消未落证 → **一次性分支 m17-t08-red-evidence（= 32403db）重放取证：run 43628732955 failure**（Albums/Vault 等新类型 cannot find in scope 编译失败实录）；Vault/Export 两条断言红随主分支修复周期实证（第一波绿候选 run 43628490559 的 Vault/Export 未跑至断言层——编译层红已覆盖门禁）。
+- 中途红（编译残留，真实 CI 每步实锤）：run 43628490559 3 败（Editor 尾段 input 残留/AlbumsView 旧 State 绑定/IndexSet→[Int]）→ 7e15ca5；run 43629963306 1 败（预览底图 url 重复行）→ 6619074；run 43630878728 1 败（VaultViewModelTests 缺 import Photos）→ 2d4f648；run 43632715926 1 败（fetchAssets 重载歧义）→ c8e5f3b。
+- 绿：run 43633912940 **success**（c8e5f3b）——core-linux success；Test (simulator) **273 tests，0 failures（2 skipped = 元数据真库用例空库守卫）**；Performance 4/4；TEST SUCCEEDED ×2。
+- 验收：audit-m17 本地复跑 **0 blocking failures**（A10 PASS 命中 0；T01 基线的 9 项 BLOCKING 至此全部 PASS）；每项 ≥1 条单测 ✓；相簿首屏：< 300ms 由结构保证（枚举全在服务队列，View 首帧不等 PhotoKit——200 相簿场景无法在 CI 合成，结构性达标登记）。
+
+### 教训
+
+- 主分支推送会取消同 ref 进行中的 run（concurrency 按 ref 分组）：跨分支取证（一次性 evidence 分支）可在不动主分支的前提下重放红提交——红证据永不缺席。
+- 大卡拆分「一项一提交」时要保证每个中间提交可编译：容器（AppContainer）引用两个新服务的声明必须与文件同提交落地，否则中间提交悬空。
+- PHFetchResult 的 removedIndexes/changedIndexes/insertedIndexes 全是 IndexSet——签名用 [Int] 的纯函数在调用点显式 Array() 转换；PhotoKit 枚举重载（fetchAssets(with:)）在 nil 实参下歧义，显式传 PHFetchOptions()。
+- 编辑器取件语义（URL/拍摄日期/adjustmentData）与导出（禁网 URL）、元数据（禁网 EXIF）三处消费不同字段——统一 PhotoEditingInfo 快照一次下沉，三处全清。
