@@ -3,8 +3,10 @@
 //（docs/32 §2.2 状态表；阈值只取 SelectionGestureConfig / SlideSelectConfig，App 层零判定数字），
 // 本类只做 UIKit 事件映射与效果执行：
 //   TouchDownObserver（UILongPress minimumPressDuration=0）→ touchDown(point:hitID:)（G3 按下点取证）
-//   UILongPress（0.28s / allowableMovement 8，取自 SelectionGestureConfig）→ holdElapsed
-//   marqueePan（单指）→ moved(dx:dy:) / edgeEntered / edgeExited / ended / cancelled
+//   holdElapsed 双通道交付：UILongPress（时长/位移取自 SelectionGestureConfig）+ 按下定时器
+//   （触点在屏时补发，识别器失效不至于丢长按；机器 state/位移守卫保证幂等）
+//   marqueePan（单指）→ moved(dx:dy:) / ended / cancelled；edgeEntered/edgeExited 由
+//   dragging/autoScrolling 期间的逐帧边缘监视交付（指尖停边缘不动也持续滚动，docs/32 §2.4）
 //   scrollViewWillBeginDragging（VC 转发）→ scrollStarted
 // 效果执行：enterSelection → VC 进多选并选锚点；beginMarquee / endMarquee 与 isScrollEnabled
 // 成对（docs/32 §2.3「进入 armed 后禁滚动」；releaseScroll 由机器在方向让位/收尾时配对补发）；
@@ -40,6 +42,7 @@ final class LibrarySelectionController: NSObject {
 
     private weak var collectionView: UICollectionView?
     private var machine: SelectionGestureMachine
+    private var gestureConfig = SelectionGestureConfig()
     private var baseIDs: Set<String> = []
     private var mode: MarqueeMode = .select
     private var lastTargetIDs: Set<String> = []
@@ -52,6 +55,10 @@ final class LibrarySelectionController: NSObject {
     /// 本次触摸已进入过多选（armed 起）：didSelectItemAt 在 touch-up 后 0.3s 内跳过重复 toggle。
     private var consumedTouch = false
     private var consumedTouchEndedAt: TimeInterval = 0
+    /// holdElapsed 定时器：识别器判定在合成触控上偶发失效，触点在屏时按同一时长补发（幂等）。
+    private var holdElapsedTimer: Timer?
+    /// dragging/autoScrolling 期间逐帧边缘监视：指尖停在边缘不动（无 .changed）也要进自动滚动。
+    private var edgeMonitorLink: CADisplayLink?
     private let selectHaptic = UISelectionFeedbackGenerator()
     private let impactHaptic = UIImpactFeedbackGenerator(style: .light)
 
@@ -75,6 +82,7 @@ final class LibrarySelectionController: NSObject {
     init(collectionView: UICollectionView, config: SelectionGestureConfig = SelectionGestureConfig()) {
         self.collectionView = collectionView
         self.machine = SelectionGestureMachine(config: config)
+        self.gestureConfig = config
         super.init()
         // TouchDownObserver：0 时长长按，只用于记录按下点（G3：框选起点 = 按下点而非 pan 触发点）
         let touchDown = UILongPressGestureRecognizer(target: self, action: #selector(handleTouchDown(_:)))
@@ -130,6 +138,9 @@ final class LibrarySelectionController: NSObject {
                 lastTargetIDs = baseIDs
             }
             feed(.touchDown(point: GridPoint(x: Double(content.x), y: Double(content.y)), hitID: hitID))
+            if machine.state == .pressing {
+                scheduleHoldElapsed()
+            }
         case .ended, .cancelled, .failed:
             feedEnd(cancelled: gesture.state != .ended)
         default:
@@ -173,6 +184,10 @@ final class LibrarySelectionController: NSObject {
     /// 退出多选统一收尾：滚链/显示恢复、机器复位。
     func finishSelection() {
         invalidateAutoScroll()
+        holdElapsedTimer?.invalidate()
+        holdElapsedTimer = nil
+        edgeMonitorLink?.invalidate()
+        edgeMonitorLink = nil
         if collectionView?.isScrollEnabled == false {
             collectionView?.isScrollEnabled = true
         }
@@ -198,7 +213,28 @@ final class LibrarySelectionController: NSObject {
         if consumedTouch {
             consumedTouchEndedAt = CACurrentMediaTime()
         }
+        holdElapsedTimer?.invalidate()
+        holdElapsedTimer = nil
         feed(event)
+    }
+
+    /// docs/32 §2.2 holdElapsed 的定时器交付：时长取自同一 config，机器侧
+    /// state == .pressing + 位移资格守卫保证与识别器交付幂等、语义一致。
+    private func scheduleHoldElapsed() {
+        holdElapsedTimer?.invalidate()
+        let timer = Timer(timeInterval: TimeInterval(gestureConfig.longPressDuration),
+                          target: self,
+                          selector: #selector(holdElapsedFired),
+                          userInfo: nil,
+                          repeats: false)
+        RunLoop.main.add(timer, forMode: .common)
+        holdElapsedTimer = timer
+    }
+
+    @objc private func holdElapsedFired() {
+        holdElapsedTimer = nil
+        guard touchDownObserver.state == .began, machine.state == .pressing else { return }
+        feed(.holdElapsed)
     }
 
     private func apply(_ effects: [SelectionGestureEffect]) {
@@ -242,6 +278,28 @@ final class LibrarySelectionController: NSObject {
                 invalidateAutoScroll()
             }
         }
+        if machine.state == .dragging || machine.state == .autoScrolling {
+            ensureEdgeMonitor()
+        }
+    }
+
+    /// docs/32 §2.4「指尖停在边缘区持续滚动」：逐帧检测边缘进出，
+    /// 不依赖 pan 的 .changed 事件（指尖静止时无事件，仅靠它会卡在 dragging 不进 autoScrolling）。
+    private func ensureEdgeMonitor() {
+        guard edgeMonitorLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(edgeMonitorTick(_:)))
+        link.preferredFramesPerSecond = 60
+        link.add(to: .main, forMode: .common)
+        edgeMonitorLink = link
+    }
+
+    @objc private func edgeMonitorTick(_ link: CADisplayLink) {
+        guard machine.state == .dragging || machine.state == .autoScrolling else {
+            edgeMonitorLink?.invalidate()
+            edgeMonitorLink = nil
+            return
+        }
+        feedEdgeEvents()
     }
 
     // MARK: 框选命中（矩形语义与 T04 GridHitTester 对接）
