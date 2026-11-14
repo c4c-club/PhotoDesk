@@ -202,6 +202,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let spacing = CGFloat(DSSpacing.gridSpacing)
         for columns in [2, 3, 4, 5] {
             let (cv, layout, _) = makeParamGrid(columns: columns)
+            cv.layoutIfNeeded()
             cv.setContentOffset(.zero, animated: false)
             cv.collectionViewLayout.invalidateLayout()
             cv.layoutIfNeeded()
@@ -218,6 +219,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     func testMarqueeHitSelectsA3_7NotA3_6() throws {
         let (cv, layout, _) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
         cv.setContentOffset(.zero, animated: false)
         cv.collectionViewLayout.invalidateLayout()
         cv.layoutIfNeeded()
