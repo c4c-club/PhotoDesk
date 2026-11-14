@@ -475,7 +475,8 @@ final class MarqueeSelectionUITests: XCTestCase {
     }
 
     /// 区域内统计边框色像素：R 通道占优（danger 红）与 B 通道占优（tint 蓝）。
-    /// 判定阈值：主通道比其余两通道高 40（0x007AFF b=255 r=0；0xE53935 r=229 g≈57 b≈53）。
+    /// 精确描边色匹配：覆盖层描边不透明，像素即纯色——danger 0xE53935=(229,57,53)、
+    /// tint 0x007AFF=(0,122,255)，容差 25。底色（含黄格 r 主导噪声）不参与判定，对模式判别免疫。
     private func dominantStrokePixels(in image: UIImage, region: CGRect) -> (red: Int, blue: Int) {
         guard let cg = image.cgImage else { return (0, 0) }
         let scale = cg.width / Int(image.size.width.rounded())
@@ -496,8 +497,8 @@ final class MarqueeSelectionUITests: XCTestCase {
                 let offset = row + x * bpp
                 if offset + 3 >= CFDataGetLength(data) { continue }
                 let r = Int(ptr[offset]), g = Int(ptr[offset + 1]), b = Int(ptr[offset + 2])
-                if r > g + 40, r > b + 40 { red += 1 }
-                if b > r + 40, b > g + 40 { blue += 1 }
+                if abs(r - 229) < 25, abs(g - 57) < 25, abs(b - 53) < 25 { red += 1 }
+                if r < 25, abs(g - 122) < 25, b > 230 { blue += 1 }
             }
         }
         return (red, blue)
