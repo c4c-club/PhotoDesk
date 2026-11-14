@@ -224,7 +224,7 @@ final class LibraryViewController: UIViewController {
         let preRotation = makePositionSnapshot()
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
-            self.collectionView.collectionViewLayout = self.makeLayout(columns: self.columns)
+            self.collectionView.collectionViewLayout = LibraryGridLayout.make(columns: self.columns)
             self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
         }, completion: { [weak self] _ in
             guard let self, let preRotation else { return }
@@ -238,7 +238,7 @@ final class LibraryViewController: UIViewController {
     // MARK: - 构建
 
     private func setupCollectionView() {
-        collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: makeLayout(columns: columns))
+        collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: LibraryGridLayout.make(columns: columns))
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         collectionView.backgroundColor = .clear
         collectionView.delegate = self
@@ -1713,41 +1713,13 @@ final class LibraryViewController: UIViewController {
         }
         columns = clamped
         if animated && usesMotion {
-            collectionView.setCollectionViewLayout(makeLayout(columns: clamped), animated: true) { _ in
+            collectionView.setCollectionViewLayout(LibraryGridLayout.make(columns: clamped), animated: true) { _ in
                 completion?()
             }
         } else {
-            collectionView.collectionViewLayout = makeLayout(columns: clamped)
+            collectionView.collectionViewLayout = LibraryGridLayout.make(columns: clamped)
             completion?()
         }
-    }
-
-    // MARK: - 布局
-
-    private func makeLayout(columns: Int) -> UICollectionViewCompositionalLayout {
-        let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0 / CGFloat(columns)),
-                                              heightDimension: .fractionalHeight(1.0))
-        let item = NSCollectionLayoutItem(layoutSize: itemSize)
-
-        let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                               heightDimension: .fractionalWidth(1.0 / CGFloat(columns)))
-        // subitem:count: 把单个 item 复制为 columns 列
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: item, count: columns)
-        group.interItemSpacing = .fixed(DSSpacing.gridSpacing)
-
-        let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = DSSpacing.gridSpacing
-        section.contentInsets = .zero
-
-        // 粘性月份分组头（docs/04 §3.1：2026年10月 · 128 张）
-        let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                                heightDimension: .absolute(48))
-        let header = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize,
-                                                                 elementKind: UICollectionView.elementKindSectionHeader,
-                                                                 alignment: .top)
-        header.pinToVisibleBounds = true
-        section.boundarySupplementaryItems = [header]
-        return UICollectionViewCompositionalLayout(section: section)
     }
 
     override func viewDidAppear(_ animated: Bool) {

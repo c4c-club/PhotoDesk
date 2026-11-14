@@ -1,5 +1,5 @@
-// MARK: - 职责说明：真实 UICollectionViewCompositionalLayout 网格几何红测试（M17 T01，docs/31 §2.2 G8/H1）——
-// 用与 LibraryViewController.makeLayout 同参的真实布局（3 列 / 48pt 粘性头 / pinToVisibleBounds）
+// MARK: - 职责说明：真实 UICollectionViewCompositionalLayout 网格几何测试（M17 T01 红 / T04 绿，docs/31 §2.2 G8/H1）——
+// 用生产布局工厂 LibraryGridLayout.make 的真实布局（3 列 / 48pt 粘性头 / pinToVisibleBounds）
 // + contentOffset.y = 5000 实测：可视段头的 supplementary attributes.minY 必须等于该段首格
 // minY - 头高。pinToVisibleBounds 把钉住的头的 minY 平移到视口顶时差值达数百 pt → H1 实锤；
 // 若差值为 0 则 H1 被证伪（supplementary attributes 未被 pin 污染）。T04 真几何改造的验收锚点。
@@ -14,31 +14,14 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         continueAfterFailure = false
     }
 
-    // 与 LibraryViewController.makeLayout(:1727-1751) 同参，改布局必须两边同步
     private let columns = 3
     private let headerHeight: CGFloat = DSSpacing.monthHeaderHeight
     private let sectionCount = 10
     private let itemsPerSection = 30
 
+    /// T04 起直接用生产布局工厂（镜像已删，弃用 API 警告随之消除）
     private func makeRealGrid() -> (collectionView: UICollectionView, layout: UICollectionViewCompositionalLayout) {
-        let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0 / CGFloat(columns)),
-                                              heightDimension: .fractionalHeight(1.0))
-        let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                               heightDimension: .fractionalWidth(1.0 / CGFloat(columns)))
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: item, count: columns)
-        group.interItemSpacing = .fixed(DSSpacing.gridSpacing)
-        let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = DSSpacing.gridSpacing
-        section.contentInsets = .zero
-        let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                                heightDimension: .absolute(headerHeight))
-        let header = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize,
-                                                                 elementKind: UICollectionView.elementKindSectionHeader,
-                                                                 alignment: .top)
-        header.pinToVisibleBounds = true
-        section.boundarySupplementaryItems = [header]
-        let layout = UICollectionViewCompositionalLayout(section: section)
+        let layout = LibraryGridLayout.make(columns: columns)
         let cv = UICollectionView(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
                                   collectionViewLayout: layout)
         cv.dataSource = self
