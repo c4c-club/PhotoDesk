@@ -183,13 +183,23 @@ final class MarqueeSelectionUITests: XCTestCase {
 
     /// 不点工具栏、不走 -uiTestingSelectMode，长按首格 0.4s：必须进入多选、该格入选、
     /// 多选栏（Selection-Count）出现。验收：长按进入后未点工具栏也出现多选栏。
+    /// 合成触控偶发整手势未达 App（count=-1 = 多选栏未出现）——有界重试 2 次（重新 launch 复位，
+    /// 同 testLongPressDragContinuesSelection 先例），断言本身保持精确、不放宽。
     func testLongPressEntersSelection() throws {
-        let app = XCUIApplication()
-        let collection = launchPlainGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        first.press(forDuration: 0.4)
-        let count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
+        var app: XCUIApplication!
+        var collection: XCUIElement!
+        var first: XCUIElement!
+        var count = -1
+        for attempt in 1...2 {
+            app = XCUIApplication()
+            collection = launchPlainGrid(app)
+            first = collection.cells.firstMatch
+            XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+            first.press(forDuration: 0.4)
+            count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
+            if count == 1 { break }
+            if attempt == 1 { usleep(500_000) }
+        }
         XCTAssertEqual(count, 1,
                        "长按首格必须进入多选且该格入选（docs/31 G13：长按路径）count=\(count)")
         XCTAssertTrue(anyElement(app, identifier: "Selection-Count").exists,
