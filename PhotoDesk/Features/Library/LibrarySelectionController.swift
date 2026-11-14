@@ -50,6 +50,9 @@ final class LibrarySelectionController: NSObject {
     private(set) var mode: MarqueeMode = .select
     /// 最近一次 beginMarquee 时刻的模式快照（UI 测试取证：横幅刷新滞后时仍可读到按下帧真值）。
     private(set) var debugArmModeRaw: Int = -1
+    /// 最近一次按下帧取证：基集合大小与命中 id（UI 测试定位锚点判定分歧）。
+    private(set) var debugTouchDownBaseCount = -1
+    private(set) var debugTouchDownHitID: String = "-"
     private var lastTargetIDs: Set<String> = []
     private var lastFingerWindowPoint: CGPoint = .zero
     private var lastPanTranslation: CGPoint = .zero
@@ -150,6 +153,10 @@ final class LibrarySelectionController: NSObject {
                 baseIDs = selectedIDsProvider()
                 mode = MarqueeSelectionPolicy.mode(baseIDs: baseIDs, anchorID: hitID)
                 lastTargetIDs = baseIDs
+                #if DEBUG
+                debugTouchDownBaseCount = baseIDs.count
+                debugTouchDownHitID = hitID
+                #endif
             }
             feed(.touchDown(point: GridPoint(x: Double(content.x), y: Double(content.y)), hitID: hitID))
             if machine.state == .pressing {
