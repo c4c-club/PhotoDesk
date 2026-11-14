@@ -1,19 +1,9 @@
 // MARK: - 职责说明：单指滑选纯逻辑——边缘自动滚动速度与 contentOffset 钳制下沉 Core；
-// 仅用 Double 与自定义 cell 值类型，零 UIKit / IndexPath / 图片对象。
-// 方向锁 / 长按判定已迁往 SelectionGestureMachine（M17 T02，docs/32 §2.2）；
-// 旧方向锁 / 往返奇偶选择死代码已删除（docs/31 X10）。
+// 仅用 Double，零 UIKit / IndexPath / 图片对象。SlideSelectCell 随参数推算命中路径
+// 一并于 M17 T04 删除（命中由 App 层 GridHitTester 真实 attributes 完成，docs/32 §2.4）；
+// 方向锁 / 长按判定已迁往 SelectionGestureMachine（M17 T02，docs/32 §2.2）。
 
 import Foundation
-
-public struct SlideSelectCell: Hashable, Codable, Sendable {
-    public let section: Int
-    public let item: Int
-
-    public init(section: Int, item: Int) {
-        self.section = section
-        self.item = item
-    }
-}
 
 public enum SlideSelectPolicy {
     /// 顶部缓冲区返回负速度，底部缓冲区返回正速度；缓冲区外返回 0。

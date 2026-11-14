@@ -48,6 +48,8 @@ final class LibraryViewController: UIViewController {
     /// M13 P3：单指滑选编排器（Core 纯策略 + UIKit 映射；长按二维框选整条移除）。
     private var slideSelectController: SlideSelectGestureController?
     private var slideSelectPan: UIPanGestureRecognizer?
+    /// M17 T04：框选命中测试器（真实 layoutAttributes；缓存随快照/列数/布局 pass 失效）
+    private var gridHitTester: GridHitTester?
     // MARK: - 快照缓存
 
     private var currentSections: [MonthSection] = []
@@ -762,8 +764,16 @@ final class LibraryViewController: UIViewController {
             self?.applySlideSelection(ids: ids)
         }
         controller.scopeProvider = { [weak self] in self?.selectionState.scope }
-        controller.geometryProvider = { [weak self] in
-            self?.marqueeGeometry()
+        gridHitTester = GridHitTester(collectionView: collectionView)
+        controller.hitTestProvider = { [weak self] rect in
+            guard let self, let tester = self.gridHitTester else { return [] }
+            var ids = Set<String>()
+            for path in tester.hitTest(rectInContent: rect) {
+                if let item = self.dataSource.itemIdentifier(for: path) {
+                    ids.insert(item.id)
+                }
+            }
+            return ids
         }
         slideSelectController = controller
         slideSelectPan = controller.pan
@@ -952,42 +962,9 @@ final class LibraryViewController: UIViewController {
 
     // MARK: - M13 P3 单指滑动连续多选（VC 只做映射，判定全在 SlideSelectPolicy）
 
-    /// 把 Core 行带计算出的目标 id 集合整体落到 SelectionState；只 diff 可见 cell，计数仅变化时刷新。
-    /// docs/25 §6.2：框选用网格几何（pt 单位）；sectionOriginY 取真实补充视图 minY，
-    /// 远距离估算布局回退累计估算（header + rows × pitch）。
-    private func marqueeGeometry() -> (metrics: GridMetrics, sectionOriginY: [Double])? {
-        guard collectionView.bounds.width > 0, !currentItemsBySection.isEmpty else { return nil }
-        let spacing = Double(DSSpacing.gridSpacing)
-        let header = Double(DSSpacing.monthHeaderHeight)
-        let width = Double(collectionView.bounds.width)
-        let itemSide = (width - spacing * Double(max(1, columns - 1))) / Double(max(1, columns))
-        guard itemSide.isFinite, itemSide > 0 else { return nil }
-        let counts = (0..<collectionView.numberOfSections).map { collectionView.numberOfItems(inSection: $0) }
-        guard counts.count == currentItemsBySection.count, !counts.isEmpty else { return nil }
-        let pitchY = itemSide + spacing
-        var origins: [Double] = []
-        var nextEstimate: Double = 0
-        for section in 0..<counts.count {
-            let rows = Int((Double(max(1, counts[section])) / Double(max(1, columns))).rounded(.up))
-            if let attrs = collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
-                ofKind: UICollectionView.elementKindSectionHeader,
-                at: IndexPath(item: 0, section: section)) {
-                origins.append(Double(attrs.frame.minY))
-                nextEstimate = Double(attrs.frame.maxY) + Double(rows) * pitchY
-            } else {
-                origins.append(nextEstimate)
-                nextEstimate += header + Double(rows) * pitchY
-            }
-        }
-        let metrics = GridMetrics(columns: columns,
-                                  itemWidth: itemSide,
-                                  itemHeight: itemSide,
-                                  interItemSpacing: spacing,
-                                  sectionHeaderHeight: header,
-                                  sectionItemCounts: counts)
-        return (metrics, origins)
-    }
-
+    /// 把框选命中的目标 id 集合整体落到 SelectionState；只 diff 可见 cell，计数仅变化时刷新。
+    /// M17 T04：矩形命中改由 GridHitTester 读真实 layoutAttributes（原网格参数推算路径已删，
+    /// docs/32 §2.4；G7/G8/G9/G11 与 A09/A15 随之根治）。
     private func applySlideSelection(ids: Set<String>) {
         let previous = selectionState.selectedSet
         guard previous != ids else { return }
@@ -1733,6 +1710,9 @@ final class LibraryViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // M17 T04：布局 pass 是命中缓存的唯一失效入口（snapshot apply / 列数切换 / 旋转
+        // 最终都会触发本轮布局）——下次框选帧重建段几何缓存
+        gridHitTester?.invalidateGeometry()
         // 首次布局前 dequeue 的 cell 拿到的是占位尺寸：布局稳定后重配可视 cell（缓存键含尺寸）。
         // M12（验证轮 12 .ips 实锤）：reloadItems 绕过 Diffable 数据源——与进行中的 dataSource.apply
         // 撞车即触发 _existingNumberOfItemsInSection abort；apply 窗口内推迟到下一轮主循环。

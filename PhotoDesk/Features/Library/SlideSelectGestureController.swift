@@ -2,8 +2,9 @@
 // idle → pressing → selecting → autoScrolling → finished；移动 ≥3pt 激活。
 // began 记录 startPoint（content 坐标，激活后不再变）、anchorID、baseIDs、
 // mode = baseIDs.contains(anchorID) ? .deselect : .select。
-// 每帧：MarqueeRect(startPoint, currentContentPoint) → MarqueeSelectionPolicy.cells(in:)
-// → itemIDProvider 映射 → resolved(base:hitIDs:mode:scope) → 集合变化才 apply/haptic。
+// 每帧：矩形（内容坐标，startPoint→当前指尖；零尺寸扩 1pt 命中起手 cell）→ VC 注入
+// hitTestProvider（GridHitTester 真实 layoutAttributes，docs/32 §2.4）→ resolved(base:hitIDs:mode:scope)
+// → 集合变化才 apply/haptic。
 // 回拖自然收缩；无 lastCurrentCell/visited/parity/insert-only；边缘 60pt 自动滚动逐帧重算；
 // cancelsTouchesInView=false，轻点仍走 didSelectItemAt。
 
@@ -57,8 +58,8 @@ final class SlideSelectGestureController: NSObject {
     var itemIDProvider: (IndexPath) -> String? = { _ in nil }
     /// VC 注入：把目标选中 id 集合整体落到 selectionState / 可见 cell / 徽标 / 计数。
     var applyTargetIDs: (Set<String>) -> Void = { _ in }
-    /// VC 注入：当前网格几何（列数/单元尺寸/间距/头高/每 section 数量 + section originY）。
-    var geometryProvider: () -> (metrics: GridMetrics, sectionOriginY: [Double])? = { nil }
+    /// VC 注入：矩形（内容坐标）→ 命中 id 集合（GridHitTester 真实 attributes + dataSource 映射）。
+    var hitTestProvider: (CGRect) -> Set<String> = { _ in [] }
 
     /// 单指框选 pan（delegate 由 VC 设置）。
     let pan = UIPanGestureRecognizer()
@@ -140,23 +141,19 @@ final class SlideSelectGestureController: NSObject {
         processFinger(atWindowPoint: lastFingerWindowPoint)
     }
 
-    /// 每帧：矩形 → 命中 cell → 目标集合；只有集合变化才刷新/haptic。
+    /// 每帧：矩形 → hitTestProvider 命中 → 目标集合；只有集合变化才刷新/haptic。
     private func processFinger(atWindowPoint: CGPoint) {
-        guard let collectionView,
-              let current = windowToContent(atWindowPoint),
-              let geometry = geometryProvider() else { return }
-        let rect = MarqueeRect(startX: Double(startPoint.x), startY: Double(startPoint.y),
-                               currentX: Double(current.x), currentY: Double(current.y))
-        let hitCells = MarqueeSelectionPolicy.cells(in: rect,
-                                                    metrics: geometry.metrics,
-                                                    sectionOriginY: geometry.sectionOriginY)
-        var hitIDs = Set<String>()
-        for cell in hitCells {
-            let path = IndexPath(item: cell.item, section: cell.section)
-            if let id = itemIDProvider(path) {
-                hitIDs.insert(id)
-            }
-        }
+        guard let current = windowToContent(atWindowPoint) else { return }
+        // 矩形（内容坐标）：start→current；宽/高为 0 扩展 1pt（起手 cell 命中，与旧 cells() 语义一致）
+        let minX = min(startPoint.x, current.x)
+        let maxX = max(startPoint.x, current.x)
+        let minY = min(startPoint.y, current.y)
+        let maxY = max(startPoint.y, current.y)
+        let clampedMaxX = maxX - minX < 1 ? minX + 1 : maxX
+        let clampedMaxY = maxY - minY < 1 ? minY + 1 : maxY
+        let rect = CGRect(x: minX, y: minY,
+                          width: clampedMaxX - minX, height: clampedMaxY - minY)
+        let hitIDs = hitTestProvider(rect)
         let target = MarqueeSelectionPolicy.resolved(base: baseIDs,
                                                      hitIDs: hitIDs,
                                                      mode: mode,
