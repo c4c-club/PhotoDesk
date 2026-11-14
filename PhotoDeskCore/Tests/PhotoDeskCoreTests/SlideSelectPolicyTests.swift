@@ -1,64 +1,11 @@
+// MARK: - 职责说明：SlideSelectPolicy 边缘速度 / offset 钳制单测。
+// 旧方向锁 / 往返奇偶选择死代码测试已随函数删除（M17 T02，docs/31 X10）；
+// 方向锁 / 长按 / 边缘配对判定改由 SelectionGestureMachineTests 覆盖。
+
 import XCTest
 @testable import PhotoDeskCore
 
 final class SlideSelectPolicyTests: XCTestCase {
-    private let a = SlideSelectCell(section: 0, item: 0)
-    private let b = SlideSelectCell(section: 0, item: 1)
-    private let c = SlideSelectCell(section: 0, item: 2)
-
-    func testHorizontalWinsOnlyWhenStrictlyGreater() {
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 12, dy: 3, wasLocked: false), .horizontal)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: -12, dy: -3, wasLocked: false), .horizontal)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 12, dy: 12, wasLocked: false), .verticalLocked)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 2, dy: 12, wasLocked: false), .verticalLocked)
-    }
-
-    func testVerticalLockNeverReactivatesInSameGesture() {
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 20, dy: 1, wasLocked: true), .verticalLocked)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 0, dy: 0, wasLocked: true), .none)
-    }
-
-    func testZeroAndNonFiniteNeverActivate() {
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: 0, dy: 0, wasLocked: false), .none)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: .nan, dy: 1, wasLocked: false), .verticalLocked)
-        XCTAssertEqual(SlideSelectPolicy.shouldActivate(dx: .infinity, dy: 2, wasLocked: false), .verticalLocked)
-    }
-
-    func testVisitedCellsBecomeSelected() {
-        let result = SlideSelectPolicy.resolvedSelection(originallySelected: [], visited: [a, b, c])
-        XCTAssertEqual(result[a], true)
-        XCTAssertEqual(result[b], true)
-        XCTAssertEqual(result[c], true)
-    }
-
-    func testOriginallySelectedCellsAreNeverCleared() {
-        let result = SlideSelectPolicy.resolvedSelection(originallySelected: [a], visited: [a, b, a, b])
-        XCTAssertEqual(result[a], true)
-        XCTAssertEqual(result[b], false)
-    }
-
-    func testSlidingBackRestoresSnapshotForUnselectedCells() {
-        let result = SlideSelectPolicy.resolvedSelection(originallySelected: [], visited: [a, b, c, a, b])
-        XCTAssertEqual(result[a], false)
-        XCTAssertEqual(result[b], false)
-        XCTAssertEqual(result[c], true)
-    }
-
-    func testThirdPassSelectsAgain() {
-        let result = SlideSelectPolicy.resolvedSelection(originallySelected: [], visited: [a, b, a, b, a])
-        XCTAssertEqual(result[a], true)
-        XCTAssertEqual(result[b], false)
-    }
-
-    func testDeduplicatedKeepsConsecutiveOrderOnly() {
-        let cells = [a, a, b, b, a, c, c]
-        XCTAssertEqual(SlideSelectPolicy.deduplicated(cells), [a, b, a, c])
-    }
-
-    func testEmptyVisitedHasNoSelectionWrites() {
-        XCTAssertTrue(SlideSelectPolicy.resolvedSelection(originallySelected: [], visited: []).isEmpty)
-        XCTAssertEqual(SlideSelectPolicy.deduplicated([]), [])
-    }
 
     func testTopEdgeVelocityIsNegativeAndProportional() {
         let atEdge = SlideSelectPolicy.edgeVelocity(fingerY: 0, top: 0, bottom: 800, buffer: 60, minStep: 1, maxStep: 18)
