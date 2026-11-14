@@ -1,6 +1,8 @@
 // MARK: - 职责说明：多选手势纯逻辑状态机（M17 T02，docs/32 §2.2）——
 // idle → pressing → armed → dragging ⇄ autoScrolling → ending → idle；
 // 长按进入 / 方向锁 / 滚动让位 / 边缘自动滚动判定全部收口在此（Foundation-only，可 Docker 单测），
+// 触点用 Core 自有 GridPoint（Double 版）：Foundation 导入的 CGPoint 在 Darwin 不满足 Equatable 合成，
+// 且红线 2 禁止几何类型进 Core；
 // App 层（T05 接线）只做 UIKit 事件映射与效果执行。
 // 事件在 docs/32 §2.2 六事件之外补 edgeEntered(direction:)/edgeExited：状态表第 7/8 行
 // 「指尖进/离边缘」的事件载体——边缘检测属于 App 层（知晓视口几何），机器只做判定与配对。
@@ -37,7 +39,7 @@ public enum SelectionGestureHaptic: Equatable, Sendable {
 }
 
 public enum SelectionGestureEvent: Equatable, Sendable {
-    case touchDown(point: CGPoint, hitID: String?)
+    case touchDown(point: GridPoint, hitID: String?)
     case holdElapsed
     case moved(dx: Double, dy: Double)
     case scrollStarted
@@ -77,7 +79,7 @@ public struct SelectionGestureMachine: Sendable {
     public var isSelectionModeActive = false
     public private(set) var state: SelectionGestureState = .idle
     /// 本次手势的真实按下点（G3：框选起点必须是按下点而非 pan 触发点）；收尾后为 nil。
-    public private(set) var pressPoint: CGPoint?
+    public private(set) var pressPoint: GridPoint?
 
     private var pressStartTime: TimeInterval = 0
     private var anchorID: String?
@@ -119,7 +121,7 @@ public struct SelectionGestureMachine: Sendable {
 
     // MARK: - 触点与长按
 
-    private mutating func handleTouchDown(point: CGPoint,
+    private mutating func handleTouchDown(point: GridPoint,
                                           hitID: String?,
                                           now: TimeInterval) -> [SelectionGestureEffect] {
         guard state == .idle, let hitID, point.x.isFinite, point.y.isFinite else { return [] }

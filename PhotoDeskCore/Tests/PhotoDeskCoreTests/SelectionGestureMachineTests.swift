@@ -24,7 +24,7 @@ final class SelectionGestureMachineTests: XCTestCase {
                        id: String = "a",
                        x: Double = 100, y: Double = 200,
                        at now: TimeInterval = 0) -> [SelectionGestureEffect] {
-        machine.handle(.touchDown(point: CGPoint(x: x, y: y), hitID: id), now: now)
+        machine.handle(.touchDown(point: GridPoint(x: x, y: y), hitID: id), now: now)
     }
 
     @discardableResult
@@ -42,12 +42,12 @@ final class SelectionGestureMachineTests: XCTestCase {
         let effects = press(&machine, id: "a", x: 37, y: 53, at: 0)
         XCTAssertTrue(effects.isEmpty, "按下本身不应产生副作用")
         XCTAssertEqual(machine.state, .pressing)
-        XCTAssertEqual(machine.pressPoint, CGPoint(x: 37, y: 53), "G3：锚点必须是真实按下点")
+        XCTAssertEqual(machine.pressPoint, GridPoint(x: 37, y: 53), "G3：锚点必须是真实按下点")
     }
 
     func testTouchDownOnGapIsIgnored() {
         var machine = SelectionGestureMachine(config: defaultConfig)
-        let effects = machine.handle(.touchDown(point: CGPoint(x: 1, y: 1), hitID: nil), now: 0)
+        let effects = machine.handle(.touchDown(point: GridPoint(x: 1, y: 1), hitID: nil), now: 0)
         XCTAssertTrue(effects.isEmpty)
         XCTAssertEqual(machine.state, .idle, "空白处按下不进入 pressing（与现网 indexPathForItem 门槛一致）")
         XCTAssertNil(machine.pressPoint)
@@ -313,9 +313,9 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.ended, now: 0.5)
         XCTAssertEqual(machine.state, .ending)
-        _ = machine.handle(.touchDown(point: CGPoint(x: 10, y: 10), hitID: "b"), now: 1.0)
+        _ = machine.handle(.touchDown(point: GridPoint(x: 10, y: 10), hitID: "b"), now: 1.0)
         XCTAssertEqual(machine.state, .pressing, "ending 状态下新按下：先复位 idle 再进入 pressing")
-        XCTAssertEqual(machine.pressPoint, CGPoint(x: 10, y: 10), "上一次手势的按下点不得泄漏")
+        XCTAssertEqual(machine.pressPoint, GridPoint(x: 10, y: 10), "上一次手势的按下点不得泄漏")
     }
 
     func testIdleEndedIsNoOp() {
@@ -360,7 +360,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     func testNonFiniteTouchDownPointIsRejected() {
         var machine = SelectionGestureMachine(config: defaultConfig)
-        let effects = machine.handle(.touchDown(point: CGPoint(x: CGFloat(Double.nan), y: 0), hitID: "a"), now: 0)
+        let effects = machine.handle(.touchDown(point: GridPoint(x: .nan, y: 0), hitID: "a"), now: 0)
         XCTAssertTrue(effects.isEmpty)
         XCTAssertEqual(machine.state, .idle, "非有限触点不得进入 pressing")
         XCTAssertNil(machine.pressPoint)
@@ -427,7 +427,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.moved(dx: 50, dy: 0), now: 0.4)
         _ = machine.handle(.ended, now: 0.5)
         // 新手势：立刻纵向拖必须按新累计判定（旧 (50,0) 若泄漏会判成横向）
-        _ = machine.handle(.touchDown(point: CGPoint(x: 5, y: 5), hitID: "b"), now: 1.0)
+        _ = machine.handle(.touchDown(point: GridPoint(x: 5, y: 5), hitID: "b"), now: 1.0)
         let effects = machine.handle(.moved(dx: 0, dy: 9), now: 1.1)
         XCTAssertEqual(effects, [.releaseScroll], "旧手势累计位移不得污染新手势方向判定")
         XCTAssertEqual(machine.state, .idle)
