@@ -63,5 +63,5 @@
 
 - 红：88b13d1 落地前 Docker 编译失败实录 `artifacts/audit/m17/t03-red-compile-failure.log`（cannot find CellFrame/HitRect/MarqueeHitResolver）
 - 绿：Docker swift:6.0-noble **459 tests 0 failures**（435 基线 + 24 新增）；过程修正 1 条测试自身矩形宽度错误（随 feat 提交，非实现缺陷）
-- 验收：新增 24 ≥ 20；不引入 UIKit/CoreGraphics；性能用例由 CI core-linux 容器同一条 swift test 复验（run id 待回填）
+- 验收：新增 24 ≥ 20；不引入 UIKit/CoreGraphics；性能用例由 CI core-linux 容器同一条 swift test 复验（run 43540179936 **success**：core-linux success + build success + 定向 Test SUCCEEDED + Performance 4/4 通过——上轮 T02 的 perf 步骤失败确证为 runner 基建抖动）
 - 本地证据（不入库）：`artifacts/audit/m17/t03-green-test-summary.txt`
