@@ -68,7 +68,6 @@ final class EditorViewModel: ObservableObject {
 
         // 预览底图（长边 1400）
         if let source = CGImageSourceCreateWithURL(info.originalURL as CFURL, nil),
-           let source = CGImageSourceCreateWithURL(url as CFURL, nil),
            let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                kCGImageSourceCreateThumbnailFromImageAlways as String: true,
                kCGImageSourceThumbnailMaxPixelSize as String: Int(previewLongEdge),
