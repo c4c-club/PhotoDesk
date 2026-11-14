@@ -1,4 +1,6 @@
 // MARK: - 职责说明：矩形框选纯策略（docs/25 §6.2 / M15 P0-3/4，替换旧「整行带」滑选）——
+// deprecated：本类型基于网格参数推算（M15 估算几何），M17 T03 起命中一律走 MarqueeHitResolver +
+// 真实 layoutAttributes；T04 迁移完成后整类删除（docs/32 §2.4，docs/31 G7/G8/G10）。
 // 语义：start→current 构成矩形，与矩形相交的 cell 进入目标集合；起手 cell 已选 → deselect 模式，
 // 未选 → select 模式；回拖自然收缩。几何：cell x = col*(itemWidth+spacing)，
 // y = sectionOriginY + headerHeight + row*(itemHeight+spacing)；矩形宽/高为 0 扩展 1pt；

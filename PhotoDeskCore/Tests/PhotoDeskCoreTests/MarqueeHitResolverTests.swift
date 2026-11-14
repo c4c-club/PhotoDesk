@@ -158,8 +158,8 @@ final class MarqueeHitResolverTests: XCTestCase {
     // MARK: - clipTop 粘性头裁剪
 
     func testClipTopClipsCellsAboveStickyHeader() {
-        // 行 0（y 0..100）被钉住头遮住：clipTop=110 抬高矩形上边 → 只剩行 1
-        let result = hit(0, 0, 100, 210, cells: grid3(), clipTop: 110)
+        // 行 0（y 0..100）被钉住头遮住：clipTop=110 抬高矩形上边 → 只剩行 1（矩形横向覆盖 3 列）
+        let result = hit(0, 0, 320, 210, cells: grid3(), clipTop: 110)
         XCTAssertEqual(result, ["c1-0", "c1-1", "c1-2"], "行 0 被粘性头遮住：clipTop=110 后只剩行 1")
     }
 
