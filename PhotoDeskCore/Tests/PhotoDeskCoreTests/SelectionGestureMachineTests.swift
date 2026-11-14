@@ -19,6 +19,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     private var defaultConfig: SelectionGestureConfig { SelectionGestureConfig() }
 
+    @discardableResult
     private func press(_ machine: inout SelectionGestureMachine,
                        id: String = "a",
                        x: Double = 100, y: Double = 200,
@@ -26,6 +27,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         machine.handle(.touchDown(point: CGPoint(x: x, y: y), hitID: id), now: now)
     }
 
+    @discardableResult
     private func arm(_ machine: inout SelectionGestureMachine,
                      id: String = "a",
                      holdAt: TimeInterval = 0.28) -> [SelectionGestureEffect] {
@@ -56,7 +58,7 @@ final class SelectionGestureMachineTests: XCTestCase {
     func testRow2HoldElapsedArmsWithHapticEnterAndZeroSizeMarquee() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         let effects = arm(&machine, id: "a", holdAt: 0.28)
-        XCTAssertEqual(effects, [.haptic(.impactLight),
+        XCTAssertEqual(effects, [.haptic(kind: .impactLight),
                                  .enterSelection(anchorID: "a"),
                                  .beginMarquee])
         XCTAssertEqual(machine.state, .armed)
@@ -146,7 +148,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         press(&machine, at: 0)
         // holdElapsed 因计时器延迟未到，0.4s 抬手：原生语义仍应进入多选并选中锚点
         let effects = machine.handle(.ended, now: 0.4)
-        XCTAssertEqual(effects, [.haptic(.impactLight), .enterSelection(anchorID: "a")])
+        XCTAssertEqual(effects, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a")])
         XCTAssertEqual(machine.state, .idle)
     }
 
@@ -358,7 +360,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     func testNonFiniteTouchDownPointIsRejected() {
         var machine = SelectionGestureMachine(config: defaultConfig)
-        let effects = machine.handle(.touchDown(point: CGPoint(x: .nan, y: 0), hitID: "a"), now: 0)
+        let effects = machine.handle(.touchDown(point: CGPoint(x: CGFloat(Double.nan), y: 0), hitID: "a"), now: 0)
         XCTAssertTrue(effects.isEmpty)
         XCTAssertEqual(machine.state, .idle, "非有限触点不得进入 pressing")
         XCTAssertNil(machine.pressPoint)
@@ -398,11 +400,11 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)                                   // haptic@0.28（impactLight）
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29) // 距上一次 0.01 → 无触觉
         let m1 = machine.handle(.moved(dx: 2, dy: 0), now: 0.35)  // 0.07 ≥ 0.06 → 触觉
-        XCTAssertEqual(m1, [.updateMarquee, .haptic(.selectionChanged)])
+        XCTAssertEqual(m1, [.updateMarquee, .haptic(kind: .selectionChanged)])
         let m2 = machine.handle(.moved(dx: 2, dy: 0), now: 0.38)  // 0.03 < 0.06 → 无触觉
         XCTAssertEqual(m2, [.updateMarquee])
         let m3 = machine.handle(.moved(dx: 2, dy: 0), now: 0.45)  // 0.10 ≥ 0.06 → 触觉
-        XCTAssertEqual(m3, [.updateMarquee, .haptic(.selectionChanged)])
+        XCTAssertEqual(m3, [.updateMarquee, .haptic(kind: .selectionChanged)])
     }
 
     // MARK: - 配置默认值锁定（docs/32 §2.2）
@@ -439,12 +441,13 @@ final class SelectionGestureMachineTests: XCTestCase {
         config.directionLockDistance = 20
         var machine = SelectionGestureMachine(config: config)
         press(&machine, at: 0)
-        _ = machine.handle(.moved(dx: 12, dy: 0), now: 0.1)
-        XCTAssertEqual(machine.state, .pressing, "12pt < 自定义 directionLockDistance=20 不得锁定")
+        // 7pt ≤ allowableMovement=8（长按存活）且 < 自定义 directionLockDistance=20（方向未决）
+        _ = machine.handle(.moved(dx: 7, dy: 0), now: 0.1)
+        XCTAssertEqual(machine.state, .pressing, "7pt < 自定义 directionLockDistance=20 不得锁定")
         _ = machine.handle(.holdElapsed, now: 0.49)
         XCTAssertEqual(machine.state, .pressing, "0.49 < 自定义 longPressDuration=0.5 不得 armed")
         let armed = machine.handle(.holdElapsed, now: 0.5)
-        XCTAssertEqual(armed, [.haptic(.impactLight), .enterSelection(anchorID: "a"), .beginMarquee])
+        XCTAssertEqual(armed, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a"), .beginMarquee])
         XCTAssertEqual(machine.state, .armed)
     }
 }
