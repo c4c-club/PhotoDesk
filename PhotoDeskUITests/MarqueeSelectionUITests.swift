@@ -575,16 +575,17 @@ final class MarqueeSelectionUITests: XCTestCase {
         collection.cells.element(boundBy: 11).tap()
         let anchorCell = collection.cells.element(boundBy: 8)
         XCTAssertTrue(anchorCell.waitForExistence(timeout: 10), "网格无 cell")
-        let preCount = waitForSelectionCountEqual(app, to: 2, timeout: 5)
-        XCTAssertEqual(preCount, 2, "点选 8/11 后计数必须为 2（count=\(preCount)）")
+        // 阶段 A 已框选 0/3/6（count=3）→ 点选 8/11 后计数=5
+        let preCount = waitForSelectionCountEqual(app, to: 5, timeout: 5)
+        XCTAssertEqual(preCount, 5, "点选 8/11 后计数必须为 5（count=\(preCount)）")
         let burstB = BurstShots()
         burstB.start(delay: 0.8)
         longPressDrag(in: collection, fromIndex: 8, toIndex: 14, hold: 1.2)
         let shotsB = burstB.finish()
         XCTAssertGreaterThanOrEqual(shotsB.count, 3, "阶段 B 连拍必须覆盖拖动窗口")
-        // 功能断言：框过 8/11/14 → 已选 8/11 全部取消 → 计数 2→0（取消模式语义）
-        let postCount = waitForSelectionCountEqual(app, to: 0, timeout: 8)
-        XCTAssertEqual(postCount, 0, "取消模式框选必须清掉锚选（count=\(postCount)）")
+        // 功能断言：框过 8/11/14 → 已选 8/11 全部取消（0/3/6 不受影响）→ 计数 5→3（取消模式语义）
+        let postCount = waitForSelectionCountEqual(app, to: 3, timeout: 8)
+        XCTAssertEqual(postCount, 3, "取消模式框选必须清掉锚选且不误伤其余（count=\(postCount)）")
         // 取证：横幅（计数变化触发刷新，读到 armed 时刻模式与覆盖层描边色/位置）
         let bannerAfter = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
         var bestRedB = 0
