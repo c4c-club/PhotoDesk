@@ -1342,6 +1342,12 @@ final class LibraryViewController: UIViewController {
             guard let sel else { return -1 }
             return sel.mode == .deselect ? 1 : 0
         }()
+        let ovc: String = {
+            guard let cg = sel?.overlayView?.layer.borderColor else { return "-" }
+            var r: CGFloat = 0; var g: CGFloat = 0; var b: CGFloat = 0; var a: CGFloat = 0
+            UIColor(cgColor: cg).getRed(&r, green: &g, blue: &b, alpha: &a)
+            return "\(Int(r * 255)),\(Int(g * 255)),\(Int(b * 255))"
+        }()
         let edge = sel?.debugLastEdgeDirection ?? 9
         let vy = Int(sel?.debugLastFingerViewportY ?? -1)
         let vB = Int(sel?.debugViewportBottom ?? -1)
@@ -1349,7 +1355,7 @@ final class LibraryViewController: UIViewController {
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) ovc=\(ovc) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 

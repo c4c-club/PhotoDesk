@@ -549,10 +549,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         // 功能断言：拖过 1/4/7 三格 → 已选 1/4 全部取消 → 计数 2→0（取消模式语义）
         let postCount = waitForSelectionCountEqual(app, to: 0, timeout: 8)
         XCTAssertEqual(postCount, 0, "取消模式框选必须清掉锚选（count=\(postCount)）")
+        // 取证：横幅框选模式 ovm 与覆盖层描边色 ovc（点击计数变化会触发横幅刷新，抬手后读数即最终态）
+        let bannerAfter = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
         var bestRed = 0
         var blueAtBest = 0
         var perShot = ""
-        var bestShot: UIImage? = nil
+        var bestShot: UIImage? = shots.first
         for shot in shots {
             let counts = dominantStrokePixels(in: shot, region: band)
             perShot += "(r=\(counts.red) b=\(counts.blue)) "
@@ -569,7 +571,7 @@ final class MarqueeSelectionUITests: XCTestCase {
             add(att)
         }
         XCTAssertGreaterThanOrEqual(bestRed, 25,
-                                    "取消模式描边必须 danger 红（red-dominant ≥ 25，got \(bestRed)，shots: \(perShot)）")
+                                    "取消模式描边必须 danger 红（red-dominant ≥ 25，got \(bestRed)，shots: \(perShot)，banner: \(bannerAfter)）")
         XCTAssertGreaterThan(bestRed, blueAtBest,
                              "取消模式描边红色必须压过蓝色（模式判别 red=\(bestRed) blue=\(blueAtBest)，shots: \(perShot)）")
     }
