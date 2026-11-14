@@ -6,6 +6,7 @@
 |---|---|---|---|---|
 | T01 | DONE | cfe46dc (test) + c9d8474 (docs 归档) | audit 红基线归档；CI run 43529901394 三红用例全部失败实锤 | 镜像 makeLayout 引入 1 条既有弃用警告实例，T04 消除 |
 | T02 | DONE | 14e651f (test) + f74d184 (feat) + 9d2e607 (refactor) + 7b692b9 (fix) | Docker 435 tests 0 failures；CI core-linux success + 定向 Test SUCCEEDED；shouldActivate/resolvedSelection 归零 | 新增 39 用例 ≥ 25 |
+| T03 | DONE | 88b13d1 (test) + 74e3585 (feat) | Docker 459 tests 0 failures；CI core-linux 复验性能用例；run id 见下 | 新增 24 用例 ≥ 20 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -49,3 +50,18 @@
 - 验收：shouldActivate / resolvedSelection 在跟踪源码命中 0；机器文件仅 import Foundation；新增用例 39 ≥ 25
 - CI：core-linux（swift:6.0-noble）同一条命令复验 **success**；定向 run 43534301697 抓到 Darwin 真实差异——Foundation 导入的 CGPoint 不满足 Equatable 合成（Docker Linux 有 Equatable 故本地全绿）→ fix 7b692b9 改用 Core 自有 GridPoint（红线 2 合规）→ 复跑 43535685266：定向 Test 步骤 **TEST SUCCEEDED**（LibraryViewModelTests 14/14，App 与新 Core 编译兼容实证）。该 run 整体 failure 仅因最后无条件 Performance 步骤的基建抖动「Test runner never began executing tests after launching」（非断言失败，与 Core 改动无关；T09 全量回归复盖）。push 全量 run 已按 concurrency 组取消省额度
 - 本地证据目录（不入库）：`artifacts/audit/m17/t02/`、`artifacts/ci-evidence/m17-t01/`
+
+## T03 — Core 命中解析（DONE，2026-11-14）
+
+### 交付物
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/MarqueeHitResolver.swift`：CellFrame（id + Double 四边）/ HitRect（anchor+current 自动归一 + 四边各扩 1pt）/ `hit(rect:cells:clipTop:) -> Set<String>`；闭区间相交（贴边即命中）、clipTop 抬矩形上边裁粘性头遮挡（抬后为空返回空集）、非有限矩形空集、非有限/退化 frame 逐个跳过、cells 乱序与同 id 重复安全；仅 import Foundation。
+- `MarqueeSelectionPolicy.swift` 顶部加 deprecated 说明注释（基于 M15 估算几何，T04 迁移后整类删除；本任务不删，避免一次改太多）。
+- 用例 24 条：空 / 单点 / 1pt 扩展 / 部分相交 / 包含 / 被包含 / 贴边 / 跨段 / 乱序 / 同 id 折叠与任一帧命中 / 反向拖归一 / HitRect 值语义 / NaN / ∞ / 非有限与退化 frame / clipTop 半裁 / 全裁 / 低于上边不生效 / 抬后为空 / 2 万 frame < 20ms。
+
+### 门禁证据
+
+- 红：88b13d1 落地前 Docker 编译失败实录 `artifacts/audit/m17/t03-red-compile-failure.log`（cannot find CellFrame/HitRect/MarqueeHitResolver）
+- 绿：Docker swift:6.0-noble **459 tests 0 failures**（435 基线 + 24 新增）；过程修正 1 条测试自身矩形宽度错误（随 feat 提交，非实现缺陷）
+- 验收：新增 24 ≥ 20；不引入 UIKit/CoreGraphics；性能用例由 CI core-linux 容器同一条 swift test 复验（run id 待回填）
+- 本地证据（不入库）：`artifacts/audit/m17/t03-green-test-summary.txt`
