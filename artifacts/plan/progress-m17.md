@@ -9,6 +9,7 @@
 | T03 | DONE | 88b13d1 (test) + 74e3585 (feat) | Docker 459 tests 0 failures；CI core-linux 复验性能用例；run id 见下 | 新增 24 用例 ≥ 20 |
 | T05 | DONE | c7cd2e7 (test) + b42b9bb (fix) + a29fcd2 (test) + 4cff229 (feat) + 9c9cd9d (refactor) + a92b594/0c949ca/f9e6d11 (fix) + eb3cb13 (fix) | CI run 43569488790 绿：core 442/0 + MarqueeSelectionUITests 10/10 + Performance 4/4；A05==0 | holdElapsed 定时器交付 + 逐帧边缘监视两处接线缺陷根治 |
 | T06 | DONE | 7ad3830 (test) + 57461fd (feat) + 3282246/f39cba9 (fix) + d707089/21b2f6c/ecce878/3dac53b/46b2afc (fix) + 6e53ac7 (fix) + b1549b0/93d5ae0/76426f7/9585327/cc65b08/4599649/8fb5552/8c33727 (fix) + 728f460/409d71b/9057e40/bd7b53b (fix) | CI run 43617711164 绿：core 442/0 + MarqueeSelectionUITests 12/12 + Performance；A07 命中 10 | 角标/压暗/边框单一入口 + 覆盖层坐标补父系偏移（真 bug）+ 精确描边色像素取证 |
+| T07 | DONE | 7fee412 (test) + 601fd0f (fix) + 83879ce (test) + 72b7a7f (fix) | CI run 43622938205 绿：core-linux success + 新单测 2 条 + MarqueeSelectionUITests 14/14 + Performance 4/4；Docker 443/0（性能锁 ~2ms/帧 < 4ms 验收）；A08/A09 PASS | scope 三处取 filteredItems 全量 + applyDelta 增量化 + apply 窗口保留上一帧目标 + 退出同步复位 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -139,3 +140,28 @@
 - XCUI press-then-drag 路径带弧线且俯冲过冲：纵向拖穿越底缘区会触发意外自动滚动、网格滚走后 boundBy 索引指向别格——像素取证测试必须单阶段一次启动内完成，且拖拽几何避开边缘区。
 - 像素判别不能依赖通道占优启发式（种子图块颜色不受控）：以「描边不透明纯色」做精确色匹配，或选底色安全的扫描列。
 - 把 App 内部状态（armed 时刻模式/描边色/覆盖层 frame/按下帧命中）经 DEBUG 横幅暴露并在计数变化时强制刷新，是定位「App 正确但测试看不到」类分歧的关键手段。
+
+## T07 — 选中一致性（DONE，2026-11-15）
+
+### 交付物
+
+- **scope 统一（A08）**：`LibraryViewModel.selectionScopeIDs`（= filteredItems 全量，唯一口径）新增；`enterSelectionMode`（scopeOverride==nil 分支）、`selectAllTapped` 索引补齐后的收敛、快照回调收敛三处全部改取该口径，`currentItemsBySection.flatMap` PhotoDesk 0 处（月 scope 分支保留月内 items，不在卡范围）。
+- **增量应用（A09）**：`applySlideSelection` 改 delta（add=ids−previous / remove=previous−ids）→ `SelectionState.applyDelta(add:remove:)`；Core applyDelta 重写为增量（remove 线性剔除 + add 按既有插入序追加，**不再整表 replace+sort**）；只刷可见 cell 差集不变；计数每帧更新（删 `previous.count != current.count` 条件）；`replaceSelection(Array(ids).sorted())` 全仓 0 处。
+- **apply 窗口**：`LibrarySelectionController.isApplyingSnapshotProvider`（VC 注入 isApplyingSnapshot）——apply 窗口内命中为空 → 保留上一帧目标集合不清空，下一帧重试 ≤3 帧，超时 ViewerTrace DEBUG 日志后按空命中放行。
+- **退出复位**：exitSelectionMode 同步（无 async）补 `collectionView.allowsSelection = true`；选框隐身/isScrollEnabled=true/scopeTitle 清空由 finishSelection 与既有路径成对交付。
+- **DEBUG 钩子**：`viewModel.debugFilteredCount` + LibraryContainer 顶部 Filtered-Count 标签（refreshDebugScrollNote 同步刷新），UI 全选断言口径 Selection-Count == Filtered-Count。
+- 测试：LibraryViewModelTests +2（索引未完成全选计数 == filteredItems.count、快照追加 500 后选中不丢——滞后快照口径丢补齐 id 的契约锁）；MarqueeSelectionUITests +2（testSelectAllCoversFullFilteredSet、testExitSelectionResetsState）；SelectionPolicyTests +1 性能锁（2 万选中 × 200 帧 ±1 守恒 delta，Docker debug 实测 412ms ≈ 2.06ms/帧，上限 800ms = 验收 4ms/帧 × 200）。
+
+### 门禁证据
+
+- 红：7fee412 CI run 43621225871 **failure**（Test (simulator) exit 65：`LibraryViewModel has no member 'selectionScopeIDs'` ×3 + 测试自身 let→mutating 小错实录；红以 CI 编译失败为实锤）。
+- 绿：run 43622938205 **success**（601fd0f）——core-linux success；定向 PhotoDeskTests/LibraryViewModelTests（含新 2 条）+ MarqueeSelectionUITests **14/14**（396s）；Performance 4/4（371s）；TEST SUCCEEDED ×2。
+- 性能锁迭代：83879ce 首版守恒断言口径错（全选下 add 已存在被跳过、每帧净减）+ 耗时上限误设 100ms（Docker 实测 412ms）→ 72b7a7f 校准（回补式 ±1 守恒 + 800ms = 4ms/帧验收上限）→ Docker **443 tests 0 failures** [OK]。
+- 验收：audit-m17 本地复跑 **A08 PASS（0 处 flatMap scope）+ A09 PASS（0 处排序替换）**；剩余 BLOCKING 仅 A10（T08 范围）；退出复位由 testExitSelectionResetsState CI 实证（多选栏消失/offset 不变/立即单指滚动）。
+
+### 教训
+
+- 守恒断言在全选前提下不成立：add 已存在于 selectedSet 会被增量路径跳过、remove 照常生效 → 每帧净减；性能锁要么回补式 ±1 设计，要么显式跟踪期望计数。
+- 耗时上限按「验收值 × 帧数」推导（4ms/帧 × 200 = 800ms），不要拍脑袋 100ms——Docker debug 构建的 O(n) 线性扫描 ~2ms/帧本就达标，先实测再定界。
+- applyDelta 的 remove 路径仍是 O(n) 线性扫描（非严格 O(delta)）：验收口径是「拖一帧 < 4ms」实测达标，不为更优复杂度引入 id→index 反查表（收益不成比例）。
+- 推送前先收 Docker 结果：83879ce 在 Docker 失败确认前已推送，产生一轮必红远端 run（本地 Core 门禁应先于 push 完成）。
