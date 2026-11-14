@@ -11,8 +11,10 @@ struct SearchView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewerContext: ViewerContext?
 
-    init(items: [PhotoItem], onApplyFilter: ((SearchPredicate) -> Void)? = nil) {
-        _viewModel = StateObject(wrappedValue: SearchViewModel(items: items))
+    /// M17 T08 X03：数据源改为实时快照——provider 闭包 + 激活刷新
+    init(itemsProvider: @escaping () -> [PhotoItem],
+         onApplyFilter: ((SearchPredicate) -> Void)? = nil) {
+        _viewModel = StateObject(wrappedValue: SearchViewModel(itemsProvider: itemsProvider))
         self.onApplyFilter = onApplyFilter
     }
 
@@ -43,6 +45,8 @@ struct SearchView: View {
                     }
                 }
         }
+        // X03：打开与激活时刷新（重取最新快照并重算）
+        .onAppear { viewModel.refresh() }
         .navigationViewStyle(.stack)
         .fullScreenCover(item: $viewerContext) { context in
             ViewerContainer(viewModel: AppContainer.shared.makeViewerViewModel(context: context))

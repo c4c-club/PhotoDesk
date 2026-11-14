@@ -94,7 +94,8 @@ struct LibraryRootView: View {
             }
         }
         .sheet(isPresented: $showSearch) {
-            SearchView(items: viewModel.itemsSnapshot) { predicate in
+            // M17 T08 X03：实时快照源——打开/激活时重取，不再固化打开瞬间的图库
+            SearchView(itemsProvider: { viewModel.itemsSnapshot }) { predicate in
                 // 「应用筛选到主库」（docs/09 D15）
                 viewModel.setFilter(predicate)
             }

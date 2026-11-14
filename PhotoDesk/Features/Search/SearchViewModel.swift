@@ -1,6 +1,8 @@
 // MARK: - 职责说明：搜索/筛选 ViewModel（docs/05 M5 任务 5.1/5.2）——
-// 谓词（@Published）→ PhotoFilter 纯函数 → 结果集；筛选在主线程对已加载快照执行
-// （万级 < 500ms，SearchPredicateTests 实测），不触碰 PhotoKit。
+// 谓词（@Published）→ PhotoFilter 纯函数 → 结果集。
+// M17 T08 X03：数据源改为实时快照——itemsProvider 闭包 + 打开/激活 refresh() 重取；
+// apply() 放后台（Task.detached）+ 代际令牌，过期结果丢弃（参照 LibraryViewModel
+// rebuildDerivedInBackground）。不触碰 PhotoKit。
 /// OCR 关键词索引与搜索历史/智能视图为后续增强，登记于已知问题。
 
 import Foundation
@@ -13,18 +15,39 @@ final class SearchViewModel: ObservableObject {
     /// 最近筛选历史（最多 10 条，JSON 持久化；docs/22 Phase 4 搜索页）
     @Published private(set) var history: [SearchPredicate] = []
 
-    let items: [PhotoItem]
+    /// 实时快照源（X03：sheet 打开瞬间不再固化图库）
+    private let itemsProvider: () -> [PhotoItem]
+    private(set) var items: [PhotoItem]
+    /// apply 代际令牌：谓词连续变化时只落最新一代结果
+    private var applyGeneration = 0
     private static let historyKey = "search.filter.history"
 
-    init(items: [PhotoItem]) {
-        self.items = items
+    init(itemsProvider: @escaping () -> [PhotoItem]) {
+        self.itemsProvider = itemsProvider
+        self.items = itemsProvider()
         results = items
         loadHistory()
     }
 
-    /// 谓词变化后重算（SwiftUI onChange 驱动）
+    /// 打开/激活时刷新（X03）：重取最新快照并按当前谓词重算
+    func refresh() {
+        items = itemsProvider()
+        apply()
+    }
+
+    /// 谓词变化后重算（SwiftUI onChange 驱动）：后台执行 + 代际令牌
     func apply() {
-        results = PhotoFilter.apply(items, predicate: predicate)
+        applyGeneration += 1
+        let generation = applyGeneration
+        let snapshot = items
+        let predicate = self.predicate
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let filtered = PhotoFilter.apply(snapshot, predicate: predicate)
+            await MainActor.run { [weak self] in
+                guard let self, generation == self.applyGeneration else { return }
+                self.results = filtered
+            }
+        }
     }
 
     func toggleMedia(_ filter: SearchPredicate.MediaFilter) {
