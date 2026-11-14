@@ -1,8 +1,11 @@
-// MARK: - 职责说明：真实 UICollectionViewCompositionalLayout 网格几何测试（M17 T01 红 / T04 绿，docs/31 §2.2 G8/H1）——
-// 用生产布局工厂 LibraryGridLayout.make 的真实布局（3 列 / 48pt 粘性头 / pinToVisibleBounds）
-// + contentOffset.y = 5000 实测：可视段头的 supplementary attributes.minY 必须等于该段首格
-// minY - 头高。pinToVisibleBounds 把钉住的头的 minY 平移到视口顶时差值达数百 pt → H1 实锤；
-// 若差值为 0 则 H1 被证伪（supplementary attributes 未被 pin 污染）。T04 真几何改造的验收锚点。
+// MARK: - 职责说明：真实 UICollectionViewCompositionalLayout 网格几何测试（M17 T01 红探针 →
+// T04 行为锁，docs/31 §2.2 G8/H1，docs/32 §4.2）——用生产布局工厂 LibraryGridLayout.make
+// 的真实布局（3 列 / 48pt 粘性头 / pinToVisibleBounds）实测两件事：
+// H1（§4.2 第 4 条）：pinToVisibleBounds 把被钉住段的 supplementary attributes.minY 平移到
+//   视口顶（offset=5000 实测 diff=902pt）→ 命中/位置几何一律不得读 supplementary；
+// H3（§4.2 第 3 条）：参数公式 (W − s(c−1))/c 与真实 item 宽一致。
+// 注意：compositional layout 需 setContentOffset + invalidateLayout + layoutIfNeeded 预热后
+// layoutAttributesForItem 才返回非 nil（CI 43546275550 实锤）——各用例统一走该预热。
 
 import XCTest
 @testable import PhotoDesk
@@ -32,7 +35,8 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         return (cv, layout)
     }
 
-    /// H1 判定：滚动 5000pt 后，被钉住段的头 attributes.minY == 首格 minY - 48
+    /// H1 行为锁（§4.2 第 4 条）：滚动 5000pt 后，被钉住段的 supplementary 头 minY 被平移到
+    /// 视口顶、与 item 推导值（首格 minY − 48）相差数百 pt → supplementary 不可用于几何。
     func testPinnedHeaderAttributeIsPinned() throws {
         let (cv, layout) = makeRealGrid()
         cv.layoutIfNeeded()
@@ -80,9 +84,13 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
             attachment.name = "h1-sticky-header-probe"
             activity.add(attachment)
         }
-        // 差值 ≤ 0.5pt 视为未钉住（浮点容差）；被 pin 平移时差值是数百 pt 量级
-        XCTAssertEqual(diff, 0, accuracy: 0.5,
-                       "可视段头的 supplementary attributes 不得被 pinToVisibleBounds 平移（docs/31 G8/H1）")
+        // H1 结论（T01 红探针 CI 43529901394 实锤 diff=902，本用例锁死该事实）：
+        // 被 pin 的 supplementary minY 精确等于视口顶；与 item 推导值差值达百 pt 量级。
+        // GridHitTester 的段顶/行高全部来自 item attributes，天然免疫本现象（docs/32 §2.4）。
+        XCTAssertEqual(headerAttrs.frame.minY, targetOffset, accuracy: 0.5,
+                       "H1 实锤：被钉住段的 supplementary 头 minY 必须平移到视口顶")
+        XCTAssertGreaterThan(abs(diff), 0.5,
+                             "H1 实锤：supplementary minY 与 item 推导值差值必须达百 pt 量级（实测 902）")
     }
 
     // MARK: - UICollectionViewDataSource
@@ -194,6 +202,8 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let spacing = CGFloat(DSSpacing.gridSpacing)
         for columns in [2, 3, 4, 5] {
             let (cv, layout, _) = makeParamGrid(columns: columns)
+            cv.setContentOffset(.zero, animated: false)
+            cv.collectionViewLayout.invalidateLayout()
             cv.layoutIfNeeded()
             let attrs = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)),
                                       "columns=\(columns) 必须能取到首格 attributes")
@@ -208,6 +218,8 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
     func testMarqueeHitSelectsA3_7NotA3_6() throws {
         let (cv, layout, _) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
         cv.layoutIfNeeded()
         let attrs = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
                                   "必须能取到 a3-7 的真实 attributes")
