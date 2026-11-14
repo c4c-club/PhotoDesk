@@ -511,6 +511,15 @@ final class MarqueeSelectionUITests: XCTestCase {
         return CGRect(x: f.minX, y: top, width: f.width, height: max(50, f.maxY - top))
     }
 
+    /// 单列跨行条带：拖拽路径带弧线（指尖先上抬），矩形顶边描边可能高于按压点行；
+    /// 覆盖按压格上下各 100pt，横向取整格宽。该列不含 danger 色系图块，红色计数即描边。
+    private func strokeStrip(of cell: XCUIElement) -> CGRect {
+        let frame = cell.frame
+        let top = max(190, frame.minY - 100)
+        let bottom = frame.maxY + 100
+        return CGRect(x: frame.minX, y: top, width: frame.width, height: bottom - top)
+    }
+
     /// 框选拖动期间覆盖层必须可见：连拍帧内检测 tint 描边像素（无覆盖层 → 0 像素 → 断言红）。
     /// 锚 col-2 黄格（cell 8/11）：黄格自身 r/g 高、b 低，蓝描边不与底色混淆；
     /// 拖拽路径带弧线 → 改用跨行高条带扫描，并要求蓝压红（选择模式判别）。
@@ -552,7 +561,10 @@ final class MarqueeSelectionUITests: XCTestCase {
     func testDeselectModeShowsDangerTint() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        let gridBand = gridScanRegion(collection)
+        let anchorCell = collection.cells.element(boundBy: 8)
+        XCTAssertTrue(anchorCell.waitForExistence(timeout: 10), "网格无 cell")
+        // 两阶段共用 cell 8 列条带：该列无 danger 色系图块；阶段 A 描边在 col 0 不入带 → 基线≈0
+        let strip = strokeStrip(of: anchorCell)
 
         // 阶段 A：选择模式拖（锚点 cell 0 未选）——tint 描边基线
         let burstA = BurstShots()
@@ -563,12 +575,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         var bestRedA = 0
         var bestBlueA = 0
         for shot in shotsA {
-            let counts = dominantStrokePixels(in: shot, region: gridBand)
+            let counts = dominantStrokePixels(in: shot, region: strip)
             bestRedA = max(bestRedA, counts.red)
             bestBlueA = max(bestBlueA, counts.blue)
         }
-        XCTAssertGreaterThanOrEqual(bestBlueA, 25,
-                                    "选择模式必须出现 tint 描边（blue ≥ 25，got \(bestBlueA)）")
+        XCTAssertLessThanOrEqual(bestRedA, 300,
+                                 "选择模式条带内不得出现 danger 描边（red ≤ 300，got \(bestRedA)）")
 
         // 阶段 B：点选锚点（8/11）→ 取消模式拖（8→14）——danger 描边
         collection.cells.element(boundBy: 8).tap()
@@ -592,7 +604,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         var perShot = ""
         var bestShot: UIImage? = shotsB.first
         for shot in shotsB {
-            let counts = dominantStrokePixels(in: shot, region: gridBand)
+            let counts = dominantStrokePixels(in: shot, region: strip)
             perShot += "(r=\(counts.red) b=\(counts.blue)) "
             if counts.red > bestRedB {
                 bestRedB = counts.red
