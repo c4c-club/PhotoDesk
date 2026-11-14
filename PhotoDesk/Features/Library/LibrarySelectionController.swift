@@ -37,6 +37,8 @@ final class LibrarySelectionController: NSObject {
     var scopeProvider: () -> Set<String>? = { nil }
     /// enterSelection 效果 → VC enterSelectionMode(selecting:)（长按进入多选的唯一入口）。
     var onSelectionEntered: (String) -> Void = { _ in }
+    /// 框选覆盖层（M17 T06；VC 挂在 collectionView 兄弟层，frame 为视口坐标，本类逐帧转换）。
+    weak var overlayView: MarqueeOverlayView?
     /// 框选矩形（内容坐标）变化回调；nil = 结束。T06 在此挂覆盖层。
     var onMarqueeRectChanged: ((CGRect?) -> Void) = { _ in }
 
@@ -44,7 +46,8 @@ final class LibrarySelectionController: NSObject {
     private var machine: SelectionGestureMachine
     private var gestureConfig = SelectionGestureConfig()
     private var baseIDs: Set<String> = []
-    private var mode: MarqueeMode = .select
+    /// 本次手势的框选模式（select/deselect，按下帧取证；多选栏提示与覆盖层配色读取）。
+    private(set) var mode: MarqueeMode = .select
     private var lastTargetIDs: Set<String> = []
     private var lastFingerWindowPoint: CGPoint = .zero
     private var lastPanTranslation: CGPoint = .zero
@@ -115,6 +118,8 @@ final class LibrarySelectionController: NSObject {
     private(set) var marqueePan: UIPanGestureRecognizer!
 
     #if DEBUG
+    /// UI 取证：触觉实发计数（验收：≤16 次/秒 = 60ms 节流生效）。
+    private(set) var debugHapticCount = 0
     /// UI 取证：自动滚动 tick 计数（M15 边缘滚动通道等价物）与机器状态名。
     private(set) var debugAutoScrollTicks = 0
     /// UI 取证：最近一次边缘判定（-1 顶 / +1 底 / 0 区外）与指尖视口 y、视口几何。
@@ -192,6 +197,7 @@ final class LibrarySelectionController: NSObject {
         holdElapsedTimer = nil
         edgeMonitorLink?.invalidate()
         edgeMonitorLink = nil
+        overlayView?.update(rect: nil)
         if collectionView?.isScrollEnabled == false {
             collectionView?.isScrollEnabled = true
         }
@@ -251,12 +257,18 @@ final class LibrarySelectionController: NSObject {
                 consumedTouch = true
                 // armed 即禁滚动（docs/32 §2.3）；endMarquee/releaseScroll 成对恢复
                 collectionView?.isScrollEnabled = false
-                onMarqueeRectChanged(currentMarqueeRect())
+                overlayView?.setDeselectMode(mode == .deselect)
+                let beginRect = currentMarqueeRect()
+                overlayView?.update(rect: overlayFrame(for: beginRect))
+                onMarqueeRectChanged(beginRect)
             case .updateMarquee:
                 processFinger()
-                onMarqueeRectChanged(currentMarqueeRect())
+                let rect = currentMarqueeRect()
+                overlayView?.update(rect: overlayFrame(for: rect))   // 每帧只改 frame，不重建（docs/32 §2.5）
+                onMarqueeRectChanged(rect)
             case .endMarquee:
                 collectionView?.isScrollEnabled = true
+                overlayView?.update(rect: nil)
                 onMarqueeRectChanged(nil)
             case .releaseScroll:
                 collectionView?.isScrollEnabled = true
@@ -268,11 +280,18 @@ final class LibrarySelectionController: NSObject {
                 switch kind {
                 case .impactLight:
                     impactHaptic.impactOccurred()
+                    #if DEBUG
+                    debugHapticCount += 1
+                    #endif
                 case .selectionChanged:
-                    // G6：以命中集合变化为最终闸门（processFinger 置位 pendingSelectionHaptic）
+                    // G6：以命中集合变化为最终闸门（processFinger 置位 pendingSelectionHaptic），
+                    // 60ms 节流由机器 hapticMinInterval 承担（验收 ≤16 次/秒）
                     if pendingSelectionHaptic {
                         selectHaptic.selectionChanged()
                         pendingSelectionHaptic = false
+                        #if DEBUG
+                        debugHapticCount += 1
+                        #endif
                     }
                 }
             case .startAutoScroll:
@@ -344,6 +363,12 @@ final class LibrarySelectionController: NSObject {
               let current = windowToContent(lastFingerWindowPoint) else { return nil }
         return CGRect(x: min(press.x, current.x), y: min(press.y, current.y),
                       width: abs(current.x - press.x), height: abs(current.y - press.y))
+    }
+
+    /// 覆盖层 frame：内容坐标 → collectionView 视口坐标（overlay 与 collectionView 同层，不随内容滚动）
+    private func overlayFrame(for rect: CGRect?) -> CGRect? {
+        guard let rect, let collectionView else { return rect }
+        return rect.offsetBy(dx: -collectionView.contentOffset.x, dy: -collectionView.contentOffset.y)
     }
 
     // MARK: 边缘自动滚动

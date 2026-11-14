@@ -54,8 +54,8 @@ final class PhotoGridCell: UICollectionViewCell {
 
     private var loadTask: Task<Void, Never>?
     private var configureToken = 0
-    /// 多选选中角标（docs/05 M3 任务 5）
-    private let selectionBadge: UIImageView = {
+    /// 多选选中角标（docs/05 M3 任务 5；internal 供 @testable 四态断言，M17 T06）
+    let selectionBadge: UIImageView = {
         let view = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
         view.tintColor = DSColor.tint
         view.backgroundColor = UIColor.white
@@ -64,32 +64,67 @@ final class PhotoGridCell: UICollectionViewCell {
         view.isHidden = true
         return view
     }()
+    /// 选中压暗层（docs/32 §2.5：选中覆盖 12% 黑；internal 供 @testable 断言）
+    let dimView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .black
+        view.alpha = 0
+        view.isUserInteractionEnabled = false
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
 
-    /// 多选模式可见性 / 选中态（VC 在进入/退出多选时批量刷新）
-    /// docs/09 D11 根因修复：必须给 isSelectingVisible 赋值（否则 didSet 永远隐藏角标 → 全选「没反应」）
-    func setSelectionVisible(_ visible: Bool) {
-        isSelectingVisible = visible
-        selectionBadge.isHidden = !visible || !isSelectedCell
-    }
-
-    private var isSelectedCell = false {
-        didSet {
-            selectionBadge.isHidden = !isSelectingVisible || !isSelectedCell
-        }
-    }
+    /// 多选模式可见性 / 选中态（M17 T06：唯一入口 applySelection；旧签名保留做转发）
+    private var isSelectedCell = false
     private var isSelectingVisible = false
 
-    func setSelected(_ selected: Bool) {
-        isSelectedCell = selected
-        contentView.layer.borderWidth = selected ? 2 : 0
-        contentView.layer.borderColor = DSColor.tint.cgColor
+    /// docs/32 §2.5 单一入口：角标 spring 弹入、12% 压暗、2pt 边框、AX 同源。
+    /// animated=true 用于多选内的状态切换（spring 0.6→1.0，0.18s damping 0.7）；
+    /// 滚动/批量刷新传 false 直接落位，杜绝逐帧动画堆积。
+    func applySelection(isSelecting: Bool, isSelected: Bool, animated: Bool) {
+        isSelectingVisible = isSelecting
+        isSelectedCell = isSelected
         #if DEBUG
-        // UI 测试（docs/09 D11）：value = "<assetID> selected/none"
+        // UI 测试（docs/09 D11）：value = "<assetID> selected/none" 与视觉同源
         if var value = accessibilityValue, !value.isEmpty {
             value = value.components(separatedBy: " ").first ?? value
-            accessibilityValue = value + (selected ? " selected" : " none")
+            accessibilityValue = value + (isSelected ? " selected" : " none")
         }
         #endif
+        let showBadge = isSelecting && isSelected
+        selectionBadge.isHidden = !showBadge
+        if showBadge && animated {
+            selectionBadge.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+            UIView.animate(withDuration: 0.18, delay: 0,
+                           usingSpringWithDamping: 0.7,
+                           initialSpringVelocity: 0.3,
+                           options: [.allowUserInteraction]) {
+                self.selectionBadge.transform = .identity
+            }
+        } else {
+            selectionBadge.transform = .identity
+        }
+        let targetDim: CGFloat = showBadge ? 0.12 : 0
+        if animated {
+            UIView.animate(withDuration: 0.12) {
+                self.dimView.alpha = targetDim
+            }
+        } else {
+            dimView.layer.removeAllAnimations()
+            dimView.alpha = targetDim
+        }
+        contentView.layer.borderWidth = showBadge ? 2 : 0
+        contentView.layer.borderColor = DSColor.tint.cgColor
+    }
+
+    /// 旧签名转发（docs/32 §2.5：内部调用 applySelection，避免大面积改调用点）
+    func setSelectionVisible(_ visible: Bool) {
+        applySelection(isSelecting: visible, isSelected: isSelectedCell, animated: false)
+    }
+
+    /// 旧签名转发
+    func setSelected(_ selected: Bool) {
+        applySelection(isSelecting: isSelectingVisible, isSelected: selected, animated: false)
     }
 
     override init(frame: CGRect) {
@@ -98,6 +133,7 @@ final class PhotoGridCell: UICollectionViewCell {
         contentView.layer.cornerRadius = DSSpacing.gridCornerRadius
         contentView.backgroundColor = DSColor.bgSecondary
         contentView.addSubview(imageView)
+        contentView.addSubview(dimView)
         contentView.addSubview(cloudBadge)
         contentView.addSubview(liveBadge)
         contentView.addSubview(screenshotBadge)
@@ -141,11 +177,10 @@ final class PhotoGridCell: UICollectionViewCell {
         cancelLoad()
         imageView.image = nil
         updateBadges(item: nil)
-        // docs/25 §6.4：复用必须复位选中态，杜绝上一张的选中残留（P0-3 伴生缺陷）
-        setSelected(false)
-        setSelectionVisible(false)
-        contentView.layer.borderWidth = 0
-        selectionBadge.isHidden = true
+        // docs/25 §6.4：复用必须复位选中态（角标/dim/边框/动画），杜绝上一张残留（P0-3 伴生缺陷）
+        selectionBadge.layer.removeAllAnimations()
+        dimView.layer.removeAllAnimations()
+        applySelection(isSelecting: false, isSelected: false, animated: false)
     }
 
     /// VC 在 didEndDisplaying 调用：取消在途加载（AGENTS.md §3.6 cell 离屏取消）

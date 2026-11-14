@@ -41,6 +41,23 @@ final class LibraryViewController: UIViewController {
         label.accessibilityLabel = "已选择 0 项"
         return label
     }()
+    /// 框选模式说明（M17 T06：仅多选且拖动时显示，结束隐藏；docs/04 §7 口径）
+    private let selectionModeHintLabel: UILabel = {
+        let label = UILabel()
+        label.font = DSTypography.font(.badge)
+        label.textColor = DSColor.textSecondary
+        label.isHidden = true
+        label.accessibilityIdentifier = "Selection-Mode-Hint"
+        return label
+    }()
+    /// 计数 + 模式说明组合（插入 topRow，替代单独的计数标签占位）
+    private lazy var selectionCountStack: UIStackView = {
+        let stack = UIStackView(arrangedSubviews: [selectionCountLabel, selectionModeHintLabel])
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 6
+        return stack
+    }()
     private let batchToast = DSToast(frame: .zero)
     /// 底部 Toast 约束（R04：约束引用切换——safeArea / selectionBar 顶部二选一）
     private var toastSafeAreaConstraint: NSLayoutConstraint?
@@ -681,7 +698,7 @@ final class LibraryViewController: UIViewController {
         let doneButton = barButton(symbol: "checkmark", label: "完成", identifier: "Batch-Done",
                                    action: #selector(doneSelectingTapped))
         let topRow = UIStackView(arrangedSubviews: [cancelButton,
-                                                    selectionCountLabel,
+                                                    selectionCountStack,
                                                     doneButton])
         topRow.axis = .horizontal
         topRow.alignment = .center
@@ -783,13 +800,23 @@ final class LibraryViewController: UIViewController {
             }
             return ids
         }
+        // M17 T06：框选覆盖层挂在根视图、collectionView 之上（视口坐标 frame，控制器逐帧转换）；
+        // 多选栏提示跟随拖动状态与框选模式。
+        let marqueeOverlay = MarqueeOverlayView()
+        view.insertSubview(marqueeOverlay, aboveSubview: collectionView)
+        controller.overlayView = marqueeOverlay
         controller.onMarqueeRectChanged = { [weak self] rect in
-            // T06 在此挂框选覆盖层；T05 仅记录（DEBUG 取证）
             #if DEBUG
             if let rect {
                 LibrarySelectionDebugState.lastMarqueeRect = rect
             }
             #endif
+            guard let self else { return }
+            self.selectionModeHintLabel.isHidden = rect == nil
+            if rect != nil {
+                self.selectionModeHintLabel.text = self.selectionController?.mode == .deselect
+                    ? "取消选择中" : "选择中"
+            }
         }
         selectionController = controller
     }
@@ -1309,6 +1336,8 @@ final class LibraryViewController: UIViewController {
         let cells = sectionCount > 0 ? String(collectionView.numberOfItems(inSection: 0)) : "0"
         let sel = selectionController
         let ticks = sel?.debugAutoScrollTicks ?? -1
+        let hap = sel?.debugHapticCount ?? -1
+        let ovHidden = sel?.overlayView?.isHidden ?? true
         let edge = sel?.debugLastEdgeDirection ?? 9
         let vy = Int(sel?.debugLastFingerViewportY ?? -1)
         let vB = Int(sel?.debugViewportBottom ?? -1)
@@ -1316,7 +1345,7 @@ final class LibraryViewController: UIViewController {
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 
