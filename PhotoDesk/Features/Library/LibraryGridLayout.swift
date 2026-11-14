@@ -5,6 +5,13 @@
 import UIKit
 
 enum LibraryGridLayout {
+    /// X08（M17 T08，docs/31 §3）：单元格点宽与 make() 同源——(行宽 − (c−1)×gridSpacing) / c。
+    /// 行宽 = collectionView 行宽（fractionalWidth 布局减去列间距后的实际 item 宽）。
+    static func itemWidth(for columns: Int, rowWidth: CGFloat) -> CGFloat {
+        guard columns > 0 else { return 0 }
+        return max(0, (rowWidth - CGFloat(columns - 1) * DSSpacing.gridSpacing) / CGFloat(columns))
+    }
+
     static func make(columns: Int) -> UICollectionViewCompositionalLayout {
         let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0 / CGFloat(columns)),
                                               heightDimension: .fractionalHeight(1.0))

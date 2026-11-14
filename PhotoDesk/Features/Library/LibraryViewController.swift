@@ -1820,8 +1820,10 @@ final class LibraryViewController: UIViewController {
     }
 
     /// 单个 cell 的像素尺寸（正方形；缓存键与预取共用，列数切换时随之变化）
+    /// X08（M17 T08）：与布局同源——collectionView 行宽 + LibraryGridLayout.itemWidth
+    ///（旧实现读 root view.bounds.width，与真实 cell 尺寸可能不一致 → 缩略图模糊/多取）。
     private var cellPixelSize: CGSize {
-        let width = (view.bounds.width - CGFloat(columns - 1) * DSSpacing.gridSpacing) / CGFloat(columns)
+        let width = LibraryGridLayout.itemWidth(for: columns, rowWidth: collectionView.bounds.width)
         let scale = UIScreen.main.scale
         return CGSize(width: width * scale, height: width * scale)
     }
