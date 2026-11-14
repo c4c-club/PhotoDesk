@@ -1307,15 +1307,17 @@ final class LibraryViewController: UIViewController {
         let sectionCount = collectionView.numberOfSections
         let sections = String(sectionCount)
         let cells = sectionCount > 0 ? String(collectionView.numberOfItems(inSection: 0)) : "0"
-        viewModel.debugScrollNote = "off=" + off + "/" + maxOffset +
-            " anchor=" + anchor + " visualY=" + String(visualY) +
-            " sec=" + sections + " cells=" + cells +
-            " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches) +
-            " slide=ticks=" + String(selectionController?.debugAutoScrollTicks ?? -1) +
-            " edge=" + String(selectionController?.debugLastEdgeDirection ?? 9) +
-            " vy=" + String(Int(selectionController?.debugLastFingerViewportY ?? -1)) +
-            " vB=" + String(Int(selectionController?.debugViewportBottom ?? -1)) +
-            " state=" + (selectionController?.debugStateName ?? "none")
+        let sel = selectionController
+        let slidePart = "slide=ticks=" + String(sel?.debugAutoScrollTicks ?? -1)
+            + " edge=" + String(sel?.debugLastEdgeDirection ?? 9)
+            + " vy=" + String(Int(sel?.debugLastFingerViewportY ?? -1))
+            + " vB=" + String(Int(sel?.debugViewportBottom ?? -1))
+            + " state=" + (sel?.debugStateName ?? "none")
+        viewModel.debugScrollNote = "off=" + off + "/" + maxOffset
+            + " anchor=" + anchor + " visualY=" + String(visualY)
+            + " sec=" + sections + " cells=" + cells
+            + " panMin=" + String(collectionView.panGestureRecognizer.minimumNumberOfTouches)
+            + " " + slidePart
         #endif
     }
 
