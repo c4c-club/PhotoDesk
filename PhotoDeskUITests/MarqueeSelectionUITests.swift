@@ -547,12 +547,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         let shots = burst.finish()
         XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
         // 功能断言：拖过 1/4/7 三格 → 已选 1/4 全部取消 → 计数 2→0（取消模式语义）
-        let postCount = waitForSelectionCount(app, atMost: 0, timeout: 8)
+        let postCount = waitForSelectionCountEqual(app, to: 0, timeout: 8)
         XCTAssertEqual(postCount, 0, "取消模式框选必须清掉锚选（count=\(postCount)）")
         var bestRed = 0
         var blueAtBest = 0
         var perShot = ""
-        var bestShot: XCUIScreen? = nil
+        var bestShot: UIImage? = nil
         for shot in shots {
             let counts = dominantStrokePixels(in: shot, region: band)
             perShot += "(r=\(counts.red) b=\(counts.blue)) "
