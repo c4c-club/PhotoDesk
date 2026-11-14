@@ -249,4 +249,16 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertLessThanOrEqual(tester.lastQueryCount, 60,
                                  "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
     }
+
+    // MARK: - M17 T08 X08：缩略图像素尺寸与布局同源（LibraryGridLayout.itemWidth）
+
+    /// cellPixelSize 公式改为与布局工厂同一来源：(rowWidth − (c−1)×gridSpacing) / c。
+    func testGridItemWidthMatchesLayoutFormula() {
+        XCTAssertEqual(LibraryGridLayout.itemWidth(for: 3, rowWidth: 390),
+                       (390 - 2 * DSSpacing.gridSpacing) / 3, accuracy: 0.001)
+        XCTAssertEqual(LibraryGridLayout.itemWidth(for: 2, rowWidth: 320),
+                       (320 - DSSpacing.gridSpacing) / 2, accuracy: 0.001)
+        XCTAssertEqual(LibraryGridLayout.itemWidth(for: 1, rowWidth: 390), 390, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(LibraryGridLayout.itemWidth(for: 5, rowWidth: 0), 0, "退化输入不得为负")
+    }
 }

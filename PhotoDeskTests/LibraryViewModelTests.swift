@@ -379,6 +379,34 @@ final class LibraryViewModelTests: XCTestCase {
                        "补齐后全选计数 == filteredItems.count（不是首屏 500）")
     }
 
+    // MARK: - M17 T08 X07：索引未完成时增量插入不再按结果索引定位（docs/31 §3）
+
+    /// allItems 是窗口子集时，fetchResult 索引≠数组索引：插入走 append + 依赖
+    /// rebuildDerived 重排，绝不按结果索引错位。
+    func testMergeChangeAppendsInsertsWhenIndexIncomplete() {
+        let current = (0..<5).map { makeItem($0) }
+        let merged = LibraryViewModel.mergedItems(current: current,
+                                                  removedIndexes: [],
+                                                  changedPairs: [],
+                                                  insertedPairs: [(120, makeItem(99))],
+                                                  indexComplete: false)
+        XCTAssertEqual(merged.count, 6)
+        XCTAssertEqual(merged.last?.id, "id-99", "索引未完成：插入走 append，绝不按结果索引错位")
+    }
+
+    /// 索引完成后保持既有原位插入语义（移除旧索引倒序 + 变更原位 + 插入按位）。
+    func testMergeChangeKeepsPositionalInsertWhenIndexComplete() {
+        let current = (0..<5).map { makeItem($0) }
+        let merged = LibraryViewModel.mergedItems(current: current,
+                                                  removedIndexes: [1],
+                                                  changedPairs: [(0, makeItem(88))],
+                                                  insertedPairs: [(2, makeItem(50))],
+                                                  indexComplete: true)
+        XCTAssertEqual(merged.count, 5)
+        XCTAssertEqual(merged[0].id, "id-88", "变更原位替换")
+        XCTAssertEqual(merged[2].id, "id-50", "索引完成：按结果索引原位插入")
+    }
+
     /// A08「索引补齐丢选中」：快照追加 500（补齐批次）后，已选 id 不得被
     /// 滞后快照口径的 scope 收敛丢弃。快照回调收敛口径必须与选中 scope 同源
     /// （filteredItems 全量）。
