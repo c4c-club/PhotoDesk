@@ -90,6 +90,9 @@ final class LibrarySelectionController: NSObject {
         // TouchDownObserver：0 时长长按，只用于记录按下点（G3：框选起点 = 按下点而非 pan 触发点）
         let touchDown = UILongPressGestureRecognizer(target: self, action: #selector(handleTouchDown(_:)))
         touchDown.minimumPressDuration = 0
+        // 观察器身份：只记录按下点与触点存续，位移不构成失败——否则按压相位的微漂移
+        // 会使其 .failed → feedEnd(.cancelled) 复位机器并作废 holdElapsed 定时器（T06 取证）。
+        touchDown.allowableMovement = .greatestFiniteMagnitude
         touchDown.cancelsTouchesInView = false
         touchDown.delegate = self
         // 长按识别：0.28s / allowableMovement（SelectionGestureConfig，docs/32 §2.3），cancelsTouchesInView=false

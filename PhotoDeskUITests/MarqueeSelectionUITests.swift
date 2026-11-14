@@ -269,11 +269,16 @@ final class MarqueeSelectionUITests: XCTestCase {
         let collection = launchSelectableGrid(app)
         let preDragIDs = Set((0..<collection.cells.count).map { cellID(collection.cells.element(boundBy: $0)) })
         XCTAssertGreaterThan(preDragIDs.count, 5, "首屏必须有足够可见 cell")
-        // 长按首格 → 拖到底缘（dy 0.97，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集
+        // 触觉节流验收（docs/32 §2.7 ≤16 次/秒）：整手势窗口 delta ≤ 64（宽裕上界）
+        let hapBefore = readHapticCount(app)
+        // 长按首格 → 拖到底缘（dy 0.99，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集
         let start = collection.cells.element(boundBy: 0)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.99))
         start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
+        let hapAfter = readHapticCount(app)
+        XCTAssertLessThanOrEqual(hapAfter - hapBefore, 64,
+                                 "触觉必须 60ms 节流（≤16 次/秒，delta=\(hapAfter - hapBefore)）")
         let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
         let banner = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
         XCTAssertGreaterThanOrEqual(count, 6,
@@ -411,6 +416,13 @@ final class MarqueeSelectionUITests: XCTestCase {
         return readOffsetY(app)
     }
 
+    private func readHapticCount(_ app: XCUIApplication) -> Int {
+        let banner = app.descendants(matching: .any)["Library-DebugSummary"].firstMatch
+        guard banner.exists else { return 0 }
+        let raw = ((banner.value as? String) ?? banner.label)
+        return Int(Self.parseDoubleField(raw, "hap"))
+    }
+
     private func waitForOffsetIncrease(_ app: XCUIApplication, from baseline: Double,
                                        atLeast threshold: Double, timeout: TimeInterval = 5) -> Double {
         let deadline = Date().addingTimeInterval(timeout)
@@ -489,17 +501,17 @@ final class MarqueeSelectionUITests: XCTestCase {
     }
 
     /// 框选拖动期间覆盖层必须可见：连拍帧内检测 tint 描边像素（无覆盖层 → 0 像素 → 断言红）。
+    /// 锚 col-1 绿格（cell 1/4）：绿格自身 g 通道占优，蓝描边（b 压 r/g 40+）不与底色混淆。
     func testMarqueeOverlayVisible() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        let cell0 = collection.cells.element(boundBy: 0)
-        let cell4 = collection.cells.element(boundBy: 4)
+        let cell0 = collection.cells.element(boundBy: 1)
         XCTAssertTrue(cell0.waitForExistence(timeout: 10), "网格无 cell")
         let frame0 = cell0.frame
         let band = CGRect(x: frame0.minX, y: frame0.midY - 8, width: frame0.width, height: 16)
         let burst = BurstShots()
         burst.start()
-        longPressDrag(in: collection, fromIndex: 0, toIndex: 4, hold: 1.2)
+        longPressDrag(in: collection, fromIndex: 1, toIndex: 4, hold: 1.2)
         let shots = burst.finish()
         XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
         var bestBlue = 0
@@ -519,18 +531,19 @@ final class MarqueeSelectionUITests: XCTestCase {
     }
 
     /// 取消模式（锚点已选 → 拖）覆盖层必须 danger 红：红像素 ≥ 25 且红 > 蓝（模式判别）。
+    /// 锚 col-1 绿格：先点选 cell 1/4（锚点已选 → 取消模式），拖 1→7。
     func testDeselectModeShowsDangerTint() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        collection.cells.element(boundBy: 0).tap()
-        collection.cells.element(boundBy: 3).tap()
-        let cell0 = collection.cells.element(boundBy: 0)
+        collection.cells.element(boundBy: 1).tap()
+        collection.cells.element(boundBy: 4).tap()
+        let cell0 = collection.cells.element(boundBy: 1)
         XCTAssertTrue(cell0.waitForExistence(timeout: 10), "网格无 cell")
         let frame0 = cell0.frame
         let band = CGRect(x: frame0.minX, y: frame0.midY - 8, width: frame0.width, height: 16)
         let burst = BurstShots()
         burst.start()
-        longPressDrag(in: collection, fromIndex: 0, toIndex: 6, hold: 1.2)
+        longPressDrag(in: collection, fromIndex: 1, toIndex: 7, hold: 1.2)
         let shots = burst.finish()
         XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
         var bestRed = 0
