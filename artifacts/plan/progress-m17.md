@@ -4,8 +4,8 @@
 
 | 任务 | 状态 | 提交 | 门禁/证据 | 备注 |
 |---|---|---|---|---|
-| T01 | DONE | cfe46dc (test) + 本提交 (docs 归档) | audit 红基线归档；CI run 43529901394 三红用例全部失败实锤 | 镜像 makeLayout 引入 1 条既有弃用警告实例，T04 消除 |
-| T02 | TODO | — | — | — |
+| T01 | DONE | cfe46dc (test) + c9d8474 (docs 归档) | audit 红基线归档；CI run 43529901394 三红用例全部失败实锤 | 镜像 makeLayout 引入 1 条既有弃用警告实例，T04 消除 |
+| T02 | DONE | 14e651f (test) + f74d184 (feat) + 9d2e607 (refactor) + 7b692b9 (fix) | Docker 435 tests 0 failures；CI core-linux success + 定向 Test SUCCEEDED；shouldActivate/resolvedSelection 归零 | 新增 39 用例 ≥ 25 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -33,3 +33,19 @@
 ### 遗留说明
 
 - 测试文件镜像 `makeLayout` 的 `NSCollectionLayoutGroup.horizontal(layoutSize:subitem:count:)`（CI 实证 LibraryViewController:1735、VaultGridView:54 早已存在同类弃用警告），T04 真几何改造时一并切换非弃用 API。
+
+## T02 — Core 手势状态机（DONE，2026-11-14）
+
+### 交付物
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift`：SelectionGestureState（idle/pressing/armed/dragging/autoScrolling/ending）+ SelectionGestureEvent（六事件 + edgeEntered(direction:)/edgeExited——状态表第 7/8 行「指尖进/离边缘」的事件载体）+ SelectionGestureConfig（0.28/8/8/1.2/6/0.06）+ handle(event:now:) → [SelectionGestureEffect]；仅 `import Foundation`。
+- 效果契约：holdElapsed → [haptic(.impactLight), enterSelection(anchorID), beginMarquee]；pressing 横向锁定 → dragging（未在多选先 enterSelection，isSelectionModeActive 由 App 注入）；纵向占优 → idle + releaseScroll；armed 纵向拖不拖框、scrollStarted 回 idle；dragging moved → updateMarquee + haptic(.selectionChanged)（hapticMinInterval 节流，App 侧以命中集合变化为最终闸门）；边缘进出 start/stop 严格配对；ended/cancelled 带资源收尾入 .ending、下一事件复位 idle；非有限 dx/dy/now/触点安全直回 idle。
+- 删除死代码（docs/31 X10）：SlideSelectPolicy.shouldActivate / resolvedSelection / deduplicated / SlideSelectActivation / SlideSelectConfig.directionLockEpsilon 及 9 条对应测试；SlideSelectCell 保留（MarqueeSelectionPolicy 在用）；edgeVelocity / clampedOffset / 其余 config 常量保留（App 控制器在用，T05 换装）。
+
+### 门禁证据
+
+- 红：14e651f 落地前 Docker 编译失败实录 `artifacts/audit/m17/t02/red-compile-failure.log`（cannot find 'SelectionGestureMachine'/'SelectionGestureConfig' in scope）
+- 绿：Docker swift:6.0-noble `scripts/test-core.ps1` —— feat 后 444 tests 0 failures；refactor 后 **435 tests 0 failures**（405 基线 + 39 新增 − 9 删除）
+- 验收：shouldActivate / resolvedSelection 在跟踪源码命中 0；机器文件仅 import Foundation；新增用例 39 ≥ 25
+- CI：core-linux（swift:6.0-noble）同一条命令复验 **success**；定向 run 43534301697 抓到 Darwin 真实差异——Foundation 导入的 CGPoint 不满足 Equatable 合成（Docker Linux 有 Equatable 故本地全绿）→ fix 7b692b9 改用 Core 自有 GridPoint（红线 2 合规）→ 复跑 43535685266：定向 Test 步骤 **TEST SUCCEEDED**（LibraryViewModelTests 14/14，App 与新 Core 编译兼容实证）。该 run 整体 failure 仅因最后无条件 Performance 步骤的基建抖动「Test runner never began executing tests after launching」（非断言失败，与 Core 改动无关；T09 全量回归复盖）。push 全量 run 已按 concurrency 组取消省额度
+- 本地证据目录（不入库）：`artifacts/audit/m17/t02/`、`artifacts/ci-evidence/m17-t01/`
