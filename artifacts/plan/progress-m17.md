@@ -65,3 +65,22 @@
 - 绿：Docker swift:6.0-noble **459 tests 0 failures**（435 基线 + 24 新增）；过程修正 1 条测试自身矩形宽度错误（随 feat 提交，非实现缺陷）
 - 验收：新增 24 ≥ 20；不引入 UIKit/CoreGraphics；性能用例由 CI core-linux 容器同一条 swift test 复验（run 43540179936 **success**：core-linux success + build success + 定向 Test SUCCEEDED + Performance 4/4 通过——上轮 T02 的 perf 步骤失败确证为 runner 基建抖动）
 - 本地证据（不入库）：`artifacts/audit/m17/t03-green-test-summary.txt`
+
+## T04 — 网格真实几何与命中（DONE，2026-11-14）
+
+### 交付物
+
+- `PhotoDesk/Features/Library/LibraryGridLayout.swift`：`enum LibraryGridLayout.make(columns:)`——自 VC `makeLayout` 原样搬出（行为零变化），VC 4 处调用点改指工厂。
+- `PhotoDesk/Features/Library/GridHitTester.swift`：框选命中测试器（docs/32 §2.4 1–8 步）——段范围缓存自 item(0)/item(count−1) attributes（不读 supplementary → 粘性头污染免疫）；列数由首行 attributes 探测；真实行高 = 次行.minY − 首行.minY；二分找候选段 + 只枚举相交行 + 每行 ≤ columns 次查询；矩形上边钳到视口顶 + 48（G11：被钉住头遮住/滚出屏的 cell 不命中）；`invalidateGeometry()` 由 VC viewDidLayoutSubviews 统一失效（snapshot/列数/旋转最终都汇入布局 pass）；DEBUG `lastQueryCount`。
+- `SlideSelectGestureController`：契约 `geometryProvider` → `hitTestProvider: (CGRect) -> Set<String>`（零尺寸矩形扩 1pt 保留在控制器）；id 映射移至 VC（`dataSource.itemIdentifier(for:)`）；anchor 仍走 itemIDProvider。
+- `LibraryViewController`：删 `marqueeGeometry()`（34 行参数推算）；`layoutAttributesForSupplementaryView` 仅剩位置记忆/月跳两处（命中路径 0）。
+- Core：`MarqueeSelectionPolicy` 只剩 `mode/resolved`（删 GridMetrics/MarqueeRect/cells，A09 随之根治）；`SlideSelectPolicy` 删 SlideSelectCell；Core 用例删 17 条参数推算几何用例（459 → 442）。
+- `PhotoDeskTests/LibraryGridGeometryTests`：T01 镜像布局删除（改用生产工厂，弃用 API 警告随之消除）；H1 断言由「不应被 pin 污染」（不可能成立）改写为 H1 实锤行为锁（被钉住段 supplementary minY == 视口顶、diff≈902pt）；新增暴力求交一致性（2/3/4/5 列 × offset {0,2000,8000,20000}）、H3 宽度公式、a3-7 回归锁、lastQueryCount ≤ 60 四用例。
+
+### 门禁证据
+
+- 红：83b8ad8 CI run 43544489881 **failure**（build: Cannot find 'LibraryGridLayout'/'GridHitTester' in scope，实录 `artifacts/audit/m17/t04-red-compile-failure.log`）
+- 中途红（真数据暴露的测试缺陷，实现未改）：run 43546275550 3 败（XCTUnwrap nil ×2 + H1 旧断言）→ 8737c4b；run 43548175125 2 败（首趟布局缺失）→ 27f4edb；run 43549332935 2 败（**UICollectionView.dataSource 弱引用**——解构丢弃导致 0 段空网格，此前暴力求交/lastQueryCount 两轮为空对空假绿）→ ade613e
+- 绿：run 43550824419 **success**——core-linux 442 tests 0 failures；定向 LibraryGridGeometryTests **5/5**（真数据）；Performance 4/4；Docker 本地同绿 `artifacts/audit/m17/t04-green-test-summary.txt`
+- 验收 grep：`marqueeGeometry` PhotoDesk 0 处；`layoutAttributesForSupplementaryView` VC 仅剩 2 处（位置记忆/月跳，命中路径外）；H1/H3 实测结论已写入测试注释（H1 成立 diff=902 → tester 全走 item attributes；H3 成立 宽=(W−s(c−1))/c）
+- 警告：T01 镜像弃用 API 警告随镜像删除而消除（净 −1，无新增）
