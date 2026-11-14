@@ -10,7 +10,7 @@ import Photos
 final class MetadataServiceTests: XCTestCase {
 
     func testBasicsForFirstLibraryAsset() async throws {
-        let fetch = PHAsset.fetchAssets(with: nil, options: nil)
+        let fetch = PHAsset.fetchAssets(with: PHFetchOptions())
         guard fetch.count > 0 else {
             throw XCTSkip("模拟器相册为空：真库通道用例跳过（本地不误伤）")
         }
@@ -22,7 +22,7 @@ final class MetadataServiceTests: XCTestCase {
     }
 
     func testExifFieldsForFirstLibraryAsset() async throws {
-        let fetch = PHAsset.fetchAssets(with: nil, options: nil)
+        let fetch = PHAsset.fetchAssets(with: PHFetchOptions())
         guard fetch.count > 0 else {
             throw XCTSkip("模拟器相册为空：真库通道用例跳过（本地不误伤）")
         }
