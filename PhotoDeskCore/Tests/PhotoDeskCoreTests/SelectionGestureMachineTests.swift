@@ -177,7 +177,8 @@ final class SelectionGestureMachineTests: XCTestCase {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.moved(dx: 0, dy: 12), now: 0.35)
-        XCTAssertEqual(effects, [.updateMarquee], "armed 纵向拖 ≥ 6pt 必须开始拖框（表第 6 行无方向限定）")
+        XCTAssertEqual(effects, [.updateMarquee, .haptic(kind: .selectionChanged)],
+                       "armed 纵向拖 ≥ 6pt 必须开始拖框（表第 6 行无方向限定；0.35-0.28 ≥ 0.06 触觉放行）")
         XCTAssertEqual(machine.state, .dragging)
         // 复位后可立即服务下一次手势
         _ = machine.handle(.ended, now: 0.4)

@@ -14,8 +14,8 @@
 //   → dragging，未在多选时先 enterSelection（表第 3 行「必要时先进入多选」，App 侧最终把关）；
 //   纵向占优（|dy| ≥ |dx|·horizontalRatio）→ idle + releaseScroll（让位滚动，G2）。
 //   累计位移 > allowableMovement 即判长按死亡（对角未决时仍 pressing，但不再响应 holdElapsed）。
-// - armed moved：横向占优且累计距离 ≥ activationDistance → dragging（框选开始）；纵向不拖框，
-//   等 scrollStarted 回 idle + endMarquee（选中集保留，App 语义）。
+// - armed moved：累计距离 ≥ activationDistance → dragging（框选开始，任意方向——表第 6 行无
+//   方向限定：长按已表达选择意图，T05 修正；0 尺寸选框已在 armed 就位）。
 // - dragging/autoScrolling moved → updateMarquee + haptic(.selectionChanged)（受 hapticMinInterval
 //   节流；App 侧以命中集合变化为最终闸门，G6）。反向拖逐帧上报，收缩由调用方计算（卡内附加 3）。
 // - edgeEntered(d)：dragging → autoScrolling + startAutoScroll(d)；autoScrolling 中反向进边缘 → 换向重启；
@@ -196,9 +196,9 @@ public struct SelectionGestureMachine: Sendable {
         case .armed:
             totalDX += dx
             totalDY += dy
-            let horizontal = abs(totalDX) > abs(totalDY) * config.horizontalRatio
-            guard horizontal, displacement() >= config.activationDistance else { return [] }
-            // 表第 6 行：armed 横向拖 ≥ activationDistance → 框选开始（0 尺寸选框已在 armed 就位）
+            guard displacement() >= config.activationDistance else { return [] }
+            // 表第 6 行：armed moved → dragging（框选开始，任意方向——表无方向限定：长按已表达
+            // 选择意图，「长按后拖到第 5 行」「底缘自动滚动」都依赖纵向拖框，T05 修正）
             state = .dragging
             scrollLocked = true
             return marqueeUpdateEffects(now: now)
