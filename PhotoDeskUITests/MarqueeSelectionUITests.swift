@@ -585,8 +585,6 @@ final class MarqueeSelectionUITests: XCTestCase {
         // 阶段 B：点选锚点（8/11）→ 取消模式拖（8→14）——danger 描边
         collection.cells.element(boundBy: 8).tap()
         collection.cells.element(boundBy: 11).tap()
-        let anchorCell = collection.cells.element(boundBy: 8)
-        XCTAssertTrue(anchorCell.waitForExistence(timeout: 10), "网格无 cell")
         // 阶段 A 已框选 0/3/6（count=3）→ 点选 8/11 后计数=5
         let preCount = waitForSelectionCountEqual(app, to: 5, timeout: 5)
         XCTAssertEqual(preCount, 5, "点选 8/11 后计数必须为 5（count=\(preCount)）")
