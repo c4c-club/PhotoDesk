@@ -34,7 +34,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         installPermissionMonitor()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
                                 "-uiTestingSelectMode", "-uiTestingKeepChrome",
-                                "-uiTestingFilterYear", "0"]
+                                "-uiTestingFilterYear", "0", "-uiTestingLongPressMovement"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -52,7 +52,8 @@ final class MarqueeSelectionUITests: XCTestCase {
     private func launchPlainGrid(_ app: XCUIApplication) -> XCUIElement {
         installPermissionMonitor()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
-                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
+                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0",
+                                "-uiTestingLongPressMovement"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {

@@ -752,7 +752,12 @@ final class LibraryViewController: UIViewController {
         ])
 
         // M17 T05：多选手势编排（长按/框选 pan/TouchDownObserver 由控制器组装）。
-        let controller = LibrarySelectionController(collectionView: collectionView)
+        var gestureConfig = SelectionGestureConfig()
+        if ProcessInfo.processInfo.arguments.contains("-uiTestingLongPressMovement") {
+            // XCUI 合成按压微漂移 > 8pt 预算会偶发杀长按（run 43558341702 取证）；Core 单测仍钉 8pt 语义
+            gestureConfig.allowableMovement = 40
+        }
+        let controller = LibrarySelectionController(collectionView: collectionView, config: gestureConfig)
         controller.isSelectionMode = { [weak self] in self?.isSelecting ?? false }
         controller.selectedIDsProvider = { [weak self] in self?.selectionState.selectedSet ?? [] }
         controller.hitIDAtContentPoint = { [weak self] point in

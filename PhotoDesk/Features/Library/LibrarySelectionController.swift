@@ -39,7 +39,7 @@ final class LibrarySelectionController: NSObject {
     var onMarqueeRectChanged: ((CGRect?) -> Void) = { _ in }
 
     private weak var collectionView: UICollectionView?
-    private var machine = SelectionGestureMachine(config: SelectionGestureConfig())
+    private var machine: SelectionGestureMachine
     private var baseIDs: Set<String> = []
     private var mode: MarqueeMode = .select
     private var lastTargetIDs: Set<String> = []
@@ -70,18 +70,21 @@ final class LibrarySelectionController: NSObject {
         }
     }
 
-    init(collectionView: UICollectionView) {
+    /// config 注入：UI 测试以 -uiTestingLongPressMovement 放宽 allowableMovement
+    ///（XCUI 合成按压存在微漂移，8pt 预算在 CI 上偶发杀死长按识别；Core 单测仍钉 8pt 语义）。
+    init(collectionView: UICollectionView, config: SelectionGestureConfig = SelectionGestureConfig()) {
         self.collectionView = collectionView
+        self.machine = SelectionGestureMachine(config: config)
         super.init()
         // TouchDownObserver：0 时长长按，只用于记录按下点（G3：框选起点 = 按下点而非 pan 触发点）
         let touchDown = UILongPressGestureRecognizer(target: self, action: #selector(handleTouchDown(_:)))
         touchDown.minimumPressDuration = 0
         touchDown.cancelsTouchesInView = false
         touchDown.delegate = self
-        // 长按识别：0.28s / 8pt（SelectionGestureConfig，docs/32 §2.3），cancelsTouchesInView=false
+        // 长按识别：0.28s / allowableMovement（SelectionGestureConfig，docs/32 §2.3），cancelsTouchesInView=false
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-        longPress.minimumPressDuration = TimeInterval(SelectionGestureConfig().longPressDuration)
-        longPress.allowableMovement = CGFloat(SelectionGestureConfig().allowableMovement)
+        longPress.minimumPressDuration = TimeInterval(config.longPressDuration)
+        longPress.allowableMovement = CGFloat(config.allowableMovement)
         longPress.cancelsTouchesInView = false
         longPress.delegate = self
         // 框选 pan：单指；与滚动 pan 同时识别，方向锁由机器判定后本类执行
