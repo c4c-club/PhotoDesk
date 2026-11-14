@@ -373,10 +373,12 @@ final class LibrarySelectionController: NSObject {
                       width: abs(current.x - press.x), height: abs(current.y - press.y))
     }
 
-    /// 覆盖层 frame：内容坐标 → collectionView 视口坐标（overlay 与 collectionView 同层，不随内容滚动）
+    /// 覆盖层 frame：内容坐标 → view 坐标（overlay 是 collectionView 的兄弟视图：
+    /// 先减 contentOffset 回到 bounds 系，再加 collectionView.frame.origin 进 superview 系）。
     private func overlayFrame(for rect: CGRect?) -> CGRect? {
         guard let rect, let collectionView else { return rect }
-        return rect.offsetBy(dx: -collectionView.contentOffset.x, dy: -collectionView.contentOffset.y)
+        return rect.offsetBy(dx: -collectionView.contentOffset.x + collectionView.frame.origin.x,
+                             dy: -collectionView.contentOffset.y + collectionView.frame.origin.y)
     }
 
     // MARK: 边缘自动滚动
