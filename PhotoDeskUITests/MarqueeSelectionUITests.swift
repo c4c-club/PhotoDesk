@@ -519,7 +519,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         let collection = launchSelectableGrid(app)
         let anchorCell = collection.cells.element(boundBy: 8)
         XCTAssertTrue(anchorCell.waitForExistence(timeout: 10), "网格无 cell")
-        let strip = strokeStrip(of: anchorCell)
+        let strip = gridScanRegion(collection)
         let burst = BurstShots()
         burst.start(delay: 0.8)
         longPressDrag(in: collection, fromIndex: 8, toIndex: 11, hold: 1.2)
