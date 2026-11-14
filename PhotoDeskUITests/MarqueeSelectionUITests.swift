@@ -44,6 +44,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        usleep(1_500_000)  // 启动布局/inset 稳定：静止按压期间内容位移 >8pt 会使长按失效
         return collection
     }
 
@@ -61,6 +62,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        usleep(1_500_000)  // 启动布局/inset 稳定，同 launchPlainGrid
         return collection
     }
 
@@ -126,7 +128,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         return value
     }
 
-    /// 长按 cell 后拖到另一 cell 中心（0.4s > 0.28s 长按阈值：armed 在按下期间成立，
+    /// 长按 cell 后拖到另一 cell 中心（0.55s > 0.28s 长按阈值并留抖动余量：armed 在按下期间成立，
     /// 起点终点都锚定真实 cell，几何不受像素估算影响）
     private func longPressDrag(in collection: XCUIElement, fromIndex: Int, toIndex: Int,
                                hold: TimeInterval? = nil) {
@@ -135,9 +137,9 @@ final class MarqueeSelectionUITests: XCTestCase {
         let end = collection.cells.element(boundBy: toIndex)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         if let hold {
-            start.press(forDuration: 0.4, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: hold)
+            start.press(forDuration: 0.55, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: hold)
         } else {
-            start.press(forDuration: 0.4, thenDragTo: end)
+            start.press(forDuration: 0.55, thenDragTo: end)
         }
     }
 
@@ -196,25 +198,37 @@ final class MarqueeSelectionUITests: XCTestCase {
 
     // MARK: - 长按后拖动继续框选（docs/32 §4.3）
 
-    /// 长按首格 0.4s → 拖到第 5 行（col-0 行 4）：命中集合精确 = col-0 行 0-4 的 assetID 列表，
+    /// 长按首格 → 拖到第 5 行（col-0 行 4）：命中集合精确 = col-0 行 0-4 的 assetID 列表，
     /// 同行右列不得被卷入（armed 任意方向拖框，docs/32 §2.2 表第 6 行）。
+    /// XCUI 合成长按时序存在环境抖动（43555732806 单例失败：长按未触发→纵向滚动→无多选栏），
+    /// 故整体最多重试 1 次（重新 launch 复位），断言本身保持精确、不放宽。
     func testLongPressDragContinuesSelection() throws {
-        let app = XCUIApplication()
-        let collection = launchPlainGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        let expected = Set([0, 3, 6, 9, 12].map { cellID(collection.cells.element(boundBy: $0)) })
-        longPressDrag(in: collection, fromIndex: 0, toIndex: 12)
-        XCTAssertEqual(waitForSelectionCountEqual(app, to: 5, timeout: 6), 5,
-                       "长按后拖到第 5 行：col-0 行 0-4 共 5 格（计数不变性见单指滚动用例）")
-        let selected = waitForSelectedSet(collection, equals: expected)
-        XCTAssertEqual(selected, expected,
-                       "命中集合必须精确等于 col-0 行 0-4 的 assetID 列表（got=\(selected.sorted())）")
-        for mate in [1, 2, 4, 5] {
-            XCTAssertFalse(cellIsSelected(collection.cells.element(boundBy: mate)),
-                           "col-0 拖动不得卷入同行右列（idx \(mate)）")
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchPlainGrid(app)
+            let first = collection.cells.firstMatch
+            XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+            let expected = Set([0, 3, 6, 9, 12].map { cellID(collection.cells.element(boundBy: $0)) })
+            longPressDrag(in: collection, fromIndex: 0, toIndex: 12)
+            let count = waitForSelectionCountEqual(app, to: 5, timeout: 6)
+            guard count == 5 else {
+                if attempt == 2 {
+                    XCTFail("长按后拖到第 5 行：两次尝试均未进入框选（count=\(count)，长按未触发）")
+                }
+                continue
+            }
+            XCTAssertEqual(count, 5,
+                           "长按后拖到第 5 行：col-0 行 0-4 共 5 格（计数不变性见单指滚动用例）")
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "命中集合必须精确等于 col-0 行 0-4 的 assetID 列表（got=\(selected.sorted())）")
+            for mate in [1, 2, 4, 5] {
+                XCTAssertFalse(cellIsSelected(collection.cells.element(boundBy: mate)),
+                               "col-0 拖动不得卷入同行右列（idx \(mate)）")
+            }
+            snap(app, "m17-longpress-drag")
+            return
         }
-        snap(app, "m17-longpress-drag")
     }
 
     // MARK: - 单指滚动保留（docs/31 §2.1 G1；T01 红锚点转绿）
