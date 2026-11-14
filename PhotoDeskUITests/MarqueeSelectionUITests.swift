@@ -253,7 +253,11 @@ final class MarqueeSelectionUITests: XCTestCase {
         let collection = launchSelectableGrid(app)
         let preDragIDs = Set((0..<collection.cells.count).map { cellID(collection.cells.element(boundBy: $0)) })
         XCTAssertGreaterThan(preDragIDs.count, 5, "首屏必须有足够可见 cell")
-        longPressDrag(in: collection, fromIndex: 0, toIndex: 0, hold: 2.0)
+        // 长按首格 → 拖到底缘（dy 0.97，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集
+        let start = collection.cells.element(boundBy: 0)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.97))
+        start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
         let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
         XCTAssertGreaterThanOrEqual(count, 6,
                                     "底缘拖 2s 必须自动滚动并选入屏外 cell（count=\(count)）")

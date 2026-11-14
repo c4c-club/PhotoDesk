@@ -99,9 +99,9 @@ final class LibrarySelectionController: NSObject {
         selectHaptic.prepare()
     }
 
-    let touchDownObserver: UILongPressGestureRecognizer
-    let longPressRecognizer: UILongPressGestureRecognizer
-    let marqueePan: UIPanGestureRecognizer
+    private(set) var touchDownObserver: UILongPressGestureRecognizer!
+    private(set) var longPressRecognizer: UILongPressGestureRecognizer!
+    private(set) var marqueePan: UIPanGestureRecognizer!
 
     #if DEBUG
     /// UI 取证：自动滚动 tick 计数（M15 边缘滚动通道等价物）与机器状态名。
