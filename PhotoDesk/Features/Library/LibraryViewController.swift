@@ -933,6 +933,7 @@ final class LibraryViewController: UIViewController {
         let suffix = selectionState.isMonthScope ? " · 本月" : ""
         selectionCountLabel.text = "已选择 \(selectionState.selected.count) 项\(suffix)"
         selectionCountLabel.accessibilityLabel = "已选择 \(selectionState.selected.count) 项\(suffix)"
+        refreshDebugScrollNote()
     }
 
     private func reloadSelectionBadges() {
@@ -1342,6 +1343,7 @@ final class LibraryViewController: UIViewController {
             guard let sel else { return -1 }
             return sel.mode == .deselect ? 1 : 0
         }()
+        let armMode = sel?.debugArmModeRaw ?? -1
         let ovc: String = {
             guard let cg = sel?.overlayView?.layer.borderColor else { return "-" }
             var r: CGFloat = 0; var g: CGFloat = 0; var b: CGFloat = 0; var a: CGFloat = 0
@@ -1355,7 +1357,7 @@ final class LibraryViewController: UIViewController {
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) ovc=\(ovc) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) arm=\(armMode) ovc=\(ovc) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 

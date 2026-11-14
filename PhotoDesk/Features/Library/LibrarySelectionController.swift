@@ -48,6 +48,8 @@ final class LibrarySelectionController: NSObject {
     private var baseIDs: Set<String> = []
     /// 本次手势的框选模式（select/deselect，按下帧取证；多选栏提示与覆盖层配色读取）。
     private(set) var mode: MarqueeMode = .select
+    /// 最近一次 beginMarquee 时刻的模式快照（UI 测试取证：横幅刷新滞后时仍可读到按下帧真值）。
+    private(set) var debugArmModeRaw: Int = -1
     private var lastTargetIDs: Set<String> = []
     private var lastFingerWindowPoint: CGPoint = .zero
     private var lastPanTranslation: CGPoint = .zero
@@ -260,6 +262,9 @@ final class LibrarySelectionController: NSObject {
                 consumedTouch = true
                 // armed 即禁滚动（docs/32 §2.3）；endMarquee/releaseScroll 成对恢复
                 collectionView?.isScrollEnabled = false
+                #if DEBUG
+                debugArmModeRaw = mode == .deselect ? 1 : 0
+                #endif
                 overlayView?.setDeselectMode(mode == .deselect)
                 let beginRect = currentMarqueeRect()
                 overlayView?.update(rect: overlayFrame(for: beginRect))
