@@ -583,7 +583,9 @@ final class MarqueeSelectionUITests: XCTestCase {
         for attempt in 1...2 {
             let burstB = BurstShots()
             burstB.start(delay: 0.8)
-            longPressDrag(in: collection, fromIndex: 8, toIndex: 16, hold: 1.2)
+            // 同行横向拖（col 2 row 2 → col 1 row 2）：矩形有宽度；弧线俯冲不触底缘区（否则自动滚动使网格滚走，
+            // 框选内容错位——8→16 纵向拖曾触发 ticks=106 的意外自动滚动）；矩形仍覆盖已选 8/11（弧线下探入 row 3）
+            longPressDrag(in: collection, fromIndex: 8, toIndex: 7, hold: 1.2)
             shotsB = burstB.finish()
             postCount = waitForSelectionCountEqual(app, to: 0, timeout: 8)
             if postCount == 0 { break }
