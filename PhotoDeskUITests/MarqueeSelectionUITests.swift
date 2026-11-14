@@ -1,7 +1,8 @@
-// MARK: - MarqueeSelectionUITests：矩形框选验收（docs/25 §6.5 / M15 P0-3/4，≥8 条）——
-// 核心语义：① 左/右列竖直下拉只选本列（旧「整行带」断言废止：4 行 ≥12 格视为失败）；
-// ② 从已选 cell 起拖 → 取消模式；③ 回拖收缩（无 insert-only 累积）；④ 斜向矩形；
-// ⑤ 边缘自动滚动逐帧入集；⑥ 轻点不被 pan 吞掉；⑦ 全选后框选取消。
+// MARK: - MarqueeSelectionUITests：多选交互验收（M17 T05 重写，docs/32 §4.3，docs/31 §2.1/§2.3）——
+// 新交互模型：长按 0.4s 进入多选并选中锚点；长按后任意方向拖 = 框选（含纵向到第 5 行 / 底缘
+// 自动滚动）；无长按的横向按压拖 = 框选（pressing 横向占优，表第 3 行）；纵向单指拖 = 滚动让位
+//（G2，多选模式下亦然）；锚点已选 → 取消模式。断言一律锚定真实 cell（3 列网格，cell 索引行优先）
+// 并按 assetID（PhotoGridCell accessibilityValue = "<id> selected/none"）精确比对。
 
 import XCTest
 
@@ -34,6 +35,23 @@ final class MarqueeSelectionUITests: XCTestCase {
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
                                 "-uiTestingSelectMode", "-uiTestingKeepChrome",
                                 "-uiTestingFilterYear", "0"]
+        app.launch()
+        let intro = app.buttons["允许访问照片"]
+        if intro.waitForExistence(timeout: 10) {
+            intro.tap()
+            app.tap()
+        }
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        return collection
+    }
+
+    /// 普通网格（不带 -uiTestingSelectMode：长按进入路径用，清位置 + 年份筛选清空）
+    private func launchPlainGrid(_ app: XCUIApplication) -> XCUIElement {
+        installPermissionMonitor()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
+                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 10) {
@@ -108,143 +126,212 @@ final class MarqueeSelectionUITests: XCTestCase {
         return value
     }
 
-    /// 单指拖动（选择模式下 pan 独占；可选 hold 模拟边缘停留）
-    private func marqueeDrag(in collection: XCUIElement,
-                             fromX: CGFloat, fromY: CGFloat,
-                             toX: CGFloat, toY: CGFloat,
-                             hold: TimeInterval? = nil) {
-        let start = collection.coordinate(withNormalizedOffset: CGVector(dx: fromX, dy: fromY))
-        let end = collection.coordinate(withNormalizedOffset: CGVector(dx: toX, dy: toY))
+    /// 长按 cell 后拖到另一 cell 中心（0.4s > 0.28s 长按阈值：armed 在按下期间成立，
+    /// 起点终点都锚定真实 cell，几何不受像素估算影响）
+    private func longPressDrag(in collection: XCUIElement, fromIndex: Int, toIndex: Int,
+                               hold: TimeInterval? = nil) {
+        let start = collection.cells.element(boundBy: fromIndex)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = collection.cells.element(boundBy: toIndex)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         if let hold {
-            start.press(forDuration: 0.05, thenDragTo: end,
-                        withVelocity: .slow, thenHoldForDuration: hold)
+            start.press(forDuration: 0.4, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: hold)
         } else {
-            start.press(forDuration: 0.05, thenDragTo: end)
+            start.press(forDuration: 0.4, thenDragTo: end)
         }
+    }
+
+    /// PhotoGridCell accessibilityValue = "<assetID> selected/none" → assetID
+    private func cellID(_ cell: XCUIElement) -> String {
+        let raw = (cell.value as? String) ?? ""
+        if raw.hasSuffix(" selected") { return String(raw.dropLast(" selected".count)) }
+        if raw.hasSuffix(" none") { return String(raw.dropLast(" none".count)) }
+        return raw
     }
 
     private func cellIsSelected(_ cell: XCUIElement) -> Bool {
-        (cell.value as? String ?? "").contains("selected")
+        ((cell.value as? String) ?? "").hasSuffix(" selected")
     }
 
-    // MARK: - 左列 / 右列竖直下拉
+    private func selectedVisibleIDs(_ collection: XCUIElement) -> Set<String> {
+        var ids = Set<String>()
+        for index in 0..<collection.cells.count {
+            let cell = collection.cells.element(boundBy: index)
+            if cellIsSelected(cell) { ids.insert(cellID(cell)) }
+        }
+        return ids
+    }
 
-    /// 3 列左列竖直下拉：只选左列；右侧两列同屏首行不得被选中；计数必须远小于整行语义（≥12）
-    func testVerticalDragOnLeftColumnSelectsOnlyLeftColumn() throws {
+    /// 等待选中集合稳定（触觉/帧重算异步收敛）
+    @discardableResult
+    private func waitForSelectedSet(_ collection: XCUIElement, equals expected: Set<String>,
+                                    timeout: TimeInterval = 4) -> Set<String> {
+        let deadline = Date().addingTimeInterval(timeout)
+        var current = selectedVisibleIDs(collection)
+        while Date() < deadline, current != expected {
+            usleep(200_000)
+            current = selectedVisibleIDs(collection)
+        }
+        return current
+    }
+
+    // MARK: - 长按进入（docs/31 §2.1 G13；T01 红锚点转绿）
+
+    /// 不点工具栏、不走 -uiTestingSelectMode，长按首格 0.4s：必须进入多选、该格入选、
+    /// 多选栏（Selection-Count）出现。验收：长按进入后未点工具栏也出现多选栏。
+    func testLongPressEntersSelection() throws {
+        let app = XCUIApplication()
+        let collection = launchPlainGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.press(forDuration: 0.4)
+        let count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
+        XCTAssertEqual(count, 1,
+                       "长按首格必须进入多选且该格入选（docs/31 G13：长按路径）count=\(count)")
+        XCTAssertTrue(anyElement(app, identifier: "Selection-Count").exists,
+                      "长按进入后必须出现多选栏（Selection-Count 存在）")
+        XCTAssertTrue(cellIsSelected(first), "锚点 cell 必须同步 selected 徽标")
+        snap(app, "m17-longpress-enter")
+    }
+
+    // MARK: - 长按后拖动继续框选（docs/32 §4.3）
+
+    /// 长按首格 0.4s → 拖到第 5 行（col-0 行 4）：命中集合精确 = col-0 行 0-4 的 assetID 列表，
+    /// 同行右列不得被卷入（armed 任意方向拖框，docs/32 §2.2 表第 6 行）。
+    func testLongPressDragContinuesSelection() throws {
+        let app = XCUIApplication()
+        let collection = launchPlainGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        let expected = Set([0, 3, 6, 9, 12].map { cellID(collection.cells.element(boundBy: $0)) })
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 12)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 5, timeout: 6), 5,
+                       "长按后拖到第 5 行：col-0 行 0-4 共 5 格（计数不变性见单指滚动用例）")
+        let selected = waitForSelectedSet(collection, equals: expected)
+        XCTAssertEqual(selected, expected,
+                       "命中集合必须精确等于 col-0 行 0-4 的 assetID 列表（got=\(selected.sorted())）")
+        for mate in [1, 2, 4, 5] {
+            XCTAssertFalse(cellIsSelected(collection.cells.element(boundBy: mate)),
+                           "col-0 拖动不得卷入同行右列（idx \(mate)）")
+        }
+        snap(app, "m17-longpress-drag")
+    }
+
+    // MARK: - 单指滚动保留（docs/31 §2.1 G1；T01 红锚点转绿）
+
+    /// -uiTestingSelectMode 进多选后单指上滑：contentOffset.y 增量 > 200 且计数不变
+    ///（纵向让位，不得被框选/双指规则劫持）。
+    func testSingleFingerScrollWorksInSelectionMode() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.22, toX: 0.12, toY: 0.80)
-        let count = waitForSelectionCount(app, atLeast: 3, timeout: 6)
-        XCTAssertGreaterThanOrEqual(count, 3, "左列下拉至少命中 3 格")
-        XCTAssertLessThanOrEqual(count, 8,
-                                 "左列下拉命中 \(count) 格——若 ≥12 说明整行带语义复活（P0-3 回归）")
-        let firstRow = collection.cells
-        XCTAssertFalse(cellIsSelected(firstRow.element(boundBy: 1)),
-                       "同行第 2 列不得被左列下拉选中：\(firstRow.element(boundBy: 1).value ?? "nil")")
-        XCTAssertFalse(cellIsSelected(firstRow.element(boundBy: 2)),
-                       "同行第 3 列不得被左列下拉选中：\(firstRow.element(boundBy: 2).value ?? "nil")")
-        snap(app, "m15-marquee-left-column")
+        guard let startY = waitForOffsetY(app) else {
+            return XCTFail("Library-DebugSummary 必须暴露 off=\n\(hierarchy(app))")
+        }
+        let countBefore = selectionCount(app)
+        // 终点 dy 0.25（≈211pt 距顶）避开 60pt 边缘自动滚动区（SlideSelectConfig.edgeBuffer）
+        collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo: collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        let endY = waitForOffsetIncrease(app, from: startY, atLeast: 200, timeout: 5)
+        XCTContext.runActivity(named: "单指滚动取证") { activity in
+            let attachment = XCTAttachment(string:
+                "startOff=\(startY) endOff=\(endY) delta=\(endY - startY) count=\(selectionCount(app))")
+            attachment.name = "m17-single-finger-scroll"
+            activity.add(attachment)
+        }
+        XCTAssertGreaterThan(endY - startY, 200,
+                             "多选模式单指上滑必须滚动（docs/31 G1）start=\(startY) end=\(endY)")
+        XCTAssertEqual(selectionCount(app), countBefore,
+                       "单指滚动是滚动不是框选：计数必须不变（before=\(countBefore)）")
+        snap(app, "m17-selectmode-single-finger-scroll")
     }
 
-    func testVerticalDragOnRightColumnSelectsOnlyRightColumn() throws {
+    // MARK: - 边缘自动滚动选入屏外（docs/32 §4.3）
+
+    /// 长按首格 → 拖到底缘停留 2s：自动滚动逐帧入集，选中集必须包含拖前不可见的 assetID。
+    func testAutoScrollSelectsOffscreenExactly() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.86, fromY: 0.22, toX: 0.86, toY: 0.80)
-        let count = waitForSelectionCount(app, atLeast: 3, timeout: 6)
-        XCTAssertGreaterThanOrEqual(count, 3)
-        XCTAssertLessThanOrEqual(count, 8, "右列下拉不得触发整行语义")
-        let firstRow = collection.cells
-        XCTAssertFalse(cellIsSelected(firstRow.element(boundBy: 0)),
-                       "同行第 1 列不得被右列下拉选中")
-        XCTAssertFalse(cellIsSelected(firstRow.element(boundBy: 1)),
-                       "同行第 2 列不得被右列下拉选中")
+        let preDragIDs = Set((0..<collection.cells.count).map { cellID(collection.cells.element(boundBy: $0)) })
+        XCTAssertGreaterThan(preDragIDs.count, 5, "首屏必须有足够可见 cell")
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 0, hold: 2.0)
+        let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
+        XCTAssertGreaterThanOrEqual(count, 6,
+                                    "底缘拖 2s 必须自动滚动并选入屏外 cell（count=\(count)）")
+        let selected = selectedVisibleIDs(collection)
+        let offscreen = selected.subtracting(preDragIDs)
+        XCTAssertFalse(offscreen.isEmpty,
+                       "屏外 assetID 必须精确入集（selected=\(selected.count) offscreen=\(offscreen.count)）")
+        assertAlive(app, "自动滚动后")
+        snap(app, "m17-autoscroll-exact")
     }
 
-    // MARK: - 取消模式（起手已选 → deselect）
+    // MARK: - 无长按横向按压拖（docs/32 §2.2 表第 3 行：必要时先进入多选）
 
-    /// 先选满首列 6 格（行 0–5），从已选首格下拉覆盖行 0–2 → 恰好取消 3 格（docs/26 §7.6）
+    /// 普通网格横向按压拖过行 1：横向占优 ≥8pt → 先进多选再框选整行（3 格精确）。
+    func testHorizontalDragFromPressSelectsRow() throws {
+        let app = XCUIApplication()
+        let collection = launchPlainGrid(app)
+        let expected = Set([3, 4, 5].map { cellID(collection.cells.element(boundBy: $0)) })
+        let start = collection.cells.element(boundBy: 3)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+        let end = collection.cells.element(boundBy: 5)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 3, timeout: 6), 3,
+                       "横向按压拖必须框选行 1 的 3 格（未在多选时先进入多选）")
+        let selected = waitForSelectedSet(collection, equals: expected)
+        XCTAssertEqual(selected, expected,
+                       "命中必须精确等于行 1 的 assetID（got=\(selected.sorted())）")
+        snap(app, "m17-horizontal-press-drag")
+    }
+
+    // MARK: - 取消模式（锚点已选 → deselect，docs/25 §6.5）
+
+    /// 点选 col-0 行 0-2 → 从锚点长按下拖覆盖同行三格 → 全部取消（计数归 0）。
     func testDragFromSelectedCellDeselects() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        // 轻点首列 6 格（idx 0,3,6,9,12,15 = 行 0–5 的第 0 列）
-        for index in [0, 3, 6, 9, 12, 15] {
+        for index in [0, 3, 6] {
             collection.cells.element(boundBy: index).tap()
         }
-        let selected = waitForSelectionCount(app, atLeast: 6)
-        XCTAssertEqual(selected, 6, "预点选首列 6 格")
-        // 从已选的首列首格下拉覆盖行 0–2（矩形命中首列 3 格，全部已选 → 取消 3）
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.13, toX: 0.12, toY: 0.50)
-        // 激活帧会先命中锚点 1 格（中间态），拖动结束后必须等目标集合稳定再断言
-        Thread.sleep(forTimeInterval: 1.0)
-        let deadline = Date().addingTimeInterval(6)
-        var after = selectionCount(app)
-        while Date() < deadline {
-            usleep(300_000)
-            let next = selectionCount(app)
-            if next == after { break }
-            after = next
-        }
-        XCTAssertEqual(after, selected - 3,
-                       "从已选格起拖必须进入取消模式且只取消矩形命中（before=\(selected) after=\(after)）")
-        snap(app, "m15-marquee-deselect")
+        XCTAssertEqual(waitForSelectionCount(app, atLeast: 3), 3, "预点选 col-0 行 0-2")
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 6)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 0, timeout: 6), 0,
+                       "锚点已选 → 取消模式：矩形命中的 3 格全部取消（armed 帧 0 尺寸选框先取消锚点）")
+        let selected = waitForSelectedSet(collection, equals: Set<String>())
+        XCTAssertTrue(selected.isEmpty, "选中集必须精确清空（got=\(selected.sorted())）")
+        snap(app, "m17-longpress-deselect")
     }
 
-    // MARK: - 回拖收缩
-
-    /// 同一起点两次手势：第二次从已选锚点起拖 → 目标集合收缩，不得保留 insert-only 累积
-    func testDragBackShrinksWithinSameGesture() throws {
+    /// 回拖收缩：第二次手势从已选锚点起拖（取消模式）→ 5 → 3（不得保留累积）。
+    func testSecondGestureFromAnchorShrinks() throws {
         let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        // 第一次：左列下拉 0.25 → 0.75
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.25, toX: 0.12, toY: 0.75)
-        let peak = waitForSelectionCount(app, atLeast: 3, timeout: 6)
-        XCTAssertGreaterThanOrEqual(peak, 3)
-        // 第二次：同一列更短的矩形（0.25 → 0.45）——锚点已选 → deselect → 集合收缩
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.25, toX: 0.12, toY: 0.45)
-        Thread.sleep(forTimeInterval: 1.0)
-        let deadline = Date().addingTimeInterval(6)
-        var shrunk = selectionCount(app)
-        while Date() < deadline {
-            usleep(300_000)
-            let next = selectionCount(app)
-            if next == shrunk { break }
-            shrunk = next
-        }
-        XCTAssertLessThan(shrunk, peak,
-                          "回拖必须收缩（peak=\(peak) after=\(shrunk)），不得保留 insert-only 累积")
-        snap(app, "m15-marquee-shrink")
+        let collection = launchPlainGrid(app)
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 12)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 5, timeout: 6), 5, "第一次手势选 col-0 行 0-4")
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 3)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 3, timeout: 6), 3,
+                       "第二次手势 = 取消模式：col-0 行 0-1 取消后剩 3 格")
+        snap(app, "m17-second-gesture-shrink")
     }
 
-    // MARK: - 斜向矩形
+    // MARK: - 斜向矩形（armed 任意方向）
 
+    /// 长按首格 → 斜向拖到 cell10（行 3 列 1）：精确覆盖 col-0/1 × 行 0-3 = 8 格。
     func testDiagonalMarqueeSelectsRectangle() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.08, fromY: 0.22, toX: 0.92, toY: 0.60)
-        let count = waitForSelectionCount(app, atLeast: 5, timeout: 6)
-        XCTAssertGreaterThanOrEqual(count, 5, "斜向矩形应覆盖 ≥2 行 × 3 列")
-        XCTAssertLessThanOrEqual(count, 12, "斜向矩形不应失控放大")
-        snap(app, "m15-marquee-diagonal")
+        let expected = Set([0, 1, 3, 4, 6, 7, 9, 10].map { cellID(collection.cells.element(boundBy: $0)) })
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 10)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: 8, timeout: 6), 8,
+                       "斜向矩形必须覆盖 col-0/1 × 行 0-3 = 8 格")
+        let selected = waitForSelectedSet(collection, equals: expected)
+        XCTAssertEqual(selected, expected,
+                       "命中必须精确等于 8 格 assetID（got=\(selected.sorted())）")
+        snap(app, "m17-diagonal")
     }
 
-    // MARK: - 边缘自动滚动
-
-    /// 左列长按拖到底缘 → 自动滚动逐帧重算，屏幕外 cell 持续入集
-    func testAutoScrollMarquee() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.40, toX: 0.12, toY: 0.995, hold: 2.0)
-        let count = waitForSelectionCount(app, atLeast: 6, timeout: 8)
-        // 屏内跨度上限实测 = 5（count=5 纯屏内，见上方竖直用例）；count > 5 即证明
-        // 边缘自动滚动把屏幕外 cell 持续选入（Stability 的 testEdgeAutoScrollSelectsOffscreenCells
-        // 同参数断言 ≥8，两处共同覆盖该机制）。
-        XCTAssertGreaterThanOrEqual(count, 6,
-                                    "边缘自动滚动必须让屏幕外 cell 入集（屏内上限 5，count=\(count)）")
-        assertAlive(app, "边缘自动滚动后")
-        snap(app, "m15-marquee-autoscroll")
-    }
-
-    // MARK: - 轻点不被吞
+    // MARK: - 轻点不被吞（docs/25 §6.5 ⑥）
 
     func testTapNotSwallowed() throws {
         let app = XCUIApplication()
@@ -253,11 +340,11 @@ final class MarqueeSelectionUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
         first.tap()
         XCTAssertGreaterThanOrEqual(waitForSelectionCount(app, atLeast: 1), 1,
-                                    "cancelsTouchesInView=false 时轻点不得被框选 pan 吞掉")
+                                    "cancelsTouchesInView=false 时轻点不得被手势吞掉")
         XCTAssertTrue(cellIsSelected(first), "轻点后徽标与 AX 必须同步为 selected")
     }
 
-    // MARK: - 全选后框选取消
+    // MARK: - 全选后框选取消（docs/25 §6.5 ⑦）
 
     func testSelectAllThenMarqueeDeselects() throws {
         let app = XCUIApplication()
@@ -267,53 +354,16 @@ final class MarqueeSelectionUITests: XCTestCase {
         selectAll.tap()
         let total = waitForSelectionCountEqual(app, to: selectionCount(app), timeout: 0.1)
         XCTAssertGreaterThan(total, 10, "全选后计数应 > 10")
-        // 从已选首列下拉 → 取消模式，计数必须下降
-        marqueeDrag(in: collection, fromX: 0.12, fromY: 0.25, toX: 0.12, toY: 0.60)
-        let deadline = Date().addingTimeInterval(6)
-        var after = selectionCount(app)
-        while Date() < deadline, after >= total {
-            usleep(150_000)
-            after = selectionCount(app)
-        }
-        XCTAssertLessThan(after, total, "全选后框选必须取消命中格")
+        // 锚点已选 → 取消模式：长按下拖取消 col-0 行 0-2 三格 → total − 3
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 6)
+        XCTAssertEqual(waitForSelectionCountEqual(app, to: total - 3, timeout: 6), total - 3,
+                       "全选后长按框选必须恰好取消 col-0 行 0-2 三格（total=\(total)）")
         assertAlive(app, "全选+框选取消后")
-        snap(app, "m15-marquee-selectall-deselect")
+        snap(app, "m17-selectall-deselect")
     }
 
-    // MARK: - 跨月（section 头跨越）
+    // MARK: - 取证通道（Library-DebugSummary → off=）
 
-    /// 矩形跨越月份头：按各 section 真实几何求交，计数持续增长且不崩
-    func testCrossSectionMarqueeStaysAlive() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        // 长距斜向拖动跨越多个月份 section（每 section 仅 2 张，头高 48）
-        marqueeDrag(in: collection, fromX: 0.08, fromY: 0.15, toX: 0.92, toY: 0.95, hold: 0.5)
-        let count = waitForSelectionCount(app, atLeast: 8, timeout: 8)
-        XCTAssertGreaterThanOrEqual(count, 8, "跨 section 矩形应持续命中")
-        assertAlive(app, "跨 section 框选后")
-        snap(app, "m15-marquee-cross-section")
-    }
-
-    // MARK: - M17 T01 红测试（docs/31 §2.3 G13/G16、§2.1 G1；验收锚点，先红后绿）
-
-    /// 不带 -uiTestingSelectMode 的普通网格（清位置 + 年份筛选清空，首屏几何确定）
-    private func launchPlainGrid(_ app: XCUIApplication) -> XCUIElement {
-        installPermissionMonitor()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
-                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0"]
-        app.launch()
-        let intro = app.buttons["允许访问照片"]
-        if intro.waitForExistence(timeout: 10) {
-            intro.tap()
-            app.tap()
-        }
-        let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
-        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
-        return collection
-    }
-
-    /// Library-DebugSummary → off=（contentOffset.y 整数 pt；DEBUG 横幅，didScroll 逐次刷新）
     private static func parseDoubleField(_ label: String, _ key: String) -> Double? {
         let escaped = NSRegularExpression.escapedPattern(for: key)
         let pattern = escaped + "=(-?[0-9]+)"
@@ -331,7 +381,6 @@ final class MarqueeSelectionUITests: XCTestCase {
         return Self.parseDoubleField(raw, "off")
     }
 
-    /// 轮询直到取证横幅出现并给出 off（DEBUG 横幅常驻，正常秒回）
     private func waitForOffsetY(_ app: XCUIApplication, timeout: TimeInterval = 10) -> Double? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -341,7 +390,6 @@ final class MarqueeSelectionUITests: XCTestCase {
         return readOffsetY(app)
     }
 
-    /// 轮询 off 增量达标（滚动是连续事件，松手后还有减速余量）
     private func waitForOffsetIncrease(_ app: XCUIApplication, from baseline: Double,
                                        atLeast threshold: Double, timeout: TimeInterval = 5) -> Double {
         let deadline = Date().addingTimeInterval(timeout)
@@ -352,45 +400,5 @@ final class MarqueeSelectionUITests: XCTestCase {
             usleep(100_000)
         }
         return value
-    }
-
-    /// 红锚点（docs/31 G13/G16）：不点工具栏、不走 -uiTestingSelectMode，直接长按首格
-    /// 必须进入多选且该格入选（Selection-Count == 1）。当前全仓无长按识别器
-    /// （audit-m17 A04/A14 FAIL）→ 必失败；长按进入接线后转绿。
-    func testLongPressEntersSelection() throws {
-        let app = XCUIApplication()
-        let collection = launchPlainGrid(app)
-        let first = collection.cells.firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-        first.press(forDuration: 0.4)
-        let count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
-        XCTAssertEqual(count, 1,
-                       "长按首格必须进入多选且该格入选（docs/31 G13：无长按路径，count=\(count)）")
-        snap(app, "m17-longpress-enter")
-    }
-
-    /// 红锚点（docs/31 G1）：-uiTestingSelectMode 进多选后单指上滑必须正常滚动
-    /// （contentOffset.y 增量 > 200pt）。当前多选把 pan 改成双指专属
-    /// （LibraryViewController.swift:802/:832，audit-m17 A05 FAIL）→ 单指滑动被框选
-    /// 接管、offset 不变 → 必失败；单指滚动规则接线后转绿。
-    func testSingleFingerScrollInSelectionMode() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        guard let startY = waitForOffsetY(app) else {
-            return XCTFail("Library-DebugSummary 必须暴露 off=\n\(hierarchy(app))")
-        }
-        // 终点 dy 0.25（≈211pt 距顶）避开 60pt 边缘自动滚动区（SlideSelectConfig.edgeBuffer）
-        collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-            .press(forDuration: 0.05, thenDragTo: collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
-        let endY = waitForOffsetIncrease(app, from: startY, atLeast: 200, timeout: 5)
-        XCTContext.runActivity(named: "单指滚动取证") { activity in
-            let attachment = XCTAttachment(string:
-                "startOff=\(startY) endOff=\(endY) delta=\(endY - startY)")
-            attachment.name = "m17-single-finger-scroll"
-            activity.add(attachment)
-        }
-        XCTAssertGreaterThan(endY - startY, 200,
-                             "多选模式单指上滑必须滚动（docs/31 G1：双指规则劫持单指）start=\(startY) end=\(endY)")
-        snap(app, "m17-selectmode-single-finger-scroll")
     }
 }
