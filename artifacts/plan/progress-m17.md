@@ -7,6 +7,7 @@
 | T01 | DONE | cfe46dc (test) + c9d8474 (docs 归档) | audit 红基线归档；CI run 43529901394 三红用例全部失败实锤 | 镜像 makeLayout 引入 1 条既有弃用警告实例，T04 消除 |
 | T02 | DONE | 14e651f (test) + f74d184 (feat) + 9d2e607 (refactor) + 7b692b9 (fix) | Docker 435 tests 0 failures；CI core-linux success + 定向 Test SUCCEEDED；shouldActivate/resolvedSelection 归零 | 新增 39 用例 ≥ 25 |
 | T03 | DONE | 88b13d1 (test) + 74e3585 (feat) | Docker 459 tests 0 failures；CI core-linux 复验性能用例；run id 见下 | 新增 24 用例 ≥ 20 |
+| T05 | DONE | c7cd2e7 (test) + b42b9bb (fix) + a29fcd2 (test) + 4cff229 (feat) + 9c9cd9d (refactor) + a92b594/0c949ca/f9e6d11 (fix) + eb3cb13 (fix) | CI run 43569488790 绿：core 442/0 + MarqueeSelectionUITests 10/10 + Performance 4/4；A05==0 | holdElapsed 定时器交付 + 逐帧边缘监视两处接线缺陷根治 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -84,3 +85,23 @@
 - 绿：run 43550824419 **success**——core-linux 442 tests 0 failures；定向 LibraryGridGeometryTests **5/5**（真数据）；Performance 4/4；Docker 本地同绿 `artifacts/audit/m17/t04-green-test-summary.txt`
 - 验收 grep：`marqueeGeometry` PhotoDesk 0 处；`layoutAttributesForSupplementaryView` VC 仅剩 2 处（位置记忆/月跳，命中路径外）；H1/H3 实测结论已写入测试注释（H1 成立 diff=902 → tester 全走 item attributes；H3 成立 宽=(W−s(c−1))/c）
 - 警告：T01 镜像弃用 API 警告随镜像删除而消除（净 −1，无新增）
+
+## T05 — 长按与滚动共存接线（DONE，2026-11-14）
+
+### 交付物
+
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（新建）：三识别器组装（TouchDownObserver minimumPressDuration=0 / 长按 0.28s+allowableMovement 取自 SelectionGestureConfig / marqueePan 单指；均 cancelsTouchesInView=false + delegate=self）；机器事件映射与效果执行——enterSelection→VC enterSelectionMode、beginMarquee/endMarquee 与 isScrollEnabled 成对、releaseScroll→marqueePan.state=.failed、G6 触觉以命中集合变化（pendingSelectionHaptic）为最终闸门；processFinger（按下点→指尖矩形、零尺寸扩 1pt、MarqueeSelectionPolicy.resolved）；autoScrollTick 用 SlideSelectPolicy.edgeVelocity + clampedOffset；DEBUG 取证（ticks/edge/vy/vB/state + lastMarqueeRect）。
+- **holdElapsed 双通道交付**（接线缺陷根治①）：UILongPress 识别器 + 按下定时器（触点仍在屏时按同一 config 时长补发；机器 state==.pressing + 位移资格守卫保证幂等、语义与 Core 单测一致）——CI 合成触控按压相位识别器偶发不触发，纯识别器交付不可靠。
+- **逐帧边缘监视**（接线缺陷根治②）：dragging/autoScrolling 期间 CADisplayLink 每帧 feedEdgeEvents——指尖停在边缘区不动（无 .changed 事件）也能进入 autoScrolling，落实 docs/32 §2.4「停边缘持续滚动」。
+- `LibraryViewController`：slideSelectController→selectionController 接线块整体替换；enter/exitSelectionMode 删 `minimumNumberOfTouches = 2`（A05 根治）；didSelectItemAt 加 isConsumingTouch 闸门（touch-up 后 0.3s 内防重 toggle）；scrollViewWillBeginDragging 转发 handleScrollStarted；手势代理扩展重写（shouldBegin=命中 cell 才起步；simultaneous 与 pinch=false 其余 true）；提示文案改「长按照片可框选；从已选照片起拖可取消；单指滑动仍可滚动」。
+- 删除 `SlideSelectGestureController.swift`（双指滚动规则载体）；`SlideSelectConfig` 退役 activationThreshold（保留 edgeBuffer/minStep/maxStep）。
+- `PhotoDeskUITests/MarqueeSelectionUITests.swift` 重写 10 用例（全部精确 assetID/计数断言）：长按进入、长按拖框（col-0 行 0-4 五格精确）、多选单指上滑 delta>200 且计数不变、底缘拖 2s 自动滚动选入屏外（屏外 id 精确）、横向按压拖行（行 1 三格）、已选锚点拖动取消→0、二次手势收缩 5→3、斜向矩形 8 格、全选后框选取消、轻点不吞。`-uiTestingLongPressMovement` 旗标放宽 allowableMovement 8→40（仅 UI 测试；Core 单测仍钉 8pt 语义）。
+
+### 门禁证据
+
+- 红（Core）：c7cd2e7 Docker 红 `artifacts/audit/m17/t05-core-red-armed.log`（armed 纵向拖 effects [] ≠ [updateMarquee] 且 state armed ≠ dragging）→ b42b9bb 修复 → Docker **442 tests 0 failures** 多轮复验。
+- 红（UI）：T01 CI 红基线 run 43529901394（长按 count=-1≠1、单指 delta=0<200）为新模型用例红实锤；b42b9bb 红派发 run 43555054479 被后续绿候选按 concurrency 取消（备查）。
+- 中途红（每步真实 CI，修复链）：run 43555732806 1 败（长按未触发→-1）→ a92b594/248bd6c；run 43558341702 2 败（-1 + 斜向计数 0=让位后橡皮筋回弹 off=-203，失败截图取证）→ 0c949ca；run 43561215730 2 败（-1×2 + autoscroll 停 5）→ f9e6d11（根治）；run 43563993911 1 败（autoscroll 停 5）→ 29751f0 取证 + dy 0.99；run 43565902177 / 43566649597 编译错（DEBUG 横幅 + 链 Swift type-check 超时）→ 5c79472/eb3cb13；run 43567326854（runner 基建抖动 Test runner never began，与代码无关）。
+- 绿：run 43569488790 **success**（eb3cb13）——core-linux 442/0；MarqueeSelectionUITests **10/10**（214s）；Performance 4/4；TEST SUCCEEDED。
+- 验收 grep：`minimumNumberOfTouches = 2` PhotoDesk/PhotoDeskCore/PhotoDeskUITests 0 处（A05 PASS，audit-m17 重定向后复跑：A04/A05/A06/A14/A15/A16/A17 PASS；A07/A08/A09/A10/A13 为 T01 基线债，T06/T07/T08 范围）。
+- 教训：审计脚本引用被重构删除的文件必须同步重指向（A04/A06/A15/A16/A17/A19 已改指新控制器/Core 机器/GridLayout）；PowerShell 5.1 读无 BOM UTF-8 中文 .ps1 解析崩坏（编辑工具回写丢 BOM，需补写）；DEBUG 横幅字符串长 + 链触发 type-check 超时（改插值模板）；XCUI press-then-drag 按压相位不可依赖识别器——事件交付要有确定性兜底且保持机器语义不变。
