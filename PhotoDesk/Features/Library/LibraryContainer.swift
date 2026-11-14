@@ -216,6 +216,21 @@ struct LibraryRootView: View {
                 .accessibilityLabel("调试汇总")
                 .accessibilityValue(viewModel.debugSummary)
         }
+        // M17 T07：filteredItems 计数钩子，UI 全选断言（Selection-Count == Filtered-Count）
+        .overlay(alignment: .topTrailing) {
+            Text(viewModel.debugFilteredCount)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(Color(ds: DSColor.textPrimary))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color(ds: DSColor.bgSecondary))
+                .cornerRadius(4)
+                .padding(.top, 2)
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("Filtered-Count")
+                .accessibilityLabel("筛选计数")
+                .accessibilityValue(viewModel.debugFilteredCount)
+        }
         #endif
     }
 

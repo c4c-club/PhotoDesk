@@ -153,6 +153,8 @@ final class LibraryViewModel: ObservableObject {
     @Published var debugRestoreNote = ""
     /// debugScrollNote：网格滚动状态（M12 级联取证：CI 失败时从 AX 可读，VC 写入）
     @Published var debugScrollNote = ""
+    /// DEBUG 钩子（M17 T07）：filteredItems 计数，供 UI 全选断言（Filtered-Count 标签）。
+    @Published var debugFilteredCount = ""
     var debugSummary: String {
         "state=\(viewState) all=\(allItems.count)/\(totalCount) filtered=\(filteredItems.count) " +
             "sections=\(sections.count) indexing=\(isIndexing) done=\(isIndexComplete) " +
@@ -162,6 +164,10 @@ final class LibraryViewModel: ObservableObject {
 
     /// 浏览页/搜索快照入口：当前筛选结果（docs/09 §2.1 单一事实来源）
     var itemsSnapshot: [PhotoItem] { filteredItems }
+
+    /// 多选 scope 唯一口径（M17 T07，docs/32 §2.6）：filteredItems 全量。
+    /// 网格快照（VC currentItemsBySection）在 apply 窗口/索引补齐期间滞后，不得作 scope 源（A08）。
+    var selectionScopeIDs: Set<String> { Set(filteredItems.map(\.id)) }
     var itemsSnapshotForViewer: [PhotoItem] { filteredItems }
 
     /// 库侧撤销（批量操作 Toast / 重启恢复横幅共用）：PhotoKit 反向写后经 observer 增量同步网格

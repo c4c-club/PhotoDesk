@@ -35,6 +35,8 @@ final class LibrarySelectionController: NSObject {
     /// 框选目标集合整体落地（applySlideSelection：可见 cell diff + 计数）。
     var applyTargetIDs: (Set<String>) -> Void = { _ in }
     var scopeProvider: () -> Set<String>? = { nil }
+    /// 快照 apply 窗口取证（M17 T07）：true = diffable apply 进行中，真实 attributes 不可靠。
+    var isApplyingSnapshotProvider: () -> Bool = { false }
     /// enterSelection 效果 → VC enterSelectionMode(selecting:)（长按进入多选的唯一入口）。
     var onSelectionEntered: (String) -> Void = { _ in }
     /// 框选覆盖层（M17 T06；VC 挂在 collectionView 兄弟层，frame 为视口坐标，本类逐帧转换）。
@@ -54,6 +56,8 @@ final class LibrarySelectionController: NSObject {
     private(set) var debugTouchDownBaseCount = -1
     private(set) var debugTouchDownHitID: String = "-"
     private var lastTargetIDs: Set<String> = []
+    /// apply 窗口保留上一帧目标的连续帧数（≤3 帧重试，超时放行并打 DEBUG 日志）。
+    private var applyWindowSkips = 0
     private var lastFingerWindowPoint: CGPoint = .zero
     private var lastPanTranslation: CGPoint = .zero
     private var currentEdgeDirection = 0
@@ -361,6 +365,17 @@ final class LibrarySelectionController: NSObject {
         let rect = CGRect(x: minX, y: minY,
                           width: clampedMaxX - minX, height: clampedMaxY - minY)
         let hitIDs = hitTestProvider(rect)
+        // M17 T07（docs/32 §2.6）：apply 窗口内命中为空 → 保留上一帧目标集合不清空，
+        // 下一帧重试（≤3 帧）；超时打 DEBUG 日志后按空命中放行（快照完成后几何自愈）。
+        if hitIDs.isEmpty, isApplyingSnapshotProvider() {
+            if applyWindowSkips < 3 {
+                applyWindowSkips += 1
+                ViewerTrace.log("marquee.apply-window skip=\(applyWindowSkips) hold-last-target")
+                return
+            }
+            ViewerTrace.log("marquee.apply-window timeout → release with empty hit")
+        }
+        applyWindowSkips = 0
         let target = MarqueeSelectionPolicy.resolved(base: baseIDs,
                                                      hitIDs: hitIDs,
                                                      mode: mode,

@@ -391,7 +391,7 @@ final class LibraryViewModelTests: XCTestCase {
         let lateID = vm.filteredItems[800].id
         let firstSnapshotIDs = Set(snapshots.first?.items.flatMap { $0.map(\.id) } ?? [])
         XCTAssertFalse(firstSnapshotIDs.contains(lateID), "前置：首屏快照不含补齐 id")
-        let state = SelectionState()
+        var state = SelectionState()
         state.begin(scope: vm.selectionScopeIDs, initial: nil)
         state.select(lateID)
         XCTAssertTrue(state.selectedSet.contains(lateID))

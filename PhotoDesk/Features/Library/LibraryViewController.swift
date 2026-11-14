@@ -789,6 +789,8 @@ final class LibraryViewController: UIViewController {
             self?.applySlideSelection(ids: ids)
         }
         controller.scopeProvider = { [weak self] in self?.selectionState.scope }
+        // M17 T07（docs/32 §2.6）：apply 窗口取证——快照 apply 期间命中为空按保留上一帧目标处理
+        controller.isApplyingSnapshotProvider = { [weak self] in self?.isApplyingSnapshot ?? false }
         gridHitTester = GridHitTester(collectionView: collectionView)
         controller.hitTestProvider = { [weak self] rect in
             guard let self, let tester = self.gridHitTester else { return [] }
@@ -846,7 +848,8 @@ final class LibraryViewController: UIViewController {
     private func enterSelectionMode(selecting id: String?, scopeOverride: Set<String>? = nil) {
         guard !isSelecting else { return }
         isSelecting = true
-        let scope = scopeOverride ?? Set(currentItemsBySection.flatMap { $0.map(\.id) })
+        // M17 T07（A08）：scope 取 filteredItems 全量——快照在 apply 窗口/索引补齐期间滞后
+        let scope = scopeOverride ?? viewModel.selectionScopeIDs
         selectionState.begin(scope: scope, initial: id)
         selectionBar.isHidden = false
         indexBar.isHidden = true
@@ -895,6 +898,9 @@ final class LibraryViewController: UIViewController {
 
     private func exitSelectionMode() {
         selectionController?.finishSelection()
+        // M17 T07（docs/32 §4.3）：退出复位同步完成（不 async）——隐身选框/恢复滚动由
+        // finishSelection 成对交付，allowsSelection 一并复位。
+        collectionView.allowsSelection = true
         isSelecting = false
         selectionState = SelectionState()
         selectionScopeTitle = nil
@@ -987,7 +993,8 @@ final class LibraryViewController: UIViewController {
                                      allowUndo: false,
                                      onUndo: nil, onDismissFinished: nil)
                 await self.viewModel.ensureIndexComplete()
-                let scope = Set(self.currentItemsBySection.flatMap { $0.map(\.id) })
+                // M17 T07（A08）：补齐后按 filteredItems 全量收敛——快照口径会截掉补齐批次的选中
+                let scope = self.viewModel.selectionScopeIDs
                 self.selectionState.intersectScope(with: scope)
             }
             if self.selectionState.allSelected {
@@ -1008,7 +1015,10 @@ final class LibraryViewController: UIViewController {
     private func applySlideSelection(ids: Set<String>) {
         let previous = selectionState.selectedSet
         guard previous != ids else { return }
-        selectionState.replaceSelection(Array(ids).sorted())
+        // M17 T07（docs/32 §2.6）：增量应用 O(delta)，不整表 replace+sort
+        //（A09：全选 2 万张拖一帧 < 4ms 的前提）；计数每帧更新。
+        selectionState.applyDelta(add: ids.subtracting(previous),
+                                  remove: previous.subtracting(ids))
         let current = selectionState.selectedSet
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard let item = dataSource.itemIdentifier(for: indexPath) else { continue }
@@ -1019,9 +1029,7 @@ final class LibraryViewController: UIViewController {
             cell.setSelectionVisible(isSelecting)
             cell.setSelected(isSelectedNow)
         }
-        if previous.count != current.count {
-            updateSelectionCount()
-        }
+        updateSelectionCount()
     }
     // MARK: - 批量动作（docs/09 D12/D16：收藏即时写；隐藏/删除入队；无 App 内删除确认）
 
@@ -1243,7 +1251,8 @@ final class LibraryViewController: UIViewController {
             self.refreshCategoryCountsAsync()
             // 多选中：筛选/pending 变化 → 选中集合收敛到新 scope（docs/09 D11 §3）
             if self.isSelecting {
-                let newScope = Set(self.currentItemsBySection.flatMap { $0.map(\.id) })
+                // M17 T07（A08）：快照回调收敛口径与 scope 同源（filteredItems 全量）
+                let newScope = self.viewModel.selectionScopeIDs
                 self.selectionState.intersectScope(with: newScope)
                 self.reloadSelectionBadges()
                 self.updateSelectionCount()
@@ -1361,6 +1370,7 @@ final class LibraryViewController: UIViewController {
         let vB = Int(sel?.debugViewportBottom ?? -1)
         let stateName = sel?.debugStateName ?? "none"
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
+        viewModel.debugFilteredCount = "\(viewModel.filteredItems.count)"
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
             + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) arm=\(armMode) ovc=\(ovc) ovf=\(ovf) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"

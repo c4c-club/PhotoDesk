@@ -87,12 +87,21 @@ public struct SelectionState: Equatable {
         replaceSelection(Array(base.union(range)).sorted())
     }
 
-    /// 增量应用：只处理 added/removed（O(delta)）。
+    /// 增量应用（docs/32 §2.6）：O(delta)——remove 剔除、add 追加（保持既有插入序，
+    /// 不整表重排排序）；全选 2 万张拖一帧 < 4ms 的前提（A09）。scope 外 id 忽略。
     public mutating func applyDelta(add: Set<String>, remove: Set<String>) {
-        var next = selectedSet
-        next.subtract(remove)
-        next.formUnion(add)
-        replaceSelection(Array(next).sorted())
+        guard !add.isEmpty || !remove.isEmpty else { return }
+        if !remove.isEmpty {
+            selected.removeAll { remove.contains($0) }
+            selectedSet.subtract(remove)
+        }
+        var appended: [String] = []
+        for id in add where scope.contains(id) && !selectedSet.contains(id) {
+            appended.append(id)
+        }
+        guard !appended.isEmpty else { return }
+        selected.append(contentsOf: appended)
+        for id in appended { selectedSet.insert(id) }
     }
 
     /// O(1) 选中判定（cell 配置/徽标刷新高频路径）。
