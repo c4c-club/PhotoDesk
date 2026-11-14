@@ -5,6 +5,7 @@
 // 并按 assetID（PhotoGridCell accessibilityValue = "<id> selected/none"）精确比对。
 
 import XCTest
+import UIKit
 
 final class MarqueeSelectionUITests: XCTestCase {
     override func setUpWithError() throws {
@@ -420,5 +421,130 @@ final class MarqueeSelectionUITests: XCTestCase {
             usleep(100_000)
         }
         return value
+    }
+
+    // MARK: - 框选覆盖层取证（M17 T06，docs/32 §2.5）
+
+    /// 手势阻塞主线程期间的后台连拍（XCUIScreen 采集）。
+    private final class BurstShots {
+        private let lock = NSLock()
+        private var images: [UIImage] = []
+        private var stopped = false
+        private let queue = DispatchQueue(label: "m17-burst")
+
+        func start() {
+            queue.async { [weak self] in
+                guard let self else { return }
+                while !self.isStopped {
+                    let shot = XCUIScreen.main.screenshot()
+                    self.lock.lock()
+                    self.images.append(shot.image)
+                    self.lock.unlock()
+                    Thread.sleep(forTimeInterval: 0.2)
+                }
+            }
+        }
+
+        private var isStopped: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return stopped
+        }
+
+        func finish() -> [UIImage] {
+            lock.lock()
+            stopped = true
+            let result = images
+            lock.unlock()
+            return result
+        }
+    }
+
+    /// 区域内统计边框色像素：R 通道占优（danger 红）与 B 通道占优（tint 蓝）。
+    /// 判定阈值：主通道比其余两通道高 40（0x007AFF b=255 r=0；0xE53935 r=229 g≈57 b≈53）。
+    private func dominantStrokePixels(in image: UIImage, region: CGRect) -> (red: Int, blue: Int) {
+        guard let cg = image.cgImage else { return (0, 0) }
+        let scale = cg.width / Int(image.size.width.rounded())
+        let rect = CGRect(x: max(0, region.minX * CGFloat(scale)),
+                          y: max(0, region.minY * CGFloat(scale)),
+                          width: region.width * CGFloat(scale),
+                          height: region.height * CGFloat(scale))
+        guard let data = cg.dataProvider?.data, let ptr = CFDataGetBytePtr(data) else { return (0, 0) }
+        let bytesPerRow = cg.bytesPerRow
+        let bpp = cg.bitsPerPixel / 8
+        var red = 0
+        var blue = 0
+        let x0 = Int(rect.minX), x1 = min(Int(rect.maxX), cg.width - 1)
+        let y0 = Int(rect.minY), y1 = min(Int(rect.maxY), cg.height - 1)
+        for y in y0...max(y0, y1) where y >= 0 {
+            let row = y * bytesPerRow
+            for x in x0...max(x0, x1) where x >= 0 {
+                let offset = row + x * bpp
+                if offset + 3 >= CFDataGetLength(data) { continue }
+                let r = Int(ptr[offset]), g = Int(ptr[offset + 1]), b = Int(ptr[offset + 2])
+                if r > g + 40, r > b + 40 { red += 1 }
+                if b > r + 40, b > g + 40 { blue += 1 }
+            }
+        }
+        return (red, blue)
+    }
+
+    /// 框选拖动期间覆盖层必须可见：连拍帧内检测 tint 描边像素（无覆盖层 → 0 像素 → 断言红）。
+    func testMarqueeOverlayVisible() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let cell0 = collection.cells.element(boundBy: 0)
+        let cell4 = collection.cells.element(boundBy: 4)
+        XCTAssertTrue(cell0.waitForExistence(timeout: 10), "网格无 cell")
+        let frame0 = cell0.frame
+        let band = CGRect(x: frame0.minX, y: frame0.midY - 8, width: frame0.width, height: 16)
+        let burst = BurstShots()
+        burst.start()
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 4, hold: 1.2)
+        let shots = burst.finish()
+        XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
+        var bestBlue = 0
+        for shot in shots {
+            let counts = dominantStrokePixels(in: shot, region: band)
+            bestBlue = max(bestBlue, counts.blue)
+            if counts.blue >= 25 { break }
+        }
+        if let data = shots.first?.pngData() {
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+            attachment.name = "m17-overlay-burst"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        XCTAssertGreaterThanOrEqual(bestBlue, 25,
+                                    "拖动期间必须出现 tint 描边（blue-dominant 像素 ≥ 25，got \(bestBlue)）")
+    }
+
+    /// 取消模式（锚点已选 → 拖）覆盖层必须 danger 红：红像素 ≥ 25 且红 > 蓝（模式判别）。
+    func testDeselectModeShowsDangerTint() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        collection.cells.element(boundBy: 0).tap()
+        collection.cells.element(boundBy: 3).tap()
+        let cell0 = collection.cells.element(boundBy: 0)
+        XCTAssertTrue(cell0.waitForExistence(timeout: 10), "网格无 cell")
+        let frame0 = cell0.frame
+        let band = CGRect(x: frame0.minX, y: frame0.midY - 8, width: frame0.width, height: 16)
+        let burst = BurstShots()
+        burst.start()
+        longPressDrag(in: collection, fromIndex: 0, toIndex: 6, hold: 1.2)
+        let shots = burst.finish()
+        XCTAssertGreaterThanOrEqual(shots.count, 3, "连拍必须覆盖拖动窗口")
+        var bestRed = 0
+        var blueAtBest = 0
+        for shot in shots {
+            let counts = dominantStrokePixels(in: shot, region: band)
+            if counts.red > bestRed {
+                bestRed = counts.red
+                blueAtBest = counts.blue
+            }
+        }
+        XCTAssertGreaterThanOrEqual(bestRed, 25,
+                                    "取消模式描边必须 danger 红（red-dominant ≥ 25，got \(bestRed)）")
+        XCTAssertGreaterThan(bestRed, blueAtBest,
+                             "取消模式描边红色必须压过蓝色（模式判别 red=\(bestRed) blue=\(blueAtBest)）")
     }
 }
