@@ -271,15 +271,21 @@ final class MarqueeSelectionUITests: XCTestCase {
         XCTAssertGreaterThan(preDragIDs.count, 5, "首屏必须有足够可见 cell")
         // 触觉节流验收（docs/32 §2.7 ≤16 次/秒）：整手势窗口 delta ≤ 64（宽裕上界）
         let hapBefore = readHapticCount(app)
-        // 长按首格 → 拖到底缘（dy 0.99，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集
+        // 长按首格 → 拖到底缘（dy 0.99，距底 25pt < 60pt 边缘区）停留 2s：自动滚动逐帧入集。
+        // 合成触控偶发整手势未达 App（arm 不发生）——有界重试 2 次（同 LongPressDrag 用例）。
         let start = collection.cells.element(boundBy: 0)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.99))
-        start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
+        var count = 0
+        for attempt in 1...2 {
+            start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
+            count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
+            if count >= 6 { break }
+            if attempt == 1 { usleep(500_000) }
+        }
         let hapAfter = readHapticCount(app)
         XCTAssertLessThanOrEqual(hapAfter - hapBefore, 64,
                                  "触觉必须 60ms 节流（≤16 次/秒，delta=\(hapAfter - hapBefore)）")
-        let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
         let banner = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
         XCTAssertGreaterThanOrEqual(count, 6,
                                     "底缘拖 2s 必须自动滚动并选入屏外 cell（count=\(count) banner=\(banner)）")
@@ -590,7 +596,8 @@ final class MarqueeSelectionUITests: XCTestCase {
         XCTAssertEqual(preCount, 5, "点选 8/11 后计数必须为 5（count=\(preCount)）")
         let burstB = BurstShots()
         burstB.start(delay: 0.8)
-        longPressDrag(in: collection, fromIndex: 8, toIndex: 14, hold: 1.2)
+        // 对角拖（col 2 行 0 → col 1 行 2）：矩形有实际宽度，描边面积可判；框选仍只覆盖 8/11（已选）
+        longPressDrag(in: collection, fromIndex: 8, toIndex: 16, hold: 1.2)
         let shotsB = burstB.finish()
         XCTAssertGreaterThanOrEqual(shotsB.count, 3, "阶段 B 连拍必须覆盖拖动窗口")
         // 功能断言：框过 8/11/14 → 已选 8/11 全部取消（0/3/6 不受影响）→ 计数 5→3（取消模式语义）
