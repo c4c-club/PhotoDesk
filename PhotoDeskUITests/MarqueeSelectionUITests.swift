@@ -555,6 +555,12 @@ final class MarqueeSelectionUITests: XCTestCase {
         var blueAtBest = 0
         var perShot = ""
         var bestShot: UIImage? = shots.first
+        if shots.count > 3 {
+            let mid = XCTAttachment(data: shots[3].pngData(), uniformTypeIdentifier: "public.png")
+            mid.name = "m17-deselect-mid"
+            mid.lifetime = .keepAlways
+            add(mid)
+        }
         for shot in shots {
             let counts = dominantStrokePixels(in: shot, region: band)
             perShot += "(r=\(counts.red) b=\(counts.blue)) "
