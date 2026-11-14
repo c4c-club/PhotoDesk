@@ -420,7 +420,7 @@ final class MarqueeSelectionUITests: XCTestCase {
         let banner = app.descendants(matching: .any)["Library-DebugSummary"].firstMatch
         guard banner.exists else { return 0 }
         let raw = ((banner.value as? String) ?? banner.label)
-        return Int(Self.parseDoubleField(raw, "hap"))
+        return Int(Self.parseDoubleField(raw, "hap") ?? 0)
     }
 
     private func waitForOffsetIncrease(_ app: XCUIApplication, from baseline: Double,
