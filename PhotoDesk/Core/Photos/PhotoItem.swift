@@ -46,4 +46,13 @@ struct PhotoItem: Identifiable, Hashable {
     /// 全选/位置恢复/查看器定位按 id 匹配才可靠。补单测 PhotoItemTests。
     static func == (lhs: PhotoItem, rhs: PhotoItem) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    /// 收藏标志变化的本地同步副本（M17 T08 X04）：id 身份不变，== / hash 不受影响
+    func withFavorite(_ favorite: Bool) -> PhotoItem {
+        PhotoItem(id: id, mediaType: mediaType, mediaSubtypes: mediaSubtypes,
+                  creationDate: creationDate, modificationDate: modificationDate,
+                  pixelWidth: pixelWidth, pixelHeight: pixelHeight, duration: duration,
+                  isFavorite: favorite, isHidden: isHidden, location: location,
+                  burstIdentifier: burstIdentifier, isCloudOnly: isCloudOnly)
+    }
 }

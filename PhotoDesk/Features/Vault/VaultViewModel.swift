@@ -193,10 +193,16 @@ final class VaultViewModel: ObservableObject {
     func favorite(ids: [String]) async -> String? {
         do {
             try await writer.setFavorite(ids: ids, isFavorite: true)
+            // M17 T08 X04（docs/31 §3）：本地状态同步——收藏后菜单/角标立即反映新值
+            let idSet = Set(ids)
+            for index in items.indices where idSet.contains(items[index].id) {
+                items[index] = items[index].withFavorite(true)
+            }
             undoCenter.push(kind: .favorite,
                             assetIDs: ids,
                             toastText: "已收藏",
                             window: settings.undoWindow)
+            onItemsChanged?()
             return nil
         } catch {
             return "操作失败：\(error.localizedDescription)"
