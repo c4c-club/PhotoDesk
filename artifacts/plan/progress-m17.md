@@ -8,6 +8,7 @@
 | T02 | DONE | 14e651f (test) + f74d184 (feat) + 9d2e607 (refactor) + 7b692b9 (fix) | Docker 435 tests 0 failures；CI core-linux success + 定向 Test SUCCEEDED；shouldActivate/resolvedSelection 归零 | 新增 39 用例 ≥ 25 |
 | T03 | DONE | 88b13d1 (test) + 74e3585 (feat) | Docker 459 tests 0 failures；CI core-linux 复验性能用例；run id 见下 | 新增 24 用例 ≥ 20 |
 | T05 | DONE | c7cd2e7 (test) + b42b9bb (fix) + a29fcd2 (test) + 4cff229 (feat) + 9c9cd9d (refactor) + a92b594/0c949ca/f9e6d11 (fix) + eb3cb13 (fix) | CI run 43569488790 绿：core 442/0 + MarqueeSelectionUITests 10/10 + Performance 4/4；A05==0 | holdElapsed 定时器交付 + 逐帧边缘监视两处接线缺陷根治 |
+| T06 | DONE | 7ad3830 (test) + 57461fd (feat) + 3282246/f39cba9 (fix) + d707089/21b2f6c/ecce878/3dac53b/46b2afc (fix) + 6e53ac7 (fix) + b1549b0/93d5ae0/76426f7/9585327/cc65b08/4599649/8fb5552/8c33727 (fix) + 728f460/409d71b/9057e40/bd7b53b (fix) | CI run 43617711164 绿：core 442/0 + MarqueeSelectionUITests 12/12 + Performance；A07 命中 10 | 角标/压暗/边框单一入口 + 覆盖层坐标补父系偏移（真 bug）+ 精确描边色像素取证 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -105,3 +106,36 @@
 - 绿：run 43569488790 **success**（eb3cb13）——core-linux 442/0；MarqueeSelectionUITests **10/10**（214s）；Performance 4/4；TEST SUCCEEDED。
 - 验收 grep：`minimumNumberOfTouches = 2` PhotoDesk/PhotoDeskCore/PhotoDeskUITests 0 处（A05 PASS，audit-m17 重定向后复跑：A04/A05/A06/A14/A15/A16/A17 PASS；A07/A08/A09/A10/A13 为 T01 基线债，T06/T07/T08 范围）。
 - 教训：审计脚本引用被重构删除的文件必须同步重指向（A04/A06/A15/A16/A17/A19 已改指新控制器/Core 机器/GridLayout）；PowerShell 5.1 读无 BOM UTF-8 中文 .ps1 解析崩坏（编辑工具回写丢 BOM，需补写）；DEBUG 横幅字符串长 + 链触发 type-check 超时（改插值模板）；XCUI press-then-drag 按压相位不可依赖识别器——事件交付要有确定性兜底且保持机器语义不变。
+
+## T06 — 框选可视反馈与角标动画（DONE，2026-11-14）
+
+### 交付物
+
+- `PhotoGridCell.applySelection(isSelecting:isSelected:animated:)` 单一入口：角标 spring（0.6→1.0 / 0.18s / damping 0.7）、12% 黑压暗（dimView 新增，黑底 alpha 0、userInteraction 关、位于 imageView 上 cloudBadge 下）、2pt tint 边框、复用全复位（layer.removeAllAnimations + 非动画归零）；setSelected/setSelectionVisible 改为转发，AX 语义不回归；DEBUG 下 selected 状态进 AX 标签。
+- `MarqueeOverlayView.swift`（新建）：单层 CALayer、cornerRadius 12、borderWidth 1.5；applyColors(deselect:)——select = tint 10% 填充/tint 描边，deselect = danger 8%/danger 描边；`update(rect:)` 每帧只改 frame 不重建（G7 预算）；isUserInteractionEnabled=false、isAccessibilityElement=false、accessibilityElementsHidden=true、identifier="Marquee-Overlay"；traitCollectionDidChange 显式刷新动态色。
+- `Colors.swift`：新增 `danger` token（light 0xE53935 / dark 0xFF5252，与 accentDelete 同值）。
+- `LibrarySelectionController`：`weak var overlayView` + `overlayFrame(for:)` 内容坐标→view 坐标转换（减 contentOffset 加 collectionView.frame.origin——初版漏加 frame.origin 为本卡唯一实现真 bug）；beginMarquee→setDeselectMode(mode==.deselect)+update、updateMarquee→update、endMarquee/finishSelection→update(nil)；DEBUG hapticCount（impactLight 与 selectionChanged 实发计数）；取证字段 debugArmModeRaw / debugTouchDownBaseCount / debugTouchDownHitID。
+- `LibraryViewController`：overlay `insertSubview(aboveSubview: collectionView)`；多选栏新增「选择中/取消选择中」模式提示（Selection-Mode-Hint）；DEBUG 横幅扩展 hap=/ov=/ovm=/arm=/ovc=/ovf=/td=（触觉计数/覆盖层显隐/框选模式/armed 时刻模式/描边色/覆盖层 frame/按下帧基集合与命中 id），updateSelectionCount 强制刷新横幅（拖拽中计数变化即可读实时状态）。
+- 测试：PhotoGridCellTests 新增 5 用例（applySelection 四态 + 非动画无 transform + 复用复位）；MarqueeSelectionUITests 新增 2 用例——testMarqueeOverlayVisible（拖拽期间连拍帧内 tint 精确色匹配 ≥25 且蓝压红）、testDeselectModeShowsDangerTint（点选 8/11 后同行对角拖 8→10，条带内 danger 精确色匹配 ≥500）。
+
+### 门禁证据
+
+- 红：7ad3830 CI run 43571885161 **failure**（`has no member 'applySelection'` + `'selectionBadge' is inaccessible due to 'private'`）。
+- 中途红（修复链，每步真实 CI）：
+  - run 43572750309 2 败（autoscroll count=0 + 取消模式红=0）→ **3282246 观察器免位移失败**：touchDownObserver（minPressDuration=0）allowableMovement 默认 10pt，按压相位微漂移 >10pt 使其 .failed → feedEnd(.cancelled) 复位机器并作废 holdElapsed 定时器，稍后到达的长按因 state≠pressing 被幂等丢弃（观察器身份不应有位移预算；机器自身 8pt 位移闸门语义不变）。此后 autoscroll 稳定。
+  - run 43576281877 → 43580586245：横幅取证链（ovm/arm/ovc）证明 App 侧完全正确（arm=1、ovc=229,57,53 danger、ov=1、state=dragging、hap=2）而像素扫描红=0 → **6e53ac7 覆盖层坐标补父系偏移（真 bug）**：overlayFrame 漏加 collectionView.frame.origin，覆盖层整体画高约 250pt；此前 overlay 用例的「通过」实为错位矩形下边缘恰好扫进扫描带的假阳性。
+  - 像素取证设计迭代（b1549b0→8c33727）：主通道占优判定对种子图块失效（图块含 danger 色系红块 218k 像素、黄格 r 主导）→ 改**精确描边色匹配**（danger(229,57,53)/tint(0,122,255) 容差 25，底色免疫）；跨行条带兜住拖拽弧线俯冲；两阶段对照因阶段 A 偶发未武装滚动污染 boundBy 索引（off=1157 实证）而拆回单阶段。
+  - 拖拽几何迭代（728f460→9057e40）：纵向拖 8→16 的 XCUI 弧线俯冲穿越底缘区 → 意外自动滚动（ticks=106、off=1157）网格滚走 → 同行横向拖 8→7 矩形高度 0 → 定格 **对角拖 8→10**（109×98，弧线俯冲 ~669 < 边缘区 703，矩形覆盖已选 8/11）。
+  - run 43609923238 / 43612592851：取消模式用例已绿，仅无条件 Performance 步骤连吃「Test runner never began executing tests」基建抖动（非断言失败）；run 43615476302 Test 步 11/12（testLongPressEntersSelection count=-1 同类合成触控闪变）→ **bd7b53b** 为其加有界重试（重新 launch 复位，断言不放宽，同 T05 先例）。
+- 绿：run 43617711164 **success**（bd7b53b）——core-linux 442/0；MarqueeSelectionUITests **12/12**（300s）；Performance 全过；TEST SUCCEEDED。
+- 验收：角标 0.2s 内可见（spring 0.18s）；dim alpha 0.12 ∈ [0.1,0.15]；取消模式 overlay 像素判别（danger 精确色 ≥500）；触觉 ≤16 次/秒（DEBUG hapticCount 经横幅 hap= 暴露，autoscroll 用例窗口 delta ≤ 64 断言）；无新增截图回归（既有 snap 快照口径不变）。
+- audit-m17：A07 命中 10（MarqueeOverlayView 落地）PASS；剩余 BLOCKING A08/A09/A10 为 T07/T08 范围。
+
+### 教训
+
+- 兄弟视图坐标转换必须带父系偏移：content → view = −contentOffset + collectionView.frame.origin；漏加即整体错位且「假阳性通过」可能长期潜伏（像素扫描带恰好扫过错位框边缘）。
+- 观察器身份的 UILongPressGestureRecognizer（minPressDuration=0）位移预算必须放开——其 .failed 会以 cancelled 语义复位机器，把定时器兜底通道一起打死。
+- XCUIScreen.screenshot 可后台连拍抓拖拽中途画面，但 pngData() 可返回 nil（隐式强解包即测试进程崩溃）——必须 guard。
+- XCUI press-then-drag 路径带弧线且俯冲过冲：纵向拖穿越底缘区会触发意外自动滚动、网格滚走后 boundBy 索引指向别格——像素取证测试必须单阶段一次启动内完成，且拖拽几何避开边缘区。
+- 像素判别不能依赖通道占优启发式（种子图块颜色不受控）：以「描边不透明纯色」做精确色匹配，或选底色安全的扫描列。
+- 把 App 内部状态（armed 时刻模式/描边色/覆盖层 frame/按下帧命中）经 DEBUG 横幅暴露并在计数变化时强制刷新，是定位「App 正确但测试看不到」类分歧的关键手段。
