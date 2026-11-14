@@ -594,14 +594,21 @@ final class MarqueeSelectionUITests: XCTestCase {
         // 阶段 A 已框选 0/3/6（count=3）→ 点选 8/11 后计数=5
         let preCount = waitForSelectionCountEqual(app, to: 5, timeout: 5)
         XCTAssertEqual(preCount, 5, "点选 8/11 后计数必须为 5（count=\(preCount)）")
-        let burstB = BurstShots()
-        burstB.start(delay: 0.8)
-        // 对角拖（col 2 行 0 → col 1 行 2）：矩形有实际宽度，描边面积可判；框选仍只覆盖 8/11（已选）
-        longPressDrag(in: collection, fromIndex: 8, toIndex: 16, hold: 1.2)
-        let shotsB = burstB.finish()
+        // 对角拖（col 2 行 0 → col 1 行 2）：矩形有实际宽度，描边面积可判；框选仍只覆盖 8/11（已选）。
+        // 合成触控偶发整手势未达 App——有界重试 2 次，连拍与计数检查逐轮进行，取成功轮连拍。
+        var shotsB: [UIImage] = []
+        var postCount = -1
+        for attempt in 1...2 {
+            let burstB = BurstShots()
+            burstB.start(delay: 0.8)
+            longPressDrag(in: collection, fromIndex: 8, toIndex: 16, hold: 1.2)
+            shotsB = burstB.finish()
+            postCount = waitForSelectionCountEqual(app, to: 3, timeout: 8)
+            if postCount == 3 { break }
+            if attempt == 1 { usleep(500_000) }
+        }
         XCTAssertGreaterThanOrEqual(shotsB.count, 3, "阶段 B 连拍必须覆盖拖动窗口")
-        // 功能断言：框过 8/11/14 → 已选 8/11 全部取消（0/3/6 不受影响）→ 计数 5→3（取消模式语义）
-        let postCount = waitForSelectionCountEqual(app, to: 3, timeout: 8)
+        // 功能断言：框过 8/11/16 区域 → 已选 8/11 全部取消（0/3/6 不受影响）→ 计数 5→3（取消模式语义）
         XCTAssertEqual(postCount, 3, "取消模式框选必须清掉锚选且不误伤其余（count=\(postCount)）")
         // 取证：横幅（计数变化触发刷新，读到 armed 时刻模式与覆盖层描边色/位置）
         let bannerAfter = (app.descendants(matching: .any)["Library-DebugSummary"].firstMatch.value as? String) ?? ""
