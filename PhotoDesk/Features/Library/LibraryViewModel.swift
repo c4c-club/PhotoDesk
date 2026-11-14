@@ -438,24 +438,46 @@ final class LibraryViewModel: ObservableObject {
         startObservingChanges()
     }
 
-    private func applyChange(_ changeSet: PhotoChangeObserver.ChangeSet) {
-        // 1. 数据层增量：allItems 镜像 fetchResult（移除（旧索引，倒序）→ 变更（旧索引原位替换）→ 插入（新索引，升序））
-        var updated = allItems
-
-        for index in changeSet.removedIndexes.sorted(by: >) where index < updated.count {
+    /// X07（M17 T08，docs/31 §3）：增量合并纯函数——索引未完成时 allItems 只是窗口子集，
+    /// fetchResult 索引≠数组索引：插入一律 append + 依赖随后的 rebuildDerived 重排
+    /// （排序短暂宽松但绝不错位）；索引完成保持原位插入语义。
+    static func mergedItems(current: [PhotoItem],
+                            removedIndexes: [Int],
+                            changedPairs: [(Int, PhotoItem)],
+                            insertedPairs: [(Int, PhotoItem)],
+                            indexComplete: Bool) -> [PhotoItem] {
+        var updated = current
+        for index in removedIndexes.sorted(by: >) where index < updated.count {
             updated.remove(at: index)
         }
-        let changed = zip(changeSet.changedIndexes, changeSet.changedObjects)
-        for (index, asset) in changed where index < updated.count {
-            updated[index] = repository.map(asset)
+        for (index, item) in changedPairs where index < updated.count {
+            updated[index] = item
         }
-        if let newResult = changeSet.resultAfterChanges {
-            for index in changeSet.insertedIndexes where index <= updated.count {
-                updated.insert(repository.map(newResult.object(at: index)), at: index)
+        if indexComplete {
+            for (index, item) in insertedPairs.sorted(by: { $0.0 < $1.0 }) where index <= updated.count {
+                updated.insert(item, at: index)
+            }
+        } else {
+            for (_, item) in insertedPairs {
+                updated.append(item)
             }
         }
+        return updated
+    }
 
-        allItems = updated
+    private func applyChange(_ changeSet: PhotoChangeObserver.ChangeSet) {
+        // 1. 数据层增量：allItems 镜像 fetchResult（移除（旧索引，倒序）→ 变更（旧索引原位替换）→ 插入）
+        let changedPairs = zip(changeSet.changedIndexes, changeSet.changedObjects)
+            .map { ($0, repository.map($1)) }
+        let insertedPairs: [(Int, PhotoItem)] = {
+            guard let newResult = changeSet.resultAfterChanges else { return [] }
+            return changeSet.insertedIndexes.map { ($0, repository.map(newResult.object(at: $0))) }
+        }()
+        allItems = Self.mergedItems(current: allItems,
+                                    removedIndexes: changeSet.removedIndexes,
+                                    changedPairs: changedPairs,
+                                    insertedPairs: insertedPairs,
+                                    indexComplete: isIndexComplete)
         totalCount = changeSet.resultAfterChanges?.count ?? totalCount
         indexProgress = (min(allItems.count, totalCount), totalCount)
         // docs/09 §2.2.5：变更后重新应用 filter + pending，再推快照（不允许混数组）
