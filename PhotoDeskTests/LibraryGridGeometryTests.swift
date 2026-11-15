@@ -288,7 +288,8 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         }
     }
 
-    /// 横向线段从 a3-7 中部向左穿到 a3-5 内部：首个命中 a3-7，x 单调不增，止点格 a3-5 命中。
+    /// 横向线段从 a3-7（第 2 行中列）中部向左穿到 a3-6（同行左列）内部：首个命中 a3-7，
+    /// x 单调不增，止点格 a3-6 命中（行优先布局：a3-7 左侧同行为 a3-6，跨行不属横向线段）。
     func testHitTestLineHorizontalOrdersLeftwardFromAnchor() throws {
         let (cv, layout, gridData) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
@@ -298,15 +299,15 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         cv.layoutIfNeeded()
         let attrs7 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
                                    "必须能取到 a3-7 的真实 attributes")
-        let attrs5 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 5, section: 3)),
-                                   "必须能取到 a3-5 的真实 attributes")
+        let attrs6 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 6, section: 3)),
+                                   "必须能取到 a3-6 的真实 attributes")
         let start = CGPoint(x: attrs7.frame.midX, y: attrs7.frame.midY)
-        let end = CGPoint(x: attrs5.frame.minX + 2, y: attrs7.frame.midY)
+        let end = CGPoint(x: attrs6.frame.minX + 2, y: attrs7.frame.midY)
         let hit = tester.hitTestLine(from: start, to: end)
         XCTAssertEqual(hit.first, IndexPath(item: 7, section: 3),
                        "起点所在格必须是首个命中（滑到哪选到哪从锚点起）")
-        XCTAssertTrue(hit.contains(IndexPath(item: 5, section: 3)),
-                      "线段止点在 a3-5 内部必须命中 a3-5")
+        XCTAssertTrue(hit.contains(IndexPath(item: 6, section: 3)),
+                      "线段止点在 a3-6 内部必须命中 a3-6")
         var lastX: CGFloat = .greatestFiniteMagnitude
         for path in hit {
             let frame = try XCTUnwrap(layout.layoutAttributesForItem(at: path)).frame
