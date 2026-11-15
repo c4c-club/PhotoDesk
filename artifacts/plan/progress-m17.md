@@ -11,6 +11,7 @@
 | T06 | DONE | 7ad3830 (test) + 57461fd (feat) + 3282246/f39cba9 (fix) + d707089/21b2f6c/ecce878/3dac53b/46b2afc (fix) + 6e53ac7 (fix) + b1549b0/93d5ae0/76426f7/9585327/cc65b08/4599649/8fb5552/8c33727 (fix) + 728f460/409d71b/9057e40/bd7b53b (fix) | CI run 43617711164 绿：core 442/0 + MarqueeSelectionUITests 12/12 + Performance；A07 命中 10 | 角标/压暗/边框单一入口 + 覆盖层坐标补父系偏移（真 bug）+ 精确描边色像素取证 |
 | T07 | DONE | 7fee412 (test) + 601fd0f (fix) + 83879ce (test) + 72b7a7f (fix) | CI run 43622938205 绿：core-linux success + 新单测 2 条 + MarqueeSelectionUITests 14/14 + Performance 4/4；Docker 443/0（性能锁 ~2ms/帧 < 4ms 验收）；A08/A09 PASS | scope 三处取 filteredItems 全量 + applyDelta 增量化 + apply 窗口保留上一帧目标 + 退出同步复位 |
 | T08 | DONE | 32403db (test 红) + 32d2447/86908e4/395a49d/c2aadb2/0c5b7fe (fix X07/X08/X03/X06/X01-02) + fb4548b/87603e8/ca47fa2 (fix X04/X05/A10 下沉) + 7e15ca5/6619074/2d4f648/c8e5f3b (fix 编译残留) | CI run 43633912940 绿：Test 273/0（2 skipped 真库守卫）+ Performance 4/4 + core-linux success；红证据 run 43628732955（红提交 32403db 编译失败）；audit **0 blocking（A10 PASS）** | X01–X10 收口；Feature 层 PHAsset 0 命中 |
+| T09 | DONE（含契约迁移 BLOCKED 项） | 361d66c (chore release) + 3f7e166 (fix export) + 61a1059 (fix uitest 种子) + 1b15da0 (fix app 列数) + docs(m17) 本提交 | audit-m17 -Strict 0 × 两连跑一致；Docker **443/0（5.759s）**；全量终验 run 43672281399：单测 **273/0（2 skipped）**+ UI **72/78**（8/9 套件绿，Marquee 14/14 转绿）；IPA 1.6.0 (7) SHA256 双端一致（docs/35 §9）；真机 BLOCKED | 6 条失败全部定性为冻结用例契约冲突（docs/35 §6.2），待授权专项迁移 |
 
 ## T01 — 基线复核与红测试（DONE，2026-11-14）
 
@@ -195,3 +196,38 @@
 - 大卡拆分「一项一提交」时要保证每个中间提交可编译：容器（AppContainer）引用两个新服务的声明必须与文件同提交落地，否则中间提交悬空。
 - PHFetchResult 的 removedIndexes/changedIndexes/insertedIndexes 全是 IndexSet——签名用 [Int] 的纯函数在调用点显式 Array() 转换；PhotoKit 枚举重载（fetchAssets(with:)）在 nil 实参下歧义，显式传 PHFetchOptions()。
 - 编辑器取件语义（URL/拍摄日期/adjustmentData）与导出（禁网 URL）、元数据（禁网 EXIF）三处消费不同字段——统一 PhotoEditingInfo 快照一次下沉，三处全清。
+
+## T09 — 全量回归与发布（DONE，2026-11-15；详证 docs/35）
+
+### 门禁
+
+- **audit-m17 -Strict**：两连跑退出码 0，STDOUT_IDENTICAL=True，归档 `artifacts/audit/m17/final/`（6 文件）。
+- **Docker test-core.ps1**：PhotoDeskCore **443 tests / 0 failures，5.759s**（DOCKER_ELAPSED_MS=17607）。
+- **版本**：361d66c `chore(release): 1.6.0 (7)`（project.yml；AppVersion 运行时读 Bundle 零改动）。
+- **全量终验 run 43672281399（1b15da0）**：core-linux ✅；单测 **273/0（2 skipped 真库守卫）**；UI **72/78，8/9 套件绿**——Marquee **14/14**（列数修复后转绿）、PositionRestore 9/9、ZoomStability 12/12、Flow/Gesture/GridPinch/Launch 全绿；Stability 27 条中 5 失败 + PageRegression 7 条中 1 失败。
+- **Release**：`artifacts/release/PhotoDesk-1.6.0-unsigned.ipa`，SHA256 `304493d434d53731b30cbc9f3a437b51657f6b825481738fdd5f4cb97e2bfe01`（与 CI .sha256 双端一致），1,277,506 字节，CI「Verify unsigned ipa」步骤通过（1.6.0 (7) · minos 16.0 · 未签名包）。
+- **真机**：BLOCKED（无设备/无工具链；docs/32 §4.4 12 条清单全部未验，未写 ✅）。
+
+### T09 修复链（红→判别→修→绿，全部真实 CI）
+
+1. **导出竞态**（run 43636991466 唯一败 ExportViewModelTests 进度复位）→ 3f7e166 epoch 守卫 + 主队列 FIFO。
+2. **种子基建**（run 43647518272 Marquee 10/14 崩 + run 43662103747 trace 实锤 `seed failed ×4 committed=0 code=-1` + `deep-seed done rounds=11`）→ 61a1059 基础种子 40/批分批 + 占位符回查 committedDates 去重（部分成功永不重插；深种子 rounds=11 恰好 432 验证口径）。
+3. **列数污染**（判别 run 43672242625：一次性分支 m17-t09-col-evidence 重放 61a1059，GridPinch 绿 → Marquee 红 → Stability 红，与全量失败逐字一致）→ 1b15da0 带 `-uiTestingSeedDatedPhotos` 的启动强制 `grid.columns = 3`（GridPinch 不带该 flag，持久化语义保留）→ 终验 run Marquee 14/14 转绿 + Stability 4 条转绿。
+
+### 余下 6 条失败 = 契约迁移 BLOCKED（docs/35 §6.2）
+
+- 3 条 panMin≥2 断言（Stability testTwoFingerScrollInSelectionMode / testScrollEnabledRestoredAfterDragEnd + PageRegression testSelectionModeUsesSlidePanAndTwoFingerScrollConfig）：M17 规划既定「永远 minimumNumberOfTouches = 1」+ audit A05（BLOCKING）强制——M14-8 双指口径已按规划删除。
+- 2 条垂直拖行带断言（testEdgeAutoScrollSelectsOffscreenCells / testReusedCellBadgeMatchesSelection）：T02 矩形语义替换 M15 整行带；M17 口径等价断言在 MarqueeSelectionUITests（14/14 绿）。
+- 1 条环境项（testSelectWholeMonth）：前序套件深种子 +432 → 月面板 299 section，XCTest AX scroll-to-visible 失败；无深种子环境同用例通过。
+- 更新 5 条冻结用例超出 T09 文件范围（T02–T07 冻结 + 不弱化断言），**待用户授权契约迁移专项**；授权前全量门禁口径 = 72/78。
+
+### 性能
+
+- T08 验收 run 43633912940 PerformanceUITests 4/4（最新完整证据）；release head 相对其无热路径改动（3f7e166 导出竞态 + 61a1059 种子脚本 + 1b15da0 DEBUG-only）。
+- 定向补验 run 43681728448（1b15da0 仅跑 PerformanceUITests）结果随 T09 汇报回填本节。
+
+### 教训
+
+- **全量轮与定向轮的差异 = 套件间持久化状态**：列数（@AppStorage）与位置文件跨套件存活，M16 时代只定向跑掩盖了两类污染；首个全量轮同时引爆。修复口径：几何校准套件统一经种子 flag 在 App.init 重置列数；位置恢复由各套件既有的 ClearPosition 覆盖。
+- **种子脚本与工作流种子（sim-photos-dated.sh 167 张）本就并存**：库 all=340 属历史常态（M15 全量绿跑同量级），勿再误判为重复播种。
+- **冻结用例的契约冲突要在规划期识别**：docs/32 既写「永远 1」又保留旧口径回归用例，T02–T07 定向绿无法暴露；全量轮是唯一能抓到的门禁。
