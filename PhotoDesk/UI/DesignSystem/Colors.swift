@@ -32,7 +32,7 @@ enum DSColor {
     static let accentHide = dynamic(light: 0x5C6BC0, dark: 0x8C9EFF)
     /// 移到最近删除（红）
     static let accentDelete = dynamic(light: 0xE53935, dark: 0xFF5252)
-    /// 取消框选 danger（红，docs/32 §2.5：覆盖层取消模式 8% 填充 + 1.5pt 描边）
+    /// danger 操作（红；删除/警示类动作通用色；M17 覆盖层专用用途已随 M18 T06 退役）
     static let danger = dynamic(light: 0xE53935, dark: 0xFF5252)
     /// 加入相簿（青，docs/04 §3.2；文档未定义深色变体，两态同色）
     static let accentAlbum = dynamic(light: 0x26A69A, dark: 0x26A69A)

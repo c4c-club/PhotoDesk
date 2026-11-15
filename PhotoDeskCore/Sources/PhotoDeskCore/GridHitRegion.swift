@@ -93,6 +93,8 @@ public enum GridHitRegion {
     /// 基线重算合并语义（docs/16 §2.8 修复 3，二选一写死）：
     /// 锚点初态已选 → 反选（base − hits）；锚点初态未选 → 加选（base ∪ hits）。
     /// 每帧都从进入拖选前的基线重算，往回拖自然移除——禁止 base ∪ 一维区间累加。
+    /// M18 退役：生产改用 `SlideSelectTrail.consume` 路径事务；仅旧 Core 单测保留（T08 冻结契约）。
+    @available(*, deprecated, message: "M18 轨迹滑选改用 SlideSelectTrail.consume；旧单测保留")
     public static func mergedSelection(base: Set<String>,
                                        hits: Set<String>,
                                        anchorInitiallySelected: Bool) -> Set<String> {

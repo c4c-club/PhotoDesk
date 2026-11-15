@@ -18,7 +18,9 @@ public enum MarqueeSelectionPolicy {
     }
 
     /// select → base ∪ hit；deselect → base − hit。提供 scope 时 hit 先按 scope 过滤
-    /// （月份 scope 等子集选择下，矩形跨出 scope 的 cell 不参与）。
+    /// （月份 scope 等子集选择下，命中跨出 scope 的 cell 不参与）。
+    /// M18 退役：生产改用 `SlideSelectTrail.consume` 净增量事务；仅旧 Core 单测保留（T08 冻结契约）。
+    @available(*, deprecated, message: "M18 轨迹滑选改用 SlideSelectTrail.consume；旧单测保留")
     public static func resolved(base: Set<String>,
                                 hitIDs: Set<String>,
                                 mode: MarqueeMode,

@@ -1,4 +1,4 @@
-// MARK: - 职责说明：框选命中测试器（M17 T04，docs/32 §2.4 1–8 步）——命中一律读真实
+// MARK: - 职责说明：网格命中测试器（M17 T04 建立，M18 T05 增线段扫掠；docs/32 §2.4）——命中一律读真实
 // layoutAttributes，废除网格参数推算（docs/31 G7/G8/G9/H1/H3 根治）：段范围缓存自
 // item(0)/item(count−1) attributes（supplementary 的钉住态 frame 不参与 → 粘性头污染免疫）；
 // 列数由段内首行 attributes 探测；真实行高 = 次行.minY − 首行.minY；二分找候选段，只枚举
@@ -42,6 +42,8 @@ final class GridHitTester {
     }
 
     /// 矩形（内容坐标）→ 命中 IndexPath 集合。零尺寸矩形扩展 1pt 由调用方负责（起手 cell 命中）。
+    /// M18 退役：生产改用 `hitTestLine(from:to:)`；LibraryGridGeometryTests 旧矩形用例迁移后 T07 物理删除。
+    @available(*, deprecated, message: "M18 改用 hitTestLine(from:to:)；T07 随测试迁移删除")
     func hitTest(rectInContent rawRect: CGRect) -> Set<IndexPath> {
         #if DEBUG
         lastQueryCount = 0

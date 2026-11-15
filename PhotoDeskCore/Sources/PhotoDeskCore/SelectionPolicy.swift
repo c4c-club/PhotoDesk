@@ -83,6 +83,8 @@ public struct SelectionState: Equatable {
     }
 
     /// v4 滑选：base 为拖动开始帧快照，range 为行带；目标 = base ∪ range。
+    /// M18 退役：生产改用 `SelectionState.applyDelta` 增量（不整表 replace+sort）；仅旧 Core 单测保留。
+    @available(*, deprecated, message: "M18 改用 SelectionState.applyDelta；旧单测保留")
     public mutating func applyRange(base: Set<String>, range: Set<String>) {
         replaceSelection(Array(base.union(range)).sorted())
     }
@@ -110,7 +112,8 @@ public struct SelectionState: Equatable {
     }
 
     /// 范围选择（docs/13 S07）：orderedIDs 内 anchor→target 连续范围与当前选中取并集；
-    /// 任一端缺失时无操作（保持现状）。
+    /// 任一端缺失时无操作（保持现状）。M18 退役：仅旧 Core 单测保留（T08 冻结契约）。
+    @available(*, deprecated, message: "M18 改用 SlideSelectTrail 路径事务；旧单测保留")
     public mutating func selectRange(in orderedIDs: [String], from anchor: String, to target: String) {
         let range = SelectionRange.ids(in: orderedIDs, from: anchor, to: target)
         guard !range.isEmpty else { return }

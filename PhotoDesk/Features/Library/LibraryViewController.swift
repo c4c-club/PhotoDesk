@@ -22,7 +22,7 @@ final class LibraryViewController: UIViewController {
     private let indexBar = MonthIndexBar()
     private var columns: Int
 
-    // MARK: - 多选与批量（docs/09 D11/D12/D13 重做：SelectionState + 长按框选）
+    // MARK: - 多选与批量（docs/09 D11/D12/D13 重做：SelectionState + 长按进入轨迹滑选）
 
     private(set) var isSelecting = false
     /// 选择状态（PhotoDeskCore.SelectionPolicy：scope = 当前筛选结果全集）
@@ -41,7 +41,7 @@ final class LibraryViewController: UIViewController {
         label.accessibilityLabel = "已选择 0 项"
         return label
     }()
-    /// 框选模式说明（M17 T06：仅多选且拖动时显示，结束隐藏；docs/04 §7 口径）
+    /// 轨迹滑选模式说明（M17 T06：仅多选且拖动时显示，结束隐藏；docs/04 §7 口径）
     private let selectionModeHintLabel: UILabel = {
         let label = UILabel()
         label.font = DSTypography.font(.badge)
@@ -64,7 +64,7 @@ final class LibraryViewController: UIViewController {
     private var toastAboveSelectionConstraint: NSLayoutConstraint?
     /// M17 T05：多选手势编排器（SelectionGestureMachine 全权判定 + UIKit 映射，docs/32 §2.3）。
     private var selectionController: LibrarySelectionController?
-    /// M17 T04：框选命中测试器（真实 layoutAttributes；缓存随快照/列数/布局 pass 失效）
+    /// M17 T04 建立：网格命中测试器（真实 layoutAttributes；缓存随快照/列数/布局 pass 失效）
     private var gridHitTester: GridHitTester?
     // MARK: - 快照缓存
 
@@ -684,7 +684,7 @@ final class LibraryViewController: UIViewController {
     }
     #endif
 
-    // MARK: - 多选模式（docs/09 D12：顶部取消/计数/完成；操作行可横滚；D13：长按拖拽框选）
+    // MARK: - 多选模式（docs/09 D12：顶部取消/计数/完成；操作行可横滚；D13：长按拖拽轨迹滑选）
 
     private func setupSelection() {
         selectionBar.translatesAutoresizingMaskIntoConstraints = false
@@ -768,7 +768,7 @@ final class LibraryViewController: UIViewController {
             actionStack.heightAnchor.constraint(equalTo: actionRow.frameLayoutGuide.heightAnchor),
         ])
 
-        // M17 T05：多选手势编排（长按/框选 pan/TouchDownObserver 由控制器组装）。
+        // M17 T05 建立，M18 T06 轨迹词汇：多选手势编排（长按/轨迹 pan/TouchDownObserver 由控制器组装）。
         var gestureConfig = SelectionGestureConfig()
         if ProcessInfo.processInfo.arguments.contains("-uiTestingLongPressMovement") {
             // XCUI 合成按压微漂移 > 8pt 预算会偶发杀长按（run 43558341702 取证）；Core 单测仍钉 8pt 语义
@@ -810,7 +810,7 @@ final class LibraryViewController: UIViewController {
             self.selectionModeHintLabel.isHidden = !active
             if active {
                 self.selectionModeHintLabel.text = self.selectionController?.anchorInitiallySelected == true
-                    ? "取消选择中" : "选择中"
+                    ? "滑过即取消" : "滑过即选"
             }
         }
         selectionController = controller
@@ -859,7 +859,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "长按照片可框选；从已选照片起拖可取消；单指滑动仍可滚动", duration: 2)
+        showTopBanner(text: "滑过照片即选中，往回滑可取消；单指上下滑动仍可滚动", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -1766,7 +1766,7 @@ final class LibraryViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // M17 T04：布局 pass 是命中缓存的唯一失效入口（snapshot apply / 列数切换 / 旋转
-        // 最终都会触发本轮布局）——下次框选帧重建段几何缓存
+        // 最终都会触发本轮布局）——下次轨迹帧重建段几何缓存
         gridHitTester?.invalidateGeometry()
         // 首次布局前 dequeue 的 cell 拿到的是占位尺寸：布局稳定后重配可视 cell（缓存键含尺寸）。
         // M12（验证轮 12 .ips 实锤）：reloadItems 绕过 Diffable 数据源——与进行中的 dataSource.apply
@@ -1851,7 +1851,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
         // docs/13 §3.7：一律经 dataSource 取 item（apply 窗口内数组下标不可信）
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
         if isSelecting {
-            // M17 T05：长按/框选已消费本次触摸（armed 起 + 抬手 0.3s 内）→ touch-up 不重复 toggle
+            // M17 T05：长按/轨迹滑选已消费本次触摸（armed 起 + 抬手 0.3s 内）→ touch-up 不重复 toggle
             if selectionController?.isConsumingTouch == true { return }
             toggleSelection(id: item.id)
             return
@@ -1939,7 +1939,7 @@ extension LibraryViewController: UICollectionViewDelegate, UICollectionViewDataS
     }
 }
 
-// MARK: - 手势代理（M17 T05，docs/32 §2.3：长按/框选 pan 只在命中 cell 时起步；
+// MARK: - 手势代理（M17 T05 建立，M18 T06 轨迹词汇：长按/轨迹 pan 只在命中 cell 时起步；
 // 多选 pan ↔ 滚动 pan ↔ 长按允许同时识别，方向归属由机器判定 + .failed；捏合保持排他）
 
 extension LibraryViewController: UIGestureRecognizerDelegate {
@@ -1947,11 +1947,11 @@ extension LibraryViewController: UIGestureRecognizerDelegate {
         guard let selectionController,
               gestureRecognizer === selectionController.touchDownObserver
                   || gestureRecognizer === selectionController.longPressRecognizer
-                  || gestureRecognizer === selectionController.marqueePan else { return true }
-        // docs/28 §4.4.3.3：列数过渡期间冻结框选（批量编辑入口）
+                  || gestureRecognizer === selectionController.trailPan else { return true }
+        // docs/28 §4.4.3.3：列数过渡期间冻结轨迹滑选（批量编辑入口）
         if isGridLayoutTransition { return false }
         // docs/32 §2.3：长按/pan 只在「命中 cell」时允许（空白处让位滚动）
-        if gestureRecognizer === selectionController.marqueePan,
+        if gestureRecognizer === selectionController.trailPan,
            gestureRecognizer.numberOfTouches > 1 { return false }
         let point = gestureRecognizer.location(in: collectionView)
         return collectionView.indexPathForItem(at: point) != nil
@@ -1959,14 +1959,14 @@ extension LibraryViewController: UIGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        // 捏合与框选识别器互斥（列数过渡由 shouldBegin 冻结兜底）；其余组合全部允许
+        // 捏合与轨迹识别器互斥（列数过渡由 shouldBegin 冻结兜底）；其余组合全部允许
         let ours = selectionController.map {
             gestureRecognizer === $0.touchDownObserver
                 || gestureRecognizer === $0.longPressRecognizer
-                || gestureRecognizer === $0.marqueePan
+                || gestureRecognizer === $0.trailPan
                 || other === $0.touchDownObserver
                 || other === $0.longPressRecognizer
-                || other === $0.marqueePan
+                || other === $0.trailPan
         } ?? false
         if ours, gestureRecognizer is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer {
             return false

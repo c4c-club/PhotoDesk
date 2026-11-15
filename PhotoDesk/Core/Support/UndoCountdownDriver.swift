@@ -74,7 +74,7 @@ final class UndoCountdownDriver {
                 weakSelf.tick()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)   // 框选/滚动期间也不停摆
+        RunLoop.main.add(timer, forMode: .common)   // 轨迹滑选/滚动期间也不停摆
         pump = timer
     }
 

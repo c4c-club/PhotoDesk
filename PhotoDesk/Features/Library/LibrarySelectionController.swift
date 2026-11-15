@@ -6,7 +6,7 @@
 //   TouchDownObserver（UILongPress minimumPressDuration=0）→ touchDown(point:hitID:)（G3 按下点取证）
 //   holdElapsed 双通道交付：UILongPress（时长/位移取自 SelectionGestureConfig）+ 按下定时器
 //   （触点在屏时补发，识别器失效不至于丢长按；机器 state/位移守卫保证幂等）
-//   marqueePan（单指）→ moved(dx:dy:) / ended / cancelled；edgeEntered/edgeExited 由
+//   trailPan（单指）→ moved(dx:dy:) / ended / cancelled；edgeEntered/edgeExited 由
 //   dragging/autoScrolling 期间的逐帧边缘监视交付（指尖停边缘不动也持续滚动，docs/32 §2.4）
 //   scrollViewWillBeginDragging（VC 转发）→ scrollStarted
 // 效果执行：enterSelection → VC 进多选并选锚点；beginTrail / endTrail 与 isScrollEnabled
@@ -57,7 +57,7 @@ final class LibrarySelectionController: NSObject {
     private var lastPanTranslation: CGPoint = .zero
     private var currentEdgeDirection = 0
     private var autoScrollLink: CADisplayLink?
-    /// G6 闸门：updateMarquee 帧命中集合确有变化时才放行机器的 selectionChanged 触觉。
+    /// G6 闸门：updateTrail 帧净增量确有变化时才放行机器的 selectionChanged 触觉。
     private var pendingSelectionHaptic = false
     /// 本次触摸已进入过多选（armed 起）：didSelectItemAt 在 touch-up 后 0.3s 内跳过重复 toggle。
     private var consumedTouch = false
@@ -69,7 +69,7 @@ final class LibrarySelectionController: NSObject {
     private let selectHaptic = UISelectionFeedbackGenerator()
     private let impactHaptic = UIImpactFeedbackGenerator(style: .light)
 
-    /// 供 VC delegate / UI 测试观察：框选拖动进行中。
+    /// 供 VC delegate / UI 测试观察：轨迹滑选拖动进行中。
     var isDragSelecting: Bool {
         machine.state == .dragging || machine.state == .autoScrolling
     }
@@ -91,7 +91,7 @@ final class LibrarySelectionController: NSObject {
         self.machine = SelectionGestureMachine(config: config)
         self.gestureConfig = config
         super.init()
-        // TouchDownObserver：0 时长长按，只用于记录按下点（G3：框选起点 = 按下点而非 pan 触发点）
+        // TouchDownObserver：0 时长长按，只用于记录按下点（G3：轨迹滑选起点 = 按下点而非 pan 触发点）
         let touchDown = UILongPressGestureRecognizer(target: self, action: #selector(handleTouchDown(_:)))
         touchDown.minimumPressDuration = 0
         // 观察器身份：只记录按下点与触点存续，位移不构成失败——否则按压相位的微漂移
@@ -105,8 +105,8 @@ final class LibrarySelectionController: NSObject {
         longPress.allowableMovement = CGFloat(config.allowableMovement)
         longPress.cancelsTouchesInView = false
         longPress.delegate = self
-        // 框选 pan：单指；与滚动 pan 同时识别，方向锁由机器判定后本类执行
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleMarqueePan(_:)))
+        // 轨迹 pan：单指；与滚动 pan 同时识别，方向锁由机器判定后本类执行
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleTrailPan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.cancelsTouchesInView = false
         pan.delegate = self
@@ -115,14 +115,14 @@ final class LibrarySelectionController: NSObject {
         collectionView.addGestureRecognizer(pan)
         touchDownObserver = touchDown
         longPressRecognizer = longPress
-        marqueePan = pan
+        trailPan = pan
         impactHaptic.prepare()
         selectHaptic.prepare()
     }
 
     private(set) var touchDownObserver: UILongPressGestureRecognizer!
     private(set) var longPressRecognizer: UILongPressGestureRecognizer!
-    private(set) var marqueePan: UIPanGestureRecognizer!
+    private(set) var trailPan: UIPanGestureRecognizer!
 
     #if DEBUG
     /// UI 取证：触觉实发计数（验收：≤16 次/秒 = 60ms 节流生效）。
@@ -182,7 +182,7 @@ final class LibrarySelectionController: NSObject {
         }
     }
 
-    @objc private func handleMarqueePan(_ gesture: UIPanGestureRecognizer) {
+    @objc private func handleTrailPan(_ gesture: UIPanGestureRecognizer) {
         switch gesture.state {
         case .changed:
             lastFingerWindowPoint = gesture.location(in: nil)
@@ -303,9 +303,9 @@ final class LibrarySelectionController: NSObject {
                 onTrailActiveChanged(false)
             case .releaseScroll:
                 collectionView?.isScrollEnabled = true
-                // 纵向占优交还滚动（docs/32 §2.3）：框选 pan 主动失败，滚动 pan 接管
-                if marqueePan.state == .changed || marqueePan.state == .began {
-                    marqueePan.state = .failed
+                // 纵向占优交还滚动（docs/32 §2.3）：轨迹 pan 主动失败，滚动 pan 接管
+                if trailPan.state == .changed || trailPan.state == .began {
+                    trailPan.state = .failed
                 }
             case .haptic(let kind):
                 switch kind {

@@ -5,7 +5,7 @@
 import UIKit
 import SwiftUI
 
-/// 隐藏库网格控制器（轻量；无多选/框选）
+/// 隐藏库网格控制器（轻量；无多选/轨迹滑选）
 final class VaultGridViewController: UIViewController {
     var items: [PhotoItem] = [] {
         didSet {
