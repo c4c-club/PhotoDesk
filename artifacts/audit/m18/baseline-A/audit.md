@@ -1,6 +1,6 @@
 ﻿# M18 全新审查（自动生成，只读扫描）
 
-- generatedAt: 2026-11-15T16:08:52Z
+- generatedAt: 2026-11-15T16:17:17Z
 - root: C:/Users/RuiZh/Desktop/photo_manager
 - version: 1.6.0 (7)，deploymentTarget: iOS 16.0
 - releaseDirs: 1.4.0, 1.5.0

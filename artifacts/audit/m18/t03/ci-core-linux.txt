@@ -1,0 +1,1 @@
+{"coreLinux":{"conclusion":"success","status":"completed","url":"https://github.com/c4c-club/PhotoDesk/actions/runs/43736641548/job/132881743299"},"createdAt":"2026-11-15T16:38:51Z","title":"feat(core): TrailHitResolver 与 CellFrame 抽离","url":"https://github.com/c4c-club/PhotoDesk/actions/runs/43736641548"}
