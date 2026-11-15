@@ -8,6 +8,7 @@
 // layoutAttributesForItem 才返回非 nil（CI 43546275550 实锤）——各用例统一走该预热。
 
 import XCTest
+import PhotoDeskCore
 @testable import PhotoDesk
 
 @MainActor
@@ -315,5 +316,209 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
                                      "向左线段的命中序列必须按经过顺序（minX 单调不增）")
             lastX = frame.minX
         }
+    }
+
+    // MARK: - M18 T07：真布局线段几何（docs/37 §4/§7，docs/38 §4）
+
+    /// 暴力基准（口径独立复算，防「实现自证」）：全量 layoutAttributesForItem 与线段求交。
+    /// 命中判据 = Liang-Barsky 进入参数 tEnter = max(tx, ty, 0) ≤ tExit；粘性头遮挡口径与
+    /// 生产一致（视口顶所在段的钉住头底边以上完全遮住与已滚出屏的 cell 不命中，
+    /// 跨头底边的 cell 有效顶钳到头底边）；排序 = (tEnter, 合成键 "s段-i项" 字典序)，
+    /// 合成键与生产 hitTestLine 同格式（docs/38 §4 第 3 行）。
+    private func bruteForceLineHit(cv: UICollectionView,
+                                   layout: UICollectionViewLayout,
+                                   from: CGPoint,
+                                   to: CGPoint) -> [IndexPath] {
+        let expand = CGFloat(SlideSelectConfig.hitExpansion)
+        let eps = CGFloat(SlideSelectConfig.segmentEpsilon)
+        let headerHeight = CGFloat(DSSpacing.monthHeaderHeight)
+        // 视口顶所在段（段起点 = 首格 minY − 头高；M17 T01 H1：item attributes 永不被 pin 平移）
+        let viewportTop = cv.contentOffset.y + cv.adjustedContentInset.top
+        var hasPinnedSection = false
+        for section in 0..<cv.numberOfSections {
+            guard let first = layout.layoutAttributesForItem(at: IndexPath(item: 0, section: section)) else { continue }
+            if first.frame.minY - headerHeight <= viewportTop { hasPinnedSection = true }
+        }
+        let clipTop: CGFloat? = hasPinnedSection ? viewportTop + headerHeight : nil
+
+        let dx = to.x - from.x
+        let dy = to.y - from.y
+        var hits: [(t: Double, id: String, path: IndexPath)] = []
+        for section in 0..<cv.numberOfSections {
+            for item in 0..<cv.numberOfItems(inSection: section) {
+                let path = IndexPath(item: item, section: section)
+                guard let attrs = layout.layoutAttributesForItem(at: path) else { continue }
+                var frame = attrs.frame
+                if let clip = clipTop {
+                    if frame.maxY <= clip { continue }                       // 完全被头遮住/已滚出屏
+                    if frame.minY < clip {
+                        frame = CGRect(x: frame.minX, y: clip,
+                                       width: frame.width, height: frame.maxY - clip)
+                    }
+                }
+                let minX = frame.minX - expand
+                let maxX = frame.maxX + expand
+                let minY = frame.minY - expand
+                let maxY = frame.maxY + expand
+                var tEnter = 0.0
+                var tExit = 1.0
+                var miss = false
+                if abs(dx) <= eps {
+                    if from.x < minX || from.x > maxX { miss = true }
+                } else {
+                    let t1 = Double((minX - from.x) / dx)
+                    let t2 = Double((maxX - from.x) / dx)
+                    tEnter = max(tEnter, min(t1, t2))
+                    tExit = min(tExit, max(t1, t2))
+                }
+                if abs(dy) <= eps {
+                    if from.y < minY || from.y > maxY { miss = true }
+                } else {
+                    let t1 = Double((minY - from.y) / dy)
+                    let t2 = Double((maxY - from.y) / dy)
+                    tEnter = max(tEnter, min(t1, t2))
+                    tExit = min(tExit, max(t1, t2))
+                }
+                guard !miss, tEnter <= tExit else { continue }
+                hits.append((tEnter, "s\(section)-i\(item)", path))
+            }
+        }
+        return hits.sorted { $0.t != $1.t ? $0.t < $1.t : $0.id < $1.id }.map(\.path)
+    }
+
+    /// 核心矩阵（docs/38 §4 第 1 行）：2/3/4/5 列 × offset {0,2000,8000,20000}，竖向与斜线
+    /// 线段的 hitTestLine 序列必须等于全量暴力基准（真实 attributes 求交 + tMin 排序）。
+    func testHitTestLineMatchesBruteForceAcrossColumnsAndOffsets() throws {
+        for columns in [2, 3, 4, 5] {
+            let (cv, layout, gridData) = makeParamGrid(columns: columns)
+            let tester = GridHitTester(collectionView: cv)
+            cv.layoutIfNeeded()
+            for offset in [0, 2000, 8000, 20000] {
+                cv.setContentOffset(CGPoint(x: 0, y: CGFloat(offset)), animated: false)
+                cv.collectionViewLayout.invalidateLayout()
+                cv.layoutIfNeeded()
+                // dataSource 弱引用陷阱（M17 T04 实锤）：gridData 由 makeParamGrid 返回值绑定保活，
+                // 若解绑则网格退化 0 段 → 命中空对空假绿。
+                let verticalStart = CGPoint(x: 30, y: CGFloat(offset) + 60)
+                let verticalEnd = CGPoint(x: 30, y: CGFloat(offset) + 900)
+                XCTAssertEqual(tester.hitTestLine(from: verticalStart, to: verticalEnd),
+                               bruteForceLineHit(cv: cv, layout: layout,
+                                                 from: verticalStart, to: verticalEnd),
+                               "columns=\(columns) offset=\(offset) 竖向线段必须等于暴力基准")
+                let diagonalStart = CGPoint(x: 10, y: CGFloat(offset) + 60)
+                let diagonalEnd = CGPoint(x: 380, y: CGFloat(offset) + 900)
+                XCTAssertEqual(tester.hitTestLine(from: diagonalStart, to: diagonalEnd),
+                               bruteForceLineHit(cv: cv, layout: layout,
+                                                 from: diagonalStart, to: diagonalEnd),
+                               "columns=\(columns) offset=\(offset) 斜线必须等于暴力基准")
+            }
+        }
+    }
+
+    /// 反向线段（docs/38 §2 回滑语义）：命中集合相同、顺序精确镜像（各格进入参数互异，无并列）。
+    func testHitTestLineReverseSegmentMirrorsForward() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let start = CGPoint(x: 200, y: 60)
+        let end = CGPoint(x: 200, y: 700)
+        let forward = tester.hitTestLine(from: start, to: end)
+        let backward = tester.hitTestLine(from: end, to: start)
+        XCTAssertFalse(forward.isEmpty, "竖向长线段必须命中多格")
+        XCTAssertEqual(backward, forward.reversed(),
+                       "反向线段 = 正向序列镜像（滑到哪选到哪、回滑取消）")
+    }
+
+    /// 斜线穿格（docs/38 §4）：x/y 同增的对角线，命中格行主序下标严格递增（不回跳、不重复）。
+    func testHitTestLineDiagonalCrossesInSweepOrder() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let hit = tester.hitTestLine(from: CGPoint(x: 10, y: 60), to: CGPoint(x: 380, y: 900))
+        XCTAssertGreaterThanOrEqual(hit.count, 4, "跨两列两行的对角线必须命中 ≥4 格")
+        var lastIndex = -1
+        for path in hit {
+            let flat = path.section * 50 + path.item
+            XCTAssertGreaterThan(flat, lastIndex,
+                                 "对角线命中必须按行主序严格递增（扫掠语义），发现回跳 \(flat) ≤ \(lastIndex)")
+            lastIndex = flat
+        }
+    }
+
+    /// 粘性头遮挡（docs/37 §4 第 4 行）：offset 8000 处线段起点在遮挡区内，
+    /// 被钉住头完全遮住的 cell 不得入栈；整体序列仍等于暴力基准（同口径钳制）。
+    func testHitTestLineSkipsCellsUnderStickyHeader() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(CGPoint(x: 0, y: 8000), animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let stickyBottom = CGFloat(8000) + CGFloat(DSSpacing.monthHeaderHeight)
+        let start = CGPoint(x: 60, y: 8000 + 10)      // 起点在钉住头遮挡区内
+        let end = CGPoint(x: 60, y: 8000 + 400)
+        let hit = tester.hitTestLine(from: start, to: end)
+        XCTAssertEqual(hit, bruteForceLineHit(cv: cv, layout: layout, from: start, to: end),
+                       "粘性头场景命中序列必须等于暴力基准（同口径钳制）")
+        let hidden = hit.filter { path in
+            guard let frame = layout.layoutAttributesForItem(at: path)?.frame else { return false }
+            return frame.maxY <= stickyBottom
+        }
+        XCTAssertTrue(hidden.isEmpty, "被钉住头完全遮住的 cell 不得命中：\(hidden)")
+    }
+
+    /// 缓存热帧查询闸（docs/31 A15）：hitTestLine 与矩形命中同受 ≤60 次/热帧约束。
+    func testHitTestLineQueryCountBoundedAtDeepOffset() throws {
+        let (cv, _, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(CGPoint(x: 0, y: 8000), animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let start = CGPoint(x: 30, y: 8060)
+        let end = CGPoint(x: 30, y: 8900)
+        _ = tester.hitTestLine(from: start, to: end)   // 首帧构建缓存不计入
+        _ = tester.hitTestLine(from: start, to: end)   // 热帧
+        XCTAssertLessThanOrEqual(tester.lastQueryCount, 60,
+                                 "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
+    }
+
+    /// invalidateGeometry() 后重建一致性（docs/38 §4 第 4 行）：失效前后同线段结果完全一致。
+    func testHitTestLineInvalidateGeometryRebuildsConsistently() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 4)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(CGPoint(x: 0, y: 2000), animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let start = CGPoint(x: 100, y: 2060)
+        let end = CGPoint(x: 100, y: 2800)
+        let before = tester.hitTestLine(from: start, to: end)
+        tester.invalidateGeometry()
+        let after = tester.hitTestLine(from: start, to: end)
+        XCTAssertEqual(before, after, "缓存失效重建后命中序列必须一致")
+        XCTAssertEqual(after, bruteForceLineHit(cv: cv, layout: layout, from: start, to: end))
+    }
+
+    /// 零长度线段 = 起手 cell 命中（docs/37 §4：扩展 1pt 起手语义的线段等价）。
+    func testHitTestLineZeroLengthHitsAnchorCellOnly() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let attrs = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
+                                  "必须能取到 a3-7 的真实 attributes")
+        let center = CGPoint(x: attrs.frame.midX, y: attrs.frame.midY)
+        let hit = tester.hitTestLine(from: center, to: center)
+        XCTAssertEqual(hit, [IndexPath(item: 7, section: 3)],
+                       "零长度线段只命中起手格（相邻格 0.5pt 内不得误命中）")
     }
 }
