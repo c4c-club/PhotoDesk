@@ -1,0 +1,49 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[1/10] Write swift-version-24593BA9C3E375BF.txt
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[3/11] Emitting module PhotoDeskCoreTests
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:16:61: error: cannot find type 'GridCellFrame' in scope
+ 14 | 
+ 15 |     private func frame(_ id: String, x: Double, y: Double,
+ 16 |                        w: Double = 100, h: Double = 100) -> GridCellFrame {
+    |                                                             `- error: cannot find type 'GridCellFrame' in scope
+ 17 |         GridCellFrame(id: id, minX: x, minY: y, maxX: x + w, maxY: y + h)
+ 18 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:21:37: error: cannot find type 'GridCellFrame' in scope
+ 19 | 
+ 20 |     /// 水平带状连续网格：列 x 0/100/200/300/400（无间隙 100 宽，y 0..200 单行带）
+ 21 |     private func band(_ n: Int) -> [GridCellFrame] {
+    |                                     `- error: cannot find type 'GridCellFrame' in scope
+ 22 |         let names = Array(["A", "B", "C", "D", "E"][0..<min(n, 5)])
+ 23 |         return names.enumerated().map { i, name in
+
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:29:32: error: cannot find type 'GridCellFrame' in scope
+ 27 | 
+ 28 |     private func order(_ from: (Double, Double), _ to: (Double, Double),
+ 29 |                        cells: [GridCellFrame], clipTop: Double? = nil,
+    |                                `- error: cannot find type 'GridCellFrame' in scope
+ 30 |                        expansion: Double = 0, epsilon: Double = 0.5) -> [String] {
+ 31 |         TrailHitResolver.orderedIDs(from: GridPoint(x: from.0, y: from.1),
+[4/11] Compiling PhotoDeskCoreTests TrailHitResolverTests.swift
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:16:61: error: cannot find type 'GridCellFrame' in scope
+ 14 | 
+ 15 |     private func frame(_ id: String, x: Double, y: Double,
+ 16 |                        w: Double = 100, h: Double = 100) -> GridCellFrame {
+    |                                                             `- error: cannot find type 'GridCellFrame' in scope
+ 17 |         GridCellFrame(id: id, minX: x, minY: y, maxX: x + w, maxY: y + h)
+ 18 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:21:37: error: cannot find type 'GridCellFrame' in scope
+ 19 | 
+ 20 |     /// 水平带状连续网格：列 x 0/100/200/300/400（无间隙 100 宽，y 0..200 单行带）
+ 21 |     private func band(_ n: Int) -> [GridCellFrame] {
+    |                                     `- error: cannot find type 'GridCellFrame' in scope
+ 22 |         let names = Array(["A", "B", "C", "D", "E"][0..<min(n, 5)])
+ 23 |         return names.enumerated().map { i, name in
+
+/workspace/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift:29:32: error: cannot find type 'GridCellFrame' in scope
