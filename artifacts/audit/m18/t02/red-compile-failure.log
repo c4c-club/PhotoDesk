@@ -1,0 +1,161 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[1/10] Write swift-version-24593BA9C3E375BF.txt
+[3/11] Emitting module PhotoDeskCoreTests
+[4/11] Compiling PhotoDeskCoreTests SlideSelectTrailTests.swift
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:15:21: error: cannot find 'SlideSelectTrail' in scope
+ 13 | 
+ 14 |     func testConsumeFirstIDAppendsAndSelects() {
+ 15 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 16 |         let delta = trail.consume(["a"])
+ 17 |         XCTAssertEqual(delta.add, ["a"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:24:21: error: cannot find 'SlideSelectTrail' in scope
+ 22 | 
+ 23 |     func testConsumeEmptyIsIdempotent() {
+ 24 |         var trail = SlideSelectTrail(base: ["p"], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 25 |         _ = trail.consume(["a"])
+ 26 |         let before = trail.target
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:35:21: error: cannot find 'SlideSelectTrail' in scope
+ 33 | 
+ 34 |     func testConsumeSameAsLastIsIgnored() {
+ 35 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 36 |         _ = trail.consume(["a"])
+ 37 |         _ = trail.consume(["b"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:44:21: error: cannot find 'SlideSelectTrail' in scope
+ 42 | 
+ 43 |     func testConsumeNewIDsAppendInOrder() {
+ 44 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 45 |         _ = trail.consume(["a"])
+ 46 |         let d2 = trail.consume(["b"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:56:21: error: cannot find 'SlideSelectTrail' in scope
+ 54 | 
+ 55 |     func testBackslideTruncatesAndDeselectsNewcomer() {
+ 56 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 57 |         _ = trail.consume(["a"])
+ 58 |         _ = trail.consume(["b"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:68:21: error: cannot find 'SlideSelectTrail' in scope
+ 66 | 
+ 67 |     func testBackslideToRootKeepsAnchorInitial() {
+ 68 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 69 |         _ = trail.consume(["a"])
+ 70 |         _ = trail.consume(["b"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:79:21: error: cannot find 'SlideSelectTrail' in scope
+ 77 | 
+ 78 |     func testAlternatingTrailKeepsEarlierIDStable() {
+ 79 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 80 |         _ = trail.consume(["a"])           // path=[a]，a 入选
+ 81 |         let delta = trail.consume(["a", "b", "a", "b"])   // 单帧 A→B→A→B
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:90:21: error: cannot find 'SlideSelectTrail' in scope
+ 88 | 
+ 89 |     func testDeselectModeSubtractsFromBase() {
+ 90 |         var trail = SlideSelectTrail(base: ["a", "b", "x"], anchorInitiallySelected: true)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+ 91 |         let delta = trail.consume(["x"])
+ 92 |         XCTAssertEqual(delta.remove, ["x"], "deselect：滑过已选 cell 即取消")
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:95:37: error: type 'Equatable' has no member 'deselect'
+ 93 |         XCTAssertTrue(delta.add.isEmpty)
+ 94 |         XCTAssertEqual(trail.target, ["a", "b"])
+ 95 |         XCTAssertEqual(trail.mode, .deselect)
+    |                                     `- error: type 'Equatable' has no member 'deselect'
+ 96 |     }
+ 97 | 
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:99:21: error: cannot find 'SlideSelectTrail' in scope
+ 97 | 
+ 98 |     func testDeselectBackslideRestoresBaseState() {
+ 99 |         var trail = SlideSelectTrail(base: ["a", "b", "x", "y", "z"], anchorInitiallySelected: true)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+100 |         _ = trail.consume(["x"])
+101 |         _ = trail.consume(["y"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:112:21: error: cannot find 'SlideSelectTrail' in scope
+110 | 
+111 |     func testBaseProtectedFromDelta() {
+112 |         var trail = SlideSelectTrail(base: ["p"], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+113 |         _ = trail.consume(["p"])           // base 内 id 入栈：target 不变（p 已在 base）
+114 |         let d2 = trail.consume(["q"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:124:21: error: cannot find 'SlideSelectTrail' in scope
+122 |     func testAnchorInBaseSurvivesTrailForLongPressEntry() {
+123 |         // 长按进入：enterSelection 已把锚点写进 selectionState → base 含锚点（docs/38 §2.2）
+124 |         var trail = SlideSelectTrail(base: ["anchor"], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+125 |         _ = trail.consume(["anchor"])
+126 |         _ = trail.consume(["b"])
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:137:21: error: cannot find 'SlideSelectTrail' in scope
+135 | 
+136 |     func testScopeOutsidersNeverEnterPath() {
+137 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false, scope: ["a", "b"])
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+138 |         let d1 = trail.consume(["out"])
+139 |         XCTAssertTrue(d1.isEmpty, "scope 外 id 忽略")
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:148:21: error: cannot find 'SlideSelectTrail' in scope
+146 | 
+147 |     func testEmptyIDIsIgnored() {
+148 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+149 |         let delta = trail.consume([""])
+150 |         XCTAssertTrue(delta.isEmpty, "空 id 忽略（防御性）")
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:155:21: error: cannot find 'SlideSelectTrail' in scope
+153 | 
+154 |     func testDuplicateIDsInOneFrameCollapse() {
+155 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+156 |         let delta = trail.consume(["a", "a", "a"])
+157 |         XCTAssertEqual(delta.add, ["a"], "同帧重复 id 折叠：等价单次 append")
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:162:21: error: cannot find 'SlideSelectTrail' in scope
+160 | 
+161 |     func testNetDeltaAgainstPreviousFrame() {
+162 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+163 |         _ = trail.consume(["a"])                                  // 上一帧：path=[a]
+164 |         let delta = trail.consume(["b", "a", "b", "c"])           // 单帧乱序回跳
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:175:21: error: cannot find 'SlideSelectTrail' in scope
+173 |         var baseSet: Set<String> = ["a"]
+174 |         var scopeSet: Set<String> = ["a", "b"]
+175 |         var trail = SlideSelectTrail(base: baseSet, anchorInitiallySelected: false, scope: scopeSet)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+176 |         baseSet.insert("z")
+177 |         scopeSet.insert("z")
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:184:21: error: cannot find 'SlideSelectTrail' in scope
+182 | 
+183 |     func testTargetMatchesAccumulatedDeltas() {
+184 |         var trail = SlideSelectTrail(base: ["p"], anchorInitiallySelected: false, scope: ["p", "a", "b", "c", "d"])
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+185 |         var accumulated: Set<String> = trail.target
+186 |         let script: [[String]] = [["a"], ["b"], ["c"], ["b"], ["a"], ["d"], ["a"], ["b"]]
+
+/workspace/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift:199:21: error: cannot find 'SlideSelectTrail' in scope
+197 | 
+198 |     func testTenThousandStepsUnderBudget() {
+199 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+    |                     `- error: cannot find 'SlideSelectTrail' in scope
+200 |         let pool = (0..<100).map { "id-\($0)" }
+201 |         let start = Date()
+error: fatalError
+[X] swift test 失败（exit 1）
