@@ -1,0 +1,61 @@
+# T07 — 真布局线段几何、自动滚动与触觉
+
+> 自包含任务卡。只读本文件 + `docs/37 §4/§7` + `docs/38 §4`。
+
+## 0. 目标
+
+用**真实 `UICollectionView` + `LibraryGridLayout.make`** 证明线段命中与手指路径逐格对齐；修自动滚动、粘性头、触觉节流缺陷。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/LibraryGridLayout.swift`
+- `PhotoDesk/Features/Library/GridHitTester.swift`
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（`autoScrollTick` / `feedEdgeEvents` / 触觉闸门）
+- `PhotoDeskTests/LibraryGridGeometryTests.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift`（边界口径）
+
+## 2. 步骤
+
+1. 红：扩写 `LibraryGridGeometryTests.swift`：
+   - 2/3/4/5 列 × `contentOffset.y ∈ {0, 2000, 8000, 20000}`，断言 `hitTestLine` 结果 == 手工按 `layoutAttributesForItem` 求交并按 `tMin` 排序的 IndexPath 序列。
+   - 反向线段、斜线穿格、粘性头钉住时头下 cell 不命中、缓存热帧 `lastQueryCount ≤ 60`、`invalidateGeometry()` 后重建一致。
+   - 保持 `UICollectionView.dataSource` 强持有（M17 T04 踩过「弱引用致 0 段空网格」假绿），写注释。
+2. 推 CI 定向 `PhotoDeskTests/LibraryGridGeometryTests` 拿红证据；每条失败附 run id / 截图附件路径；提交红测试。
+3. 按真实失败修 `GridHitTester`：
+   - 候选行/列枚举必须来自真实 attributes，不得用 `DSSpacing` 推算。
+   - 线段外接矩形只用于**缩小候选集**，最终顺序与命中一律由 `TrailHitResolver` 决定。
+   - `clipTop` 仍为「视口顶 + 钉住头高」；头下被遮住的 cell 不得入栈。
+   - 自动滚动 `setContentOffset` 前后同一窗口坐标换算，内容流过方向 `before→after`；`SlideSelectPolicy.clampedOffset` 保持。
+   - `LibraryGridGeometryTests` 全部迁到 `hitTestLine` 后，**物理删除** `GridHitTester.hitTest(rectInContent:)`；`audit-m18.ps1 -Strict` 的矩形残留类 BLOCKING 必须归零，日志存 `artifacts/audit/m18/t07/green.md`。
+4. 触觉：`pendingSelectionHaptic` 只在 `SlideSelectDelta.isEmpty == false` 置位；机器 `hapticMinInterval=0.06` 节流保持；DEBUG `debugHapticCount` 断言 ≤16 次/秒。
+5. 跑：Docker `scripts/test-core.ps1`；CI 定向单测 + `PerformanceUITests`；记录帧预算（拖动一帧 ≤4ms / 滚动 ≥55FPS / 内存 <250MB）。
+6. 更新 docs/05、progress-m18：T07 DONE。
+
+## 3. 验收
+
+- 真布局用例 ≥8；`dataSource` 强持有；无「空对空假绿」。
+- `grep -R -E "hitTest\(rectInContent|MarqueeOverlayView|Marquee-Overlay|lastMarqueeRect" PhotoDesk/ PhotoDeskTests/` = 0。
+- `grep -R "DSSpacing" GridHitTester.swift` 不用于命中计算。
+- 自动滚动 2s 后 DEBUG `trailPathCount` 持续增长且无逆序重复；离开边缘 displayLink 严格销毁。
+
+## 4. Git
+
+1. `test(selection): 真布局线段命中红用例`
+2. `fix(selection): 自动滚动采样与粘性头裁剪`
+3. `docs(m18): T07 进度与证据`
+
+## 5. 完成后
+
+只输出：T07 完成后，只读 T08-精确路径UI测试.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

@@ -1,0 +1,60 @@
+# T03 — Core 线段命中解析
+
+> 自包含任务卡。只读本文件 + `docs/37 §4/§7` + `docs/38 §2/§3/§4`。
+
+## 0. 目标
+
+把「矩形 ∩ cell」换成「指尖线段 ∩ cell」，输出**按经过顺序**的 id 序列。Core 只 `import Foundation`；不引入 `CGRect/CGPoint`。
+
+## 1. 只读范围
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/GridHitRegion.swift`（`GridPoint` 复用）
+- `PhotoDeskCore/Sources/PhotoDeskCore/MarqueeHitResolver.swift`（`CellFrame` 抽出处）
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectConfig.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/MarqueeHitResolverTests.swift`（旧用例仅作边界参考）
+- `PhotoDesk/Features/Library/GridHitTester.swift`（理解 App 将喂什么 frame；本卡不改它）
+
+## 2. 步骤
+
+1. 红测试 `PhotoDeskCore/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift`（≥18 条）：
+   - 水平/垂直/斜线；反向线段必须产出反向 id 顺序；零长度线段命中起手 cell；快速一帧跨 5 格补扫。
+   - 贴边 1pt 扩展命中；完全不交；cell 乱序/同 id 重复；`clipTop` 半裁/全裁/低于上边不生效。
+   - `NaN`、`±∞`、负宽 frame、退化 frame；`expansion < 0` 钳制；2 万 frame <20ms。
+   - 排序稳定性：相同 `tMin` 时按 id 排序，结果确定。
+2. 跑 `scripts/test-core.ps1` 得红编译失败 → `artifacts/audit/m18/t03/red-compile-failure.log` → 提交红测试。
+3. 新增 `PhotoDeskCore/Sources/PhotoDeskCore/GridCellFrame.swift`：把 `CellFrame` 定义从 `MarqueeHitResolver.swift` 搬来；旧文件改为 `typealias CellFrame = GridCellFrame`（或保留同名并标 deprecated，二选一，必须保证旧测试编译）。
+4. 在 `SlideSelectConfig.swift` 补 `hitExpansion = 1`、`segmentEpsilon`；保留 `edgeBuffer/minStep/maxStep`。
+5. 新增 `PhotoDeskCore/Sources/PhotoDeskCore/TrailHitResolver.swift`：
+   - `orderedIDs(from: GridPoint, to: GridPoint, cells: [CellFrame], clipTop: Double?, expansion: Double, epsilon: Double) -> [String]`。
+   - 用 Liang–Barsky / slab 法求线段参数 `[tMin,tMax]` 与每个扩展后 cell 矩形的交；`abs(dx) <= epsilon` / `abs(dy) <= epsilon` 走退化分支。
+   - `clipTop` 先抬高 cell 下边参与命中（粘性头遮挡区不可命中），不是只过滤 cells。
+   - 按 `max(tMin,0)` 升序、id 升序排序；同 id 去重保序；非法 frame 逐个跳过。
+6. Core 全绿 + CI core-linux 复验；记录用例总数与性能数字。
+
+## 3. 验收
+
+- 新增 ≥18 用例；`TrailHitResolver.swift` / `GridCellFrame.swift` 仅 `import Foundation`。
+- 反向线段断言真实存在（这是 T05 回滑截断的前提）。
+- `MarqueeHitResolverTests` 不因 `CellFrame` 搬迁产生编译失败；若无引用，允许在 T06 一并删。
+
+## 4. Git
+
+1. `test(core): 线段命中红用例`
+2. `feat(core): TrailHitResolver 与 CellFrame 抽离`
+3. `docs(m18): T03 进度与证据`
+
+## 5. 完成后
+
+只输出：T03 完成后，只读 T04-状态机与命名迁移.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

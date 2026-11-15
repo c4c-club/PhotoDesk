@@ -1,0 +1,88 @@
+# T01 — 全新审查与审查脚本重写
+
+> 自包含任务卡。**禁止沿用 docs/31/32/35 的结论**；它们只是历史产物。本卡只读本文件 + `docs/36-M18-审查基线.md` + 当前源码。
+
+## 0. 目标
+
+1. 把工作树里 M17 未追踪文档/脚本处理成可追踪状态，避免与 M18 代码提交混淆。
+2. **重写**过期审查脚本为 `scripts/audit-m18.ps1`，跑出全新只读红基线。
+3. 写 `docs/37-M18-审查报告.md`：用当前源码行号回答 `docs/36-M18-审查基线.md §4` 的 10 个问题。
+4. 复核并修订 `docs/38-M18-实施规划.md`，作为 T02–T10 唯一事实源。
+5. 产出 T02 红测试清单（只写清单/测试文件名，不写实现）。
+
+## 1. 前置与工作树处置
+
+1. 跑 `git status --short --branch`、`git rev-parse HEAD`、`git log -1 --oneline`；从当前 HEAD 新建并切到 `feat/m18-trail-selection`，避免污染 `fix/m16-20261112`。
+2. 已观测到未追踪：`docs/31*`、`docs/32*`、`docs/33-任务分段/`、`docs/34-启动提示词.txt`、`scripts/audit-m17.ps1`。
+   - 先读每个文件头 20 行确认是 M17 历史产物；**不修改其内容**。
+   - **默认单独提交** `docs(m17): 归档 M17 规划与审查资料`，不等待用户二次确认；仅当 `.gitignore` 拒绝或提交失败才报告 BLOCKED。处置方式写进 `artifacts/plan/progress-m18.md`。
+   - 提交后 `git status --short` 必须干净。
+   - 后续每次进度提交用 `git add -f artifacts/plan/progress-m18.md`（`artifacts/` 默认被忽略，但历史进度表已强制跟踪）。
+3. 确认 `project.yml` 版本/部署目标、`.github/workflows/ios.yml` 产物名、`scripts/test-core.ps1` 当前镜像。
+
+## 2. 必读（仅这些）
+
+- `AGENTS.md`（全局红线）
+- `docs/36-M18-审查基线.md`（只看盘点表，不把它的「现状」当最终结论）
+- `docs/38-M18-实施规划.md`（仅 §1 不变量、§3 文件清单，用于校验是否漏扫）
+- `scripts/audit-m17.ps1`（只为了证明它过期；**不改它**）
+- `PhotoDeskCore/Sources/PhotoDeskCore/`：`SelectionGestureMachine.swift`、`MarqueeHitResolver.swift`、`MarqueeSelectionPolicy.swift`、`GridHitRegion.swift`、`SelectionPolicy.swift`、`SlideSelectPolicy.swift`、`SlideSelectConfig.swift`
+- `PhotoDesk/Features/Library/`：`LibrarySelectionController.swift`、`GridHitTester.swift`、`LibraryViewController.swift`、`MarqueeOverlayView.swift`、`PhotoGridCell.swift`
+- `PhotoDeskUITests/MarqueeSelectionUITests.swift`、`StabilityUITests.swift`、`PhotoDeskTests/LibraryGridGeometryTests.swift`
+- `.github/workflows/ios.yml`、`project.yml`
+
+## 3. 步骤
+
+1. **重写脚本**：新建 `scripts/audit-m18.ps1`（UTF-8 **带 BOM**；PowerShell 5.1 可读；只读；`generatedAt` 之外输出确定性）。
+   - 参数与 M17 同形：`-Root`、`-OutDir`、`-Strict`；输出 `audit.md` + `audit.json`；退出码 0 / 2 / 3。
+   - 检查项至少 18 条，且必须包含：
+     - BLOCKING：`PhotoDeskCore` 出现 `import UIKit|SwiftUI|Photos|...`；App 出现 iOS 17+ API；App 出现 `minimumNumberOfTouches = 2`；Feature 层出现 `PHAsset`；出现 `彻底删除|永久删除`；出现活跃 `MarqueeOverlayView|Marquee-Overlay|lastMarqueeRect|hitTest\(rectInContent:\)|HitRect|MarqueeSelectionPolicy.resolved`；出现 `try!|as!`；UI 测试仍断言框选 overlay/矩形/整行/双指。
+     - PRESENT：`SelectionGestureMachine`、`SlideSelectTrail`、`TrailHitResolver`、`trailHitProvider`、`hitTestLine`、`applySelectionDelta`、`applyDelta\(add:remove:\)、`SlideSelectTrailTests`、`TrailHitResolverTests`、`SlideSelectTrailUITests.swift`。
+     - INFO：版本号、部署目标、workflow artifact 名、release 目录、DEBUG 取证字段。
+   - **文件不存在必须显式记 FAIL**，不得静默跳过；所有检查输出 文件:行号 原文。
+2. 连跑两次到 `artifacts/audit/m18/baseline-A/` 与 `baseline-B/`：忽略 `generatedAt` 后 `audit.md/audit.json/stdout` 必须一致；记录到 `artifacts/audit/m18/determinism.txt`。
+3. 跑 `scripts/test-core.ps1`，记录当前 Core 用例总数/失败数，作为数字基线（预期全绿；若红，先定位是否环境/历史债）。
+4. 写 `docs/37-M18-审查报告.md`：
+   - §0 结论摘要（不超过 10 条，每条带 文件:行号 证据）
+   - §1 完整调用链（touchDown → machine effects → hit → selection → cell）
+   - §2 框选残留矩阵（Core/App/测试/DEBUG/文案/AX，逐项行号 + 处置：保留/改名/删除/deprecated）
+   - §3 手势仲裁裁决（保留方向锁 or 产品改裁决；必须写理由与影响的测试）
+   - §4 几何裁决（真实 attributes 复用面、线段扫掠改造面、粘性头 clipTop）
+   - §5 两个基线与路径事务取证帧
+   - §6 UIKit 系统多选 API 不采用的理由（引用 Apple 文档可用性 iOS 13 + 与 `SelectionState` 冲突）
+   - §7 自动滚动采样顺序
+   - §8 测试债清单（逐条旧断言 → 新断言）
+   - §9 Release/真机证据链
+   - §10 与旧文档冲突声明：docs/31/32/35 的框选语义作废
+5. 修订 `docs/38-M18-实施规划.md`：若 §2.1 状态表、§3 文件清单、§4 测试矩阵与 T01 实测不同，**当场改本文件**并在变更日志写「T01 修订」。
+6. 写 `artifacts/audit/m18/t02-red-test-list.md`：列出 T02 要新增的 ≥14 条用例名与断言口径；不写实现代码。
+7. 更新 `docs/05` 增加 M18 行（🟨 5%）、变更日志一条；更新 `artifacts/plan/progress-m18.md`：T01 DONE。
+
+## 4. Git（本卡三个提交）
+
+1. `docs(m17): 归档 M17 规划与审查资料`（仅已存在的未追踪 M17 文件）
+2. `test(audit): 重写 M18 只读审查脚本并归档红基线`
+3. `docs(m18): 全新审查报告与实施定稿`（含 docs/05、progress-m18）
+
+## 5. 验证
+
+- `scripts/audit-m18.ps1` 两次输出确定性一致；`-Strict` 在改造前必须报出 BLOCKING（红基线真实存在）。
+- 报告中每条「现状」都能用 文件:行号 复核；不得复制 docs/31/32 结论。
+- `git status --short` 干净；M17 归档提交与 M18 规划/脚本提交分开。
+- 本地 `scripts/test-core.ps1` 结果写入进度表。
+
+## 6. 完成后
+
+只输出：T01 完成后，只读 T02-Core轨迹事务.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。`artifacts/plan/progress-m18.md` 被 `.gitignore` 的 `artifacts/` 覆盖，进度提交必须显式 `git add -f artifacts/plan/progress-m18.md`（沿用已跟踪 progress-m17.md 的做法）。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

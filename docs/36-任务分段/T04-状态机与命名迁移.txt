@@ -1,0 +1,56 @@
+# T04 — 状态机 effect 命名迁移
+
+> 自包含任务卡。只读本文件 + `docs/37 §1/§3` + `docs/38 §2.1/§3`。
+
+## 0. 目标
+
+把 `SelectionGestureMachine` 中 `beginMarquee / updateMarquee / endMarquee` 改为 `beginTrail / updateTrail / endTrail`；**状态迁移、方向锁、长按、滚动让位、边缘进出、触觉节流行为保持等价**。同步机器单测。本卡不改 App 接线（避免一次跨层编译红）。
+
+## 1. 只读范围
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/SelectionGestureMachineTests.swift`
+- `docs/37 §3`（仲裁裁决）
+
+## 2. 步骤
+
+1. 红：先改 `SelectionGestureMachineTests.swift` 断言新的 effect 枚举名，跑 `scripts/test-core.ps1` 得编译失败（`cannot find beginTrail` 类），日志存 `artifacts/audit/m18/t04/red.log`；提交红测试。
+2. 改 `SelectionGestureMachine.swift`：
+   - `SelectionGestureEffect` 三个 case 改名；注释里「框选」改「轨迹滑选」；顶部 `// MARK: - 职责说明` 同步。
+   - **不要改** `SelectionGestureState`、事件、阈值、状态表、`haptic`、`startAutoScroll/stopAutoScroll`、`releaseScroll`。
+   - 若 `docs/37 §3` 明确要求调整方向锁，只允许在本卡做最小改动，并同步补一条机器单测；否则保持默认。
+3. 更新机器单测全部 effect 期望；保留原有用例数，额外加 3 条：
+   - `armed moved` → `beginTrail` 后 `updateTrail` 顺序；
+   - 横向锁定进 `dragging` 后反向 `moved` 仍 `updateTrail`（集合收缩交给 T02 事务，不在这里断言集合）；
+   - 非有限输入 `safetyReset` 不产生 `endTrail` 之外的 marquee 命名。
+4. Core 全绿；`grep -R -E "beginMarquee|updateMarquee|endMarquee" PhotoDeskCore` = 0（历史文档注释不算，源码必须 0）。**本卡不推远端**：push 会触发全量 build，而 App 仍引用旧 effect 名会红；T05 完成接线后统一推 CI。
+5. **兼容闸门**：App 此刻仍引用旧 effect，Core 测试绿不代表 App 编译绿；在进度表写「T05 接线前 App 暂不可编译，本卡只留本地 Docker 证据，CI 由 T05 统一跑」。
+6. 更新 docs/05、progress-m18：T04 DONE。
+
+## 3. 验收
+
+- Core 用例总数不低于 T03 结果；新增 3 条。
+- 机器源码只 `import Foundation`，无 iOS 17+ API。
+- diff 中不得出现状态表/阈值/触觉节流改动；如有，必须在进度表解释。
+
+## 4. Git
+
+1. `test(core): 轨迹 effect 命名红用例`
+2. `refactor(core): 框选 effect 改名轨迹 effect`
+3. `docs(m18): T04 进度与证据`
+
+## 5. 完成后
+
+只输出：T04 完成后，只读 T05-App轨迹接线.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

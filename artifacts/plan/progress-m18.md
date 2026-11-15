@@ -1,0 +1,25 @@
+# M18 执行进度
+
+> 按 `docs/36-任务分段/00-索引.md` 顺序执行；**一次只读一张任务卡**。每卡先红测试后实现，单独提交，更新本表后才读下一卡。
+> 状态：TODO / DOING / BLOCKED（等 CI / 等真机）/ DONE（门禁通过且已提交）。
+
+| 任务 | 状态 | 提交 | 门禁/证据 | 备注 |
+|---|---|---|---|---|
+| T01 | DONE | 0a59ff8（M17 归档）/ ce6b58f（audit 脚本+红基线）/ 本卡 docs 提交（见 git log 第 3 条） | audit-m18 29 项：A/B 确定性一致 + `-Strict` exit 2（3 BLOCKING 红基线）；Core Docker 443/0；docs/37 §0–§10 + docs/38 T01 修订 + t02-red-test-list 16 条 | M17 归档 14 文件；红基线 B06=45/B08=18/B10=39 |
+| T02 | TODO | — | — | Core 轨迹事务红/绿 |
+| T03 | TODO | — | — | Core 线段命中红/绿 |
+| T04 | TODO | — | — | 状态机 effect 改名与红线复核 |
+| T05 | TODO | — | — | App 线段命中 + 路径增量接线 |
+| T06 | TODO | — | — | 退役框选视觉/矩形残留/文案 |
+| T07 | TODO | — | — | 真布局单测 + 自动滚动/粘性头/触觉 |
+| T08 | TODO | — | — | 重写精确路径 UI 断言 + CI 模拟器实跑 |
+| T09 | TODO | — | — | 本地 git 检查点、AltServer 真机 12 条 |
+| T10 | TODO | — | — | 1.7.0 (8) Release、IPA 绝对路径 + SHA256 |
+
+## 证据目录约定
+
+- 审查：`artifacts/audit/m18/baseline-*`
+- Core 红/绿：`artifacts/audit/m18/t02/*`、`t03/*`
+- CI：`artifacts/ci-evidence/m18-t*/<run-id>/*`
+- Release：`artifacts/release/1.7.0/*`
+- 真机：`docs/39-M18验收记录.md`；未接入写 BLOCKED + 未执行项清单

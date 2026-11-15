@@ -1,0 +1,64 @@
+# T06 — 框选残留退役与文案校对
+
+> 自包含任务卡。只读本文件 + `docs/37 §2/§10` + `docs/38 §1.2/§3`。
+
+## 0. 目标
+
+把「框选」从生产代码、测试契约、DEBUG 钩子、文案、AX 标识里彻底退役；保留角标/压暗/边框等选中视觉。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/MarqueeOverlayView.swift`
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（确认 T05 已无 overlay 驱动）
+- `PhotoDesk/Features/Library/LibraryViewController.swift`（提示文案、DEBUG Summary、gesture delegate 注释）
+- `PhotoDeskCore/Sources/PhotoDeskCore/MarqueeHitResolver.swift`、`MarqueeSelectionPolicy.swift`、`GridHitRegion.swift`、`SelectionRange.swift`、`SelectionPolicy.swift`
+- `PhotoDeskTests/LibraryGridGeometryTests.swift`、`PhotoDeskUITests/MarqueeSelectionUITests.swift`、`StabilityUITests.swift`（只列残留，不在本卡整体重写 UI 套件）
+- `docs/04-UIUX设计文档.md §7`（中文文案口径）
+
+## 2. 步骤
+
+1. 先跑 `scripts/audit-m18.ps1 -Strict -OutDir artifacts/audit/m18/t06-red`，把仍存在的框选残留作为红基线；提交证据。
+2. 删除 `PhotoDesk/Features/Library/MarqueeOverlayView.swift`（XcodeGen 自动 target membership：确认 `project.yml` 无显式 excludes 残留）。
+3. 删 `LibrarySelectionDebugState.lastMarqueeRect`；VC 中 `Marquee-Overlay`、`ov*` 调试字段、`insertSubview(marqueeOverlay...)`、`onMarqueeRectChanged` 全部清除。
+4. 旧矩形纯逻辑与命中接口的退役分两步，**本卡不制造编译断层**：
+   - 先 `grep` 全仓（源码 + 测试）列引用，逐项写进红基线。
+   - `MarqueeSelectionPolicy.resolved` / `GridHitRegion.mergedSelection` / `SelectionRange.selectRange` / `SelectionPolicy.applyRange`：生产活跃引用归零后标 `@available(*, deprecated, ...)`；旧 Core 单测保留（Core 用例总数不得无故下降，若下降必须逐条列明）。
+   - `GridHitTester.hitTest(rectInContent:)` **保留 deprecated 到 T07**：`PhotoDeskTests/LibraryGridGeometryTests.swift` 此刻仍调用它，提前删除会让 iOS 单测编译红。T07 把该测试全部迁到 `hitTestLine` 后再物理删除。
+   - UI 套件里的矩形/整行/overlay 旧断言属于 T08 冻结契约，本卡只登记，不改名/不标 skip 充当完成。
+5. Core `SelectionGestureMachine` / App 控制器 / VC 注释统一「轨迹滑选」；`docs/04 §7` 口径：
+   - 首入提示改为「滑过照片即选中，往回滑可取消；单指上下滑动仍可滚动」
+   - 拖动横幅：select →「滑过即选」，deselect →「滑过即取消」
+   - 禁止出现「框选」「整行」「双指滚动」「矩形」作为用户可见文案。
+6. `PhotoGridCell.applySelection` 单一入口保留；确认 `prepareForReuse` 复位角标/压暗/边框、AX 与视觉同源。
+7. 跑 `scripts/test-core.ps1` + CI `build`；`audit-m18.ps1 -Strict -OutDir artifacts/audit/m18/t06-green` 允许仍报 **UI 冻结契约**类 BLOCKING（逐条登记，T08 收口），但必须证明「生产代码框选驱动」类 BLOCKING = 0：另附 `grep` 清单。整个脚本 0 blocking 的硬门禁放到 T08/T09。
+8. 更新 docs/05、progress-m18：T06 DONE。
+
+## 3. 验收
+
+- `grep -R -E "MarqueeOverlayView|Marquee-Overlay|lastMarqueeRect|onMarqueeRectChanged" PhotoDesk/` = 0（历史文档字符串不计）。
+- `hitTest(rectInContent:)` 仅允许剩 1 处 deprecated 声明 + `LibraryGridGeometryTests` 旧调用，数量写进进度表；**T07 归零**。
+- App 中文文案人工校对记录写入 `docs/39` 草稿节（T09 补真机）。
+- 无新增警告；删除文件后 XcodeGen 生成工程不报缺失引用。
+
+## 4. Git
+
+1. `test(audit): T06 框选残留红基线`
+2. `refactor(selection): 退役选框与矩形命中残留`
+3. `fix(ui): 轨迹滑选文案校对`
+4. `docs(m18): T06 进度与证据`
+
+## 5. 完成后
+
+只输出：T06 完成后，只读 T07-真布局与自动滚动.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

@@ -1,0 +1,61 @@
+# T02 — Core 轨迹事务（base + 路径栈）
+
+> 自包含任务卡。只读本文件 + `docs/37 §2/§5` + `docs/38 §2.2/§2.3` + `artifacts/audit/m18/t02-red-test-list.md`。
+
+## 0. 目标
+
+在 `PhotoDeskCore` 新增 `SlideSelectTrail`：手势基线快照 + 路径栈截断，输出 O(delta) 的 `add/remove`。**不碰 UIKit、不碰 App**。
+
+## 1. 只读范围
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift`（理解 `applyDelta` 契约）
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectConfig.swift`（常量放置位置）
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/SelectionPolicyTests.swift`（测试风格）
+- `artifacts/audit/m18/t02-red-test-list.md`
+
+## 2. 步骤
+
+1. 先写 `PhotoDeskCore/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift` 红用例（≥14 条）：
+   - select 正向 `A→B→C`；`A→B→C→B` 回滑；回跳到更早节点；`A→B→A→B` 净 delta；同一 id 抖动幂等；空输入幂等。
+   - base 保护：手势前已选 X 不受 path 出栈影响；deselect 模式回滑恢复 base 内 cell。
+   - `anchorInitiallySelected=true/false` 模式分叉；`base` 已含 anchor 仍正确。
+   - scope 外 id 忽略；空 id 忽略；重复 id 折叠；`target` 与逐帧 delta 累加一致。
+   - 10k 步 consume <5ms（用 `measure` 或时间戳；CI 容器预算单独记录）。
+2. 跑 `scripts/test-core.ps1` 拿到**真实编译失败**（`cannot find SlideSelectTrail`），日志存 `artifacts/audit/m18/t02/red-compile-failure.log`，单独提交红测试。
+3. 新增 `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectTrail.swift`：
+   - `public enum SlideSelectMode { case select, deselect }`
+   - `public struct SlideSelectDelta { add/remove: Set<String>; isEmpty }`
+   - `public struct SlideSelectTrail`：`base`、`scope`、`mode`、`target`、`path: [String]`、`occurrences: [String:[Int]]`。
+   - `init(base:anchorInitiallySelected:scope:)`：`base` 先与 scope 取交集；`mode` 由 `anchorInitiallySelected` 决定。
+   - `mutating func consume(_ orderedIDs: [String]) -> SlideSelectDelta`：按 `docs/38 §2.3` 实现；同帧 delta 净抵消；`consume([])` 不改状态。
+   - 文件顶部 `// MARK: - 职责说明`；只 `import Foundation`；无魔法数（阈值来自 `SlideSelectConfig` 或无阈值）。
+4. 跑 `scripts/test-core.ps1` 全绿；记录总数/失败数；推一次 CI core-linux 复验（Linux Foundation 与 Darwin 差异由 CI 兜底）。
+5. 更新 `docs/05` 变更日志、`artifacts/plan/progress-m18.md`：T02 DONE（红/绿日志 + run id）。
+
+## 3. 验收
+
+- 新增 ≥14 用例；`PhotoDeskCore` 仍 0 个 Apple UI import。
+- `grep -R -E "applyRange|selectRange" PhotoDeskCore/Sources` 若仍存在，T02 只记录引用，不删（T04/T06 处理）。
+- 事务不得 `sorted()` 全量重排；10k 步复杂度线性。
+
+## 4. Git
+
+1. `test(core): 轨迹事务红用例`
+2. `feat(core): SlideSelectTrail 基线与路径栈`
+3. `docs(m18): T02 进度与证据`
+
+## 5. 完成后
+
+只输出：T02 完成后，只读 T03-Core线段命中.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

@@ -1,0 +1,70 @@
+# T05 — App 线段命中与路径增量接线
+
+> 自包含任务卡。只读本文件 + `docs/37 §1/§4/§5/§7` + `docs/38 §2/§3`。
+
+## 0. 目标
+
+把 App 三处核心链路从「矩形 + base∪rect」换成「线段 + 路径事务 + 增量 delta」；恢复 App 可编译。允许滚动保持 T04 仲裁状态表。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`
+- `PhotoDesk/Features/Library/GridHitTester.swift`
+- `PhotoDesk/Features/Library/LibraryViewController.swift`（只看 `setupSelectionController` 接线块、`applySlideSelection`、`scrollViewWillBeginDragging`、gesture delegate）
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectTrail.swift`、`TrailHitResolver.swift`
+- `PhotoDeskTests/LibraryGridGeometryTests.swift`（只确认现有 `hitTest(rectInContent:)` 调用点，不改测试）
+
+## 2. 步骤
+
+1. 红测试（App 单测层）：在 `PhotoDeskTests` 新增/改写 2 条真布局测试，断言 `GridHitTester.hitTestLine(from:to:)` 存在且返回有序 IndexPath；本机不能编译，用 GitHub Actions 定向 `LibraryGridGeometryTests` 拿真实编译失败 log，存 `artifacts/ci-evidence/m18-t05/<run-id>/red.log`；提交红测试。
+2. `GridHitTester.swift`：
+   - 保留 section 缓存、`probeColumns`、真实行高、二分、`invalidateGeometry()`、`lastQueryCount`、粘性头 `clipTop` 计算。
+   - 新增 `func hitTestLine(from: CGPoint, to: CGPoint) -> [IndexPath]`：用现有候选段/行枚举收集与「线段外接矩形」相交的 cell frame，转 `[CellFrame]`，调 `TrailHitResolver.orderedIDs`，按 id 映射回 IndexPath；`clipTop` 传现有粘性头下缘。
+   - 旧 `hitTest(rectInContent:)` 本卡先保留标 deprecated（T06 删），避免一次改动过大；但生产调用必须切到新接口。
+   - 查询数仍 ≤60/热帧；不得遍历全部 section。
+3. `LibrarySelectionController.swift`：
+   - 删 `hitTestProvider(CGRect)`、`applyTargetIDs(Set)`、`lastTargetIDs`、`applyWindowSkips`、`processFinger()`、`currentMarqueeRect()`、`overlayFrame(for:)`、`onMarqueeRectChanged`、`overlayView` 的矩形驱动（视觉文件 T06 删）。
+   - 新增 `trailHitProvider: (CGPoint, CGPoint) -> [String]`、`applySelectionDelta: (Set<String>, Set<String>) -> Void`、`private var trail: SlideSelectTrail?`、`lastTrailContentPoint: CGPoint?`、`anchorInitiallySelected: Bool`。
+   - `handleTouchDown(.began)`：`anchorInitiallySelected = selectedIDsProvider().contains(hitID)`；`baseIDs` 不再在此拍。
+   - `.beginTrail` effect：`enterSelection` 已执行完后 `base = selectedIDsProvider()`，构造 `SlideSelectTrail(base:anchorInitiallySelected:scope:)`，`consume([anchorID])` 落地；`lastTrailContentPoint = machine.pressPoint` 转 `CGPoint`；禁滚动与 `endTrail/releaseScroll` 成对。
+   - `.updateTrail`：`processTrail(to: windowToContent(lastFingerWindowPoint))`；`delta.isEmpty` 直接返回，不触发触觉；变化才 `pendingSelectionHaptic = true` + `applySelectionDelta`。
+   - `autoScrollTick`：`setContentOffset` 前取 `before = windowToContent(lastFingerWindowPoint)`，后取 `after = windowToContent(lastFingerWindowPoint)`，用 `before→after` 喂 `processTrail`，保证屏外内容按序入栈；`edgeVelocity/clampedOffset` 不动。
+   - `finishSelection` / `endTrail`：销毁 `trail`、`lastTrailContentPoint`、displayLink；**不清空 `selectionState`**（退出多选由 VC 负责）。
+   - `isConsumingTouch`、方向锁、`scrollStarted` 转发、`holdElapsed` 双通道、逐帧边缘监视保持不变。
+4. `LibraryViewController.swift`：
+   - 注入 `trailHitProvider`：`gridHitTester.hitTestLine(from:to:)` → `dataSource.itemIdentifier(for:)` → 有序 `[String]`（保持顺序、只过滤 nil）。
+   - 注入 `applySelectionDelta`；把 `applySlideSelection(ids:)` 抽成 `applySelectionChanges(previous:current:)`：`SelectionState.applyDelta(add:remove:)` → 可见 cell diff → `updateSelectionCount()`（每帧写，仅 count 变化做 0.15s 过渡）。
+   - 删除矩形 overlay 注入块（T06 清文件）；DEBUG `Library-DebugSummary` 的 `ovHidden/ovm/ovColor/ovFrame` 改为 `trailMode/trailPathCount/lastDelta` 取证字段。
+   - 保留 `scrollViewWillBeginDragging` → `handleScrollStarted()`；`didSelectItemAt` 的 `isConsumingTouch` 闸门。
+5. 推 CI 定向 `LibraryGridGeometryTests + SlideSelectTrailUITests尚未改名时的编译检查`；若 T08 未到，至少跑 `build` + 单测。记录真实 run id、失败→修复链，不得跳过。
+6. 更新 docs/05、progress-m18：T05 DONE；写明 App 编译已恢复、矩形接口仅剩 deprecated。
+
+## 3. 验收
+
+- `grep -R "hitTestProvider|applyTargetIDs|lastMarqueeRect|onMarqueeRectChanged" PhotoDesk/` 生产活跃引用 = 0。
+- `SelectionState.applyDelta` 是唯一集合写入口；每帧不 `sorted()`、不整表 replace。
+- 边缘自动滚动时 `before/after` 来自同一窗口坐标；单指纵向滚动计数不变。
+- 无新增 Xcode 警告；iOS 16 基线不抬高。
+
+## 4. Git
+
+1. `test(selection): 线段命中真布局红用例`
+2. `feat(selection): 轨迹滑选 App 接线与增量应用`
+3. `fix(selection): CI 失败链修复`（每轮真实红各一提交，合并亦可但需列 run id）
+4. `docs(m18): T05 进度与证据`
+
+## 5. 完成后
+
+只输出：T05 完成后，只读 T06-框选残留退役.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

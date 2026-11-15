@@ -1,0 +1,52 @@
+# T09 — 本地提交检查点与 AltServer 真机验收
+
+> 自包含任务卡。只读本文件 + `docs/38 §6` + `docs/39-M18验收记录.md`（若 T06 已建草稿节）。
+
+## 0. 目标
+
+确认本地 git 历史干净分段的，按 Windows + AltServer 通道把当前未签名 IPA 装到 iPhone 做 12 条实测；设备未接入则如实 BLOCKED。
+
+## 1. 步骤
+
+1. 本地检查：
+   - `git status --short`；`git log --oneline -20`；列出 T01–T08 每个提交号并写入 `artifacts/plan/progress-m18.md`。
+   - `git diff --stat HEAD~1..HEAD` 确认没有意外二进制/截图入库；未追踪证据目录按 `.gitignore` 规则处理。
+   - 跑 `scripts/test-core.ps1` 最终 Core 数；`scripts/audit-m18.ps1 -Strict` 输出 0 blocking（T08 后的 UI 改名也算进脚本）。
+2. 取包：
+   - 从 T08 最终绿 CI run 下载 `PhotoDesk-unsigned-ipa` artifact；若尚未是 1.7.0，先用当前版本做真机交互验证并在进度表注明「版本号待 T10 变更」。
+   - 校验 `Payload/PhotoDesk.app/Info.plist` 的 `MinimumOSVersion=16.0`；记录 SHA256 与来源 run id。
+3. 真机通道（Windows）：
+   - 探测 AltServer / AltStore / iPhone 是否接入；按 `安装说明.md` / `docs/06 §7.4` 用 AltServer 对未签名 IPA 签名安装（免费账号 7 天）。
+   - 若不可用：在 `docs/39` 写 **BLOCKED**，逐条列出未执行项，不得用模拟器结果冒充真机。
+4. 12 条真机清单（逐条写 PASS/FAIL/BLOCKED + 现象）：
+   - ① 安装与首启授权 ② 长按进入多选 ③ 轨迹滑选到哪选到哪 ④ 斜拖不补全矩形 ⑤ `A→B→C→B` 回滑取消 ⑥ 起手已选取消 + 回滑恢复 ⑦ 单指纵向滚动计数不变 ⑧ 底缘自动滚动连续入集 ⑨ 跨月份/粘性头不误选 ⑩ 全选后轨迹取消 + 单月 scope ⑪ 退出多选复位 ⑫ 深色模式/VoiceOver/连续 10 次手势。
+5. 真机发现缺陷：回到对应任务卡范围开 `fix(selection): <真机缺陷>` 提交，重跑最小 CI；不得在验收记录里只写「已优化」。
+6. 更新 `docs/05`、`artifacts/plan/progress-m18.md`：T09 DONE 或 BLOCKED（等真机）；`docs/39` 写验收记录初稿。
+
+## 2. 验收
+
+- 本地 git 历史按任务分段可追溯；无未提交代码。
+- 真机 12 条有明确状态；BLOCKED 时列出设备/AltServer/账号阻塞原因。
+- 不违反红线 1：删除相关验证只到「移到最近删除 + 撤销窗口/系统相册恢复」，不测永久删除。
+
+## 3. Git
+
+1. `docs(m18): T09 本地提交检查点与真机清单`
+2. `fix(selection): 真机缺陷修复`（如有，每个缺陷一个提交）
+3. `docs(m18): T09 验收结果`
+
+## 4. 完成后
+
+只输出：T09 完成后，只读 T10-Release打包.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

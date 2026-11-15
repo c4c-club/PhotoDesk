@@ -1,0 +1,63 @@
+# T10 — Release 1.7.0 (8) 与产物路径
+
+> 自包含任务卡。只读本文件 + `docs/38 §6` + `.github/workflows/ios.yml` + `project.yml`。
+
+## 0. 目标
+
+产出可安装的 Release 未签名 IPA，归档到固定路径，汇报**完整绝对路径**与 SHA256。
+
+## 1. 步骤
+
+1. 前置：`artifacts/plan/progress-m18.md` T01–T09 全部 DONE；真机若 BLOCKED，允许 Release 但必须在最终回复写「真机 BLOCKED」。
+2. 改 `project.yml`：`MARKETING_VERSION = 1.7.0`、`CURRENT_PROJECT_VERSION = 8`；`IPHONEOS_DEPLOYMENT_TARGET` 保持 `16.0`；`DEVELOPMENT_TEAM` 仍从环境变量注入，禁止硬编码。
+3. 提交 `chore(release): 1.7.0 (8)`；push 到远端并触发完整 GitHub Actions。
+4. 等真实 CI：
+   - `core-linux` `swift test` 全绿；
+   - `macos-15` / Xcode 16.4 / iOS 16.4 模拟器 build + `PhotoDeskTests` + `PhotoDeskUITests` + `PerformanceUITests`；
+   - `Verify deployment target` 与 `Verify unsigned ipa` 两步通过（`minos 16.0` / `MinimumOSVersion 16.0` / 未签名）。
+5. 下载 artifact `PhotoDesk-unsigned-ipa` 的 `.ipa` 与 `.sha256`；写到：
+   - `artifacts/release/1.7.0/PhotoDesk-1.7.0-build8-unsigned.ipa`
+   - `artifacts/release/1.7.0/PhotoDesk-1.7.0-build8-unsigned.ipa.sha256`
+   - `artifacts/release/1.7.0/release-manifest.json`（version/build/run id/head sha/minos/SHA256/真机状态/生成时间）
+6. 本机复算 SHA256（PowerShell `Get-FileHash` 或 `sha256sum`），必须与 CI `.sha256` 一致；两串都写进 `docs/39-M18验收记录.md`。
+6a. **Release 包真机复验**：若 T09 设备/AltServer 已接入，把这份 `1.7.0 (8)` IPA 用 AltServer 重装，跑 6 条冒烟（安装首启 / 长按进入 / 轨迹滑选 / 回滑取消 / 单指滚动 / 退出复位），逐条 PASS/FAIL 写进 `docs/39`；未接入则沿用 T09 的 BLOCKED 状态，不得把 T09 的旧包结果冒充 Release 包结果。
+7. 更新 `docs/05` M18 行 → ✅ 100% + 变更日志；`artifacts/plan/progress-m18.md` T10 DONE；`docs/39` 写最终验收（CI run id、测试数字、真机 12 条状态、release 路径）。
+8. 最终提交 `docs(m18): Release 1.7.0 (8) 验收记录`（大 IPA 按 `.gitignore` 不入库；`artifacts/release/1.7.0/release-manifest.json` 如需入库用 `git add -f`，并在 `docs/39` 注明本地 IPA 绝对路径）。
+
+## 2. 验收
+
+- `git status --short` 干净；版本号双处一致；`minos=16.0`。
+- IPA 存在且 `unzip -l` 有 `Payload/PhotoDesk.app/PhotoDesk`；SHA256 双端一致。
+- 不得把模拟器 `.app.zip` 当最终 IPA；不得声称已签名（CI 产出为**未签名**，真机靠 AltServer 签名）。
+
+## 3. Git
+
+1. `chore(release): 1.7.0 (8)`
+2. `docs(m18): Release 1.7.0 (8) 验收记录`
+
+## 4. 最终输出（执行 Agent 对用户）
+
+```text
+Release 完成
+IPA：<Windows 完整绝对路径>
+SHA256：<64 位>
+CI run：<id> / head：<sha>
+真机：<12/12 PASS | BLOCKED 原因>
+证据：docs/39-M18验收记录.md、artifacts/plan/progress-m18.md
+```
+
+## 5. 完成后
+
+全部任务结束；不再读取任何任务卡。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

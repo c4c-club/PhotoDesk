@@ -1,0 +1,67 @@
+# T08 — 精确路径 UI 测试与 CI 模拟器实跑
+
+> 自包含任务卡。只读本文件 + `docs/37 §8` + `docs/38 §4`。
+
+## 0. 目标
+
+把「矩形/整行/双指/overlay」冻结契约整体替换为**精确 assetID 序列**断言；在 iOS 16.4 模拟器真实跑绿。
+
+## 1. 只读范围
+
+- `PhotoDeskUITests/MarqueeSelectionUITests.swift`（改名来源）
+- `PhotoDeskUITests/StabilityUITests.swift`（冻结契约清理）
+- `PhotoDesk/App/UITestHooks.swift`、`PhotoDesk/Core/Photos/UITestDatedPhotoSeeder.swift`（种子/DEBUG 钩子）
+- `PhotoDeskUITests/PageRegressionUITests.swift`（只确认不受类名改名影响）
+
+## 2. 步骤
+
+1. 新建 `PhotoDeskUITests/SlideSelectTrailUITests.swift`；删除旧 `MarqueeSelectionUITests.swift`（git mv 后整体重写内容，不保留矩形断言）。
+2. 至少 12 条精确路径用例：
+   - 长按 0.4s 进入 + 锚点选中计数 1；
+   - 长按不抬手继续纵向/横向/斜向拖 → 精确 assetID 列表；
+   - 左列下滑：右列 assetID **不得**出现；斜拖不补全矩形内对角 cell；
+   - `A→B→C→B` 回滑：C 取消、B 按模式恢复/取消、A 保持；计数精确；
+   - 从已选 cell 起拖取消 + 回滑恢复；手势前已选 X 不受任何出栈影响；
+   - 单指纵向快速滑：`contentOffset.y` 增量 >200 且计数不变（允许滚动）；
+   - 底缘拖 2s：自动滚动按序入集、指定屏外 assetID 命中；
+   - 粘性头钉住时头下第一行不误选；
+   - 全选后轨迹取消、单月 scope 不泄漏、退出多选计数归零；
+   - 无 `Marquee-Overlay` 元素；角标/压暗/边框像素或 AX 同源断言。
+3. 清理 `StabilityUITests.swift` 中：
+   - 整行/矩形/双指 `minimumNumberOfTouches` 断言；
+   - 只查 `count >= 6` 的弱断言；
+   - 旧中文提示字符串。
+   保留纯稳定性用例（捏合、快滑、位置记忆、Toast 等），不得借机删回归。
+4. `PhotoDeskApp.swift` / `UITestDatedPhotoSeeder.swift` 中 Marquee 套件排序注释同步改名。
+5. 推 GitHub Actions：先定向 `-only-testing:PhotoDeskUITests/SlideSelectTrailUITests`，失败逐轮读 `--log-failed` / 截图附件修根因；再跑全量 `PhotoDeskTests + PhotoDeskUITests + PerformanceUITests`。
+6. 记录：每个 run id、用例数/失败数、截图附件路径、最终绿 run；存 `artifacts/ci-evidence/m18-t08/<run-id>/`。
+7. 更新 docs/05、progress-m18：T08 DONE；若全量仍有历史冻结用例红，必须列出用例名 + 定性 + 是否在 T09 前收口，不得写「全绿」。
+
+## 3. 验收
+
+- `grep -R "MarqueeSelectionUITests|Marquee-Overlay|框选|整行|minimumNumberOfTouches = 2" PhotoDeskUITests` = 0。
+- 新套件 ≥12 用例，全部精确 assetID/计数/offset 断言；CI 真实绿证据。
+- 模拟器 iOS 16.4；`minos=16.0` 校验随 CI 输出留存。
+
+## 4. Git
+
+1. `test(selection): 精确轨迹路径 UI 红用例`
+2. `test(selection): 清理框选冻结契约`
+3. `fix(selection): CI 失败链修复`（每轮真实红一个提交或在进度表列全）
+4. `docs(m18): T08 进度与 CI 证据`
+
+## 5. 完成后
+
+只输出：T08 完成后，只读 T09-本地提交与真机验收.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short`。
+2. 打开 `artifacts/plan/progress-m18.md`：上一任务必须 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完整份 docs/37/38。
+4. 先写红测试并跑出真实失败证据，再改实现；禁止弱化断言、禁止编造 CI/真机结果。
+5. 门禁：本机只跑 `scripts/test-core.ps1`（Docker `swift:6.0-noble`）；App/iOS 编译、模拟器测试必须推 GitHub Actions `macos-15`/Xcode 16.4/iOS 16.4 看真实 run。
+6. 每个任务在「红测试提交」「实现/修复提交」「文档进度提交」三个合适节点做本地 git；提交格式 `type(scope): 中文摘要`，不得把无关 M17 未追踪文件混进来。
+7. 更新 `docs/05` 进度/变更日志 + `artifacts/plan/progress-m18.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+
