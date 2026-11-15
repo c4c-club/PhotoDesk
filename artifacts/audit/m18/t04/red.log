@@ -1,0 +1,37 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/3] Write sources
+[1/3] Write swift-version-24593BA9C3E375BF.txt
+[3/5] Emitting module PhotoDeskCoreTests
+[4/5] Compiling PhotoDeskCoreTests SelectionGestureMachineTests.swift
+/workspace/Tests/PhotoDeskCoreTests/SelectionGestureMachineTests.swift:64:35: error: type 'SelectionGestureEffect' has no member 'beginTrail'
+ 62 |         XCTAssertEqual(effects, [.haptic(kind: .impactLight),
+ 63 |                                  .enterSelection(anchorID: "a"),
+ 64 |                                  .beginTrail])
+    |                                   `- error: type 'SelectionGestureEffect' has no member 'beginTrail'
+ 65 |         XCTAssertEqual(machine.state, .armed)
+ 66 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/SelectionGestureMachineTests.swift:102:67: error: type 'SelectionGestureEffect' has no member 'beginTrail'
+100 |         press(&machine, at: 0)
+101 |         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
+102 |         XCTAssertEqual(effects, [.enterSelection(anchorID: "a"), .beginTrail])
+    |                                                                   `- error: type 'SelectionGestureEffect' has no member 'beginTrail'
+103 |         XCTAssertEqual(machine.state, .dragging)
+104 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/SelectionGestureMachineTests.swift:111:35: error: type 'SelectionGestureEffect' has no member 'beginTrail'
+109 |         press(&machine, at: 0)
+110 |         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
+111 |         XCTAssertEqual(effects, [.beginTrail], "已在多选模式不得重复 enterSelection")
+    |                                   `- error: type 'SelectionGestureEffect' has no member 'beginTrail'
+112 |         XCTAssertEqual(machine.state, .dragging)
+113 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/SelectionGestureMachineTests.swift:162:35: error: type 'SelectionGestureEffect' has no member 'updateTrail'
+160 |         _ = arm(&machine)
+161 |         let effects = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
+162 |         XCTAssertEqual(effects, [.updateTrail], "框选开始：首帧 updateMarquee（0.29-0.28 < 0.06 无触觉）")
+    |                                   `- error: type 'SelectionGestureEffect' has no member 'updateTrail'

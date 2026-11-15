@@ -1,14 +1,15 @@
-// MARK: - 职责说明：SelectionGestureMachine 状态机全迁移单测（M17 T02，docs/32 §2.2）——
-// 覆盖状态表每一行 + 卡内附加 5 条（短长按/纵向让位/反向收缩/边缘往返/非有限安全）。
+// MARK: - 职责说明：SelectionGestureMachine 状态机全迁移单测（M17 T02 建立，M18 T04 改名迁移，docs/32 §2.2 → docs/38 §2.1/§3）——
+// 覆盖状态表每一行 + 卡内附加 5 条（短长按/纵向让位/反向收缩/边缘往返/非有限安全）+ T04 新增 3 条（轨迹词汇序列）。
 // 事件枚举在 docs/32 §2.2 六个事件之外补 edgeEntered(direction:)/edgeExited：
 // 状态表第 7/8 行「指尖进/离边缘」必须有事件载体才能全覆盖单测（机器只判定，App 层检测边缘）。
-// 效果序列契约：
-//   holdElapsed → [haptic(.impactLight), enterSelection(anchorID), beginMarquee]（表第 2 行副作用顺序）
-//   pressing 横向锁定 → dragging + [enterSelection(未在多选时)/无, beginMarquee]（表第 3 行「必要时先进入多选」）
-//   dragging moved → [updateMarquee] + 受 hapticMinInterval 节流的 haptic(.selectionChanged)
-//   ended/cancelled 收尾（表第 9 行）：armed [endMarquee]；dragging [endMarquee, releaseScroll]；
-//   autoScrolling [stopAutoScroll, endMarquee, releaseScroll]；收尾后状态 .ending，下一事件先复位 idle。
+// 效果序列契约（M18 T04 起轨迹命名）：
+//   holdElapsed → [haptic(.impactLight), enterSelection(anchorID), beginTrail]（表第 2 行副作用顺序）
+//   pressing 横向锁定 → dragging + [enterSelection(未在多选时)/无, beginTrail]（表第 3 行「必要时先进入多选」）
+//   dragging moved → [updateTrail] + 受 hapticMinInterval 节流的 haptic(.selectionChanged)
+//   ended/cancelled 收尾（表第 9 行）：armed [endTrail]；dragging [endTrail, releaseScroll]；
+//   autoScrolling [stopAutoScroll, endTrail, releaseScroll]；收尾后状态 .ending，下一事件先复位 idle。
 // 异常输入（非有限 dx/dy/now/触点）不走 ending，直接安全复位 idle（卡内附加要求）。
+// 状态迁移、方向锁、长按、滚动让位、边缘进出、触觉节流行为与 M17 完全等价（docs/37 §3 仲裁保留裁决）。
 
 import XCTest
 @testable import PhotoDeskCore
@@ -60,7 +61,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         let effects = arm(&machine, id: "a", holdAt: 0.28)
         XCTAssertEqual(effects, [.haptic(kind: .impactLight),
                                  .enterSelection(anchorID: "a"),
-                                 .beginMarquee])
+                                 .beginTrail])
         XCTAssertEqual(machine.state, .armed)
     }
 
@@ -98,7 +99,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         machine.isSelectionModeActive = false
         press(&machine, at: 0)
         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
-        XCTAssertEqual(effects, [.enterSelection(anchorID: "a"), .beginMarquee])
+        XCTAssertEqual(effects, [.enterSelection(anchorID: "a"), .beginTrail])
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -107,7 +108,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         machine.isSelectionModeActive = true
         press(&machine, at: 0)
         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
-        XCTAssertEqual(effects, [.beginMarquee], "已在多选模式不得重复 enterSelection")
+        XCTAssertEqual(effects, [.beginTrail], "已在多选模式不得重复 enterSelection")
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -158,7 +159,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
-        XCTAssertEqual(effects, [.updateMarquee], "框选开始：首帧 updateMarquee（0.29-0.28 < 0.06 无触觉）")
+        XCTAssertEqual(effects, [.updateTrail], "框选开始：首帧 updateMarquee（0.29-0.28 < 0.06 无触觉）")
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -177,7 +178,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.moved(dx: 0, dy: 12), now: 0.35)
-        XCTAssertEqual(effects, [.updateMarquee, .haptic(kind: .selectionChanged)],
+        XCTAssertEqual(effects, [.updateTrail, .haptic(kind: .selectionChanged)],
                        "armed 纵向拖 ≥ 6pt 必须开始拖框（表第 6 行无方向限定；0.35-0.28 ≥ 0.06 触觉放行）")
         XCTAssertEqual(machine.state, .dragging)
         // 复位后可立即服务下一次手势
@@ -195,7 +196,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         let effects = machine.handle(.moved(dx: 4, dy: 2), now: 0.30)
-        XCTAssertEqual(effects, [.updateMarquee], "0.30-0.28=0.02 < 0.06 无触觉")
+        XCTAssertEqual(effects, [.updateTrail], "0.30-0.28=0.02 < 0.06 无触觉")
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -266,7 +267,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         XCTAssertEqual(stops.count, 3)
         XCTAssertEqual(machine.state, .dragging)
         let finish = machine.handle(.ended, now: 0.4)
-        XCTAssertEqual(finish, [.endMarquee, .releaseScroll],
+        XCTAssertEqual(finish, [.endTrail, .releaseScroll],
                        "边缘已退出：收尾不得再发 stopAutoScroll（无泄漏）")
     }
 
@@ -277,7 +278,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         let effects = machine.handle(.ended, now: 0.5)
-        XCTAssertEqual(effects, [.endMarquee, .releaseScroll])
+        XCTAssertEqual(effects, [.endTrail, .releaseScroll])
         XCTAssertEqual(machine.state, .ending)
     }
 
@@ -287,7 +288,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         _ = machine.handle(.edgeEntered(direction: -1), now: 0.30)
         let effects = machine.handle(.ended, now: 0.5)
-        XCTAssertEqual(effects, [.stopAutoScroll, .endMarquee, .releaseScroll])
+        XCTAssertEqual(effects, [.stopAutoScroll, .endTrail, .releaseScroll])
         XCTAssertEqual(machine.state, .ending)
     }
 
@@ -295,7 +296,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.ended, now: 0.5)
-        XCTAssertEqual(effects, [.endMarquee], "armed 收尾：隐藏 0 尺寸选框（多选与锚点选中保留）")
+        XCTAssertEqual(effects, [.endTrail], "armed 收尾：隐藏 0 尺寸选框（多选与锚点选中保留）")
         XCTAssertEqual(machine.state, .ending)
     }
 
@@ -304,7 +305,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         let effects = machine.handle(.cancelled, now: 0.5)
-        XCTAssertEqual(effects, [.endMarquee, .releaseScroll], "cancelled 与 ended 同收尾语义")
+        XCTAssertEqual(effects, [.endTrail, .releaseScroll], "cancelled 与 ended 同收尾语义")
         XCTAssertEqual(machine.state, .ending)
     }
 
@@ -335,7 +336,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.moved(dx: 10, dy: 0), now: 0.1)
         XCTAssertEqual(machine.state, .dragging)
         let reverse = machine.handle(.moved(dx: -10, dy: 0), now: 0.2)
-        XCTAssertTrue(reverse.contains(.updateMarquee), "反向拖仍逐帧上报，命中集合收缩由调用方计算")
+        XCTAssertTrue(reverse.contains(.updateTrail), "反向拖仍逐帧上报，命中集合收缩由调用方计算")
         XCTAssertEqual(machine.state, .dragging, "方向锁后反向不得退出 dragging")
     }
 
@@ -346,7 +347,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         let effects = machine.handle(.moved(dx: .nan, dy: 0), now: 0.30)
-        XCTAssertEqual(effects, [.endMarquee, .releaseScroll], "NaN 输入按收尾处理，绝不污染 contentOffset/状态")
+        XCTAssertEqual(effects, [.endTrail, .releaseScroll], "NaN 输入按收尾处理，绝不污染 contentOffset/状态")
         XCTAssertEqual(machine.state, .idle, "安全路径直接回 idle（不走 ending 两段）")
     }
 
@@ -355,7 +356,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         let effects = machine.handle(.moved(dx: 1, dy: 0), now: .infinity)
-        XCTAssertEqual(effects, [.endMarquee, .releaseScroll])
+        XCTAssertEqual(effects, [.endTrail, .releaseScroll])
         XCTAssertEqual(machine.state, .idle)
     }
 
@@ -390,7 +391,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         press(&machine, at: 0)
         _ = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
         let effects = machine.handle(.scrollStarted, now: 0.2)
-        XCTAssertEqual(effects, [.endMarquee, .releaseScroll])
+        XCTAssertEqual(effects, [.endTrail, .releaseScroll])
         XCTAssertEqual(machine.state, .idle)
     }
 
@@ -401,11 +402,11 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = arm(&machine)                                   // haptic@0.28（impactLight）
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29) // 距上一次 0.01 → 无触觉
         let m1 = machine.handle(.moved(dx: 2, dy: 0), now: 0.35)  // 0.07 ≥ 0.06 → 触觉
-        XCTAssertEqual(m1, [.updateMarquee, .haptic(kind: .selectionChanged)])
+        XCTAssertEqual(m1, [.updateTrail, .haptic(kind: .selectionChanged)])
         let m2 = machine.handle(.moved(dx: 2, dy: 0), now: 0.38)  // 0.03 < 0.06 → 无触觉
-        XCTAssertEqual(m2, [.updateMarquee])
+        XCTAssertEqual(m2, [.updateTrail])
         let m3 = machine.handle(.moved(dx: 2, dy: 0), now: 0.45)  // 0.10 ≥ 0.06 → 触觉
-        XCTAssertEqual(m3, [.updateMarquee, .haptic(kind: .selectionChanged)])
+        XCTAssertEqual(m3, [.updateTrail, .haptic(kind: .selectionChanged)])
     }
 
     // MARK: - 配置默认值锁定（docs/32 §2.2）
@@ -448,7 +449,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.holdElapsed, now: 0.49)
         XCTAssertEqual(machine.state, .pressing, "0.49 < 自定义 longPressDuration=0.5 不得 armed")
         let armed = machine.handle(.holdElapsed, now: 0.5)
-        XCTAssertEqual(armed, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a"), .beginMarquee])
+        XCTAssertEqual(armed, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a"), .beginTrail])
         XCTAssertEqual(machine.state, .armed)
     }
 }
