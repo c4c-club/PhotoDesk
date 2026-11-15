@@ -1,6 +1,7 @@
-// MARK: - 职责说明：多选手势编排器（M17 T05，docs/32 §2.3）——长按进入多选、长按/横向拖框选、
-// 方向锁、单指滚动保留、边缘自动滚动。全部判定喂 PhotoDeskCore.SelectionGestureMachine
-//（docs/32 §2.2 状态表；阈值只取 SelectionGestureConfig / SlideSelectConfig，App 层零判定数字），
+// MARK: - 职责说明：多选手势编排器（M17 T05 建立，M18 T05 轨迹滑选接线，docs/38 §2/§3）——
+// 长按进入多选、轨迹滑选（滑到哪选到哪、回滑收缩、允许滚动）、方向锁、边缘自动滚动。
+// 全部判定喂 PhotoDeskCore.SelectionGestureMachine（docs/32 §2.2 状态表 + M18 T04 effect 改名；
+// 阈值只取 SelectionGestureConfig / SlideSelectConfig，App 层零判定数字），
 // 本类只做 UIKit 事件映射与效果执行：
 //   TouchDownObserver（UILongPress minimumPressDuration=0）→ touchDown(point:hitID:)（G3 按下点取证）
 //   holdElapsed 双通道交付：UILongPress（时长/位移取自 SelectionGestureConfig）+ 按下定时器
@@ -8,21 +9,16 @@
 //   marqueePan（单指）→ moved(dx:dy:) / ended / cancelled；edgeEntered/edgeExited 由
 //   dragging/autoScrolling 期间的逐帧边缘监视交付（指尖停边缘不动也持续滚动，docs/32 §2.4）
 //   scrollViewWillBeginDragging（VC 转发）→ scrollStarted
-// 效果执行：enterSelection → VC 进多选并选锚点；beginMarquee / endMarquee 与 isScrollEnabled
+// 效果执行：enterSelection → VC 进多选并选锚点；beginTrail / endTrail 与 isScrollEnabled
 // 成对（docs/32 §2.3「进入 armed 后禁滚动」；releaseScroll 由机器在方向让位/收尾时配对补发）；
-// updateMarquee → 重算命中（命中集合变化才是 G6 触觉闸门）；startAutoScroll / stopAutoScroll →
-// CADisplayLink 60fps（边缘 60pt、2–12pt/帧，Core edgeVelocity + clampedOffset）。
-// 框选矩形：机器按下点（content 坐标）→ 当前指尖；零尺寸扩 1pt（起手 cell 命中）。
+// updateTrail → trailHitProvider 线段有序命中 + SlideSelectTrail 路径事务净 delta
+//（滑到哪选到哪、回滑截断出栈、delta 空不触觉）；startAutoScroll / stopAutoScroll →
+// CADisplayLink 60fps（边缘 60pt、2–12pt/帧，Core edgeVelocity + clampedOffset）；
+// 自动滚动 tick 以滚动前后同一窗口坐标换算的 content 两点喂轨迹（屏外内容按序入栈）。
+// 选中集唯一写入口：applySelectionDelta → VC applySelectionChanges（SelectionState.applyDelta）。
 
 import UIKit
 import PhotoDeskCore
-
-#if DEBUG
-/// UI 取证：最近一次框选矩形（content 坐标；T06 覆盖层接入前供 UI 测试取证）。
-enum LibrarySelectionDebugState {
-    static var lastMarqueeRect: CGRect?
-}
-#endif
 
 @MainActor
 final class LibrarySelectionController: NSObject {
@@ -30,34 +26,33 @@ final class LibrarySelectionController: NSObject {
     // MARK: VC 注入
 
     var isSelectionMode: () -> Bool = { false }
-    /// 矩形（内容坐标）→ 命中 id 集合（GridHitTester 真实 attributes + dataSource 映射，T04）。
-    var hitTestProvider: (CGRect) -> Set<String> = { _ in [] }
-    /// 框选目标集合整体落地（applySlideSelection：可见 cell diff + 计数）。
-    var applyTargetIDs: (Set<String>) -> Void = { _ in }
+    /// 线段（内容坐标起止）→ 有序命中 id 序列（GridHitTester.hitTestLine + dataSource 映射，
+    /// 只过滤 nil、保持扫掠顺序，docs/38 §3）。
+    var trailHitProvider: (CGPoint, CGPoint) -> [String] = { _, _ in [] }
+    /// 路径事务净增量落地（applySelectionChanges：SelectionState.applyDelta + 可见 cell diff）。
+    var applySelectionDelta: (Set<String>, Set<String>) -> Void = { _, _ in }
     var scopeProvider: () -> Set<String>? = { nil }
     /// 快照 apply 窗口取证（M17 T07）：true = diffable apply 进行中，真实 attributes 不可靠。
     var isApplyingSnapshotProvider: () -> Bool = { false }
     /// enterSelection 效果 → VC enterSelectionMode(selecting:)（长按进入多选的唯一入口）。
     var onSelectionEntered: (String) -> Void = { _ in }
-    /// 框选覆盖层（M17 T06；VC 挂在 collectionView 兄弟层，frame 为视口坐标，本类逐帧转换）。
-    weak var overlayView: MarqueeOverlayView?
-    /// 框选矩形（内容坐标）变化回调；nil = 结束。T06 在此挂覆盖层。
-    var onMarqueeRectChanged: ((CGRect?) -> Void) = { _ in }
+    /// 轨迹活跃变化（beginTrail → true；endTrail/finishSelection → false）：多选栏提示由 VC 切换。
+    var onTrailActiveChanged: (Bool) -> Void = { _ in }
 
     private weak var collectionView: UICollectionView?
     private var machine: SelectionGestureMachine
     private var gestureConfig = SelectionGestureConfig()
-    private var baseIDs: Set<String> = []
-    /// 本次手势的框选模式（select/deselect，按下帧取证；多选栏提示与覆盖层配色读取）。
-    private(set) var mode: MarqueeMode = .select
-    /// 最近一次 beginMarquee 时刻的模式快照（UI 测试取证：横幅刷新滞后时仍可读到按下帧真值）。
-    private(set) var debugArmModeRaw: Int = -1
+    /// 本次手势的路径事务（beginTrail 构造、consume 逐帧推进；endTrail/finishSelection 销毁）。
+    private var trail: SlideSelectTrail?
+    /// 最近一次轨迹命中点（content 坐标）：线段起点；autoScroll 前后两点取同一窗口坐标换算。
+    private var lastTrailContentPoint: CGPoint?
+    /// enterSelection 交付的锚点 id（beginTrail 帧构造事务的起点 cell）。
+    private var trailAnchorID: String?
+    /// 锚点语义按下帧取证（docs/25 §6.1）：true = 起手已选（取消模式），false = 选择模式。
+    private(set) var anchorInitiallySelected = false
     /// 最近一次按下帧取证：基集合大小与命中 id（UI 测试定位锚点判定分歧）。
     private(set) var debugTouchDownBaseCount = -1
     private(set) var debugTouchDownHitID: String = "-"
-    private var lastTargetIDs: Set<String> = []
-    /// apply 窗口保留上一帧目标的连续帧数（≤3 帧重试，超时放行并打 DEBUG 日志）。
-    private var applyWindowSkips = 0
     private var lastFingerWindowPoint: CGPoint = .zero
     private var lastPanTranslation: CGPoint = .zero
     private var currentEdgeDirection = 0
@@ -138,6 +133,10 @@ final class LibrarySelectionController: NSObject {
     private(set) var debugLastEdgeDirection = 0
     private(set) var debugLastFingerViewportY: Double = -1
     private(set) var debugViewportBottom: Double = -1
+    /// UI 取证：当前路径事务深度（SlideSelectTrail 路径栈长度；无事务 -1）。
+    private(set) var debugTrailPathCount = -1
+    /// UI 取证：最近一次净增量（"+add/-remove" 计数；"+0/-0" = 空帧）。
+    private(set) var debugLastDelta = "-"
     var debugStateName: String { "\(machine.state)" }
     #endif
 
@@ -153,12 +152,11 @@ final class LibrarySelectionController: NSObject {
             guard let content = windowToContent(lastFingerWindowPoint) else { return }
             let hitID = hitIDAtContentPoint(content)
             if let hitID {
-                // 锚点语义在按下帧取证（docs/25 §6.1：起手已选 → 取消模式）
-                baseIDs = selectedIDsProvider()
-                mode = MarqueeSelectionPolicy.mode(baseIDs: baseIDs, anchorID: hitID)
-                lastTargetIDs = baseIDs
+                // 锚点语义在按下帧取证（docs/25 §6.1：起手已选 → 取消模式；M18 由 SlideSelectTrail
+                // init 快照，App 不再持有 base 集合）
+                anchorInitiallySelected = selectedIDsProvider().contains(hitID)
                 #if DEBUG
-                debugTouchDownBaseCount = baseIDs.count
+                debugTouchDownBaseCount = selectedIDsProvider().count
                 debugTouchDownHitID = hitID
                 #endif
             }
@@ -206,21 +204,21 @@ final class LibrarySelectionController: NSObject {
         feed(.scrollStarted)
     }
 
-    /// 退出多选统一收尾：滚链/显示恢复、机器复位。
+    /// 退出多选统一收尾：滚链/显示恢复、机器复位；不清空 selectionState（退出多选由 VC 负责）。
     func finishSelection() {
         invalidateAutoScroll()
         holdElapsedTimer?.invalidate()
         holdElapsedTimer = nil
         edgeMonitorLink?.invalidate()
         edgeMonitorLink = nil
-        overlayView?.update(rect: nil)
+        trail = nil
+        lastTrailContentPoint = nil
+        trailAnchorID = nil
+        anchorInitiallySelected = false
         if collectionView?.isScrollEnabled == false {
             collectionView?.isScrollEnabled = true
         }
-        onMarqueeRectChanged(nil)
-        baseIDs = []
-        lastTargetIDs = []
-        mode = .select
+        onTrailActiveChanged(false)
         currentEdgeDirection = 0
         lastPanTranslation = .zero
         consumedTouch = false
@@ -268,27 +266,41 @@ final class LibrarySelectionController: NSObject {
             switch effect {
             case .enterSelection(let anchorID):
                 consumedTouch = true
+                trailAnchorID = anchorID
                 onSelectionEntered(anchorID)
-            case .beginMarquee:
+            case .beginTrail:
                 consumedTouch = true
-                // armed 即禁滚动（docs/32 §2.3）；endMarquee/releaseScroll 成对恢复
+                // armed 即禁滚动（docs/32 §2.3）；endTrail/releaseScroll 成对恢复
                 collectionView?.isScrollEnabled = false
+                // 事务基集 = enterSelection 之后的真实选中集（含锚点），按下帧锚点语义定 mode
+                guard let anchor = trailAnchorID else { break }
+                var started = SlideSelectTrail(base: selectedIDsProvider(),
+                                               anchorInitiallySelected: anchorInitiallySelected,
+                                               scope: scopeProvider())
+                let delta = started.consume([anchor])
+                trail = started
+                if let press = machine.pressPoint {
+                    lastTrailContentPoint = CGPoint(x: press.x, y: press.y)
+                }
                 #if DEBUG
-                debugArmModeRaw = mode == .deselect ? 1 : 0
+                debugTrailPathCount = started.path.count
+                debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
                 #endif
-                overlayView?.setDeselectMode(mode == .deselect)
-                let beginRect = currentMarqueeRect()
-                overlayView?.update(rect: overlayFrame(for: beginRect))
-                onMarqueeRectChanged(beginRect)
-            case .updateMarquee:
-                processFinger()
-                let rect = currentMarqueeRect()
-                overlayView?.update(rect: overlayFrame(for: rect))   // 每帧只改 frame，不重建（docs/32 §2.5）
-                onMarqueeRectChanged(rect)
-            case .endMarquee:
+                if !delta.isEmpty {
+                    pendingSelectionHaptic = true
+                    applySelectionDelta(delta.add, delta.remove)
+                }
+                onTrailActiveChanged(true)
+            case .updateTrail:
+                if let last = lastTrailContentPoint,
+                   let current = windowToContent(lastFingerWindowPoint) {
+                    processTrail(from: last, to: current)
+                }
+            case .endTrail:
                 collectionView?.isScrollEnabled = true
-                overlayView?.update(rect: nil)
-                onMarqueeRectChanged(nil)
+                trail = nil
+                lastTrailContentPoint = nil
+                onTrailActiveChanged(false)
             case .releaseScroll:
                 collectionView?.isScrollEnabled = true
                 // 纵向占优交还滚动（docs/32 §2.3）：框选 pan 主动失败，滚动 pan 接管
@@ -303,7 +315,7 @@ final class LibrarySelectionController: NSObject {
                     debugHapticCount += 1
                     #endif
                 case .selectionChanged:
-                    // G6：以命中集合变化为最终闸门（processFinger 置位 pendingSelectionHaptic），
+                    // G6：以路径净增量变化为最终闸门（processTrail 置位 pendingSelectionHaptic），
                     // 60ms 节流由机器 hapticMinInterval 承担（验收 ≤16 次/秒）
                     if pendingSelectionHaptic {
                         selectHaptic.selectionChanged()
@@ -344,7 +356,7 @@ final class LibrarySelectionController: NSObject {
         feedEdgeEvents()
     }
 
-    // MARK: 框选命中（矩形语义与 T04 GridHitTester 对接）
+    // MARK: 轨迹命中（线段语义与 M18 TrailHitResolver 对接，docs/38 §2/§3）
 
     /// VC 注入：当前选中 id 快照（锚点模式取证用）。
     var selectedIDsProvider: () -> Set<String> = { [] }
@@ -352,55 +364,25 @@ final class LibrarySelectionController: NSObject {
     /// VC 注入：内容坐标 → 命中 cell 的 assetID（indexPathForItem + dataSource）。
     var hitIDAtContentPoint: (CGPoint) -> String? = { _ in nil }
 
-    private func processFinger() {
-        guard machine.state == .dragging || machine.state == .autoScrolling || machine.state == .armed,
-              let press = machine.pressPoint else { return }
-        guard let current = windowToContent(lastFingerWindowPoint) else { return }
-        let minX = min(press.x, current.x)
-        let maxX = max(press.x, current.x)
-        let minY = min(press.y, current.y)
-        let maxY = max(press.y, current.y)
-        let clampedMaxX = maxX - minX < 1 ? minX + 1 : maxX
-        let clampedMaxY = maxY - minY < 1 ? minY + 1 : maxY
-        let rect = CGRect(x: minX, y: minY,
-                          width: clampedMaxX - minX, height: clampedMaxY - minY)
-        let hitIDs = hitTestProvider(rect)
-        // M17 T07（docs/32 §2.6）：apply 窗口内命中为空 → 保留上一帧目标集合不清空，
-        // 下一帧重试（≤3 帧）；超时打 DEBUG 日志后按空命中放行（快照完成后几何自愈）。
-        if hitIDs.isEmpty, isApplyingSnapshotProvider() {
-            if applyWindowSkips < 3 {
-                applyWindowSkips += 1
-                ViewerTrace.log("marquee.apply-window skip=\(applyWindowSkips) hold-last-target")
-                return
-            }
-            ViewerTrace.log("marquee.apply-window timeout → release with empty hit")
-        }
-        applyWindowSkips = 0
-        let target = MarqueeSelectionPolicy.resolved(base: baseIDs,
-                                                     hitIDs: hitIDs,
-                                                     mode: mode,
-                                                     scope: scopeProvider())
-        if target != lastTargetIDs {
-            pendingSelectionHaptic = true
-        }
-        guard target != lastTargetIDs else { return }
-        lastTargetIDs = target
-        applyTargetIDs(target)
-    }
-
-    private func currentMarqueeRect() -> CGRect? {
-        guard let press = machine.pressPoint,
-              let current = windowToContent(lastFingerWindowPoint) else { return nil }
-        return CGRect(x: min(press.x, current.x), y: min(press.y, current.y),
-                      width: abs(current.x - press.x), height: abs(current.y - press.y))
-    }
-
-    /// 覆盖层 frame：内容坐标 → view 坐标（overlay 是 collectionView 的兄弟视图：
-    /// 先减 contentOffset 回到 bounds 系，再加 collectionView.frame.origin 进 superview 系）。
-    private func overlayFrame(for rect: CGRect?) -> CGRect? {
-        guard let rect, let collectionView else { return rect }
-        return rect.offsetBy(dx: -collectionView.contentOffset.x + collectionView.frame.origin.x,
-                             dy: -collectionView.contentOffset.y + collectionView.frame.origin.y)
+    /// 一段轨迹推进：from→to 线段取有序命中 id 喂 SlideSelectTrail.consume，净增量落地。
+    /// delta 空 → 不置触觉、不触发 apply（G6 闸门；docs/38 §2.3 第 5 行）。
+    /// apply 窗口内命中为空：保持线段起点不前进，下一帧重扫同段（M17 T07 语义；
+    /// 快照完成后几何自愈，无需帧数上限——endTrail/finishSelection 收口）。
+    private func processTrail(from: CGPoint, to: CGPoint) {
+        guard machine.state == .dragging || machine.state == .autoScrolling,
+              var current = trail else { return }
+        let orderedIDs = trailHitProvider(from, to)
+        if orderedIDs.isEmpty, isApplyingSnapshotProvider() { return }
+        let delta = current.consume(orderedIDs)
+        trail = current
+        lastTrailContentPoint = to
+        #if DEBUG
+        debugTrailPathCount = current.path.count
+        debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
+        #endif
+        guard !delta.isEmpty else { return }
+        pendingSelectionHaptic = true
+        applySelectionDelta(delta.add, delta.remove)
     }
 
     // MARK: 边缘自动滚动
@@ -438,10 +420,15 @@ final class LibrarySelectionController: NSObject {
                                                      delta: velocity,
                                                      min: minY,
                                                      max: maxY)
+        // 自动滚动采样（docs/38 §2）：指尖窗口坐标不变、content 坐标随 offset 平移——
+        // 滚动前后取同一窗口坐标换算的两点喂轨迹，屏外内容按滚动方向依序入栈（顺序语义）。
+        let before = windowToContent(lastFingerWindowPoint)
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target),
                                         animated: false)
         feedEdgeEvents()   // 内容触底/顶后指尖仍在边缘：方向保持，位移由 clampedOffset 钳制
-        processFinger()    // 滚动后指尖下内容变化 → 逐帧重算命中（docs/31 §2.4）
+        if let startPoint = before, let endPoint = windowToContent(lastFingerWindowPoint) {
+            processTrail(from: startPoint, to: endPoint)   // 滚动推进路径（docs/31 §2.4 每帧重算的轨迹等价）
+        }
     }
 
     private func edgeVelocity() -> Double {

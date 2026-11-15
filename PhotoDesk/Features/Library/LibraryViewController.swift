@@ -785,38 +785,31 @@ final class LibraryViewController: UIViewController {
         controller.onSelectionEntered = { [weak self] anchorID in
             self?.enterSelectionMode(selecting: anchorID)
         }
-        controller.applyTargetIDs = { [weak self] ids in
-            self?.applySlideSelection(ids: ids)
+        controller.applySelectionDelta = { [weak self] add, remove in
+            self?.applySelectionChanges(add: add, remove: remove)
         }
         controller.scopeProvider = { [weak self] in self?.selectionState.scope }
-        // M17 T07（docs/32 §2.6）：apply 窗口取证——快照 apply 期间命中为空按保留上一帧目标处理
+        // M17 T07（docs/32 §2.6）：apply 窗口取证——快照 apply 期间线段命中为空按保留路径重扫处理
         controller.isApplyingSnapshotProvider = { [weak self] in self?.isApplyingSnapshot ?? false }
         gridHitTester = GridHitTester(collectionView: collectionView)
-        controller.hitTestProvider = { [weak self] rect in
+        // M18 T05（docs/38 §2/§3）：线段有序命中 → 有序 id（保持扫掠顺序、只过滤 nil）
+        controller.trailHitProvider = { [weak self] from, to in
             guard let self, let tester = self.gridHitTester else { return [] }
-            var ids = Set<String>()
-            for path in tester.hitTest(rectInContent: rect) {
+            var ids: [String] = []
+            ids.reserveCapacity(16)
+            for path in tester.hitTestLine(from: from, to: to) {
                 if let item = self.dataSource.itemIdentifier(for: path) {
-                    ids.insert(item.id)
+                    ids.append(item.id)
                 }
             }
             return ids
         }
-        // M17 T06：框选覆盖层挂在根视图、collectionView 之上（视口坐标 frame，控制器逐帧转换）；
-        // 多选栏提示跟随拖动状态与框选模式。
-        let marqueeOverlay = MarqueeOverlayView()
-        view.insertSubview(marqueeOverlay, aboveSubview: collectionView)
-        controller.overlayView = marqueeOverlay
-        controller.onMarqueeRectChanged = { [weak self] rect in
-            #if DEBUG
-            if let rect {
-                LibrarySelectionDebugState.lastMarqueeRect = rect
-            }
-            #endif
+        // M18 T05：多选栏提示跟随轨迹活跃状态与按下帧锚点语义（覆盖层由 T06 退役）。
+        controller.onTrailActiveChanged = { [weak self] active in
             guard let self else { return }
-            self.selectionModeHintLabel.isHidden = rect == nil
-            if rect != nil {
-                self.selectionModeHintLabel.text = self.selectionController?.mode == .deselect
+            self.selectionModeHintLabel.isHidden = !active
+            if active {
+                self.selectionModeHintLabel.text = self.selectionController?.anchorInitiallySelected == true
                     ? "取消选择中" : "选择中"
             }
         }
@@ -1007,18 +1000,15 @@ final class LibraryViewController: UIViewController {
         }
     }
 
-    // MARK: - M13 P3 单指滑动连续多选（VC 只做映射，判定全在 SlideSelectPolicy）
+    // MARK: - M13 P3 单指滑动连续多选（M18 T05 起为轨迹增量落地，判定全在 PhotoDeskCore）
 
-    /// 把框选命中的目标 id 集合整体落到 SelectionState；只 diff 可见 cell，计数仅变化时刷新。
-    /// M17 T04：矩形命中改由 GridHitTester 读真实 layoutAttributes（原网格参数推算路径已删，
-    /// docs/32 §2.4；G7/G8/G9/G11 与 A09/A15 随之根治）。
-    private func applySlideSelection(ids: Set<String>) {
+    /// 路径事务净增量落地（docs/38 §3）：SelectionState.applyDelta 是选中集唯一写入口——
+    /// 每帧不 sorted()、不整表 replace（A09：全选 2 万张拖一帧 < 4ms 的前提）；
+    /// 可见 cell 只 diff 变化项；计数每帧写（0.15s 过渡仅 count 变化时发生）。
+    private func applySelectionChanges(add: Set<String>, remove: Set<String>) {
+        guard !add.isEmpty || !remove.isEmpty else { return }
         let previous = selectionState.selectedSet
-        guard previous != ids else { return }
-        // M17 T07（docs/32 §2.6）：增量应用 O(delta)，不整表 replace+sort
-        //（A09：全选 2 万张拖一帧 < 4ms 的前提）；计数每帧更新。
-        selectionState.applyDelta(add: ids.subtracting(previous),
-                                  remove: previous.subtracting(ids))
+        selectionState.applyDelta(add: add, remove: remove)
         let current = selectionState.selectedSet
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard let item = dataSource.itemIdentifier(for: indexPath) else { continue }
@@ -1347,22 +1337,13 @@ final class LibraryViewController: UIViewController {
         let sel = selectionController
         let ticks = sel?.debugAutoScrollTicks ?? -1
         let hap = sel?.debugHapticCount ?? -1
-        let ovHidden = sel?.overlayView?.isHidden ?? true
-        let ovm: Int = {
-            guard let sel else { return -1 }
-            return sel.mode == .deselect ? 1 : 0
+        // M18 T05 取证字段（docs/38 §3）：轨迹模式/路径深度/最近净增量（旧 ov* 覆盖层字段随 T06 删除）
+        let trailMode: Int = {
+            guard let sel, sel.anchorInitiallySelected else { return 0 }
+            return 1
         }()
-        let armMode = sel?.debugArmModeRaw ?? -1
-        let ovc: String = {
-            guard let cg = sel?.overlayView?.layer.borderColor else { return "-" }
-            var r: CGFloat = 0; var g: CGFloat = 0; var b: CGFloat = 0; var a: CGFloat = 0
-            UIColor(cgColor: cg).getRed(&r, green: &g, blue: &b, alpha: &a)
-            return "\(Int(r * 255)),\(Int(g * 255)),\(Int(b * 255))"
-        }()
-        let ovf: String = {
-            guard let f = sel?.overlayView?.frame else { return "-" }
-            return "\(Int(f.minX)),\(Int(f.minY)),\(Int(f.width))x\(Int(f.height))"
-        }()
+        let trailPath = sel?.debugTrailPathCount ?? -1
+        let lastDelta = sel?.debugLastDelta ?? "-"
         let tdBase = sel?.debugTouchDownBaseCount ?? -1
         let tdHit = sel?.debugTouchDownHitID ?? "-"
         let edge = sel?.debugLastEdgeDirection ?? 9
@@ -1373,7 +1354,7 @@ final class LibraryViewController: UIViewController {
         viewModel.debugFilteredCount = "\(viewModel.filteredItems.count)"
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) ov=\(ovHidden ? 0 : 1) ovm=\(ovm) arm=\(armMode) ovc=\(ovc) ovf=\(ovf) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 

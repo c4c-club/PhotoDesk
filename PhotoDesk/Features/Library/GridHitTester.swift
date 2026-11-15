@@ -8,6 +8,7 @@
 // 调 invalidateGeometry() 失效。DEBUG lastQueryCount 供测试断言缓存已热帧 ≤ 60 次查询。
 
 import UIKit
+import PhotoDeskCore
 
 @MainActor
 final class GridHitTester {
@@ -200,5 +201,90 @@ final class GridHitTester {
             }
         }
         return low
+    }
+
+    // MARK: - M18 T05：线段命中（docs/38 §2/§3，TrailHitResolver 扫掠排序）
+
+    /// 线段（内容坐标）→ 按经过顺序命中的 IndexPath 序列（滑到哪选到哪；docs/37 §4）。
+    /// 复用段缓存/二分/真实行高/粘性头钳制：只枚举线段外接矩形（含 hitExpansion）相交的
+    /// 候选行/列，转 Core `TrailHitResolver.orderedIDs` 做扫掠排序与去重，再映射回 IndexPath。
+    /// cell id 采用 "s{段}-i{项}" 合成键（item 全局唯一），映射回查 O(候选数)。
+    func hitTestLine(from: CGPoint, to: CGPoint) -> [IndexPath] {
+        #if DEBUG
+        lastQueryCount = 0
+        #endif
+        guard let collectionView,
+              from.x.isFinite, from.y.isFinite, to.x.isFinite, to.y.isFinite else { return [] }
+        ensureCache()
+        guard !sections.isEmpty, derivedColumns >= 1 else { return [] }
+
+        // G11 粘性头钳制（与矩形同语义）：视口顶所在段的钉住头遮挡 [视口顶, 视口顶+头高]，
+        // 线段候选范围钳到头底边；被完全遮住与已滚出屏的 cell 不命中（docs/32 §2.4 第 6 步）。
+        let viewportTop = Double(collectionView.contentOffset.y)
+            + Double(collectionView.adjustedContentInset.top)
+        var clipTop: Double?
+        if sectionIndex(containingContentY: viewportTop) != nil {
+            clipTop = viewportTop + Double(DSSpacing.monthHeaderHeight)
+        }
+
+        let expand = Double(SlideSelectConfig.hitExpansion)
+        let boundMinX = Double(min(from.x, to.x)) - expand
+        let boundMaxX = Double(max(from.x, to.x)) + expand
+        let boundMinYRaw = Double(min(from.y, to.y)) - expand
+        let boundMaxY = Double(max(from.y, to.y)) + expand
+        if let clip = clipTop, boundMaxY <= clip { return [] }
+        let boundMinY = max(boundMinYRaw, clipTop ?? boundMinYRaw)
+        let boundRect = CGRect(x: boundMinX, y: boundMinY,
+                               width: boundMaxX - boundMinX, height: boundMaxY - boundMinY)
+
+        let layout = collectionView.collectionViewLayout
+        var candidates: [GridCellFrame] = []
+        candidates.reserveCapacity(32)
+        var pathByID: [String: IndexPath] = [:]
+        // 候选段：lastMaxY 升序二分第一个与外接矩形相交的段，线性推进到段顶越过底边即停
+        var index = firstSectionIndex(withLastMaxYAtLeast: boundMinY)
+        while index < sections.count {
+            let geo = sections[index]
+            if geo.headerNaturalMinY > boundMaxY { break }
+            guard geo.rowHeight.isFinite, geo.rowHeight > 0 else { index += 1; continue }
+            // 行候选：外接矩形 y 范围换算行号，首行向前回退一行防浮点误差；真实行高枚举
+            let firstRow = max(0, Int(((boundMinY - geo.firstRowMinY) / geo.rowHeight).rounded(.down)) - 1)
+            let lastRow = Int(((boundMaxY - geo.firstRowMinY) / geo.rowHeight).rounded(.up))
+            var row = firstRow
+            while row <= lastRow {
+                let rowTop = geo.firstRowMinY + Double(row) * geo.rowHeight
+                if rowTop > boundMaxY { break }
+                guard rowTop + geo.rowHeight >= boundMinY else {
+                    row += 1
+                    continue
+                }
+                for column in 0..<derivedColumns {
+                    let item = row * derivedColumns + column
+                    guard item < geo.itemCount else { break }
+                    guard let attrs = query(layout, item: item, section: geo.section) else {
+                        continue
+                    }
+                    let frame = attrs.frame
+                    guard frame.intersects(boundRect) else { continue }
+                    let id = "s\(geo.section)-i\(item)"
+                    pathByID[id] = IndexPath(item: item, section: geo.section)
+                    candidates.append(GridCellFrame(id: id,
+                                                    minX: Double(frame.minX),
+                                                    minY: Double(frame.minY),
+                                                    maxX: Double(frame.maxX),
+                                                    maxY: Double(frame.maxY)))
+                }
+                row += 1
+            }
+            index += 1
+        }
+        let orderedIDs = TrailHitResolver.orderedIDs(
+            from: GridPoint(x: Double(from.x), y: Double(from.y)),
+            to: GridPoint(x: Double(to.x), y: Double(to.y)),
+            cells: candidates,
+            clipTop: clipTop,
+            expansion: Double(SlideSelectConfig.hitExpansion),
+            epsilon: Double(SlideSelectConfig.segmentEpsilon))
+        return orderedIDs.compactMap { pathByID[$0] }
     }
 }
