@@ -1,0 +1,26 @@
+# audit-m18.ps1 确定性取证（T01）
+
+- 日期：2026-11-16（本地 Windows 10，Windows PowerShell 5.1）
+- 脚本：scripts/audit-m18.ps1（UTF-8 带 BOM，只读，29 项检查）
+- 运行方式：powershell -NoProfile -ExecutionPolicy Bypass -File scripts/audit-m18.ps1 [-OutDir ...] [-Strict]
+
+## 连跑一致性（忽略 generatedAt）
+
+| 输出 | 结果 |
+|---|---|
+| baseline-A/audit.md vs baseline-B/audit.md | 一致（仅 generatedAt 行不同） |
+| baseline-A/audit.json vs baseline-B/audit.json | 一致（仅 generatedAt 字段不同） |
+| 同 OutDir 连跑两次 stdout（stdout-run1.txt / stdout-run2.txt） | 逐行一致 |
+
+## 红基线（-Strict）
+
+- baseline-strict：exit code = 2（预期：存在 BLOCKING 未达标，红基线真实存在）
+- blocking failures: 3 / 29
+  - B06 App 层活跃框选符号 45 处（marquee*/MarqueeOverlayView/lastMarqueeRect/hitTest(rectInContent:) 等）
+  - B08 状态机旧 effect 名 beginMarquee/updateMarquee/endMarquee 18 处
+  - B10 UI/单元测试框选旧断言 39 处
+- PRESENT 红项（文件/符号尚未产出，按任务卡逐步转绿）：P02、P03、P04、P05、P06、P07、P09、P10、P11、P12
+- INFO：version 1.6.0 (7)、deploymentTarget iOS 16.0、I05 release 目录未建（T10 前预期缺失）
+- 绿项：B01/B02/B03/B04/B05/B07/B09（Core 零 Apple 依赖、iOS 17+ API、双指、PHAsset、删除文案、try!/as! 全部 0 命中）
+
+结论：脚本确定性成立；改造前红基线 = 3 BLOCKING + 10 PRESENT 缺失。
