@@ -9,22 +9,9 @@
 
 import Foundation
 
-/// 一个 cell 的真实 frame（由 App 侧 layoutAttributes 换算；id 即 PhotoItem.id）
-public struct CellFrame: Hashable, Sendable {
-    public let id: String
-    public let minX: Double
-    public let minY: Double
-    public let maxX: Double
-    public let maxY: Double
-
-    public init(id: String, minX: Double, minY: Double, maxX: Double, maxY: Double) {
-        self.id = id
-        self.minX = minX
-        self.minY = minY
-        self.maxX = maxX
-        self.maxY = maxY
-    }
-}
+/// cell 真实 frame 已抽至 GridCellFrame.swift（M18 T03，避免新逻辑依赖 marquee 命名）；
+/// 旧矩形命中链路的类型别名，保证 MarqueeHitResolverTests 等旧单测照常编译（T06 一并退役）。
+public typealias CellFrame = GridCellFrame
 
 /// 框选矩形（anchor/current 两点构造：自动归一 + 四边各扩 1pt）
 public struct HitRect: Equatable, Sendable {
