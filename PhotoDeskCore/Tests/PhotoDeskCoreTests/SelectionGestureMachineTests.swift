@@ -56,7 +56,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     // MARK: - 状态表第 2 行：pressing + holdElapsed → armed
 
-    func testRow2HoldElapsedArmsWithHapticEnterAndZeroSizeMarquee() {
+    func testRow2HoldElapsedArmsWithHapticEnterAndZeroSizeTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         let effects = arm(&machine, id: "a", holdAt: 0.28)
         XCTAssertEqual(effects, [.haptic(kind: .impactLight),
@@ -155,11 +155,11 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     // MARK: - 状态表第 6 行：armed + moved（横向占优 ≥ activationDistance）→ dragging
 
-    func testRow6ArmedHorizontalDragBeginsMarquee() {
+    func testRow6ArmedHorizontalDragBeginsTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
-        XCTAssertEqual(effects, [.updateTrail], "框选开始：首帧 updateMarquee（0.29-0.28 < 0.06 无触觉）")
+        XCTAssertEqual(effects, [.updateTrail], "轨迹滑选开始：首帧 updateTrail（0.29-0.28 < 0.06 无触觉）")
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -174,7 +174,7 @@ final class SelectionGestureMachineTests: XCTestCase {
     /// 状态表第 6 行（T05 修正）：armed + moved 任意方向 ≥ activationDistance → dragging——
     /// docs/32 §2.2 表第 6 行无方向限定：长按已表达选择意图，「长按后拖到第 5 行」「底缘拖 2s
     /// 自动滚动」（T05 卡 UI 用例）都依赖纵向拖框。
-    func testArmedVerticalDragBeginsMarqueeAnyDirection() {
+    func testArmedVerticalDragBeginsTrailAnyDirection() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.moved(dx: 0, dy: 12), now: 0.35)
@@ -191,7 +191,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     // MARK: - 状态表第 7 行：dragging + moved → dragging（重算命中）
 
-    func testRow7DraggingMovedEmitsUpdateMarquee() {
+    func testRow7DraggingMovedEmitsUpdateTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
@@ -211,7 +211,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .autoScrolling)
     }
 
-    func testEdgeEnteredWithoutActiveMarqueeIsIgnored() {
+    func testEdgeEnteredWithoutActiveTrailIsIgnored() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.edgeEntered(direction: 1), now: 0.30)
@@ -273,7 +273,7 @@ final class SelectionGestureMachineTests: XCTestCase {
 
     // MARK: - 状态表第 10 行：任意 ended/cancelled → ending → idle（收尾）
 
-    func testRow10DraggingEndedFinishesMarqueeAndReleasesScroll() {
+    func testRow10DraggingEndedFinishesTrailAndReleasesScroll() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
@@ -292,7 +292,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .ending)
     }
 
-    func testRow10ArmedEndedHidesZeroSizeMarquee() {
+    func testRow10ArmedEndedHidesZeroSizeTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         _ = arm(&machine)
         let effects = machine.handle(.ended, now: 0.5)
@@ -385,7 +385,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .idle)
     }
 
-    func testScrollStartedDuringDraggingFinishesMarquee() {
+    func testScrollStartedDuringDraggingFinishesTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         machine.isSelectionModeActive = true
         press(&machine, at: 0)
@@ -432,6 +432,41 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.touchDown(point: GridPoint(x: 5, y: 5), hitID: "b"), now: 1.0)
         let effects = machine.handle(.moved(dx: 0, dy: 9), now: 1.1)
         XCTAssertEqual(effects, [.releaseScroll], "旧手势累计位移不得污染新手势方向判定")
+        XCTAssertEqual(machine.state, .idle)
+    }
+
+    // MARK: - T04 新增：轨迹 effect 词汇序列（docs/38 §2.1/§3）
+
+    /// armed 序列：holdElapsed 以 beginTrail 收尾，随后 moved 首个效果是 updateTrail
+    func testArmedMovedSequenceIsBeginTrailThenUpdateTrail() {
+        var machine = SelectionGestureMachine(config: defaultConfig)
+        let armEffects = arm(&machine)
+        XCTAssertEqual(armEffects.last, .beginTrail, "armed 进入序列以 beginTrail 收尾")
+        let moveEffects = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
+        XCTAssertEqual(moveEffects.first, .updateTrail, "armed moved 首个效果是 updateTrail")
+        XCTAssertEqual(machine.state, .dragging)
+    }
+
+    /// 横向锁定进 dragging 后反向 moved：节流窗口内效果恰为 [updateTrail]——集合收缩交给 SlideSelectTrail 事务，机器不断言集合
+    func testReverseMovedAfterLockEmitsOnlyUpdateTrail() {
+        var machine = SelectionGestureMachine(config: defaultConfig)
+        machine.isSelectionModeActive = true
+        _ = arm(&machine)                                     // haptic@0.28 + beginTrail（触觉节流器就位）
+        _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)   // updateTrail（0.01 < 0.06 无触觉）
+        let reverse = machine.handle(.moved(dx: -10, dy: 0), now: 0.30)
+        XCTAssertEqual(reverse, [.updateTrail], "反向拖仅上报 updateTrail（docs/38 §2.3 收缩在事务侧）")
+        XCTAssertEqual(machine.state, .dragging)
+    }
+
+    /// 非有限输入安全复位：效果词汇表只含轨迹命名（stopAutoScroll/endTrail/releaseScroll）
+    func testNonFiniteSafetyResetEmitsTrailVocabularyOnly() {
+        var machine = SelectionGestureMachine(config: defaultConfig)
+        _ = arm(&machine)
+        _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
+        _ = machine.handle(.edgeEntered(direction: 1), now: 0.30)   // → autoScrolling
+        let effects = machine.handle(.moved(dx: .nan, dy: 0), now: 0.31)
+        XCTAssertEqual(effects, [.stopAutoScroll, .endTrail, .releaseScroll],
+                       "safetyReset 只发轨迹词汇，无任何 marquee 命名残留")
         XCTAssertEqual(machine.state, .idle)
     }
 

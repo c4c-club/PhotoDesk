@@ -1,4 +1,4 @@
-// MARK: - 职责说明：多选手势纯逻辑状态机（M17 T02，docs/32 §2.2）——
+// MARK: - 职责说明：多选手势纯逻辑状态机（M17 T02 建立，M18 T04 effect 改名轨迹词汇，docs/38 §2.1/§3）——
 // idle → pressing → armed → dragging ⇄ autoScrolling → ending → idle；
 // 长按进入 / 方向锁 / 滚动让位 / 边缘自动滚动判定全部收口在此（Foundation-only，可 Docker 单测），
 // 触点用 Core 自有 GridPoint（Double 版）：Foundation 导入的 CGPoint 在 Darwin 不满足 Equatable 合成，
@@ -9,18 +9,18 @@
 // 迁移契约（每条都有单测，SelectionGestureMachineTests）：
 // - touchDown：hitID 为 nil 或触点非有限 → 忽略；否则入 pressing 并记录真实按下点（G3 锚点取证）。
 // - holdElapsed：now − 按下 ≥ longPressDuration 且累计位移 ≤ allowableMovement 才 armed；
-//   副作用 [haptic(.impactLight), enterSelection(anchorID:), beginMarquee]（表第 2 行，0 尺寸选框）。
+//   副作用 [haptic(.impactLight), enterSelection(anchorID:), beginTrail]（表第 2 行，轨迹事务开启）。
 // - pressing moved：累计距离 ≥ directionLockDistance 时定方向——横向占优（|dx| > |dy|·horizontalRatio）
 //   → dragging，未在多选时先 enterSelection（表第 3 行「必要时先进入多选」，App 侧最终把关）；
 //   纵向占优（|dy| ≥ |dx|·horizontalRatio）→ idle + releaseScroll（让位滚动，G2）。
 //   累计位移 > allowableMovement 即判长按死亡（对角未决时仍 pressing，但不再响应 holdElapsed）。
-// - armed moved：累计距离 ≥ activationDistance → dragging（框选开始，任意方向——表第 6 行无
-//   方向限定：长按已表达选择意图，T05 修正；0 尺寸选框已在 armed 就位）。
-// - dragging/autoScrolling moved → updateMarquee + haptic(.selectionChanged)（受 hapticMinInterval
+// - armed moved：累计距离 ≥ activationDistance → dragging（轨迹滑选开始，任意方向——表第 6 行无
+//   方向限定：长按已表达选择意图，T05 修正；路径事务已在 armed 就位）。
+// - dragging/autoScrolling moved → updateTrail + haptic(.selectionChanged)（受 hapticMinInterval
 //   节流；App 侧以命中集合变化为最终闸门，G6）。反向拖逐帧上报，收缩由调用方计算（卡内附加 3）。
 // - edgeEntered(d)：dragging → autoScrolling + startAutoScroll(d)；autoScrolling 中反向进边缘 → 换向重启；
 //   edgeExited：autoScrolling → dragging + stopAutoScroll（进出严格配对，无泄漏）。
-// - ended/cancelled：armed/dragging/autoScrolling 收尾（stopAutoScroll → endMarquee → releaseScroll）
+// - ended/cancelled：armed/dragging/autoScrolling 收尾（stopAutoScroll → endTrail → releaseScroll）
 //   后进 .ending，下一事件先复位 idle 再正常处理（表第 9 行 ending → idle）；
 //   idle/pressing 无活动资源，直接复位（短按交 tap，表第 5 行）。
 // - 非有限 dx/dy/now/触点：异常安全路径直接回 idle（不走 ending），带资源先收尾（卡内附加 5）。
@@ -64,9 +64,9 @@ public struct SelectionGestureConfig: Equatable, Sendable {
 
 public enum SelectionGestureEffect: Equatable, Sendable {
     case enterSelection(anchorID: String)
-    case beginMarquee
-    case updateMarquee
-    case endMarquee
+    case beginTrail
+    case updateTrail
+    case endTrail
     case releaseScroll
     case haptic(kind: SelectionGestureHaptic)
     case startAutoScroll(direction: Int)
@@ -78,7 +78,7 @@ public struct SelectionGestureMachine: Sendable {
     /// App 侧注入：当前是否已处于多选模式（表第 3 行「必要时先进入多选」的判断输入）。
     public var isSelectionModeActive = false
     public private(set) var state: SelectionGestureState = .idle
-    /// 本次手势的真实按下点（G3：框选起点必须是按下点而非 pan 触发点）；收尾后为 nil。
+    /// 本次手势的真实按下点（G3：轨迹滑选起点必须是按下点而非 pan 触发点）；收尾后为 nil。
     public private(set) var pressPoint: GridPoint?
 
     private var pressStartTime: TimeInterval = 0
@@ -148,7 +148,7 @@ public struct SelectionGestureMachine: Sendable {
             lastHapticAt = now
         }
         effects.append(.enterSelection(anchorID: anchor))
-        effects.append(.beginMarquee)
+        effects.append(.beginTrail)
         return effects
     }
 
@@ -183,7 +183,7 @@ public struct SelectionGestureMachine: Sendable {
                 if !isSelectionModeActive, let anchor = anchorID {
                     effects.append(.enterSelection(anchorID: anchor))
                 }
-                effects.append(.beginMarquee)
+                effects.append(.beginTrail)
                 return effects
             }
             if abs(totalDY) >= abs(totalDX) * config.horizontalRatio {
@@ -197,21 +197,21 @@ public struct SelectionGestureMachine: Sendable {
             totalDX += dx
             totalDY += dy
             guard displacement() >= config.activationDistance else { return [] }
-            // 表第 6 行：armed moved → dragging（框选开始，任意方向——表无方向限定：长按已表达
-            // 选择意图，「长按后拖到第 5 行」「底缘自动滚动」都依赖纵向拖框，T05 修正）
+            // 表第 6 行：armed moved → dragging（轨迹滑选开始，任意方向——表无方向限定：长按已表达
+            // 选择意图，「长按后拖到第 5 行」「底缘自动滚动」都依赖纵向拖动，T05 修正）
             state = .dragging
             scrollLocked = true
-            return marqueeUpdateEffects(now: now)
+            return trailUpdateEffects(now: now)
         case .dragging, .autoScrolling:
             // 表第 7 行：逐帧重算命中；反向拖同样上报（收缩由调用方计算）
-            return marqueeUpdateEffects(now: now)
+            return trailUpdateEffects(now: now)
         default:
             return []
         }
     }
 
-    private mutating func marqueeUpdateEffects(now: TimeInterval) -> [SelectionGestureEffect] {
-        var effects: [SelectionGestureEffect] = [.updateMarquee]
+    private mutating func trailUpdateEffects(now: TimeInterval) -> [SelectionGestureEffect] {
+        var effects: [SelectionGestureEffect] = [.updateTrail]
         if now - lastHapticAt >= config.hapticMinInterval {
             effects.append(.haptic(kind: .selectionChanged))
             lastHapticAt = now
@@ -230,15 +230,15 @@ public struct SelectionGestureMachine: Sendable {
         case .armed:
             state = .idle
             resetGesture()
-            return [.endMarquee]
+            return [.endTrail]
         case .dragging:
             state = .idle
             resetGesture()
-            return [.endMarquee, .releaseScroll]
+            return [.endTrail, .releaseScroll]
         case .autoScrolling:
             state = .idle
             resetGesture()
-            return [.stopAutoScroll, .endMarquee, .releaseScroll]
+            return [.stopAutoScroll, .endTrail, .releaseScroll]
         default:
             return []
         }
@@ -292,15 +292,15 @@ public struct SelectionGestureMachine: Sendable {
         case .armed:
             state = .ending
             resetGesture()
-            return [.endMarquee]
+            return [.endTrail]
         case .dragging:
             state = .ending
             resetGesture()
-            return [.endMarquee, .releaseScroll]
+            return [.endTrail, .releaseScroll]
         case .autoScrolling:
             state = .ending
             resetGesture()
-            return [.stopAutoScroll, .endMarquee, .releaseScroll]
+            return [.stopAutoScroll, .endTrail, .releaseScroll]
         default:
             return []
         }
@@ -311,11 +311,11 @@ public struct SelectionGestureMachine: Sendable {
         var effects: [SelectionGestureEffect] = []
         switch state {
         case .armed:
-            effects = [.endMarquee]
+            effects = [.endTrail]
         case .dragging:
-            effects = scrollLocked ? [.endMarquee, .releaseScroll] : [.endMarquee]
+            effects = scrollLocked ? [.endTrail, .releaseScroll] : [.endTrail]
         case .autoScrolling:
-            effects = [.stopAutoScroll, .endMarquee, .releaseScroll]
+            effects = [.stopAutoScroll, .endTrail, .releaseScroll]
         default:
             break
         }
