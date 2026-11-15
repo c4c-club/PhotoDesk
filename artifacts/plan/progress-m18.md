@@ -10,7 +10,7 @@
 | T03 | DONE | 2210868（红）/ 9e53f36（绿）/ 本卡 docs 提交（git log 第 3 条） | Docker **480/480**（+19）；CI core-linux success（run 43736641548）；性能 2 万 frame 5ms ≪ 20ms 预算 | CellFrame 抽出 + typealias 桥接；反向序列断言就位 |
 | T04 | DONE | 7459d08（红）/ 22e09d7（绿）/ 本卡 docs 提交（git log 第 3 条） | Docker **483/483**（+3）；旧名 grep=0；状态表/阈值零行为改动 | **T05 接线前 App 暂不可编译，本卡只留本地 Docker 证据，CI 由 T05 统一跑** |
 | T05 | DONE | 5118921（红）/ 5417dc6（接线）/ 403d869（修复）/ 本卡 docs 提交 | 红 run 43738415536（App 旧名 ×3 编译红）；修复轮 run 43750931513：**App 编译恢复 ✓ + 单测 275/275 绿**（2 条 hitTestLine 真布局测试过）；UI 78 条中 9 败全部为旧框选契约（MarqueeSelection ×2 / PageRegression ×1 / Stability ×6，T08 重写范围，无新增失败） | **App 编译已恢复**；矩形接口仅剩 hitTest(rectInContent:) 声明本体（T07 随测试迁移删除，未加 deprecated 属性避免新增警告）；0.15s 过渡按文本级语义（每帧写、计数变才变文案，docs/38 无此表述，不引入 UIView 动画避免动冻结契约） |
-| T06 | TODO | — | — | 退役框选视觉/矩形残留/文案 |
+| T06 | DONE | 6910751（退役+红基线）/ 本卡 docs 提交 | 红基线 t06-red（B06=17）；绿审查 t06-green（验收 grep=0；B06=1 deprecated 声明=卡允许；B10=39 T08 冻结）；Docker 483/483 不变；CI run 43764101857：build ✓ + 单测 275/275 绿 + UI 9 败全旧契约（同 T05 轮集合） | hitTest(rectInContent:) 剩 1 deprecated 声明 + 测试旧调用 **4 处**（T07 归零）；deprecated 警告 = 旧测调用点（Core resolved×12/mergedSelection×4/selectRange×5/applyRange×1），T08 迁移后归零；文案校对入 docs/39 |
 | T07 | TODO | — | — | 真布局单测 + 自动滚动/粘性头/触觉 |
 | T08 | TODO | — | — | 重写精确路径 UI 断言 + CI 模拟器实跑 |
 | T09 | TODO | — | — | 本地 git 检查点、AltServer 真机 12 条 |

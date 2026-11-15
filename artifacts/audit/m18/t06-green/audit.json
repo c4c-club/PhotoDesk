@@ -1,0 +1,981 @@
+﻿{
+    "generatedAt":  "2026-11-15T21:31:28Z",
+    "root":  "C:/Users/RuiZh/Desktop/photo_manager",
+    "version":  "1.6.0 (7)",
+    "deploymentTarget":  "iOS 16.0",
+    "releaseDirs":  [
+                        "1.4.0",
+                        "1.5.0"
+                    ],
+    "blockingFailures":  2,
+    "total":  29,
+    "checks":  [
+                   {
+                       "id":  "B01",
+                       "level":  "BLOCKING",
+                       "title":  "PhotoDeskCore 零 Apple 依赖：只允许 import Foundation（AGENTS 红线 2）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B02",
+                       "level":  "BLOCKING",
+                       "title":  "App 不得出现 iOS 17+ API（iOS 16 基线，禁 @Observable/SwiftData/ContentUnavailableView/scrollTargetBehavior/scrollPosition）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B03",
+                       "level":  "BLOCKING",
+                       "title":  "App 不得出现 minimumNumberOfTouches = 2（不用双指规则，docs/38 §1.2 #4）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B04",
+                       "level":  "BLOCKING",
+                       "title":  "Feature 层不得直接引用 PHAsset（AGENTS 架构规则 1）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B05",
+                       "level":  "BLOCKING",
+                       "title":  "红线 1 文案：不得出现「彻底删除/永久删除」祈使/陈述句（否定句与疑问句视为合规引用）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B06",
+                       "level":  "BLOCKING",
+                       "title":  "App 层不得有活跃框选符号（marquee*/MarqueeOverlayView/Marquee-Overlay/lastMarqueeRect/hitTest(rectInContent:)/HitRect，docs/38 §1.2 #1）",
+                       "expect":  "empty",
+                       "status":  "FAIL",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/GridHitTester.swift",
+                                        "line":  47,
+                                        "text":  "func hitTest(rectInContent rawRect: CGRect) -\u003e Set\u003cIndexPath\u003e {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "B07",
+                       "level":  "BLOCKING",
+                       "title":  "Core 层不得有框选调用点（MarqueeSelectionPolicy.mode/resolved、MarqueeHitResolver.hit、GridHitRegion.hitIDs/mergedSelection 的调用归零）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B08",
+                       "level":  "BLOCKING",
+                       "title":  "状态机 effect 不得再用旧名 beginMarquee/updateMarquee/endMarquee（T04 改名 beginTrail/updateTrail/endTrail）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B09",
+                       "level":  "BLOCKING",
+                       "title":  "App 禁止 try! / as!（AGENTS 代码规范）",
+                       "expect":  "empty",
+                       "status":  "PASS",
+                       "count":  0,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "B10",
+                       "level":  "BLOCKING",
+                       "title":  "UI/单测不得再断言框选 overlay/矩形/整行带/双指滚动（冻结用例契约必须迁移）",
+                       "expect":  "empty",
+                       "status":  "FAIL",
+                       "count":  39,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  178,
+                                        "text":  "let hit = tester.hitTest(rectInContent: rawRect)"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  221,
+                                        "text":  "func testMarqueeHitSelectsA3_7NotA3_6() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  231,
+                                        "text":  "let ids = Set(tester.hitTest(rectInContent: rect).map { \"a\\($0.section)-\\($0.item)\" })"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  237,
+                                        "text":  "/// docs/32 §2.4 第 8 步：缓存已热后，同一帧深位置框选 ≤ 60 次 layoutAttributesForItem 查询"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  247,
+                                        "text":  "_ = tester.hitTest(rectInContent: rect)"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskTests/LibraryGridGeometryTests.swift",
+                                        "line":  248,
+                                        "text":  "_ = tester.hitTest(rectInContent: rect)"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  1,
+                                        "text":  "// MARK: - MarqueeSelectionUITests：多选交互验收（M17 T05 重写，docs/32 §4.3，docs/31 §2.1/§2.3）——"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  2,
+                                        "text":  "// 新交互模型：长按 0.4s 进入多选并选中锚点；长按后任意方向拖 = 框选（含纵向到第 5 行 / 底缘"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  3,
+                                        "text":  "// 自动滚动）；无长按的横向按压拖 = 框选（pressing 横向占优，表第 3 行）；纵向单指拖 = 滚动让位"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  10,
+                                        "text":  "final class MarqueeSelectionUITests: XCTestCase {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  211,
+                                        "text":  "// MARK: - 长按后拖动继续框选（docs/32 §4.3）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  228,
+                                        "text":  "XCTFail(\"长按后拖到第 5 行：两次尝试均未进入框选（count=\\(count)，长按未触发）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  249,
+                                        "text":  "///（纵向让位，不得被框选/双指规则劫持）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  270,
+                                        "text":  "\"单指滚动是滚动不是框选：计数必须不变（before=\\(countBefore)）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  312,
+                                        "text":  "/// 普通网格横向按压拖过行 1：横向占优 ≥8pt → 先进多选再框选整行（3 格精确）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  313,
+                                        "text":  "func testHorizontalDragFromPressSelectsRow() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  323,
+                                        "text":  "\"横向按压拖必须框选行 1 的 3 格（未在多选时先进入多选）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  342,
+                                        "text":  "\"锚点已选 → 取消模式：矩形命中的 3 格全部取消（armed 帧 0 尺寸选框先取消锚点）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  363,
+                                        "text":  "func testDiagonalMarqueeSelectsRectangle() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  389,
+                                        "text":  "// MARK: - 全选后框选取消（docs/25 §6.5 ⑦）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  391,
+                                        "text":  "func testSelectAllThenMarqueeDeselects() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  402,
+                                        "text":  "\"全选后长按框选必须恰好取消 col-0 行 0-2 三格（total=\\(total)）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  403,
+                                        "text":  "assertAlive(app, \"全选+框选取消后\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  454,
+                                        "text":  "// MARK: - 框选覆盖层取证（M17 T06，docs/32 §2.5）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  539,
+                                        "text":  "/// 框选拖动期间覆盖层必须可见：连拍帧内检测 tint 描边像素（无覆盖层 → 0 像素 → 断言红）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  542,
+                                        "text":  "func testMarqueeOverlayVisible() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  597,
+                                        "text":  "// （8→16 曾触及底缘区触发 ticks=106 自动滚动，网格滚走后框选内容错位）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/MarqueeSelectionUITests.swift",
+                                        "line":  607,
+                                        "text":  "XCTAssertEqual(postCount, 0, \"取消模式框选必须清掉锚选（count=\\(postCount) banner=\\(bannerAfter)）\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/PageRegressionUITests.swift",
+                                        "line":  234,
+                                        "text":  "func testSelectionModeUsesSlidePanAndTwoFingerScrollConfig() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  605,
+                                        "text":  "// MARK: - M15 P0-3/4：矩形框选（整行带/快照恢复旧用例已删，验收在 MarqueeSelectionUITests）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  608,
+                                        "text":  "// -uiTestingClearPosition：框选/轻点族断言依赖确定的首屏几何（首格可点、两行满格），"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  643,
+                                        "text":  "\"框选应继续加选\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  645,
+                                        "text":  "\"框选矩形未覆盖首格，首格必须保持选中\")"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  648,
+                                        "text":  "/// P0-4：选择模式双指滚动配置（单指已由框选 pan 独占，collectionView pan 至少 2 指）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  649,
+                                        "text":  "func testTwoFingerScrollInSelectionMode() throws {"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  711,
+                                        "text":  "// 选择模式下的复用驱动器是框选自动滚动本身（MonthIndexBar 在多选态 isHidden，"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  712,
+                                        "text":  "// 单指 swipe 是框选手势）：第一段拖动选中的是行 1–2 × 3 列（6 格），第二段从"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/StabilityUITests.swift",
+                                        "line":  832,
+                                        "text":  "// MARK: - S07 多选单指滑选连续选中（M13：整条替换长按框选）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskUITests/ZoomStabilityUITests.swift",
+                                        "line":  368,
+                                        "text":  "// coordinate.tap，坐标通路已被框选 press/drag 证明可达 app）。任一通路让"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P01",
+                       "level":  "PRESENT",
+                       "title":  "SelectionGestureMachine 状态机存在（复用状态表）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  76,
+                                        "text":  "public struct SelectionGestureMachine: Sendable {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P02",
+                       "level":  "PRESENT",
+                       "title":  "SlideSelectTrail.swift 存在（路径事务，T02 产出）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectTrail.swift",
+                                        "line":  0,
+                                        "text":  "[文件存在]"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P03",
+                       "level":  "PRESENT",
+                       "title":  "TrailHitResolver.swift 存在（线段扫掠命中，T03 产出）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/TrailHitResolver.swift",
+                                        "line":  0,
+                                        "text":  "[文件存在]"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P04",
+                       "level":  "PRESENT",
+                       "title":  "GridCellFrame.swift 存在（CellFrame 从 marquee 命名中抽出，T03 产出）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/GridCellFrame.swift",
+                                        "line":  0,
+                                        "text":  "[文件存在]"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P05",
+                       "level":  "PRESENT",
+                       "title":  "App 控制器接线 trailHitProvider（线段命中注入）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  4,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  14,
+                                        "text":  "// updateTrail → trailHitProvider 线段有序命中 + SlideSelectTrail 路径事务净 delta"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  31,
+                                        "text":  "var trailHitProvider: (CGPoint, CGPoint) -\u003e [String] = { _, _ in [] }"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  374,
+                                        "text":  "let orderedIDs = trailHitProvider(from, to)"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                        "line":  796,
+                                        "text":  "controller.trailHitProvider = { [weak self] from, to in"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P06",
+                       "level":  "PRESENT",
+                       "title":  "GridHitTester.hitTestLine(from:to:) 存在（真实 attributes 线段扫描）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/GridHitTester.swift",
+                                        "line":  214,
+                                        "text":  "func hitTestLine(from: CGPoint, to: CGPoint) -\u003e [IndexPath] {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P07",
+                       "level":  "PRESENT",
+                       "title":  "App 增量落地 applySelectionDelta 存在",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  5,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  18,
+                                        "text":  "// 选中集唯一写入口：applySelectionDelta → VC applySelectionChanges（SelectionState.applyDelta）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  33,
+                                        "text":  "var applySelectionDelta: (Set\u003cString\u003e, Set\u003cString\u003e) -\u003e Void = { _, _ in }"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  291,
+                                        "text":  "applySelectionDelta(delta.add, delta.remove)"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  385,
+                                        "text":  "applySelectionDelta(delta.add, delta.remove)"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibraryViewController.swift",
+                                        "line":  788,
+                                        "text":  "controller.applySelectionDelta = { [weak self] add, remove in"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P08",
+                       "level":  "PRESENT",
+                       "title":  "Core SelectionState.applyDelta(add:remove:) 存在（事务输出承担者）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift",
+                                        "line":  94,
+                                        "text":  "public mutating func applyDelta(add: Set\u003cString\u003e, remove: Set\u003cString\u003e) {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P09",
+                       "level":  "PRESENT",
+                       "title":  "SlideSelectTrailTests 存在（T02 红/绿单测）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift",
+                                        "line":  10,
+                                        "text":  "final class SlideSelectTrailTests: XCTestCase {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P10",
+                       "level":  "PRESENT",
+                       "title":  "TrailHitResolverTests 存在（T03 红/绿单测）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Tests/PhotoDeskCoreTests/TrailHitResolverTests.swift",
+                                        "line":  11,
+                                        "text":  "final class TrailHitResolverTests: XCTestCase {"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P11",
+                       "level":  "PRESENT",
+                       "title":  "SlideSelectTrailUITests.swift 存在（T08 改名重写产物）",
+                       "expect":  "present",
+                       "status":  "FAIL",
+                       "count":  0,
+                       "missing":  [
+                                       "PhotoDeskUITests/SlideSelectTrailUITests.swift"
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "P12",
+                       "level":  "PRESENT",
+                       "title":  "状态机新 effect 名 beginTrail/updateTrail/endTrail 就位（T04 产出）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  18,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  12,
+                                        "text":  "//   副作用 [haptic(.impactLight), enterSelection(anchorID:), beginTrail]（表第 2 行，轨迹事务开启）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  19,
+                                        "text":  "// - dragging/autoScrolling moved → updateTrail + haptic(.selectionChanged)（受 hapticMinInterval"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  23,
+                                        "text":  "// - ended/cancelled：armed/dragging/autoScrolling 收尾（stopAutoScroll → endTrail → releaseScroll）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  67,
+                                        "text":  "case beginTrail"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  68,
+                                        "text":  "case updateTrail"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  69,
+                                        "text":  "case endTrail"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  151,
+                                        "text":  "effects.append(.beginTrail)"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  186,
+                                        "text":  "effects.append(.beginTrail)"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  214,
+                                        "text":  "var effects: [SelectionGestureEffect] = [.updateTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  233,
+                                        "text":  "return [.endTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  237,
+                                        "text":  "return [.endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  241,
+                                        "text":  "return [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  295,
+                                        "text":  "return [.endTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  299,
+                                        "text":  "return [.endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  303,
+                                        "text":  "return [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  314,
+                                        "text":  "effects = [.endTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  316,
+                                        "text":  "effects = scrollLocked ? [.endTrail, .releaseScroll] : [.endTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  318,
+                                        "text":  "effects = [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "P13",
+                       "level":  "PRESENT",
+                       "title":  "方向锁与滚动让位保留（releaseScroll/scrollLocked，单指纵向滚动共存）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  18,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  13,
+                                        "text":  "// 成对（docs/32 §2.3「进入 armed 后禁滚动」；releaseScroll 由机器在方向让位/收尾时配对补发）；"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  273,
+                                        "text":  "// armed 即禁滚动（docs/32 §2.3）；endTrail/releaseScroll 成对恢复"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  304,
+                                        "text":  "case .releaseScroll:"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  15,
+                                        "text":  "//   纵向占优（|dy| ≥ |dx|·horizontalRatio）→ idle + releaseScroll（让位滚动，G2）。"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  23,
+                                        "text":  "// - ended/cancelled：armed/dragging/autoScrolling 收尾（stopAutoScroll → endTrail → releaseScroll）"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  70,
+                                        "text":  "case releaseScroll"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  89,
+                                        "text":  "private var scrollLocked = false"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  135,
+                                        "text":  "scrollLocked = false"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  181,
+                                        "text":  "scrollLocked = true"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  193,
+                                        "text":  "return [.releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  203,
+                                        "text":  "scrollLocked = true"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  237,
+                                        "text":  "return [.endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  241,
+                                        "text":  "return [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  299,
+                                        "text":  "return [.endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  303,
+                                        "text":  "return [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  316,
+                                        "text":  "effects = scrollLocked ? [.endTrail, .releaseScroll] : [.endTrail]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  318,
+                                        "text":  "effects = [.stopAutoScroll, .endTrail, .releaseScroll]"
+                                    },
+                                    {
+                                        "file":  "PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift",
+                                        "line":  334,
+                                        "text":  "scrollLocked = false"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "I01",
+                       "level":  "INFO",
+                       "title":  "project.yml 版本号（T10 目标 1.7.0 (8)）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  2,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "project.yml",
+                                        "line":  17,
+                                        "text":  "MARKETING_VERSION: \"1.6.0\""
+                                    },
+                                    {
+                                        "file":  "project.yml",
+                                        "line":  18,
+                                        "text":  "CURRENT_PROJECT_VERSION: \"7\""
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "I02",
+                       "level":  "INFO",
+                       "title":  "部署目标 IPHONEOS_DEPLOYMENT_TARGET = 16.0",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  1,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "project.yml",
+                                        "line":  16,
+                                        "text":  "IPHONEOS_DEPLOYMENT_TARGET: \"16.0\""
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "I03",
+                       "level":  "INFO",
+                       "title":  "CI 产物名 PhotoDesk-Simulator-app-zip / PhotoDesk-unsigned-ipa",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  2,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  231,
+                                        "text":  "name: PhotoDesk-Simulator-app-zip"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  237,
+                                        "text":  "name: PhotoDesk-unsigned-ipa"
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "I04",
+                       "level":  "INFO",
+                       "title":  "CI minos=16.0 校验链（MINOS_VERSION + otool LC_BUILD_VERSION）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  11,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  33,
+                                        "text":  "MINOS_VERSION: \u002716.0\u0027"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  100,
+                                        "text":  "-showBuildSettings | grep \"IPHONEOS_DEPLOYMENT_TARGET = $MINOS_VERSION\""
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  188,
+                                        "text":  "otool -l \"$APP/PhotoDesk\" | grep -A3 LC_BUILD_VERSION"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  189,
+                                        "text":  "otool -l \"$APP/PhotoDesk\" | grep -A3 LC_BUILD_VERSION | grep -q \"minos $MINOS_VERSION\" || {"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  190,
+                                        "text":  "echo \"::error::LC_BUILD_VERSION minos != $MINOS_VERSION\"; exit 1; }"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  217,
+                                        "text":  "test \"$PLIST_MINOS\" = \"$MINOS_VERSION\" || {"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  218,
+                                        "text":  "echo \"::error::MinimumOSVersion != $MINOS_VERSION\"; exit 1; }"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  220,
+                                        "text":  "otool -l ipa-check/Payload/PhotoDesk.app/PhotoDesk | grep -A3 LC_BUILD_VERSION"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  221,
+                                        "text":  "otool -l ipa-check/Payload/PhotoDesk.app/PhotoDesk | grep -A3 LC_BUILD_VERSION | grep -q \"minos $MINOS_VERSION\" || {"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  222,
+                                        "text":  "echo \"::error::ipa minos != $MINOS_VERSION\"; exit 1; }"
+                                    },
+                                    {
+                                        "file":  ".github/workflows/ios.yml",
+                                        "line":  226,
+                                        "text":  "echo \"[OK] 未签名 IPA 校验通过（Payload / MinimumOSVersion=$MINOS_VERSION / minos=$MINOS_VERSION / 未签名）\""
+                                    }
+                                ]
+                   },
+                   {
+                       "id":  "I05",
+                       "level":  "INFO",
+                       "title":  "Release 归档目录 artifacts/release/1.7.0（T10 前允许缺失）",
+                       "expect":  "present",
+                       "status":  "FAIL",
+                       "count":  0,
+                       "missing":  [
+                                       "artifacts/release/1.7.0"
+                                   ],
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "I06",
+                       "level":  "INFO",
+                       "title":  "DEBUG 取证字段（debugAutoScrollTicks/debugHapticCount/debugTouchDownHitID）",
+                       "expect":  "present",
+                       "status":  "PASS",
+                       "count":  7,
+                       "missing":  [
+
+                                   ],
+                       "hits":  [
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  55,
+                                        "text":  "private(set) var debugTouchDownHitID: String = \"-\""
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  129,
+                                        "text":  "private(set) var debugHapticCount = 0"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  131,
+                                        "text":  "private(set) var debugAutoScrollTicks = 0"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  160,
+                                        "text":  "debugTouchDownHitID = hitID"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  315,
+                                        "text":  "debugHapticCount += 1"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  324,
+                                        "text":  "debugHapticCount += 1"
+                                    },
+                                    {
+                                        "file":  "PhotoDesk/Features/Library/LibrarySelectionController.swift",
+                                        "line":  412,
+                                        "text":  "debugAutoScrollTicks += 1"
+                                    }
+                                ]
+                   }
+               ]
+}
