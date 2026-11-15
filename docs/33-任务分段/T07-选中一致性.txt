@@ -1,0 +1,44 @@
+# T07 — 选中一致性
+
+> 自包含任务卡。只读本文件 + docs/32 §2.6/§4.3 + docs/31 §2.5。
+
+## 0. 目标
+
+修掉「全选只覆盖已加载页」「索引补齐丢选中」「每帧全量排序」「apply 窗口静默失效」「退出多选残留」。
+
+## 1. 前置
+
+T06 DONE。
+
+## 2. 必读
+
+- `PhotoDesk/Features/Library/LibraryViewController.swift`：`:786-1008`、`:1190-1240`
+- `PhotoDesk/Features/Library/LibraryViewModel.swift`：`filteredItems`/`isIndexComplete`/`ensureIndexComplete`
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift`
+
+## 3. 步骤
+
+1. scope 统一：`enterSelectionMode`、月 scope 之外的 `scopeOverride == nil` 分支、快照回调三处全部改为 `Set(viewModel.filteredItems.map(\.id))`；禁止再出现 `currentItemsBySection.flatMap`（audit A08 必须 PASS）。
+2. 增量应用：`applySlideSelection(ids:)` 改为 `delta = ids.symmetricDifference(selectionState.selectedSet)` → `applyDelta(add:remove:)`；只刷可见 cell 的差集；计数每帧更新（去掉 `previous.count != current.count` 条件）。
+3. apply 窗口：`hitTest` 返回 nil/空且 `isApplyingSnapshot` 时保留上一帧目标集合，不清空；下一帧重试（最多 3 帧，超时打 DEBUG 日志）。
+4. 退出复位：`exitSelectionMode` 清 `selectionScopeTitle`、隐身选框、`isScrollEnabled = true`、`allowsSelection = true`（同步，不用 `DispatchQueue.main.async`）。
+5. DEBUG 钩子：`Filtered-Count` 标签（`viewModel.filteredItems.count`），供 UI 全选断言。
+6. 测试：
+   - `LibraryViewModelTests`：索引未完成时全选计数 == filteredItems.count（不是 500）；
+   - 快照追加 500 后选中不丢；
+   - UI：`testSelectAllCoversFullFilteredSet`、`testExitSelectionResetsState`。
+
+## 4. 验收
+
+- audit A08/A09 PASS；`grep replaceSelection(Array(ids).sorted()) ` 为 0。
+- 全选 2 万张时拖动一帧 < 4ms（DEBUG p95）。
+- 退出多选后 1 帧内 `contentOffset` 不变、可立即单指滚动。
+
+## 5. Git
+
+- `test(selection): 全选 scope 与退出复位用例`
+- `fix(selection): scope 取全量筛选结果并改增量应用`
+
+## 6. 完成后
+
+只输出：T07 完成后，只读 T08-其他页面缺陷收口.txt。

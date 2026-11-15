@@ -1,0 +1,55 @@
+# T01 — 基线复核与红测试
+
+> 自包含任务卡。只读本文件 + docs/31 §0/§4 + docs/32 §3/§4。
+
+## 0. 目标
+
+把「当前确实坏了」变成可重复的证据：跑通 `scripts/audit-m17.ps1`，记录红基线；为三个用户问题各写至少一条**会失败**的测试，作为后续任务的验收锚点。
+
+## 1. 前置门禁
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 干净（允许本任务新增文件）。
+2. 读 `artifacts/plan/progress-m17.md`；不存在则创建（模板见 §6）。
+3. 本任务**不改任何 App/Core 源码**。
+
+## 2. 必读
+
+- `scripts/audit-m17.ps1`（19 项检查；`-Strict` 时 BLOCKING 未达标退出 2）
+- `PhotoDesk/Features/Library/SlideSelectGestureController.swift`
+- `PhotoDesk/Features/Library/LibraryViewController.swift`（仅 `:790-1010`、`:1725-1752`、`:1930-1955`）
+- `PhotoDeskUITests/MarqueeSelectionUITests.swift`
+- docs/31 §0、§2、§4
+
+## 3. 步骤
+
+1. 跑 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/audit-m17.ps1`，连跑两次；除 `generatedAt` 外逐字节一致；把输出复制到 `artifacts/audit/m17/baseline-<日期>/`（audit.md/json + 两次 stdout 日志）。
+2. 记录 9 项 BLOCKING 未达标（A04/A05/A06/A07/A08/A09/A10/A14/A15）为红基线，写进 `artifacts/plan/progress-m17.md`。
+3. 写红测试（只需失败，不求通过）：
+   - `PhotoDeskUITests/MarqueeSelectionUITests.swift` 追加 `testLongPressEntersSelection`：不点工具栏，直接 `press(forDuration: 0.4)` 首格 → 断言 `Selection-Count == 1`（当前必失败）。
+   - 同文件追加 `testSingleFingerScrollInSelectionMode`：用 `-uiTestingSelectMode` 进多选，上滑 → 断言 `collectionView.contentOffset.y` 变化 > 200（当前必失败：双指规则）。
+   - `PhotoDeskTests/LibraryGridGeometryTests.swift` 新建，写 `testPinnedHeaderAttributeIsPinned`：真实布局 + `contentOffset.y = 5000`，比较 `layoutAttributesForSupplementaryView(...).frame.minY` 与 `layoutAttributesForItem(at: IndexPath(item: 0, section: s)).frame.minY - 48`，把差值 `XCTContext.runActivity` 记录下来并断言 `差值 == 0`（用于判定 H1，当前可能失败）。
+4. 推 CI 定向跑这三个用例，记录 run id 与失败截图/日志路径。
+
+## 4. 验收
+
+- audit 红基线归档，两次输出一致。
+- 三个红用例在 CI 上有明确失败证据（截图/日志），不是"本地没编过"。
+- 不改产品代码；`git diff --stat` 只有测试与 artifacts。
+
+## 5. Git
+
+- `test(selection): 长按进入/单指滚动/粘性头几何红用例`
+- `docs(m17): 归档 audit-m17 红基线`
+
+## 6. progress-m17.md 模板
+
+```
+# M17 执行进度
+| 任务 | 状态 | 提交 | 门禁/证据 | 备注 |
+|---|---|---|---|---|
+| T01 | DOING | — | audit 9 BLOCKING | — |
+```
+
+## 7. 完成后
+
+只输出：T01 完成后，只读 T02-Core手势状态机.txt。

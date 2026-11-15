@@ -1,0 +1,42 @@
+# T09 — 全量回归与发布
+
+> 自包含任务卡。只读本文件 + docs/32 §6。前置：T01–T08 全部 DONE。
+
+## 0. 目标
+
+全量门禁 + 真机 + 1.6.0 (7) 未签名 IPA。
+
+## 1. 步骤
+
+1. `scripts/audit-m17.ps1 -Strict` 退出码 0；归档 `artifacts/audit/m17/final/`（两连跑一致）。
+2. `scripts/test-core.ps1`：Core 全绿，记录数字（用例数/耗时）。
+3. CI 全量：`core-linux`、`build`（iOS 16 模拟器 destination）、`PhotoDeskTests`、`PhotoDeskUITests`（含重写的 MarqueeSelectionUITests、Stability、ZoomStability、PositionRestore、Performance）。记录 run id 与失败项；不得弱化断言。
+4. 性能：`PerformanceUITests` 记录 FPS 与内存峰值截图；不达标先修再发。
+5. 真机：
+   - 有设备：用 AltServer 装 IPA，跑 docs/32 §4.4 的 12 条清单，逐条记录（机型/iOS 版本/结果/截图）。
+   - 无设备：写 **BLOCKED**，列清未验项，不得写"通过"。
+6. 版本：`project.yml` → `MARKETING_VERSION: "1.6.0"`、`CURRENT_PROJECT_VERSION: "7"`；`AppVersion` 与 `docs/05` 同步。
+7. 出包：CI IPA job 产出 `PhotoDesk-1.6.0-unsigned.ipa`，复制到 `artifacts/release/`；计算 SHA256（PowerShell `Get-FileHash`）。
+8. 更新 `docs/05`（M17 章节）与 `artifacts/plan/progress-m17.md`；写 `docs/35-M17验收记录.md`（测试数字、run id、真机结论、IPA 路径）。
+
+## 2. 验收
+
+- 全部门禁绿（或明确 BLOCKED 项）。
+- IPA 绝对路径 + SHA256 + 大小。
+- `docs/05` 含 M17 一行汇总。
+
+## 3. Git
+
+- `chore(release): 1.6.0 (7)`（project.yml + AppVersion）
+- `docs(m17): 验收记录与进度回填`
+
+## 4. 最终汇报格式
+
+```
+M17 完成。
+- Core: N/N（Docker）
+- CI: run <id> build ✅ / tests ✅ / UI ✅
+- 真机: DONE（机型/iOS）或 BLOCKED（原因）
+- Release: C:\Users\RuiZh\Desktop\photo_manager\artifacts\release\PhotoDesk-1.6.0-unsigned.ipa
+- SHA256: <hash>
+```

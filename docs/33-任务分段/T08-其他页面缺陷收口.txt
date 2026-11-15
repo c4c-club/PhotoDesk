@@ -1,0 +1,48 @@
+# T08 — 其他页面缺陷收口
+
+> 自包含任务卡。只读本文件 + docs/31 §3。
+
+## 0. 目标
+
+按 docs/31 §3 收口 X01–X10；本任务**不改**滑动多选相关文件（T02–T07 已冻结）。
+
+## 1. 前置
+
+T07 DONE。
+
+## 2. 必读（按子项，不要全读）
+
+- X01/X02：`PhotoDesk/Features/Albums/AlbumsView.swift`、`PhotoDesk/Core/Photos/PhotoLibraryService.swift`
+- X03：`PhotoDesk/Features/Search/SearchView.swift`、`SearchViewModel.swift`、`LibraryContainer.swift:97`
+- X04：`PhotoDesk/Features/Vault/VaultViewModel.swift:193-210`
+- X05：`PhotoDesk/Features/Export/ExportViewModel.swift:42-70`
+- X06：`PhotoDesk/Features/Metadata/MetadataView.swift:190-245`
+- X07：`PhotoDesk/Features/Library/LibraryViewModel.swift:430-465`
+- X08：`PhotoDesk/Features/Library/LibraryViewController.swift:1795-1802`
+- X09：`PhotoDesk/Features/Library/SlideSelectGestureController.swift`（若 T05 已删，改为检查新控制器无同类问题）
+- X10：`PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectPolicy.swift`（T02 已删则跳过）
+
+## 3. 步骤（逐项，一项一提交）
+
+1. **X01+X02 相簿**：新增 `AlbumService`（protocol + 实现）放在 `PhotoDesk/Core/Photos/`，把 `PHAssetCollection/PHAsset` 查询搬过去；列表改增量（`PHPhotoLibraryChangeObserver` 或 `PHFetchResult` 监听）；计数用 `PHFetchOptions` + `fetchLimit` 或缓存；主线程不枚举。`AlbumsView` 只消费 `[AlbumSummary]`。
+2. **X03 搜索**：`SearchView` 改为接收 `() -> [PhotoItem]`（或 `@ObservedObject LibraryViewModel`），打开与激活时刷新；`apply()` 放 `Task.detached` + 代际令牌（参照 LibraryViewModel `rebuildDerivedInBackground`）。
+3. **X04 保险箱收藏**：`favorite(ids:)` 成功后本地更新 `items[i].isFavorite` 并 `onItemsChanged?()`；给 `VaultViewModelTests` 加一条断言。
+4. **X05 导出进度**：`defer { downloadProgress = nil }` 或错误分支显式清空。
+5. **X06 元数据**：`loadBasics` 与 `CGImageSource` 全部移到 `Task.detached`，主线程只赋值。
+6. **X07 增量插入**：索引未完成时不做「按结果索引插入」，改为 `updated.append` + 依赖下一次 `rebuildDerived` 排序；或对 `index > updated.count` 走 append 分支并标记 `needsFullResort`。
+7. **X08 像素尺寸**：`cellPixelSize` 改为读 `collectionView.bounds.width` 与 `LibraryGridLayout.itemWidth(for:columns:)`，与布局同源。
+8. **X09/X10**：删除失效诊断字段或改为「setContentOffset 前后各取一次」；死代码若 T02 未删则删除。
+
+## 4. 验收
+
+- audit A10（Feature 层 PHAsset）**PASS**：`grep -rn "PHAsset" PhotoDesk/Features` 为 0（注释也算，改注释）。
+- 每项至少一条单测或 UI 断言；UI 测试用 `-uiTestingStorageMock` 类钩子避免真库依赖。
+- 无新增 `.ips`；相簿页 200 个相簿首屏 < 300ms（DEBUG 计时）。
+
+## 5. Git（每项一条）
+
+`fix(albums): 相簿查询下沉 Service 并增量刷新` / `fix(search): 搜索页数据源改为实时快照` / `fix(vault): 收藏后本地状态同步` / `fix(export): 失败路径复位下载进度` / `fix(metadata): EXIF 解析移出主线程` / `fix(library): 索引期增量插入不再错位` / `fix(library): 缩略图像素尺寸与布局同源`
+
+## 6. 完成后
+
+只输出：T08 完成后，只读 T09-全量回归与发布.txt。

@@ -1,0 +1,51 @@
+# T05 — 长按与滚动共存接线
+
+> 自包含任务卡。只读本文件 + docs/32 §2.3/§4.3 + docs/31 §2.1/§2.3。
+
+## 0. 目标
+
+用 `LibrarySelectionController` 替换 `SlideSelectGestureController`：长按进入多选、长按后继续拖动、方向锁、单指滚动保留、边缘自动滚动。
+
+## 1. 前置
+
+T04 DONE（命中已走真实 attributes）。
+
+## 2. 必读
+
+- `PhotoDesk/Features/Library/SlideSelectGestureController.swift`（旧实现，整份）
+- `PhotoDesk/Features/Library/LibraryViewController.swift`：`:740-770`（接线）、`:786-860`（enter/exit）、`:1930-1955`（delegate）
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionGestureMachine.swift`（T02 产物）
+
+## 3. 步骤
+
+1. 新建 `LibrarySelectionController.swift`（`@MainActor`）：
+   - 识别器：`UILongPressGestureRecognizer`（0.28/8）+ `UIPanGestureRecognizer`（1 指）+ `TouchDownObserver`（`UILongPress` 0 时长，只用于记录按下点）。
+   - 全部判定喂给 `SelectionGestureMachine`，控制器只做 UIKit 映射（禁止在 App 层再写阈值）。
+   - `.began` 的起点必须用 `TouchDownObserver` 记下的**按下点**（content 坐标），不得用 pan 的 `.began` 位置。
+   - 方向锁：横向占优 → `collectionView.isScrollEnabled = false`；纵向占优 → `pan.state = .failed` 交还滚动。
+   - 自动滚动：`CADisplayLink` 60fps，边缘 60pt，速度 2–12pt/帧，`clampedOffset` 复用 Core。
+   - 收尾：恢复 `isScrollEnabled`、移除覆盖层（T06 提供）、`state = .idle`。
+2. VC 改动：
+   - 删除 `collectionView.panGestureRecognizer.minimumNumberOfTouches = 2`（两处），改为永远 1；`exitSelectionMode` 不再改回。
+   - `gestureRecognizerShouldBegin` 改为：长按/pan 只在「命中 cell」时允许；`isGridLayoutTransition` 期间冻结。
+   - `shouldRecognizeSimultaneouslyWith`：长按 ↔ pan ↔ scroll pan 允许；捏合保持现状。
+   - `didSelectItemAt` 保持，但确保长按触发后 0.3s 内的 touch-up 不重复 toggle（用 `controller.isConsumingTouch` 守卫）。
+3. UI 测试：`testLongPressEntersSelection`、`testLongPressDragContinuesSelection`、`testSingleFingerScrollWorksInSelectionMode`、`testAutoScrollSelectsOffscreenExactly`（改自 T01 红用例，转绿）。
+4. 删除 `SlideSelectGestureController.swift`。
+
+## 4. 验收
+
+- 上述 4 条 UI 用例在 CI 全绿；含长按 0.4s + 拖动场景。
+- 全仓 `minimumNumberOfTouches = 2` 为 0（audit A05 PASS）。
+- 长按进入后**未点工具栏**也出现多选栏（断言 `Selection-Count` 存在）。
+- 多选模式上滑后 `contentOffset.y` 变化 > 200 且计数不变。
+
+## 5. Git
+
+- `test(selection): 长按进入与单指滚动用例`
+- `feat(selection): LibrarySelectionController 长按与方向锁`
+- `refactor(selection): 移除双指滚动规则与旧控制器`
+
+## 6. 完成后
+
+只输出：T05 完成后，只读 T06-选中渲染与触觉.txt。

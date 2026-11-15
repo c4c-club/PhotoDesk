@@ -1,0 +1,51 @@
+# T04 — 网格真实几何与命中
+
+> 自包含任务卡。只读本文件 + docs/32 §2.4/§4.2 + docs/31 §2.2/§6。
+
+## 0. 目标
+
+删掉 `marqueeGeometry()` 的参数推算，改为读**真实 layout attributes**；并用「真实 UICollectionView + 真实布局」单测把 H1（粘性头）/H3（item 宽）钉死。
+
+## 1. 前置
+
+T03 DONE。
+
+## 2. 必读
+
+- `PhotoDesk/Features/Library/LibraryViewController.swift`：`:958-1008`（marqueeGeometry/applySlideSelection）、`:1725-1752`（makeLayout）、`:374-407`（dataSource）
+- `PhotoDesk/Features/Library/SlideSelectGestureController.swift`（`geometryProvider` 契约）
+- `PhotoDeskTests/LibraryGridPinchTests.swift`（现有真布局测试写法参考）
+
+## 3. 步骤
+
+1. 新建 `PhotoDesk/Features/Library/LibraryGridLayout.swift`：把 `makeLayout(columns:)` 原样搬出为 `enum LibraryGridLayout { static func make(columns: Int) -> UICollectionViewCompositionalLayout }`；VC 改为调用它（行为零变化）。
+2. 新建 `GridHitTester.swift`：
+   - `init(collectionView:)`
+   - `func invalidateGeometry()`
+   - `func hitTest(rectInContent: CGRect) -> Set<IndexPath>`：按 docs/32 §2.4 的 1–8 步实现；内部缓存 `sectionRange` 与 `rowHeight`，布局变化（`layoutSubviews` 后 / snapshot apply / 列数变化）失效。
+   - DEBUG 计数器 `lastQueryCount`，供 UI 测试断言 ≤ 60。
+3. VC 改动：删除 `marqueeGeometry()`；`SlideSelectGestureController.geometryProvider` 契约改为 `hitTestProvider: (CGRect) -> Set<String>`（id 映射在 VC 内用 `dataSource.itemIdentifier(for:)`）；`applyTargetIDs` 不变。
+4. 单测 `PhotoDeskTests/LibraryGridGeometryTests.swift`：
+   - 390 宽、2/3/4/5 列、2000 item / 40 段；
+   - offset 0/2000/8000/20000；
+   - 断言 `GridHitTester` 结果 == 逐 item 用 `layoutAttributesForItem` 暴力求交的结果（集合相等）；
+   - 记录并断言 H1/H3 结论（见 docs/32 §4.2 第 3/4 条）；
+   - 一条回归锁：`a3-7` 被选中、`a3-6` 未被选中。
+5. 跑 Core 与 `PhotoDeskTests/LibraryGridGeometryTests`（CI 定向）。
+
+## 4. 验收
+
+- `grep -rn "marqueeGeometry" PhotoDesk` 为 0。
+- `grep -rn "layoutAttributesForSupplementaryView" PhotoDesk/Features/Library/LibraryViewController.swift` 只剩位置记忆/月跳用途（命中路径 0）。
+- 单测全绿；H1/H3 在测试注释里写明实测结论。
+- `lastQueryCount ≤ 60`（同一帧深位置框选）。
+
+## 5. Git
+
+- `test(library): 真布局命中几何与粘性头红用例`
+- `refactor(library): 抽出 LibraryGridLayout`
+- `fix(selection): 命中改用真实 layoutAttributes`
+
+## 6. 完成后
+
+只输出：T04 完成后，只读 T05-长按与滚动共存接线.txt。

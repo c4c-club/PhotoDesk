@@ -1,0 +1,50 @@
+# T03 — Core 命中解析
+
+> 自包含任务卡。只读本文件 + docs/32 §2.4/§4.1 + docs/31 §2.2。
+
+## 0. 目标
+
+把「矩形 + 一组真实 cell frame」→「命中 id 集合」做成**纯函数**，替换现有 `MarqueeSelectionPolicy` 的参数推算（保留其公开 API 到 T04 迁移完成后再删）。
+
+## 1. 前置
+
+T02 DONE；Core 可跑。
+
+## 2. 必读
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/MarqueeSelectionPolicy.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/MarqueeSelectionPolicyTests.swift`
+- docs/32 §2.4
+
+## 3. 步骤
+
+1. 新增 `MarqueeHitResolver.swift`：
+   ```swift
+   public struct CellFrame: Hashable, Sendable { public let id: String; public let minX, minY, maxX, maxY: Double }
+   public struct HitRect: Equatable, Sendable { public let minX, minY, maxX, maxY: Double
+       public init(anchor: (Double, Double), current: (Double, Double))  // 自动归一 + 1pt 扩展
+   }
+   public enum MarqueeHitResolver {
+       public static func hit(_ rect: HitRect, cells: [CellFrame], clipTop: Double? = nil) -> Set<String>
+   }
+   ```
+   - 相交判定：`cell.minX <= rect.maxX && cell.maxX >= rect.minX && cell.minY <= rect.maxY && cell.maxY >= rect.minY`
+   - `clipTop` 非 nil 时先把矩形上边抬到 `clipTop`（粘性头裁剪），抬后为空则返回空集
+   - 非有限值/空数组 → 空集；`cells` 允许未排序
+2. 单元测试 ≥ 20：空、单点、1pt、部分相交、包含、被包含、跨段、同 id 重复、`clipTop` 裁掉一半、`clipTop` 全裁、矩形反向拖、2 万个 frame 性能 < 5ms。
+3. 在 `MarqueeSelectionPolicy` 顶部加注释：`@available(*, deprecated, message: "T04 完成后删除；命中一律走 MarqueeHitResolver + 真实 layoutAttributes")`，本任务不删（避免一次改太多）。
+
+## 4. 验收
+
+- Core 全绿；新增用例 ≥ 20。
+- 不引入 UIKit/CoreGraphics 依赖（只用 Foundation 的 Double）。
+- 性能用例在 CI 容器内稳定通过（若容器慢，阈值放宽到 20ms 并在注释说明）。
+
+## 5. Git
+
+- `test(core): MarqueeHitResolver 红用例`
+- `feat(core): 矩形命中纯函数与粘性头裁剪`
+
+## 6. 完成后
+
+只输出：T03 完成后，只读 T04-网格真实几何与命中.txt。

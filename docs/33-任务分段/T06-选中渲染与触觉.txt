@@ -1,0 +1,48 @@
+# T06 — 选中渲染与触觉
+
+> 自包含任务卡。只读本文件 + docs/32 §2.5/§2.7 + docs/31 §2.1（G4/G6）。
+
+## 0. 目标
+
+让「选/取消」在视觉与触觉上**一眼可辨**：选框、角标弹入、压暗、取消模式变色、触觉节流。
+
+## 1. 前置
+
+T05 DONE。
+
+## 2. 必读
+
+- `PhotoDesk/Features/Library/PhotoGridCell.swift`
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（T05 产物）
+- `PhotoDesk/UI/DesignSystem/Colors.swift`（`DSColor.tint` / 是否有 danger token；没有就在 DS 内新增）
+- `PhotoDeskTests/PhotoGridCellTests.swift`
+
+## 3. 步骤
+
+1. `PhotoGridCell`：新增 `applySelection(isSelecting:isSelected:animated:)` 单一入口；实现角标 spring 弹入、12% 压暗、2pt 边框、`prepareForReuse` 全复位；`setSelectionVisible/setSelected` 改为内部调用（保留旧签名做转发，避免大面积改调用点）。
+2. 新建 `MarqueeOverlayView.swift`：单层 CALayer、圆角 12、tint 10%/1.5pt；取消模式 danger 8%/1.5pt；`accessibilityIdentifier = "Marquee-Overlay"`、`isUserInteractionEnabled = false`。
+3. `LibrarySelectionController`：
+   - 拖动开始显示 overlay，`ending` 隐藏；每帧只改 `frame`，不重建；
+   - 取消模式切换 overlay 配色；
+   - 触觉：进入多选 `impact(.light)`；命中集合变化 `selectionChanged()` 但 60ms 节流（`hapticMinInterval`）。
+4. 多选栏提示：`selectionCountLabel` 右侧加模式说明「选择中/取消选择中」（仅多选且拖动时显示，结束隐藏）——文案走 docs/04 §7 口径。
+5. 测试：
+   - `PhotoGridCellTests`：`applySelection` 四态（选中/未选/退出多选/复用）断言 badge/dim/border/AX 一致；
+   - UI：`testMarqueeOverlayVisible`、`testDeselectModeShowsDangerTint`（像素采样：overlay 边框颜色 R 通道占优）。
+
+## 4. 验收
+
+- 角标在 0.2s 内可见（截图对比）；dim alpha 在 0.1–0.15 之间。
+- 取消模式 overlay 颜色与选择模式明显不同（像素判定）。
+- 触觉频率 ≤ 16 次/秒（DEBUG 计数器暴露 `hapticCount`，UI 测试读）。
+- 无新增全局截图回归（对比 `artifacts/pages` 基线需人工确认差异仅限选中态）。
+
+## 5. Git
+
+- `test(cell): 选中渲染四态与 overlay 红用例`
+- `feat(selection): 选框覆盖层与角标动画`
+- `fix(selection): 触觉节流与取消模式提示`
+
+## 6. 完成后
+
+只输出：T06 完成后，只读 T07-选中一致性.txt。

@@ -1,0 +1,51 @@
+# T02 — Core 手势状态机
+
+> 自包含任务卡。只读本文件 + docs/32 §2.2 + docs/31 §2.1/§2.3。
+
+## 0. 目标
+
+在 `PhotoDeskCore` 实现**纯逻辑**手势状态机，把「长按进入 / 方向锁 / 滚动让位 / 自动滚动」的全部判定从 UIKit 抽离，可单测。
+
+## 1. 前置
+
+1. T01 为 DONE；`git status` 干净。
+2. `scripts/test-core.ps1`（Docker `swift:6.0-noble`）可跑。
+
+## 2. 必读
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectConfig.swift`
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectPolicy.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/SlideSelectPolicyTests.swift`（旧语义参考，将被替换）
+- docs/32 §2.2
+
+## 3. 步骤
+
+1. 新增 `SelectionGestureMachine.swift`：
+   - `SelectionGestureState`（idle/pressing/armed/dragging/autoScrolling/ending）
+   - `SelectionGestureEvent`（touchDown/holdElapsed/moved/scrollStarted/ended/cancelled）
+   - `SelectionGestureConfig`（0.28 / 8 / 8 / 1.2 / 6 / 0.06）
+   - `mutating func handle(_ event: SelectionGestureEvent, now: TimeInterval) -> [SelectionGestureEffect]`，effect 为枚举：`enterSelection(anchorID:)`、`beginMarquee`、`updateMarquee`、`endMarquee`、`releaseScroll`、`haptic(kind:)`、`startAutoScroll(direction:)`、`stopAutoScroll`
+   - 所有阈值只从 config 取，禁止散落数字。
+2. 新增 `SelectionGestureMachineTests.swift`，覆盖 docs/32 §2.2 状态表的**每一行**，另加：
+   - 长按 0.27s 抬手 → 不进入多选（交给 tap）
+   - 长按后纵向拖 → 进入 armed 但不拖框，收到 `scrollStarted` 后回 idle
+   - 横向锁定后反向拖回起点 → 命中集合收缩（effect 只报状态，集合由调用方算）
+   - 自动滚动进出边缘 3 次 → start/stop 配对，无泄漏
+   - 非有限 `dt/dx/dy` → 安全回 idle
+3. 删除 `SlideSelectPolicy` 中 `shouldActivate/resolvedSelection/deduplicated` 与对应测试（死代码，docs/31 X10）；若外部仍被引用，先给 App 侧留 `@available(*, deprecated)` 一个版本？——**不**：本任务直接删除并修编译。
+
+## 4. 验收
+
+- Core 全绿；新增用例 ≥ 25。
+- `grep -r "shouldActivate" PhotoDeskCore PhotoDesk` 为 0。
+- 状态机文件中 `import Foundation` 之外无其它 import。
+
+## 5. Git
+
+- `test(core): 手势状态机红用例`
+- `feat(core): SelectionGestureMachine 与配置常量`
+- `refactor(core): 删除 SlideSelectPolicy 死代码`
+
+## 6. 完成后
+
+只输出：T02 完成后，只读 T03-Core命中解析.txt。
