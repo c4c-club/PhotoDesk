@@ -3,9 +3,12 @@
 // 这里改为 PHAssetCreationRequest 显式写入 creationDate，保证 2020–2026 每月数据在筛选/月份/位置测试里稳定可复现。
 // 性能约束（docs/21 §6 绿轮教训）：seeding 在 viewState 进入 .ready 前阻塞 loadIfNeeded，
 // 超过 UI 测试网格超时会被杀进程且 didSeedKey 无法落盘，导致每次启动重试级联失败——
-// 因此必须单张小图 + 单批事务，把总耗时压到秒级。
+// 因此必须单张小图 + 分批小事务，把总耗时压到秒级。
 // 正确性约束（绿5 实测 167 请求只落 23 张）：多个 creation 请求不得共享同一个临时文件——
-// Photos 对同一 URL 的并发拷贝会互相失败；逐文件落盘（96×96 小图 ≈1s 总量）后单批事务稳定。
+// Photos 对同一 URL 的并发拷贝会互相失败；逐文件落盘（96×96 小图 ≈1s 总量）。
+// M17 T09 run 43647518272 实锤：基础种子 167 请求单事务踩 CI 五/七轮实锤的 -1 高危形态，
+// 部分成功 → didSeedKey 不落盘 → 重启重插且事务后立即枚举读到旧状态 → 库翻倍（all=340/772），
+// Marquee 套件 10/14 崩。基础种子与深种子同形 40/批分批；抛错按占位符回查已落库日期去重。
 // 深库种子（-uiTestingSeedDeepLibrary，M16 T03）：2002–2019 每月 2 张共 432 张，
 // 让「锚点 globalIndex > 500」的位置恢复测试有真实深锚点（总量 519）；分批事务 40/批 + 幂等补种。
 // CI 五/七轮实锤：150/批 大事务与「15+ 次启动后才执行」都会整体报 PHPhotosErrorDomain -1；
@@ -49,26 +52,36 @@ enum UITestDatedPhotoSeeder {
         // didSeedKey 未落盘会让下次启动整批重插，库从 341 涨到 468/500（重复月份 4 张）。
         // 改为「缺什么补什么」的幂等补种：每次先枚举现有 creationDate，只创建缺失日期；
         // 补齐才落盘标记。部分成功的事务不会因为重试而产生重复。
-        for attempt in 1...2 {
-            let missing = missingSeedDates(wanted: wanted)
+        // locallyCommitted 兜底：事务抛错后的立即枚举可能读到旧状态（M17 T09 实锤库翻倍根因），
+        // 占位符回查确认的已落库日期不再重提，杜绝部分成功后的重复播种。
+        var locallyCommitted = Set<Date>()
+        for attempt in 1...4 {
+            let missing = missingSeedDates(wanted: wanted.subtracting(locallyCommitted))
             if missing.isEmpty {
                 defaults.set(true, forKey: didSeedKey)
                 return
             }
-            do {
-                try await performChanges(dates: missing)
-                if missingSeedDates(wanted: wanted).isEmpty {
-                    defaults.set(true, forKey: didSeedKey)
+            var aborted = false
+            for chunkStart in stride(from: 0, to: missing.count, by: 40) {
+                let chunk = Array(missing[chunkStart..<min(chunkStart + 40, missing.count)])
+                let outcome = await performChanges(dates: chunk)
+                locallyCommitted.formUnion(outcome.committedDates)
+                if let error = outcome.error {
+                    let nsError = error as NSError
+                    ViewerTrace.log("seed failed count=\(chunk.count) attempt=\(attempt) committed=\(outcome.committedDates.count) code=\(nsError.code) " +
+                                    "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
+                                    "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
+                    aborted = true
+                    break
                 }
+                do { try await Task.sleep(nanoseconds: 300_000_000) } catch { /* 睡眠失败直接续发 */ }
+            }
+            if missingSeedDates(wanted: wanted.subtracting(locallyCommitted)).isEmpty {
+                defaults.set(true, forKey: didSeedKey)
                 return
-            } catch {
-                let nsError = error as NSError
-                ViewerTrace.log("seed failed count=\(missing.count) attempt=\(attempt) code=\(nsError.code) " +
-                                "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
-                                "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
-                if attempt == 1 {
-                    do { try await Task.sleep(nanoseconds: 500_000_000) } catch { /* 睡眠失败直接重试 */ }
-                }
+            }
+            if aborted {
+                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { /* 睡眠失败直接重试 */ }
             }
         }
     }
@@ -79,20 +92,21 @@ enum UITestDatedPhotoSeeder {
         guard UITestHooks.enabled("-uiTestingSeedDeepLibrary"),
               !defaults.bool(forKey: didDeepSeedKey) else { return }
         let wanted = Set(makeDeepDates())
+        var locallyCommitted = Set<Date>()
         var rounds = 0
         while rounds < 14 {
-            let missing = missingSeedDates(wanted: wanted)
+            let missing = missingSeedDates(wanted: wanted.subtracting(locallyCommitted))
             if missing.isEmpty {
                 defaults.set(true, forKey: didDeepSeedKey)
                 ViewerTrace.log("deep-seed done wanted=\(wanted.count) rounds=\(rounds)")
                 return
             }
             let chunk = Array(missing.prefix(40))
-            do {
-                try await performChanges(dates: chunk)
-            } catch {
+            let outcome = await performChanges(dates: chunk)
+            locallyCommitted.formUnion(outcome.committedDates)
+            if let error = outcome.error {
                 let nsError = error as NSError
-                ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) code=\(nsError.code) " +
+                ViewerTrace.log("deep-seed failed count=\(chunk.count) round=\(rounds) committed=\(outcome.committedDates.count) code=\(nsError.code) " +
                                 "msg=\(nsError.userInfo[NSLocalizedDescriptionKey] ?? "-") " +
                                 "underlying=\(nsError.userInfo[NSUnderlyingErrorKey] ?? "-")")
                 // CI 八轮实锤：瞬时连发 14 轮全 -1（Photos daemon 忙），轮间喘息后再试
@@ -185,26 +199,47 @@ enum UITestDatedPhotoSeeder {
         return urls
     }
 
+    /// 单批事务结果：error 非 nil = 事务失败（可能部分成功）；committedDates = 已确认落库的日期。
+    /// 占位符 localIdentifier 与提交后的资产一致：成功按写入日期计；抛错只按回查真实落库的计——
+    /// 事务后立即枚举可能读到旧状态，调用方以本结果去重，防止部分成功后重插。
+    private struct SeedTransactionOutcome {
+        let error: Error?
+        let committedDates: Set<Date>
+    }
+
     @MainActor
-    private static func performChanges(dates: [Date]) async throws {
+    private static func performChanges(dates: [Date]) async -> SeedTransactionOutcome {
         guard let urls = makeSeedFileURLs(count: dates.count), urls.count == dates.count else {
-            throw SeedError.seedImageUnavailable
+            return SeedTransactionOutcome(error: SeedError.seedImageUnavailable, committedDates: [])
         }
         defer {
             for url in urls {
                 do { try FileManager.default.removeItem(at: url) } catch { }
             }
         }
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<SeedTransactionOutcome, Never>) in
+            var placeholders: [(date: Date, id: String)] = []
             PHPhotoLibrary.shared().performChanges {
                 for (offset, url) in urls.enumerated() {
                     guard let request = PHAssetCreationRequest.creationRequestForAssetFromImage(atFileURL: url) else { continue }
                     request.creationDate = dates[offset]
+                    if let placeholder = request.placeholderForCreatedAsset {
+                        placeholders.append((dates[offset], placeholder.localIdentifier))
+                    }
                 }
             } completionHandler: { success, error in
-                if let error { continuation.resume(throwing: error) }
-                else if success { continuation.resume() }
-                else { continuation.resume(throwing: SeedError.photoLibraryRejected) }
+                let lookup = PHAsset.fetchAssets(withLocalIdentifiers: placeholders.map { $0.id }, options: nil)
+                var committed = Set<Date>()
+                lookup.enumerateObjects { asset, _, _ in
+                    if let date = asset.creationDate { committed.insert(date) }
+                }
+                if let error {
+                    continuation.resume(returning: SeedTransactionOutcome(error: error, committedDates: committed))
+                } else if success {
+                    continuation.resume(returning: SeedTransactionOutcome(error: nil, committedDates: Set(placeholders.map { $0.date })))
+                } else {
+                    continuation.resume(returning: SeedTransactionOutcome(error: SeedError.photoLibraryRejected, committedDates: committed))
+                }
             }
         }
     }
