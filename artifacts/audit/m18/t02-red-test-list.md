@@ -18,7 +18,7 @@
 | 11 | testScopeOutsidersNeverEnterPath | scope={"a","b"}：consume(["out"]) → path 不变、delta 空；后续 consume(["out"]) 仍忽略（不残留 occurrences） |
 | 12 | testDuplicateIDsInOneFrameCollapse | consume(["a","a","a"])：等价 consume(["a"])，path=[a]，delta add={"a"} 一次 |
 | 13 | testNetDeltaAgainstPreviousFrame | path=[a]（上帧已 add a）后单帧 consume(["b","a","b","c"])：净 delta = remove 无 a？→ 断言相对上一帧净差：add={"b","c"}，a 保持（净差口径锁） |
-| 14 | testTenThousandStepsUnderBudget | 10000 步正反交替 consume 总耗时 <5ms（docs/38 §4 性能锁；CI 容器预算） |
+| 14 | testTenThousandStepsUnderBudget | （T02 修订，docs/38 §4 留痕）10k 步绝对回归闸 60ms + 4× 步数 <8× 耗时摊还线性锁；原「<5ms」DEBUG Docker 五连跑 16.0–24.9ms 不可达，语义断言未动 |
 | 15 | testSnapshotImmutableAfterInit | init(base:mode:scope:) 后外部修改传入集合（防御性拷贝）不影响 trail 状态；mode/base 只读 |
 | 16 | testAnchorInBaseSurvivesTrailForLongPressEntry | 长按进入场景 base 含锚点 a：任意回滑/截断后 a 始终 ∈ target（T05 双基线 Core 侧前置，docs/38 §2.2） |
 

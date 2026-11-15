@@ -1,0 +1,1 @@
+{"coreLinux":{"conclusion":"success","status":"completed","url":"https://github.com/c4c-club/PhotoDesk/actions/runs/43735741291/job/132877851365"},"createdAt":"2026-11-15T16:29:23Z","title":"feat(core): SlideSelectTrail 基线与路径栈","url":"https://github.com/c4c-club/PhotoDesk/actions/runs/43735741291"}

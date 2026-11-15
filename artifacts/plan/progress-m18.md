@@ -6,7 +6,7 @@
 | 任务 | 状态 | 提交 | 门禁/证据 | 备注 |
 |---|---|---|---|---|
 | T01 | DONE | 0a59ff8（M17 归档）/ ce6b58f（audit 脚本+红基线）/ 本卡 docs 提交（见 git log 第 3 条） | audit-m18 29 项：A/B 确定性一致 + `-Strict` exit 2（3 BLOCKING 红基线）；Core Docker 443/0；docs/37 §0–§10 + docs/38 T01 修订 + t02-red-test-list 16 条 | M17 归档 14 文件；红基线 B06=45/B08=18/B10=39 |
-| T02 | TODO | — | — | Core 轨迹事务红/绿 |
+| T02 | DONE | 05b7f10（红）/ a1d2d4c（绿）/ 本卡 docs 提交（git log 第 3 条） | Docker **461/461**（+18）；CI core-linux success（run 43735741291）；红日志 artifacts/audit/m18/t02/red-compile-failure.log；性能预算 T02 修订见 docs/38 变更日志 | applyRange/selectRange 仅定义 0 调用 |
 | T03 | TODO | — | — | Core 线段命中红/绿 |
 | T04 | TODO | — | — | 状态机 effect 改名与红线复核 |
 | T05 | TODO | — | — | App 线段命中 + 路径增量接线 |
