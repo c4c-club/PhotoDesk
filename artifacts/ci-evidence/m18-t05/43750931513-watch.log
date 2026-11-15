@@ -1,0 +1,4836 @@
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push less than a minute ago
+
+JOBS
+* core-linux (ID 132924482175)
+  ✓ Set up job
+  * Initialize containers
+  * Run actions/checkout@v4
+  * Test PhotoDeskCore (with coverage)
+  * Coverage report
+  * Stop containers
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 minute ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  * Ensure iOS simulator runtime
+  * Create simulator
+  * Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 2 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  * Ensure iOS simulator runtime
+  * Create simulator
+  * Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 3 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  * Ensure iOS simulator runtime
+  * Create simulator
+  * Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 4 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  * Ensure iOS simulator runtime
+  * Create simulator
+  * Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 5 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  * Ensure iOS simulator runtime
+  * Create simulator
+  * Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 6 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 7 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  * Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 8 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 9 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  * Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 10 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 11 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 12 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 13 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 14 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 15 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 16 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 17 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 18 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 20 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 21 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 22 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 23 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 24 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 25 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 26 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 27 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 28 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 29 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 30 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 31 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 32 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 33 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 34 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 35 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 36 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 37 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 38 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 39 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 40 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 41 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 42 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 43 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 44 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 45 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 46 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 47 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 48 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 50 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 51 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 52 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 53 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 54 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 55 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 56 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 57 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 58 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 59 minutes ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
+Refreshing run status every 60 seconds. Press Ctrl+C to quit.
+
+* feat/m18-trail-selection Build & Test · 43750931513
+Triggered via push about 1 hour ago
+
+JOBS
+✓ core-linux in 56s (ID 132924482175)
+  ✓ Set up job
+  ✓ Initialize containers
+  ✓ Run actions/checkout@v4
+  ✓ Test PhotoDeskCore (with coverage)
+  ✓ Coverage report
+  ✓ Post Run actions/checkout@v4
+  ✓ Stop containers
+  ✓ Complete job
+* build (ID 132924771886)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run maxim-lobanov/setup-xcode@v1
+  ✓ Install xcodegen
+  ✓ Generate project
+  ✓ Ensure iOS simulator runtime
+  ✓ Create simulator
+  ✓ Verify generated build settings
+  ✓ Build (simulator)
+  ✓ Seed photos for UI tests
+  * Test (simulator)
+  * Capture simulator state on failure
+  * Run actions/upload-artifact@v4
+  * Extract UI test attachments
+  * Run actions/upload-artifact@v4
+  * Package simulator app
+  * Verify deployment target
+  * Build unsigned ipa
+  * Verify unsigned ipa
+  * Run actions/upload-artifact@v4
+  * Run actions/upload-artifact@v4
+  * Simulator smoke (install / launch / photos / screenshot)
+  * Run actions/upload-artifact@v4
+  * Performance tests (5,000+ photos)
+  * Run actions/upload-artifact@v4
+  * Collect crash reports on failure
+  * Run actions/upload-artifact@v4
+  * Upload logs on failure
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+core-linux: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+core-linux: .github#1
+
