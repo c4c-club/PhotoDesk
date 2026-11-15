@@ -261,4 +261,58 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertEqual(LibraryGridLayout.itemWidth(for: 1, rowWidth: 390), 390, accuracy: 0.001)
         XCTAssertGreaterThanOrEqual(LibraryGridLayout.itemWidth(for: 5, rowWidth: 0), 0, "退化输入不得为负")
     }
+
+    // MARK: - M18 T05：hitTestLine 真布局测试（docs/38 §2/§3：线段扫掠、滑到哪选到哪）
+
+    /// 竖向线段穿过 a3-7 至下一行：命中非空、含 a3-7，且序列按经过顺序（minY 单调不减）。
+    func testHitTestLineSweepsTopToBottomInOrder() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let attrs = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
+                                  "必须能取到 a3-7 的真实 attributes")
+        let start = CGPoint(x: attrs.frame.midX, y: attrs.frame.minY - 1)
+        let end = CGPoint(x: attrs.frame.midX, y: attrs.frame.maxY + 60)
+        let hit = tester.hitTestLine(from: start, to: end)
+        XCTAssertFalse(hit.isEmpty, "穿过两行的竖向线段必须命中 cell")
+        XCTAssertTrue(hit.contains(IndexPath(item: 7, section: 3)), "线段穿过 a3-7 必须命中")
+        var lastY: CGFloat = -.greatestFiniteMagnitude
+        for path in hit {
+            let frame = try XCTUnwrap(layout.layoutAttributesForItem(at: path)).frame
+            XCTAssertGreaterThanOrEqual(frame.minY, lastY,
+                                        "命中序列必须按经过顺序（minY 单调不减）")
+            lastY = frame.minY
+        }
+    }
+
+    /// 横向线段从 a3-7 中部向左穿到 a3-5 内部：首个命中 a3-7，x 单调不增，止点格 a3-5 命中。
+    func testHitTestLineHorizontalOrdersLeftwardFromAnchor() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        cv.layoutIfNeeded()
+        cv.setContentOffset(.zero, animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+        let attrs7 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
+                                   "必须能取到 a3-7 的真实 attributes")
+        let attrs5 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 5, section: 3)),
+                                   "必须能取到 a3-5 的真实 attributes")
+        let start = CGPoint(x: attrs7.frame.midX, y: attrs7.frame.midY)
+        let end = CGPoint(x: attrs5.frame.minX + 2, y: attrs7.frame.midY)
+        let hit = tester.hitTestLine(from: start, to: end)
+        XCTAssertEqual(hit.first, IndexPath(item: 7, section: 3),
+                       "起点所在格必须是首个命中（滑到哪选到哪从锚点起）")
+        XCTAssertTrue(hit.contains(IndexPath(item: 5, section: 3)),
+                      "线段止点在 a3-5 内部必须命中 a3-5")
+        var lastX: CGFloat = .greatestFiniteMagnitude
+        for path in hit {
+            let frame = try XCTUnwrap(layout.layoutAttributesForItem(at: path)).frame
+            XCTAssertLessThanOrEqual(frame.minX, lastX,
+                                     "向左线段的命中序列必须按经过顺序（minX 单调不增）")
+            lastX = frame.minX
+        }
+    }
 }
