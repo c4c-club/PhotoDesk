@@ -224,7 +224,7 @@
 ### 性能
 
 - T08 验收 run 43633912940 PerformanceUITests 4/4（最新完整证据）；release head 相对其无热路径改动（3f7e166 导出竞态 + 61a1059 种子脚本 + 1b15da0 DEBUG-only）。
-- 定向补验 run 43681728448（1b15da0 仅跑 PerformanceUITests）结果随 T09 汇报回填本节。
+- 定向补验（release head）：7 连「Test runner never began」基建抖动（43681728448/43683215003/43684594134/43686210734/43687683035/43690048057/43691527960，含 5 轮自动重试，无用例真实执行）——M15/M16 同款事故，7 条 run id 原样记录；以 T08 run 43633912940 Performance 4/4 + head 无热路径改动为替代证据。
 
 ### 教训
 
