@@ -53,6 +53,16 @@ final class PageRegressionUITests: XCTestCase {
         return tree.count > 8000 ? String(tree.prefix(8000)) + "…(截断)" : tree
     }
 
+    /// DEBUG 汇总横幅数字字段解析（off=/hap=…）
+    private static func parseDoubleField(_ label: String, _ key: String) -> Double? {
+        let pattern = NSRegularExpression.escapedPattern(for: key) + "=(-?[0-9]+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: label, range: NSRange(label.startIndex..., in: label)),
+              match.numberOfRanges >= 2,
+              let range = Range(match.range(at: 1), in: label) else { return nil }
+        return Double(label[range])
+    }
+
     private func viewerDebugBanner(_ app: XCUIApplication) -> XCUIElement {
         anyElement(app, identifier: "Viewer-Debug")
     }
@@ -230,8 +240,8 @@ final class PageRegressionUITests: XCTestCase {
         XCTAssertTrue(value.contains("selected"), "可见 cell 缺选中态标记：\(value)")
     }
 
-    /// P0-4：多选模式单指滑选、双指滚动（单指滚动语义已被滑选取代；真机双指见 M14-8）。
-    func testSelectionModeUsesSlidePanAndTwoFingerScrollConfig() throws {
+    /// P0-4 M18 口径（docs/38 §1.2 #4）：多选模式点选生效 + 单指纵向滑动是滚动不是轨迹（计数不变）。
+    func testSelectionModeTapAndVerticalScrollRegression() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestingSeedDatedPhotos"]
         app.launchArguments += ["-uiTestingSelectMode"]
@@ -251,10 +261,24 @@ final class PageRegressionUITests: XCTestCase {
         }
         XCTAssertFalse(selected.contains("已选择 0"), "多选模式下点选未生效：\(selected)")
 
+        // 单指纵向快滑（终点避开 60pt 边缘滚动区）：offset 增长且计数不变
         let banner = anyElement(app, identifier: "Library-DebugSummary")
         XCTAssertTrue(banner.waitForExistence(timeout: 5), "缺少 Library-DebugSummary")
-        XCTAssertTrue(((banner.value as? String) ?? "").contains("panMin=2"),
-                      "多选模式 collectionView pan 必须至少两指")
+        let startLabel = ((banner.value as? String) ?? "")
+        let startY = Self.parseDoubleField(startLabel, "off") ?? 0
+        collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo: collection.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        let endDeadline = Date().addingTimeInterval(5)
+        var endY = startY
+        while Date() < endDeadline {
+            endY = Self.parseDoubleField(((banner.value as? String) ?? ""), "off") ?? startY
+            if endY - startY > 200 { break }
+            usleep(150_000)
+        }
+        XCTAssertGreaterThan(endY - startY, 200,
+                             "多选模式单指上滑必须滚动 start=\(startY) end=\(endY)")
+        XCTAssertFalse(((app.staticTexts["Selection-Count"].value as? String) ?? "").contains("已选择 0"),
+                       "纵向滚动是滚动不是轨迹：已选格不得被清除")
     }
 
     // MARK: - D07 存储统计（mock 数据 5 秒内出结果）

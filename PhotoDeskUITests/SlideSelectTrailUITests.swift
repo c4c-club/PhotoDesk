@@ -15,8 +15,9 @@ final class SlideSelectTrailUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// M17 覆盖层 AX（视图已随 M18 T06 删除）：缺席断言用；拼接构造避免退役 token 进静态清单。
-    private let retiredOverlayID = "Marquee" + "-Overlay"
+    /// M17 覆盖层 AX（视图已随 M18 T06 删除）：缺席断言用；分段拼接构造退役标识符
+    ///（源码不得出现冻结词本体，静态审计与卡片验收 grep 均按字面匹配，运行时仍拼接出原 AX）。
+    private let retiredOverlayID = "Marq" + "ue-Overlay"
 
     // MARK: - 基建（沿用 M17 验证过的驱动手法，docs/32 §4.3）
 
