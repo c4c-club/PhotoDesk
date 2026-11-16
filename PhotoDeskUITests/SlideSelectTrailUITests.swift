@@ -374,12 +374,20 @@ final class SlideSelectTrailUITests: XCTestCase {
                 if attempt == 2 { XCTFail("首屏同列可见格不足（column=\(column)）") }
                 continue
             }
-            let lastInColumn = column[column.count - 1]
-            let expectedIDs = column.map { cellID(collection.cells.element(boundBy: $0)) }
+            // 终点必须远离底缘 60pt 自动滚动触发区（留 80pt 余量）：慢速/停留会触发
+            // 边缘滚动，内容坐标下路径延长多扫一格（T08 第 4 轮 CI 实锤 +1）
+            let safeBottom = collection.frame.maxY - 80
+            let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+            guard safeColumn.count >= 3 else {
+                if attempt == 2 { XCTFail("同列远离底缘的可见格不足（column=\(column)）") }
+                continue
+            }
+            let lastInColumn = safeColumn[safeColumn.count - 1]
+            let expectedIDs = safeColumn.map { cellID(collection.cells.element(boundBy: $0)) }
             longPressDrag(in: collection, fromIndex: 0, toIndex: lastInColumn)
-            let count = waitForSelectionCountEqual(app, to: column.count, timeout: 6)
-            guard count == column.count else {
-                if attempt == 2 { XCTFail("左列竖拖计数必须 \(column.count)（count=\(count)）") }
+            let count = waitForSelectionCountEqual(app, to: safeColumn.count, timeout: 6)
+            guard count == safeColumn.count else {
+                if attempt == 2 { XCTFail("左列竖拖计数必须 \(safeColumn.count)（count=\(count)）") }
                 continue
             }
             let selected = waitForSelectedSet(collection, equals: Set(expectedIDs))
@@ -410,14 +418,25 @@ final class SlideSelectTrailUITests: XCTestCase {
             let app = XCUIApplication()
             let collection = launchSelectableGrid(app)
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-            let lineHit = expectedLineHitIDs(in: collection, from: 0, to: 10)
+            // 终点远离底缘 80pt 余量（同 ③：避免边缘滚动延长路径）
+            let diagSafeBottom = collection.frame.maxY - 80
+            var diagEnd = -1
+            for index in (1...10).reversed() {
+                let frame = collection.cells.element(boundBy: index).frame
+                if frame.width > 1, frame.maxY < diagSafeBottom { diagEnd = index; break }
+            }
+            guard diagEnd >= 3 else {
+                if attempt == 2 { XCTFail("远离底缘的对角终点格不足（diagEnd=\(diagEnd)）") }
+                continue
+            }
+            let lineHit = expectedLineHitIDs(in: collection, from: 0, to: diagEnd)
             guard lineHit.count >= 3 else {
                 if attempt == 2 { XCTFail("斜线基准命中不足（\(lineHit)）") }
                 continue
             }
             // 外接矩形集（矩形语义的反例集）：两对角格围成矩形内的可见格
             let startFrame = collection.cells.element(boundBy: 0).frame
-            let endFrame = collection.cells.element(boundBy: 10).frame
+            let endFrame = collection.cells.element(boundBy: diagEnd).frame
             let bound = startFrame.union(endFrame)
             var rectFillers: [String] = []
             for index in 0..<collection.cells.count {
@@ -433,7 +452,7 @@ final class SlideSelectTrailUITests: XCTestCase {
                 if attempt == 2 { XCTFail("本几何下矩形 filler 与线段命中重合，用例失去判别力") }
                 continue
             }
-            longPressDrag(in: collection, fromIndex: 0, toIndex: 10)
+            longPressDrag(in: collection, fromIndex: 0, toIndex: diagEnd)
             let count = waitForSelectionCountEqual(app, to: lineHit.count, timeout: 6)
             guard count == lineHit.count else {
                 if attempt == 2 {
@@ -522,13 +541,16 @@ final class SlideSelectTrailUITests: XCTestCase {
         collection.cells.element(boundBy: 0).tap()
         XCTAssertEqual(waitForSelectionCountEqual(app, to: 1, timeout: 5), 1, "预选 X")
         let xID = cellID(collection.cells.element(boundBy: 0))
-        // 竖拖（避开首格所在行的同列起点：从第 2 行同列起拖）
+        // 竖拖（从第 2 行同列起拖；终点远离底缘 80pt 余量，同 ③）
         let column = sameColumnIndices(in: collection, anchorIndex: 0)
         XCTAssertGreaterThanOrEqual(column.count, 3, "同列可见格不足")
-        let fromIndex = column[1]
-        let toIndex = column[column.count - 1]
+        let safeBottom = collection.frame.maxY - 80
+        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+        XCTAssertGreaterThanOrEqual(safeColumn.count, 3, "同列远离底缘的可见格不足")
+        let fromIndex = safeColumn[1]
+        let toIndex = safeColumn[safeColumn.count - 1]
         longPressDrag(in: collection, fromIndex: fromIndex, toIndex: toIndex)
-        let trailIDs = Set(column[1...].map { cellID(collection.cells.element(boundBy: $0)) })
+        let trailIDs = Set(safeColumn[1...].map { cellID(collection.cells.element(boundBy: $0)) })
         let expected = trailIDs.union([xID])
         let selected = waitForSelectedSet(collection, equals: expected)
         XCTAssertEqual(selected, expected,
@@ -640,13 +662,16 @@ final class SlideSelectTrailUITests: XCTestCase {
         let total = waitForSelectionCount(app, atLeast: 1, timeout: 5)
         XCTAssertEqual(total, filtered,
                        "全选计数必须 = filteredItems.count（total=\(total) filtered=\(filtered)）")
-        // 锚点已选 → 取消模式：竖拖取消一列可见格
+        // 锚点已选 → 取消模式：竖拖取消一列可见格（终点远离底缘 80pt 余量，同 ③）
         let column = sameColumnIndices(in: collection, anchorIndex: 0)
         XCTAssertGreaterThanOrEqual(column.count, 2, "同列可见格不足")
-        longPressDrag(in: collection, fromIndex: column[0], toIndex: column[column.count - 1])
-        let remaining = waitForSelectionCountEqual(app, to: total - column.count, timeout: 6)
-        XCTAssertEqual(remaining, total - column.count,
-                       "取消模式竖拖必须恰好取消 \(column.count) 格（remaining=\(remaining)）")
+        let safeBottom = collection.frame.maxY - 80
+        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+        XCTAssertGreaterThanOrEqual(safeColumn.count, 2, "同列远离底缘的可见格不足")
+        longPressDrag(in: collection, fromIndex: safeColumn[0], toIndex: safeColumn[safeColumn.count - 1])
+        let remaining = waitForSelectionCountEqual(app, to: total - safeColumn.count, timeout: 6)
+        XCTAssertEqual(remaining, total - safeColumn.count,
+                       "取消模式竖拖必须恰好取消 \(safeColumn.count) 格（remaining=\(remaining)）")
         // 退出多选：计数归零、多选栏消失
         let done = anyElement(app, identifier: "Batch-Done")
         XCTAssertTrue(done.waitForExistence(timeout: 5), "缺完成按钮")
@@ -671,10 +696,12 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)
         // 月份头菜单「选择本月全部」（宿主 UIButton + UIMenu，同 StabilityUITests 手法）；
-        // 倒序种子首屏 = 2026-10/09/08/07…，取必定完整可见的 2026-08
+        // 倒序种子首屏顶部是 2026-10/09，先快滑一段让 2026-08 头进入视口
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 0.6)
         let menu = anyElement(app, identifier: "MonthHeader-Menu-2026-08")
         guard menu.waitForExistence(timeout: 5) else {
-            return XCTFail("首屏未出现 2026-08 月份头\n\(hierarchy(app))")
+            return XCTFail("快滑一段后未出现 2026-08 月份头\n\(hierarchy(app))")
         }
         menu.tap()
         let selectAllMonth = app.buttons["选择本月全部"]
@@ -682,8 +709,15 @@ final class SlideSelectTrailUITests: XCTestCase {
         selectAllMonth.tap()
         let monthCount = waitForSelectionCount(app, atLeast: 1, timeout: 5)
         XCTAssertGreaterThan(monthCount, 0, "单月全选后计数应 > 0")
-        // 屏内首格（scope 外，未选 → 选择模式轨迹）：scope 外新增必须被拒，计数不得增长
-        let scopeCells = sameColumnIndices(in: collection, anchorIndex: 0)
+        // 屏内首个可见格起拖（快滑后 index0 可能离屏）：无论锚点在 scope 内外，
+        // 计数不得越过 scope 边界增长
+        var anchorVisible = -1
+        for index in 0..<collection.cells.count {
+            let cell = collection.cells.element(boundBy: index)
+            if cell.exists, cell.frame.width > 1, cell.frame.minY > collection.frame.minY + 60 { anchorVisible = index; break }
+        }
+        guard anchorVisible >= 0 else { return XCTFail("快滑后无可见 cell\n\(hierarchy(app))") }
+        let scopeCells = sameColumnIndices(in: collection, anchorIndex: anchorVisible)
         XCTAssertGreaterThanOrEqual(scopeCells.count, 2, "同列可见格不足")
         longPressDrag(in: collection, fromIndex: scopeCells[0], toIndex: scopeCells[scopeCells.count - 1])
         Thread.sleep(forTimeInterval: 0.8)
