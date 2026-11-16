@@ -424,7 +424,8 @@ final class SlideSelectTrailUITests: XCTestCase {
                 let cell = collection.cells.element(boundBy: index)
                 guard cell.exists, cell.frame.width > 1 else { continue }
                 let id = cellID(cell)
-                if bound.contains(cell.frame.center), !lineHit.contains(id) {
+                let center = CGPoint(x: cell.frame.midX, y: cell.frame.midY)
+                if bound.contains(center), !lineHit.contains(id) {
                     rectFillers.append(id)
                 }
             }
