@@ -670,10 +670,11 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)
-        // 月份头菜单「选择本月全部」（宿主 UIButton + UIMenu，同 StabilityUITests 手法）
-        let menu = anyElement(app, identifier: "MonthHeader-Menu-2024-05")
+        // 月份头菜单「选择本月全部」（宿主 UIButton + UIMenu，同 StabilityUITests 手法）；
+        // 倒序种子首屏 = 2026-10/09/08/07…，取必定完整可见的 2026-08
+        let menu = anyElement(app, identifier: "MonthHeader-Menu-2026-08")
         guard menu.waitForExistence(timeout: 5) else {
-            return XCTFail("首屏未出现 2024-05 月份头（倒序种子首屏应为其后段）\n\(hierarchy(app))")
+            return XCTFail("首屏未出现 2026-08 月份头\n\(hierarchy(app))")
         }
         menu.tap()
         let selectAllMonth = app.buttons["选择本月全部"]
@@ -681,7 +682,7 @@ final class SlideSelectTrailUITests: XCTestCase {
         selectAllMonth.tap()
         let monthCount = waitForSelectionCount(app, atLeast: 1, timeout: 5)
         XCTAssertGreaterThan(monthCount, 0, "单月全选后计数应 > 0")
-        // 相邻月（屏内其它段）cell 起拖取消模式轨迹：scope 外 id 不得改变计数
+        // 屏内首格（scope 外，未选 → 选择模式轨迹）：scope 外新增必须被拒，计数不得增长
         let scopeCells = sameColumnIndices(in: collection, anchorIndex: 0)
         XCTAssertGreaterThanOrEqual(scopeCells.count, 2, "同列可见格不足")
         longPressDrag(in: collection, fromIndex: scopeCells[0], toIndex: scopeCells[scopeCells.count - 1])
