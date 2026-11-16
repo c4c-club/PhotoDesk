@@ -365,7 +365,7 @@ final class ZoomStabilityUITests: XCTestCase {
         var attempt = 0
         while Date() < zoomDeadline, zoomSeen <= 1 {
             // 两条通路交替取证：元素双击（AX activation point）与坐标双击（两次快速
-            // coordinate.tap，坐标通路已被框选 press/drag 证明可达 app）。任一通路让
+            // coordinate.tap，坐标通路已被轨迹 press/drag 证明可达 app）。任一通路让
             // zoom>1 即验证双击链路；读数（gprobe/root/probe）区分命中层。
             if attempt % 2 == 0 {
                 inner.doubleTap()
