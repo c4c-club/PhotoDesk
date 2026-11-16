@@ -331,7 +331,7 @@ final class SlideSelectTrailUITests: XCTestCase {
                       "长按进入后必须出现多选栏")
         XCTAssertTrue(cellIsSelected(appRef.collectionViews.firstMatch.cells.firstMatch),
                       "锚点 cell AX 必须同步 selected（视觉/AX 同源）")
-        XCTAssertEqual(appRef.descendants(matching: .any)[retiredOverlayID].count, 0,
+        XCTAssertFalse(appRef.descendants(matching: .any)[retiredOverlayID].exists,
                        "M18 起不得存在任何覆盖层元素")
         snap(appRef, "m18-longpress-enter")
     }
@@ -476,7 +476,7 @@ final class SlideSelectTrailUITests: XCTestCase {
                 continue
             }
             let (a, b, c) = (rowCells[0], rowCells[1], rowCells[2])
-            let ids = { (index: Int) in cellID(collection.cells.element(boundBy: index)) }
+            let ids = { (index: Int) in self.cellID(collection.cells.element(boundBy: index)) }
             // G1：长按 A → 拖 C（途经 B）
             longPressDrag(in: collection, fromIndex: a, toIndex: c)
             var count = waitForSelectionCountEqual(app, to: 3, timeout: 6)
@@ -766,7 +766,7 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(raw.contains("trail="), "DEBUG 汇总必须暴露 trail= 字段\n\(raw)")
         XCTAssertTrue(raw.contains("delta="), "DEBUG 汇总必须暴露 delta= 字段\n\(raw)")
         XCTAssertFalse(raw.contains("ov="), "旧 ov* 覆盖层取证字段必须已退役\n\(raw)")
-        XCTAssertEqual(app.descendants(matching: .any)[retiredOverlayID].count, 0,
+        XCTAssertFalse(app.descendants(matching: .any)[retiredOverlayID].exists,
                        "旧覆盖层元素必须不存在")
         snap(app, "m18-debug-fields")
     }
