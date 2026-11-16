@@ -249,11 +249,15 @@ final class SlideSelectTrailUITests: XCTestCase {
     /// 仅覆盖当前可见 cell（屏外 cell 无有效 frame）；用例须保证命中全程在屏内。
     private func expectedLineHitIDs(in collection: XCUIElement,
                                     from startIndex: Int,
-                                    to endIndex: Int) -> [String] {
+                                    to endIndex: Int,
+                                    startOffset: CGVector = CGVector(dx: 0.5, dy: 0.5),
+                                    endOffset: CGVector = CGVector(dx: 0.5, dy: 0.5)) -> [String] {
         let startFrame = collection.cells.element(boundBy: startIndex).frame
         let endFrame = collection.cells.element(boundBy: endIndex).frame
-        let from = CGPoint(x: startFrame.midX, y: startFrame.midY)
-        let to = CGPoint(x: endFrame.midX, y: endFrame.midY)
+        let from = CGPoint(x: startFrame.minX + startFrame.width * CGFloat(startOffset.dx),
+                           y: startFrame.minY + startFrame.height * CGFloat(startOffset.dy))
+        let to = CGPoint(x: endFrame.minX + endFrame.width * CGFloat(endOffset.dx),
+                         y: endFrame.minY + endFrame.height * CGFloat(endOffset.dy))
         let dx = to.x - from.x
         let dy = to.y - from.y
         let expansion: CGFloat = 1   // SlideSelectConfig.hitExpansion
@@ -430,7 +434,12 @@ final class SlideSelectTrailUITests: XCTestCase {
                 if attempt == 2 { XCTFail("远离底缘的对角终点格不足（diagEnd=\(diagEnd)）") }
                 continue
             }
-            let lineHit = expectedLineHitIDs(in: collection, from: 0, to: diagEnd)
+            // 角内偏移 (0.3,0.3)→(0.7,0.7)：线段从格内部穿过，距角落 ≥24pt，
+            // 避开中心-中心对角线贴角 ±1 格的路径曲率噪声（第 4/9 轮 CI 实锤）
+            let diagOffsetStart = CGVector(dx: 0.3, dy: 0.3)
+            let diagOffsetEnd = CGVector(dx: 0.7, dy: 0.7)
+            let lineHit = expectedLineHitIDs(in: collection, from: 0, to: diagEnd,
+                                             startOffset: diagOffsetStart, endOffset: diagOffsetEnd)
             guard lineHit.count >= 3 else {
                 if attempt == 2 { XCTFail("斜线基准命中不足（\(lineHit)）") }
                 continue
@@ -453,11 +462,13 @@ final class SlideSelectTrailUITests: XCTestCase {
                 if attempt == 2 { XCTFail("本几何下矩形 filler 与线段命中重合，用例失去判别力") }
                 continue
             }
-            longPressDrag(in: collection, fromIndex: 0, toIndex: diagEnd)
+            longPressDrag(in: collection, fromIndex: 0, toIndex: diagEnd,
+                          startOffset: diagOffsetStart, endOffset: diagOffsetEnd)
             let count = waitForSelectionCountEqual(app, to: lineHit.count, timeout: 6)
             guard count == lineHit.count else {
                 if attempt == 2 {
-                    XCTFail("斜拖计数必须 = 线段扫掠数 \(lineHit.count)（count=\(count)；\n"
+                    let got = selectedVisibleIDs(collection).sorted()
+                    XCTFail("斜拖计数必须 = 线段扫掠数 \(lineHit.count)（count=\(count) got=\(got)；\n"
                             + "若等于矩形数则实现退回矩形语义）")
                 }
                 continue
@@ -626,15 +637,17 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 5), "滚动后无 cell")
         let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
         let stickyBottom = collection.frame.minY + headerHeight
-        // 起拖点在头底边下方 30pt、居中列；竖拖一屏
+        // 起拖点在头底边下方 30pt、居中列；竖拖约半屏。
+        // 终点必须远离底缘 80pt 且不带 hold：边缘滚动会把「扫过时可见」的格事后滚进
+        // 头下遮挡区（第 9 轮 CI 实锤）——遮挡契约判定的是扫掠时刻，不是终态位置
         let startX = collection.frame.midX
         let startY = stickyBottom + 30
-        let endY = collection.frame.maxY - 40
+        let endY = collection.frame.maxY - 85
         let start = collection.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: startX - collection.frame.minX, dy: startY - collection.frame.minY))
         let end = collection.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: startX - collection.frame.minX, dy: endY - collection.frame.minY))
-        start.press(forDuration: 0.55, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+        start.press(forDuration: 0.55, thenDragTo: end)
         _ = waitForSelectionCount(app, atLeast: 1, timeout: 6)
         let selected = selectedVisibleIDs(collection)
         var occluded: [String] = []
@@ -648,7 +661,7 @@ final class SlideSelectTrailUITests: XCTestCase {
             }
         }
         XCTAssertTrue(occluded.isEmpty,
-                      "被钉住头完全遮住的 cell 不得入选：\(occluded)")
+                      "被钉住头完全遮住的 cell 不得入选：\(occluded)\nstartY=\(startY) endY=\(endY)")
         snap(app, "m18-sticky-header")
     }
 
@@ -697,16 +710,27 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)
         // 月份头菜单「选择本月全部」（宿主 UIButton + UIMenu，同 StabilityUITests 手法）；
-        // 倒序种子首屏顶部是 2026-10/09，先快滑一段让 2026-08 头进入视口
+        // 倒序种子首屏顶部是 2026-10/09，一次快滑约跳 2-4 个段，故按候选序探测任一可见段头
         app.swipeUp()
         Thread.sleep(forTimeInterval: 0.6)
-        let menu = anyElement(app, identifier: "MonthHeader-Menu-2026-08")
-        guard menu.waitForExistence(timeout: 5) else {
-            return XCTFail("快滑一段后未出现 2026-08 月份头\n\(hierarchy(app))")
+        let monthCandidates = ["2026-08", "2026-07", "2026-06", "2026-05", "2026-04",
+                               "2026-03", "2026-02", "2026-01", "2025-12"]
+        var menu: XCUIElement?
+        var chosenMonth = ""
+        for candidate in monthCandidates {
+            let probe = anyElement(app, identifier: "MonthHeader-Menu-\(candidate)")
+            if probe.waitForExistence(timeout: 1.2) {
+                menu = probe
+                chosenMonth = candidate
+                break
+            }
+        }
+        guard let menu else {
+            return XCTFail("快滑一段后未出现任何候选月份头（\(monthCandidates)）\n\(hierarchy(app))")
         }
         menu.tap()
         let selectAllMonth = app.buttons["选择本月全部"]
-        XCTAssertTrue(selectAllMonth.waitForExistence(timeout: 5), "月份菜单缺「选择本月全部」")
+        XCTAssertTrue(selectAllMonth.waitForExistence(timeout: 5), "月份菜单（\(chosenMonth)）缺「选择本月全部」")
         selectAllMonth.tap()
         let monthCount = waitForSelectionCount(app, atLeast: 1, timeout: 5)
         XCTAssertGreaterThan(monthCount, 0, "单月全选后计数应 > 0")
