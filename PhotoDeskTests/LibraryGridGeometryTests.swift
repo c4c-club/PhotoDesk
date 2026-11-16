@@ -163,41 +163,6 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         return (cv, layout, dataSource)
     }
 
-    /// docs/32 §4.2 ②：2/3/4/5 列 × offset {0,2000,8000,20000}，GridHitTester 命中集合
-    /// 必须与逐 item layoutAttributesForItem 暴力求交一致（含粘性头底边钳制语义）。
-    func testHitTesterMatchesBruteForceAcrossColumnsAndOffsets() throws {
-        for columns in [2, 3, 4, 5] {
-            let (cv, layout, gridData) = makeParamGrid(columns: columns)
-            let tester = GridHitTester(collectionView: cv)
-            cv.layoutIfNeeded()
-            for offset in [0, 2000, 8000, 20000] {
-                cv.setContentOffset(CGPoint(x: 0, y: CGFloat(offset)), animated: false)
-                cv.collectionViewLayout.invalidateLayout()
-                cv.layoutIfNeeded()
-                // 矩形上沿刻意低于粘性头底边（offset+10 < offset+48）→ 钳制路径被覆盖
-                let rawRect = CGRect(x: 12, y: CGFloat(offset) + 10, width: 366, height: 520)
-                let hit = tester.hitTest(rectInContent: rawRect)
-                // 暴力求交基准：矩形上边钳到视口顶 + 粘性头高（docs/32 §2.4 第 6 步）
-                let stickyBottom = CGFloat(offset) + DSSpacing.monthHeaderHeight
-                var expected = Set<IndexPath>()
-                if rawRect.maxY > stickyBottom {
-                    let baseRect = CGRect(x: 12, y: stickyBottom, width: 366,
-                                          height: rawRect.maxY - stickyBottom)
-                    for section in 0..<40 {
-                        for item in 0..<50 {
-                            if let attrs = layout.layoutAttributesForItem(at: IndexPath(item: item, section: section)),
-                               attrs.frame.intersects(baseRect) {
-                                expected.insert(IndexPath(item: item, section: section))
-                            }
-                        }
-                    }
-                }
-                XCTAssertEqual(hit, expected,
-                               "columns=\(columns) offset=\(offset) 命中集合必须等于逐 item 暴力求交")
-            }
-        }
-    }
-
     /// docs/32 §4.2 ③（docs/31 H3）：参数公式 (W − s(c−1))/c 必须等于真实 attributes 宽。
     /// 相等 → 旧横向估算公式与 iOS 16 真实布局一致；GridHitTester 读真实 attributes，
     /// 即使未来公式失效也天然免疫（结论写进注释，docs/32 §4.2 第 3/4 条）。
@@ -217,9 +182,9 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         }
     }
 
-    /// docs/32 §4.2 映射回归锁：严格落在 a3-7 内部的矩形只命中 a3-7，不命中相邻 a3-6
-    /// （旧参数推算的 pitch/origin 误差把邻格算进同一命中带，docs/31 G7/G9）。
-    func testMarqueeHitSelectsA3_7NotA3_6() throws {
+    /// 映射回归锁（docs/32 §4.2 迁移到线段语义，docs/38 §4）：完全落在 a3-7 内部的竖向
+    /// 短线段只命中 a3-7，不命中相邻 a3-6 / a3-8 / a3-4（docs/31 G7/G9 根治回归锁）。
+    func testHitTestLineSelectsA3_7NotNeighbors() throws {
         let (cv, layout, gridData) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
         cv.layoutIfNeeded()
@@ -228,27 +193,13 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         cv.layoutIfNeeded()
         let attrs = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)),
                                   "必须能取到 a3-7 的真实 attributes")
-        let rect = attrs.frame.insetBy(dx: 2, dy: 2)
-        let ids = Set(tester.hitTest(rectInContent: rect).map { "a\($0.section)-\($0.item)" })
-        XCTAssertEqual(ids, ["a3-7"], "回归锁：矩形必须只命中 a3-7")
-        XCTAssertTrue(ids.contains("a3-7"))
+        let start = CGPoint(x: attrs.frame.midX, y: attrs.frame.minY + 2)
+        let end = CGPoint(x: attrs.frame.midX, y: attrs.frame.maxY - 2)
+        let ids = tester.hitTestLine(from: start, to: end).map { "a\($0.section)-\($0.item)" }
+        XCTAssertEqual(ids, ["a3-7"], "回归锁：格内短线段必须只命中 a3-7")
         XCTAssertFalse(ids.contains("a3-6"), "a3-6 不得被命中")
-    }
-
-    /// docs/32 §2.4 第 8 步：缓存已热后，同一帧深位置框选 ≤ 60 次 layoutAttributesForItem 查询
-    /// （首帧构建缓存不计入断言；O(可见行×列) 复杂度锁，docs/31 A15）。
-    func testLastQueryCountBoundedAtDeepOffset() throws {
-        let (cv, _, gridData) = makeParamGrid(columns: 3)
-        let tester = GridHitTester(collectionView: cv)
-        cv.layoutIfNeeded()
-        cv.setContentOffset(CGPoint(x: 0, y: 8000), animated: false)
-        cv.collectionViewLayout.invalidateLayout()
-        cv.layoutIfNeeded()
-        let rect = CGRect(x: 12, y: 8010, width: 366, height: 520)
-        _ = tester.hitTest(rectInContent: rect)
-        _ = tester.hitTest(rectInContent: rect)
-        XCTAssertLessThanOrEqual(tester.lastQueryCount, 60,
-                                 "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
+        XCTAssertFalse(ids.contains("a3-8"), "a3-8 不得被命中")
+        XCTAssertFalse(ids.contains("a3-4"), "a3-4 不得被命中")
     }
 
     // MARK: - M17 T08 X08：缩略图像素尺寸与布局同源（LibraryGridLayout.itemWidth）
@@ -473,7 +424,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertTrue(hidden.isEmpty, "被钉住头完全遮住的 cell 不得命中：\(hidden)")
     }
 
-    /// 缓存热帧查询闸（docs/31 A15）：hitTestLine 与矩形命中同受 ≤60 次/热帧约束。
+    /// 缓存热帧查询闸（docs/31 A15）：hitTestLine 受 ≤60 次/热帧约束（O(可见行×列) 复杂度锁）。
     func testHitTestLineQueryCountBoundedAtDeepOffset() throws {
         let (cv, _, gridData) = makeParamGrid(columns: 3)
         let tester = GridHitTester(collectionView: cv)
