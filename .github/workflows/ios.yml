@@ -118,19 +118,43 @@ jobs:
         env:
           TEST_FILTER: ${{ github.event.inputs.test_filter }}
         run: |
-          if [ -n "$TEST_FILTER" ]; then
-            echo "targeted test filter: $TEST_FILTER"
-            xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
-              -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
-              -derivedDataPath build/DerivedData \
-              -resultBundlePath build/TestResults.xcresult \
-              $TEST_FILTER test
+          set -o pipefail
+          run_tests() {
+            if [ -n "$TEST_FILTER" ]; then
+              echo "targeted test filter: $TEST_FILTER"
+              xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+                -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
+                -derivedDataPath build/DerivedData \
+                -resultBundlePath build/TestResults.xcresult \
+                $TEST_FILTER test 2>&1 | tee build/test-output.log
+            else
+              xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+                -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
+                -derivedDataPath build/DerivedData \
+                -resultBundlePath build/TestResults.xcresult \
+                -skip-testing:PhotoDeskUITests/PerformanceUITests test 2>&1 | tee build/test-output.log
+            fi
+          }
+          # runner 启动挂死（macos-15 舰队间歇故障：进程拉起后 9 分钟零输出判死）只擦洗重试，
+          # 不吞真实断言失败：仅当日志命中挂死特征才重试，最多 2 次；擦洗后重播系统照片种子
+          if run_tests; then
+            echo "TEST_OK"
           else
-            xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
-              -destination "platform=iOS Simulator,name=CI-iPhone13,OS=$IOS_DESTINATION_OS" \
-              -derivedDataPath build/DerivedData \
-              -resultBundlePath build/TestResults.xcresult \
-              -skip-testing:PhotoDeskUITests/PerformanceUITests test
+            for i in 1 2; do
+              if ! grep -q "never began executing tests" build/test-output.log; then
+                echo "真实测试失败，不重试"
+                exit 1
+              fi
+              echo "runner 启动挂死，擦洗模拟器后重试（第 $i 次）"
+              xcrun simctl shutdown CI-iPhone13 2>/dev/null || true
+              xcrun simctl erase CI-iPhone13 || true
+              bash scripts/sim-photos-dated.sh 2 || true
+              if run_tests; then
+                echo "TEST_OK after retry $i"
+                exit 0
+              fi
+            done
+            exit 1
           fi
 
       # M12/M13 取证：UI 测试失败时 App 视觉现场 + App 自写崩溃/缩放日志
