@@ -1,4 +1,4 @@
-# .github/workflows/ios.yml —— CI 编译/测试/出包通道（docs/06 §5 + §7.4）
+﻿# .github/workflows/ios.yml —— CI 编译/测试/出包通道（docs/06 §5 + §7.4）
 # 职责说明：
 #   core-linux：无 Mac 验证 PhotoDeskCore 纯逻辑（与本地 scripts/test-core.ps1 同一条命令）
 #   build     ：macos-15 + Xcode 16.4 上 xcodegen → 模拟器 build/test（iOS 16.4 运行时）→ 模拟器 .app.zip + 未签名 ipa
@@ -28,8 +28,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IOS_RUNTIME: '16.4'
-  IOS_DESTINATION_OS: '16.4'
+  IOS_RUNTIME: '18.4'
+  IOS_DESTINATION_OS: '18.4'
   MINOS_VERSION: '16.0'
 
 jobs:
