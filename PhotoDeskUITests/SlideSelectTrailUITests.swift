@@ -296,9 +296,10 @@ final class SlideSelectTrailUITests: XCTestCase {
         return hits.sorted { $0.t != $1.t ? $0.t < $1.t : $0.id < $1.id }.map(\.id)
     }
 
-    /// 路径走廊：线段两侧 tolerance pt 内的可见 cell（含线段格本身）。
-    /// XCUI 合成拖拽为样条弧线，中段侧摆 ~10-20pt（第 4/9/12 轮 ±1 格实锤），
-    /// 斜拖用例以此作为「滑到哪选到哪」与弧度噪声的边界；对角矩形角仍远在走廊外。
+    /// 路径走廊：沿线等距采样 40 点，frame 膨胀 tolerance pt 后含任一采样点的可见 cell
+    ///（frame 口径，与生产 hitTest 的 frame 相交判定同侧度——弧线扫过格边角即算走廊内）。
+    /// XCUI 合成拖拽为样条弧线，中段可侧摆 ~20-40pt（第 4/9/12/13 轮 ±1 格实锤），
+    /// 斜拖用例以此作「滑到哪选到哪」与弧度噪声的边界；对角矩形远角仍在走廊外。
     private func expectedCorridorIDs(in collection: XCUIElement,
                                      from startIndex: Int,
                                      to endIndex: Int,
@@ -311,22 +312,19 @@ final class SlideSelectTrailUITests: XCTestCase {
                            y: startFrame.minY + startFrame.height * CGFloat(startOffset.dy))
         let to = CGPoint(x: endFrame.minX + endFrame.width * CGFloat(endOffset.dx),
                          y: endFrame.minY + endFrame.height * CGFloat(endOffset.dy))
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let lengthSq = dx * dx + dy * dy
+        var samples: [CGPoint] = []
+        let steps = 40
+        for step in 0...steps {
+            let t = CGFloat(step) / CGFloat(steps)
+            samples.append(CGPoint(x: from.x + (to.x - from.x) * t,
+                                   y: from.y + (to.y - from.y) * t))
+        }
         var result: [String] = []
         for index in 0..<collection.cells.count {
             let cell = collection.cells.element(boundBy: index)
             guard cell.exists, cell.frame.width > 1 else { continue }
-            let center = CGPoint(x: cell.frame.midX, y: cell.frame.midY)
-            let vx = center.x - from.x
-            let vy = center.y - from.y
-            let rawT = lengthSq > 0 ? (vx * dx + vy * dy) / lengthSq : 0
-            let t = min(max(rawT, 0), 1)
-            let projX = from.x + t * dx
-            let projY = from.y + t * dy
-            let dist = hypot(center.x - projX, center.y - projY)
-            if dist <= tolerance { result.append(cellID(cell)) }
+            let inflated = cell.frame.insetBy(dx: -tolerance, dy: -tolerance)
+            if samples.contains(where: inflated.contains) { result.append(cellID(cell)) }
         }
         return result
     }
@@ -513,7 +511,7 @@ final class SlideSelectTrailUITests: XCTestCase {
             // 「不补全对角矩形」：filler 格严格排除，线段格允许 ±1 弧度噪声（路径走廊）。
             let corridor = Set(expectedCorridorIDs(in: collection, from: 0, to: diagEnd,
                                                    startOffset: diagOffsetStart, endOffset: diagOffsetEnd,
-                                                   tolerance: 30))
+                                                   tolerance: 36))
             for filler in rectFillers where !corridor.contains(filler) {
                 XCTAssertFalse(got.contains(filler),
                                "矩形 filler 格 \(filler) 不得被斜拖命中（滑到哪选到哪）")
