@@ -29,8 +29,8 @@ final class FlowUITests: XCTestCase {
     }
 
     /// 启动并进入网格（授权 → cell 就绪）；undoWindow 经 launchArguments 覆盖（消除 Toast 5s 窗口竞态）。
-    /// 授权弹窗用 SpringBoard 显式点按（run 44173518292 实锤：首套件启动时系统弹窗出现慢于
-    /// intro.tap() 后的单次 app.tap()，中断监视器无交互可派发 → 弹窗滞留 30s → 网格判定失败）。
+    /// 照片授权弹窗是 App 内 alert（PhotosUI 承载，SpringBoard 不可见——run 44195619201
+    /// 层级实锤）：显式轮询 app.alerts 点「允许」，不依赖中断监视器的派发时机。
     private func launchToGrid(_ app: XCUIApplication, undoWindow: Double = 30) {
         installPermissionMonitor(for: app)
         app.launchArguments += ["-gesture.undoWindow", "\(undoWindow)"]
@@ -39,12 +39,11 @@ final class FlowUITests: XCTestCase {
         if intro.waitForExistence(timeout: 10) {
             intro.tap()
         }
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let collection = app.collectionViews.firstMatch
         let deadline = Date().addingTimeInterval(40)
         while Date() < deadline {
             if collection.exists { break }
-            let alert = springboard.alerts.firstMatch
+            let alert = app.alerts.firstMatch
             if alert.waitForExistence(timeout: 2) {
                 for index in 0..<alert.buttons.count {
                     let label = alert.buttons.element(boundBy: index).label
@@ -54,6 +53,8 @@ final class FlowUITests: XCTestCase {
                 }
                 continue
             }
+            let introAgain = app.buttons["允许访问照片"]
+            if introAgain.exists { introAgain.tap() }
             usleep(500_000)
         }
         XCTAssertTrue(collection.waitForExistence(timeout: 5), "照片网格未出现\n\(hierarchy(app))")

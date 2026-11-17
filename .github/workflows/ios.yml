@@ -131,6 +131,9 @@ jobs:
         run: |
           xcrun simctl boot $SIM_UDID 2>/dev/null || true
           xcrun simctl bootstatus $SIM_UDID -b
+          # 预授权照片权限（run 44195619201 实锤：照片授权弹窗为 App 内 alert，
+          # 中断监视器派发时机不稳导致首套件 30s 网格判定失败）
+          xcrun simctl privacy $SIM_UDID grant photos com.example.PhotoDesk || true
           bash scripts/sim-photos-dated.sh 2
 
       - name: Test (simulator)
