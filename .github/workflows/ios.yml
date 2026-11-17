@@ -166,6 +166,19 @@ jobs:
             exit 1
           fi
 
+      # M18 T08：runner 启动挂死诊断——抓 runner/xctest 系统日志与崩溃报告
+      - name: Dump runner diagnostics on failure
+        if: failure()
+        run: |
+          mkdir -p build/screenshots
+          xcrun simctl spawn CI-iPhone13 log show --last 15m \
+            --predicate 'processImagePath CONTAINS "xctest" OR processImagePath CONTAINS "PhotoDeskUITests" OR senderImagePath CONTAINS "CoreSimulator"' \
+            > build/screenshots/runner-diag.log 2>&1 || true
+          echo "--- runner-diag tail ---"
+          tail -c 6000 build/screenshots/runner-diag.log || true
+          echo "--- DiagnosticReports ---"
+          ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -20 || true
+
       # M12/M13 取证：UI 测试失败时 App 视觉现场 + App 自写崩溃/缩放日志
       - name: Capture simulator state on failure
         if: failure()
