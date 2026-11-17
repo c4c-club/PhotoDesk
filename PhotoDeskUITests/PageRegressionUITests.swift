@@ -250,9 +250,15 @@ final class PageRegressionUITests: XCTestCase {
 
         let count = app.staticTexts["Selection-Count"]
         XCTAssertTrue(count.waitForExistence(timeout: 5), "多选计数未出现")
-        let cell = collection.cells.firstMatch
-        XCTAssertTrue(cell.waitForExistence(timeout: 5), "网格无 cell")
-        cell.tap()
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 5), "网格无 cell")
+        // 首格可能被瞬时层（Toast/过场）短暂盖住（run 44173518292 not hittable 实锤），探测可点格
+        var tappedCell: XCUIElement?
+        for index in 0..<6 {
+            let probe = collection.cells.element(boundBy: index)
+            if probe.exists && probe.isHittable { tappedCell = probe; break }
+        }
+        XCTAssertTrue(tappedCell != nil, "前 6 格均不可点\n\(hierarchy(app))")
+        tappedCell?.tap()
         let deadline = Date().addingTimeInterval(5)
         var selected = count.label
         while Date() < deadline, selected.contains("0") {
