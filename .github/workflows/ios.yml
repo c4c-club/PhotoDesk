@@ -119,6 +119,16 @@ jobs:
           TEST_FILTER: ${{ github.event.inputs.test_filter }}
         run: |
           set -o pipefail
+          # 每次尝试前彻底重置模拟器态（2026-11-16 挂死窗口实锤：boot 正常但 runner
+          # 进程拉起后零输出 9 分钟判死；fresh springboard + 清缓存可显著降低复发）
+          reset_sim() {
+            xcrun simctl shutdown all 2>/dev/null || true
+            rm -rf "$HOME/Library/Developer/CoreSimulator/Caches" || true
+            xcrun simctl erase CI-iPhone13 || true
+            bash scripts/sim-photos-dated.sh 2 || true
+            xcrun simctl boot CI-iPhone13 2>/dev/null || true
+            xcrun simctl bootstatus CI-iPhone13 -b
+          }
           run_tests() {
             if [ -n "$TEST_FILTER" ]; then
               echo "targeted test filter: $TEST_FILTER"
@@ -135,8 +145,9 @@ jobs:
                 -skip-testing:PhotoDeskUITests/PerformanceUITests test 2>&1 | tee build/test-output.log
             fi
           }
-          # runner 启动挂死（macos-15 舰队间歇故障：进程拉起后 9 分钟零输出判死）只擦洗重试，
-          # 不吞真实断言失败：仅当日志命中挂死特征才重试，最多 2 次；擦洗后重播系统照片种子
+          # runner 启动挂死（macos-15 舰队间歇故障：进程拉起后 9 分钟零输出判死）只重置重试，
+          # 不吞真实断言失败：仅当日志命中挂死特征才重试，最多 2 次
+          reset_sim
           if run_tests; then
             echo "TEST_OK"
           else
@@ -145,10 +156,8 @@ jobs:
                 echo "真实测试失败，不重试"
                 exit 1
               fi
-              echo "runner 启动挂死，擦洗模拟器后重试（第 $i 次）"
-              xcrun simctl shutdown CI-iPhone13 2>/dev/null || true
-              xcrun simctl erase CI-iPhone13 || true
-              bash scripts/sim-photos-dated.sh 2 || true
+              echo "runner 启动挂死，重置模拟器后重试（第 $i 次）"
+              reset_sim
               if run_tests; then
                 echo "TEST_OK after retry $i"
                 exit 0
