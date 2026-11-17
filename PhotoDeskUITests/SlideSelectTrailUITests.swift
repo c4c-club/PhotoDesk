@@ -137,18 +137,17 @@ final class SlideSelectTrailUITests: XCTestCase {
         return value
     }
 
-    /// 长按 cell 后拖到另一 cell 中心（0.55s > 0.28s 长按阈值并留抖动余量）
+    /// 长按 cell 后拖到另一 cell 内指定点（0.55s > 0.28s 长按阈值并留抖动余量）。
+    /// 不用 .slow：慢速拖拽终点停留会触发底缘自动滚动（T08 CI 实锤 +1 格），
+    /// 屏内轨迹用默认速度合成多点路径；角内偏移供斜拖用例让线段穿格内部。
     private func longPressDrag(in collection: XCUIElement, fromIndex: Int, toIndex: Int,
-                               hold: TimeInterval? = nil) {
+                               startOffset: CGVector = CGVector(dx: 0.5, dy: 0.5),
+                               endOffset: CGVector = CGVector(dx: 0.5, dy: 0.5)) {
         let start = collection.cells.element(boundBy: fromIndex)
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .coordinate(withNormalizedOffset: startOffset)
         let end = collection.cells.element(boundBy: toIndex)
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        if let hold {
-            start.press(forDuration: 0.55, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: hold)
-        } else {
-            start.press(forDuration: 0.55, thenDragTo: end)
-        }
+            .coordinate(withNormalizedOffset: endOffset)
+        start.press(forDuration: 0.55, thenDragTo: end)
     }
 
     /// PhotoGridCell accessibilityValue = "<assetID> selected/none" → assetID
