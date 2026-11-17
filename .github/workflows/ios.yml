@@ -176,11 +176,26 @@ jobs:
           if run_tests; then
             echo "TEST_OK"
           else
+            if grep -q "never began executing tests" build/test-output.log; then
+              echo "=== 挂死现场取证（重置前）==="
+              echo "--- 磁盘 ---"; df -h / | tail -2
+              echo "--- runner 安装态 ---"
+              xcrun simctl listapps CI-iPhone13 2>/dev/null | grep -B2 -A6 "PhotoDeskUITests" | head -30 || echo "runner 未安装"
+              echo "--- sim 侧 installd/SpringBoard ---"
+              xcrun simctl spawn CI-iPhone13 log show --last 10m \
+                --predicate 'eventMessage CONTAINS "PhotoDeskUITests" OR process == "installd"' \
+                --style compact 2>/dev/null | tail -c 8000 || true
+              echo "--- 宿主侧 testmanagerd/CoreSimulator ---"
+              log show --last 10m \
+                --predicate 'process == "testmanagerd" OR process CONTAINS "CoreSimulator" OR process == "xcodebuild"' \
+                --style compact 2>/dev/null | grep -iE 'error|fail|timeout|hang|PhotoDesk|xctest' | tail -c 8000 || true
+              echo "--- 宿主进程 ---"
+              ps aux | grep -E 'xcodebuild|xctest|CoreSimulator|testmanagerd' | grep -v grep | head -12 || true
+            else
+              echo "真实测试失败，不重试"
+              exit 1
+            fi
             for i in 1 2; do
-              if ! grep -q "never began executing tests" build/test-output.log; then
-                echo "真实测试失败，不重试"
-                exit 1
-              fi
               echo "runner 启动挂死，重置模拟器后重试（第 $i 次）"
               reset_sim
               if run_tests; then
