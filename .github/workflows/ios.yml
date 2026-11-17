@@ -123,11 +123,36 @@ jobs:
           # 进程拉起后零输出 9 分钟判死；fresh springboard + 清缓存可显著降低复发）
           reset_sim() {
             xcrun simctl shutdown all 2>/dev/null || true
+            # runner 挂死诊断实锤（2026-11-17）：runner 进程存活但与 testmanagerd 握手
+            # 不达（无崩溃报告，9 分钟零输出判死）→ 强杀 CoreSimulator 服务态重建
+            sudo killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+            sudo pkill -9 testmanagerd 2>/dev/null || true
+            sleep 5
             rm -rf "$HOME/Library/Developer/CoreSimulator/Caches" || true
             xcrun simctl erase CI-iPhone13 || true
             bash scripts/sim-photos-dated.sh 2 || true
             xcrun simctl boot CI-iPhone13 2>/dev/null || true
             xcrun simctl bootstatus CI-iPhone13 -b
+          }
+          # UDID 精确寻址，避开 name+OS 匹配歧义
+          SIM_UDID=$(xcrun simctl list devices | grep "CI-iPhone13 (" | head -1 | grep -Eo '[0-9A-F-]{36}' | head -1)
+          echo "SIM_UDID=$SIM_UDID"
+          DEST="platform=iOS Simulator,id=$SIM_UDID"
+          run_tests() {
+            if [ -n "$TEST_FILTER" ]; then
+              echo "targeted test filter: $TEST_FILTER"
+              xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+                -destination "$DEST" \
+                -derivedDataPath build/DerivedData \
+                -resultBundlePath build/TestResults.xcresult \
+                $TEST_FILTER test 2>&1 | tee build/test-output.log
+            else
+              xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
+                -destination "$DEST" \
+                -derivedDataPath build/DerivedData \
+                -resultBundlePath build/TestResults.xcresult \
+                -skip-testing:PhotoDeskUITests/PerformanceUITests test 2>&1 | tee build/test-output.log
+            fi
           }
           run_tests() {
             if [ -n "$TEST_FILTER" ]; then
