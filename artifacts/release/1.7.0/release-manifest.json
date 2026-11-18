@@ -1,0 +1,27 @@
+{
+  "version": "1.7.0",
+  "build": 8,
+  "deploymentTarget": "16.0",
+  "ciRunId": "44392687921",
+  "headSha": "ac03b46",
+  "commitMessage": "test(selection): 多选滚动回归清位置恢复；ci(actions): 冒烟/性能步 always 执行不因存量红阻断",
+  "versionBumpCommit": "4fc778b",
+  "artifact": "PhotoDesk-unsigned-ipa",
+  "ipaFile": "PhotoDesk-1.7.0-build8-unsigned.ipa",
+  "sha256Ci": "0b176d2c608d639cfa110b577a86a11f674119c3c025c8b3266c0e4c3aaf141e",
+  "sha256Local": "0b176d2c608d639cfa110b577a86a11f674119c3c025c8b3266c0e4c3aaf141e",
+  "signed": false,
+  "signingChannel": "AltServer（用户侧，免费 Apple ID 7 天续签）",
+  "tests": {
+    "coreLinux": "483/483",
+    "unitPhotoDeskTests": "483/483（模拟器单测，含 PhotoDeskCore 全量）",
+    "uiPhotoDeskUITests": "71/72（唯一红 StabilityUITests.testDynamicTypeTopBarDoesNotClip 为已定性存量 XXXL 响应式缺陷，docs/39 §5）",
+    "performance": "4/4（5000+ 照片，582s）"
+  },
+  "verifySteps": {
+    "verifyDeploymentTarget": "success（minos 16.0）",
+    "verifyUnsignedIpa": "success（Payload / MinimumOSVersion=16.0 / minos=16.0 / 未签名）"
+  },
+  "deviceStatus": "真机 12 条 BLOCKED（AltServer 未安装、无 iPhone USB 接入——docs/39 §4，恢复路径已写明）",
+  "generatedAt": "2026-11-19T06:55:00+08:00"
+}
