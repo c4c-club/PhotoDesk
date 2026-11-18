@@ -334,6 +334,7 @@ jobs:
             build/PhotoDesk-unsigned.ipa.sha256
 
       - name: Simulator smoke (install / launch / photos / screenshot)
+        if: always()
         run: |
           xcrun simctl boot $SIM_UDID 2>/dev/null || true
           xcrun simctl bootstatus $SIM_UDID -b
@@ -352,6 +353,7 @@ jobs:
           path: build/screenshots
 
       - name: Performance tests (5,000+ photos)
+        if: always()
         env:
           DEVELOPER_DIR: ${{ env.TEST_DEVELOPER_DIR }}
         run: |

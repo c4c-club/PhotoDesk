@@ -241,9 +241,11 @@ final class PageRegressionUITests: XCTestCase {
     }
 
     /// P0-4 M18 口径（docs/38 §1.2 #4）：多选模式点选生效 + 单指纵向滑动是滚动不是轨迹（计数不变）。
+    /// -uiTestingClearPosition：跨用例位置恢复把网格停在深处（run 44367199320 实锤 start=22672，
+    /// 拖拽落点在末尾空区既不滚也不轨迹），清掉恢复位置保证首屏几何确定（同 Stability 选择族口径）。
     func testSelectionModeTapAndVerticalScrollRegression() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestingSeedDatedPhotos"]
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition"]
         app.launchArguments += ["-uiTestingSelectMode"]
         launchToGrid(app)
         let collection = app.collectionViews.firstMatch
