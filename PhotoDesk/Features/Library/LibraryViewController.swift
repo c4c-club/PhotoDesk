@@ -536,6 +536,11 @@ final class LibraryViewController: UIViewController {
         categoryButton.setTitleColor(DSColor.tint, for: .normal)
         categoryButton.titleLabel?.font = DSTypography.font(.body)
         categoryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        // XXXL 辅助字号下六个 rightBarButtonItem 挤压 customView 至不可点
+        // （iPhone 16 Pro + iOS 18.6，run 44195619201/44201983872 三连实锤）：
+        // 让标题在压缩后的宽度内缩放而不是把按钮挤没
+        categoryButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        categoryButton.titleLabel?.minimumScaleFactor = 0.5
         categoryButton.showsMenuAsPrimaryAction = true
         categoryButton.accessibilityIdentifier = "Library-Category"
         categoryButton.accessibilityLabel = "分类"

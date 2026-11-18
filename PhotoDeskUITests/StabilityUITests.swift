@@ -77,6 +77,16 @@ final class StabilityUITests: XCTestCase {
     }
 
     private func tapLibraryTools(in app: XCUIApplication) {
+        // 同 tapLibraryCategory 口径（run 44201983872 实锤：iPhone 16 Pro 新顶栏布局下
+        // minX+46 固定偏移落空，sheet 未打开）：读元素 frame 按绝对坐标点中心。
+        // 旧固定偏移保留作兜底：frame 异常（零宽/未就位）时退回栏左端 +46pt。
+        let tools = anyElement(app, identifier: "Library-Tools")
+        if tools.waitForExistence(timeout: 10), tools.frame.width > 1 {
+            let frame = tools.frame
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
+            return
+        }
         let bar = libraryBarFrame(in: app)
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: bar.minX + 46, dy: bar.midY)).tap()
