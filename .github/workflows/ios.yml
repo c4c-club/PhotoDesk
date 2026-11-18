@@ -94,7 +94,13 @@ jobs:
         run: |
           xcrun simctl list runtimes
           xcrun simctl list devices available | head -40
-          UDID=$(xcrun simctl list devices available | awk '/-- iOS 18.6 --/{f=1;next} /^-- iOS/{f=0} f && /iPhone/ {match($0, /[0-9A-F-]{36}/); print substr($0, RSTART, RLENGTH); exit}')
+          # 按名字精确锁 iPhone 16 Pro：镜像含多台预创建 iPhone，取「第一台」会随镜像
+          # 设备清单漂移到被多轮安装搞挂 TCC/photolived 的设备（run 44212270710 实锤：
+          # C67F9F5E 上 requestAuthorization 既无弹窗也无回调，App 永卡 intro；
+          # 已验证设备为 iPhone 16 Pro），必须可复现地选中同一台
+          UDID=$(xcrun simctl list devices available | awk '/-- iOS 18.6 --/{f=1;next} /^-- iOS/{f=0} f && /iPhone 16 Pro \(/ {match($0, /[0-9A-F-]{36}/); print substr($0, RSTART, RLENGTH); exit}')
+          if [ -z "$UDID" ]; then UDID=$(xcrun simctl list devices available | awk '/-- iOS 18.6 --/{f=1;next} /^-- iOS/{f=0} f && /iPhone/ {match($0, /[0-9A-F-]{36}/); print substr($0, RSTART, RLENGTH); exit}'); fi
+          if [ -z "$UDID" ]; then UDID=$(xcrun simctl list devices available | awk '/-- iOS 18.5 --/{f=1;next} /^-- iOS/{f=0} f && /iPhone 16 Pro \(/ {match($0, /[0-9A-F-]{36}/); print substr($0, RSTART, RLENGTH); exit}'); fi
           if [ -z "$UDID" ]; then UDID=$(xcrun simctl list devices available | awk '/-- iOS 18.5 --/{f=1;next} /^-- iOS/{f=0} f && /iPhone/ {match($0, /[0-9A-F-]{36}/); print substr($0, RSTART, RLENGTH); exit}'); fi
           echo "PICKED_UDID=$UDID"
           if [ -z "$UDID" ]; then echo '::error::无预创建 iPhone 设备'; exit 1; fi
@@ -146,6 +152,8 @@ jobs:
           # 进程拉起后零输出 9 分钟判死；fresh springboard + 清缓存可显著降低复发）
           reset_sim() {
             xcrun simctl shutdown all 2>/dev/null || true
+            # 重装 App 会清 TCC 授权（新装设备上弹窗派发时机不稳），启动后补授权一次
+            xcrun simctl privacy $SIM_UDID grant photos com.example.PhotoDesk 2>/dev/null || true
             sleep 3
             xcrun simctl boot $SIM_UDID 2>/dev/null || true
             xcrun simctl bootstatus $SIM_UDID -b
