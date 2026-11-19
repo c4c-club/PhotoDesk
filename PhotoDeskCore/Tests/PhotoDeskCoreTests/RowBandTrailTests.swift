@@ -176,6 +176,85 @@ final class RowBandTrailTests: XCTestCase {
         XCTAssertEqual(trail.path, bandIDs(map, [0, 1, 2]), "路径栈保持行带平铺序")
     }
 
+    // MARK: - 行为矩阵边界（M19 T06，docs/43 T06、docs/42 §1.2 行为表/§4 矩阵）
+
+    /// ① 回滑跨 section：第 2 月滑到第 1 月末行 → 第 2 月整段撤销（4+3 格）。
+    func testTrailBackslideAcrossSectionRevokesWholeSection() {
+        let map = makeMap()
+        var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+        _ = trail.consume(bandIDs(map, [3]))   // 第 1 月末行（s0-i9，1 格）
+        _ = trail.consume(bandIDs(map, [4]))   // 第 2 月首行（4 格）
+        _ = trail.consume(bandIDs(map, [5]))   // 第 2 月末行（3 格）
+        XCTAssertEqual(trail.target.count, 8, "跨两月累计 1+4+3 = 8 格")
+        let delta = trail.consume(bandIDs(map, [3]))   // 回滑到第 1 月末行
+        XCTAssertEqual(delta.remove.count, 7, "第 2 月两个行带整段撤销")
+        XCTAssertTrue(delta.add.isEmpty)
+        XCTAssertEqual(trail.target, Set(bandIDs(map, [3])), "只剩第 1 月末行")
+        XCTAssertEqual(trail.path.count, 1, "路径栈同步收缩到第 1 月末行")
+    }
+
+    /// ② 取消模式 base 只含整行部分格：滑过该行只移除 base 内格，行内其余格不新增。
+    func testDeselectPartialBaseRowRemovesOnlyBaseCells() {
+        let map = makeMap()
+        let partial: Set<String> = ["s0-i0", "s0-i2"]
+        var trail = SlideSelectTrail(base: partial, anchorInitiallySelected: true)
+        XCTAssertEqual(trail.mode, .deselect)
+        let delta = trail.consume(bandIDs(map, [0]))
+        XCTAssertEqual(delta.remove, partial, "只移除 base 内 2 格")
+        XCTAssertTrue(delta.add.isEmpty, "行内未选格不得新增（取消模式不反向选）")
+        XCTAssertTrue(trail.target.isEmpty, "target = base − 行带∩base")
+    }
+
+    /// ③ 起手行已全选（deselect）：滑过下一行后回滑，被出栈行整行恢复 base 态。
+    func testDeselectFullRowsBackslideRestoresRow() {
+        let map = makeMap()
+        let base = Set(bandIDs(map, [0, 1]))
+        var trail = SlideSelectTrail(base: base, anchorInitiallySelected: true)
+        _ = trail.consume(bandIDs(map, [0]))
+        _ = trail.consume(bandIDs(map, [1]))
+        XCTAssertTrue(trail.target.isEmpty, "两行全取消")
+        let delta = trail.consume(bandIDs(map, [0]))   // 回滑到第 1 行
+        XCTAssertEqual(delta.add, Set(bandIDs(map, [1])), "第 2 行整行恢复（base 态）")
+        XCTAssertEqual(trail.target, Set(bandIDs(map, [1])), "第 1 行保持取消、第 2 行恢复")
+    }
+
+    /// ④ 单月 scope：跨月单帧（第 1 月末行 + 第 2 月首行）只展开并入选当月 item。
+    func testMonthScopeSingleFrameCrossSectionOnlyScopedItems() {
+        let map = makeMap()
+        let scope = Set(bandIDs(map, [4, 5]))   // 第 2 月全量
+        var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false, scope: scope)
+        let delta = trail.consume(bandIDs(map, [3, 4]))   // 跨月单帧
+        XCTAssertEqual(delta.add, Set(bandIDs(map, [4])), "只入选第 2 月首行 4 格")
+        XCTAssertFalse(delta.add.contains("s0-i9"), "第 1 月末行不得越界入选")
+        XCTAssertEqual(trail.path.count, 4, "scope 外 id 不入路径栈")
+        XCTAssertEqual(trail.target, Set(bandIDs(map, [4])))
+    }
+
+    /// ⑤ 全选（scope 全量）后行带取消：只减对应行，其余行（含跨月）保持。
+    func testSelectAllThenBandDeselectRemovesOnlyThatRow() {
+        let map = makeMap()
+        let all = Set(bandIDs(map, [0, 1, 2, 3, 4, 5]))
+        var trail = SlideSelectTrail(base: all, anchorInitiallySelected: true, scope: all)
+        let delta = trail.consume(bandIDs(map, [1]))
+        XCTAssertEqual(delta.remove, Set(bandIDs(map, [1])), "只减第 2 行 3 格")
+        XCTAssertTrue(delta.add.isEmpty)
+        XCTAssertEqual(trail.target, all.subtracting(bandIDs(map, [1])), "其余行全部保持")
+        XCTAssertTrue(trail.target.contains("s1-i0"), "跨月行不受影响")
+    }
+
+    /// ⑥ 同一行内抖动（反复重喂同一行带）：净差为零、路径栈与 target 幂等。
+    func testBandSequenceJitterWithinRowIsIdempotent() {
+        let map = makeMap()
+        var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+        _ = trail.consume(bandIDs(map, [0]))
+        let before = trail.target
+        let pathBefore = trail.path
+        XCTAssertTrue(trail.consume(bandIDs(map, [0])).isEmpty, "同行抖动第 1 次零净差")
+        XCTAssertTrue(trail.consume(bandIDs(map, [0])).isEmpty, "同行抖动第 2 次零净差")
+        XCTAssertEqual(trail.target, before, "target 幂等")
+        XCTAssertEqual(trail.path, pathBefore, "路径栈不重复增长")
+    }
+
     // MARK: - 性能（docs/42 §5：1 万 item 全库展开 + consume）
 
     func testPerfTenThousandItemsExpandAndConsumeUnder10ms() {
