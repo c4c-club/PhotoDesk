@@ -917,4 +917,167 @@ final class SlideSelectTrailUITests: XCTestCase {
         throw XCTSkip("T01 临时探针：证据已采集（actual=\(actual) bandTarget=\(bandTarget)）；" +
                       "T06/T08 转正断言 actual == 3×columns")
     }
+
+    // MARK: - M19 行为矩阵（docs/43 T06、docs/42 §1.2 行为表：精确 行数×列数 断言）
+
+    /// 首行几何：columns、第 choice 列 anchor 及其同列远离底缘 80pt 的行序列（y 升序）。
+    private func bandGeometry(in collection: XCUIElement, columnChoice: Int)
+        -> (columns: Int, anchorIndex: Int, safeColumn: [Int]) {
+        let anchorFrame = collection.cells.element(boundBy: 0).frame
+        var rowCells: [Int] = []
+        for index in 0..<collection.cells.count {
+            let cell = collection.cells.element(boundBy: index)
+            guard cell.exists, cell.frame.width > 1 else { continue }
+            if abs(cell.frame.midY - anchorFrame.midY) < 8 { rowCells.append(index) }
+        }
+        rowCells.sort {
+            collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
+        }
+        let columns = rowCells.count
+        let pick = min(max(columnChoice, 0), max(columns - 1, 0))
+        let anchorIndex = rowCells.isEmpty ? 0 : rowCells[pick]
+        let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
+        let safeBottom = collection.frame.maxY - 80
+        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+        return (columns, anchorIndex, safeColumn)
+    }
+
+    /// 给定行 y 集合（可见格 midY ±8）→ 整行 cell id 独立复算（行带语义的期望集）。
+    private func fullRowIDs(in collection: XCUIElement, rowMidYs: [CGFloat]) -> Set<String> {
+        var ids = Set<String>()
+        for index in 0..<collection.cells.count {
+            let cell = collection.cells.element(boundBy: index)
+            guard cell.exists, cell.frame.width > 1 else { continue }
+            if rowMidYs.contains(where: { abs(cell.frame.midY - $0) < 8 }) {
+                ids.insert(cellID(cell))
+            }
+        }
+        return ids
+    }
+
+    /// M19-① 右列长按下拖 3 行：计数 = 3×columns（精确，非 ≥）；3 个整行全选、第 4 行不入选。
+    func testRightColumnBandDragSelectsThreeFullRows() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            let geo = bandGeometry(in: collection, columnChoice: Int.max)   // 最右列锚点
+            guard geo.columns >= 2, geo.safeColumn.count >= 3 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(geo.columns) safeRows=\(geo.safeColumn.count)")
+                }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: geo.anchorIndex, toIndex: geo.safeColumn[2])
+            let bandTarget = 3 * geo.columns
+            let count = waitForSelectionCountEqual(app, to: bandTarget, timeout: 6)
+            guard count == bandTarget else {
+                if attempt == 2 {
+                    XCTFail("右列下滑 3 行计数必须 = 3×\(geo.columns)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            let rowYs = geo.safeColumn.prefix(3).map { collection.cells.element(boundBy: $0).frame.midY }
+            let expected = fullRowIDs(in: collection, rowMidYs: Array(rowYs))
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "3 个整行必须全选（got=\(selected.sorted()) expected=\(expected.sorted())）")
+            if geo.safeColumn.count >= 4 {
+                XCTAssertFalse(cellIsSelected(collection.cells.element(boundBy: geo.safeColumn[3])),
+                               "行带外第 4 行不得入选（精确断言，非 ≥）")
+            }
+            snap(app, "m19-band-right-column-3rows")
+            return
+        }
+    }
+
+    /// M19-② 下滑 3 行后回滑 2 行：计数回到 1 行（G1 正向 3×columns → G2 取消模式上拖一行）。
+    func testRowBandBackslideTwoRowsReturnsToOneRow() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            let geo = bandGeometry(in: collection, columnChoice: 0)
+            guard geo.columns >= 2, geo.safeColumn.count >= 3 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(geo.columns) safeRows=\(geo.safeColumn.count)")
+                }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[0], toIndex: geo.safeColumn[2])
+            let bandTarget = 3 * geo.columns
+            guard waitForSelectionCountEqual(app, to: bandTarget, timeout: 6) == bandTarget else {
+                if attempt == 2 {
+                    XCTFail("正向 3 行计数必须 = 3×\(geo.columns)（count=\(selectionCount(app))）")
+                }
+                continue
+            }
+            // G2：终点行已选 → 取消模式，上拖一行（3 行 − 2 行 = 1 行）
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[1])
+            let count = waitForSelectionCountEqual(app, to: geo.columns, timeout: 6)
+            guard count == geo.columns else {
+                if attempt == 2 {
+                    XCTFail("回滑 2 行后计数必须回到 1 行 = \(geo.columns)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            let firstRowY = collection.cells.element(boundBy: geo.safeColumn[0]).frame.midY
+            let firstRow = fullRowIDs(in: collection, rowMidYs: [firstRowY])
+            let selected = waitForSelectedSet(collection, equals: firstRow)
+            XCTAssertEqual(selected, firstRow, "剩余必须恰为第 1 整行（got=\(selected.sorted())）")
+            snap(app, "m19-band-backslide-2rows")
+            return
+        }
+    }
+
+    /// M19-③ 从已选格起手下滑 2 行：整 2 行取消（3 行剩 1 行）；回滑后 3 行全量恢复。
+    func testSelectedAnchorBandDeselectTwoRowsAndRestore() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            let geo = bandGeometry(in: collection, columnChoice: 0)
+            guard geo.columns >= 2, geo.safeColumn.count >= 3 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(geo.columns) safeRows=\(geo.safeColumn.count)")
+                }
+                continue
+            }
+            let rowYs = (0..<3).map { collection.cells.element(boundBy: geo.safeColumn[$0]).frame.midY }
+            let allRows = fullRowIDs(in: collection, rowMidYs: rowYs)
+            // G0：预选 3 个整行
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[0], toIndex: geo.safeColumn[2])
+            let full = 3 * geo.columns
+            guard waitForSelectionCountEqual(app, to: full, timeout: 6) == full else {
+                if attempt == 2 {
+                    XCTFail("G0 预选 3 行计数必须 = \(full)（count=\(selectionCount(app))）")
+                }
+                continue
+            }
+            // G1：锚点 = 第 2 行已选格 → 取消模式；下滑到第 3 行 → 第 2、3 行整行取消
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[1], toIndex: geo.safeColumn[2])
+            guard waitForSelectionCountEqual(app, to: geo.columns, timeout: 6) == geo.columns else {
+                if attempt == 2 {
+                    XCTFail("取消 2 行后必须剩 1 行 = \(geo.columns)（count=\(selectionCount(app))，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            // G2：锚点 = 第 3 行（已取消 → 选择模式），回滑到第 2 行 → 整行恢复
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[1])
+            guard waitForSelectionCountEqual(app, to: full, timeout: 6) == full else {
+                if attempt == 2 {
+                    XCTFail("回滑恢复必须回 \(full)（count=\(selectionCount(app))，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            let selected = waitForSelectedSet(collection, equals: allRows)
+            XCTAssertEqual(selected, allRows, "回滑恢复后 3 个整行全量复原")
+            snap(app, "m19-band-deselect-restore")
+            return
+        }
+    }
 }
