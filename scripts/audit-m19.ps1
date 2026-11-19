@@ -107,17 +107,18 @@ try {
     Add-Check 'gridhittester-rowbandhittest' 'BLOCKING' $(if ($hits.Count -gt 0) { 'PASS' } else { 'FAIL' }) "GridHitTester 必须实现 func rowBandHitTest(from:to:)（行带命中唯一单元）" $hits
     }
 
-    # B2 生产选择路径不得仍以 hitTestLine 为选择结果
+    # B2 生产选择路径必须走行带展开（T05 落地：注入名已改 rowBandHitProvider，docs/42 §3.2）
     $relVc = 'PhotoDesk/Features/Library/LibraryViewController.swift'
     if (File-Missing $relVc) {
         Add-Check 'production-trail-provider-band' 'BLOCKING' 'FAIL' "$relVc 文件不存在" @()
     } else {
         $text = Get-Text $relVc
-        $stillLine = [regex]::IsMatch($text, 'trailHitProvider[\s\S]{0,800}?hitTestLine\(')
-        $hasBand = [regex]::IsMatch($text, 'trailHitProvider[\s\S]{0,800}?rowBandHitTest')
+        $hasBand = [regex]::IsMatch($text, 'rowBandHitProvider[\s\S]{0,800}?rowBandHitTest\(')
+        $staleName = @() + (Find-Hits $appFiles 'trailHitProvider')
         $hits = @()
-        if ($stillLine) { $hits += 'LibraryViewController.swift: trailHitProvider 闭包内引用 hitTestLine（未接行带展开）' }
-    Add-Check 'production-trail-provider-band' 'BLOCKING' $(if ($hasBand) { 'PASS' } else { 'FAIL' }) "trailHitProvider 必须走行带展开（rowBandHitTest）；直连 hitTestLine = 逐格语义残留（docs/42 §3.2）" $hits
+        if (-not $hasBand) { $hits += 'LibraryViewController.swift: rowBandHitProvider 闭包未接 rowBandHitTest（行带展开缺失）' }
+        if ($staleName.Count -gt 0) { $hits += $staleName }
+    Add-Check 'production-trail-provider-band' 'BLOCKING' $(if ($hasBand -and $staleName.Count -eq 0) { 'PASS' } else { 'FAIL' }) "rowBandHitProvider 必须走行带展开（rowBandHitTest）且旧名 trailHitProvider 清零（docs/42 §3.2）" $hits
     }
 
     # B3 行带链路 scope 过滤（Core 侧：T01 修订 docs/42 §10.1 —— RowBandExpander 不新增，
