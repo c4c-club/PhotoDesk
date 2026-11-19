@@ -34,6 +34,9 @@ final class GridHitTester {
     #if DEBUG
     /// 最近一次 hitTest 的 layoutAttributesForItem 查询次数（含缓存构建帧；断言 ≤ 60 须在缓存已热帧）。
     private(set) var lastQueryCount = 0
+    /// UI 取证（M19 T05）：最近一次 rowBandHitTest 的行带数与展开格数。
+    private(set) var lastBandCount = 0
+    private(set) var lastExpandedCount = 0
     #endif
 
     init(collectionView: UICollectionView) {
@@ -274,7 +277,11 @@ final class GridHitTester {
         guard let fromBand = map.bandIndex(atContentY: Double(from.y), clipTop: clipTop),
               let toBand = map.bandIndex(atContentY: Double(to.y), clipTop: clipTop) else { return [] }
         let sequence = map.bandSequence(from: fromBand, to: toBand)
-        return map.items(forBandIndices: sequence)
-            .map { IndexPath(item: $0.item, section: $0.section) }
+        let expanded = map.items(forBandIndices: sequence)
+        #if DEBUG
+        lastBandCount = sequence.count
+        lastExpandedCount = expanded.count
+        #endif
+        return expanded.map { IndexPath(item: $0.item, section: $0.section) }
     }
 }

@@ -135,6 +135,12 @@ final class LibrarySelectionController: NSObject {
     private(set) var debugViewportBottom: Double = -1
     /// UI 取证：当前路径事务深度（SlideSelectTrail 路径栈长度；无事务 -1）。
     private(set) var debugTrailPathCount = -1
+    /// UI 取证（M19 T05）：最近一次行带喂入——band = 行带数（tester.lastBandCount，-1 未知）、
+    /// exp = 展开格数（行主序 id 数）。
+    private(set) var debugBandCount = -1
+    private(set) var debugExpandedCount = -1
+    /// DEBUG 注入：行带数取证（VC 由 GridHitTester.lastBandCount 提供）。
+    var debugBandCountProvider: () -> Int = { -1 }
     /// UI 取证：最近一次净增量（"+add/-remove" 计数；"+0/-0" = 空帧）。
     private(set) var debugLastDelta = "-"
     var debugStateName: String { "\(machine.state)" }
@@ -277,13 +283,21 @@ final class LibrarySelectionController: NSObject {
                 var started = SlideSelectTrail(base: selectedIDsProvider(),
                                                anchorInitiallySelected: anchorInitiallySelected,
                                                scope: scopeProvider())
-                let delta = started.consume([anchor])
-                trail = started
+                // M19（docs/43 T05）：零长度 (press, press) 取锚点所在整行——长按先整行入选/取消再拖；
+                // provider 不可用（apply 窗口/几何未热）退回单锚点，processTrail 下一帧自愈
+                var beginIDs = [anchor]
                 if let press = machine.pressPoint {
-                    lastTrailContentPoint = CGPoint(x: press.x, y: press.y)
+                    let pressPoint = CGPoint(x: press.x, y: press.y)
+                    let rowIDs = rowBandHitProvider(pressPoint, pressPoint)
+                    if rowIDs.contains(anchor) { beginIDs = rowIDs }
+                    lastTrailContentPoint = pressPoint
                 }
+                let delta = started.consume(beginIDs)
+                trail = started
                 #if DEBUG
                 debugTrailPathCount = started.path.count
+                debugExpandedCount = beginIDs.count
+                debugBandCount = debugBandCountProvider()
                 debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
                 #endif
                 if !delta.isEmpty {
@@ -378,6 +392,8 @@ final class LibrarySelectionController: NSObject {
         lastTrailContentPoint = to
         #if DEBUG
         debugTrailPathCount = current.path.count
+        debugExpandedCount = orderedIDs.count
+        debugBandCount = debugBandCountProvider()
         debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
         #endif
         guard !delta.isEmpty else { return }

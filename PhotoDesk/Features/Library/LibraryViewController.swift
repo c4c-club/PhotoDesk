@@ -792,25 +792,30 @@ final class LibraryViewController: UIViewController {
         // M17 T07（docs/32 §2.6）：apply 窗口取证——快照 apply 期间线段命中为空按保留路径重扫处理
         controller.isApplyingSnapshotProvider = { [weak self] in self?.isApplyingSnapshot ?? false }
         gridHitTester = GridHitTester(collectionView: collectionView)
-        // M18 T05（docs/38 §2/§3）：线段有序命中 → 有序 id（保持扫掠顺序、只过滤 nil）
-        controller.trailHitProvider = { [weak self] from, to in
+        // M19 T05（docs/42 §3.2）：行带命中 → 整行有序 id（行主序展开、零长度 = 所在整行）
+        controller.rowBandHitProvider = { [weak self] from, to in
             guard let self, let tester = self.gridHitTester else { return [] }
             var ids: [String] = []
             ids.reserveCapacity(16)
-            for path in tester.hitTestLine(from: from, to: to) {
+            for path in tester.rowBandHitTest(from: from, to: to) {
                 if let item = self.dataSource.itemIdentifier(for: path) {
                     ids.append(item.id)
                 }
             }
             return ids
         }
+        #if DEBUG
+        controller.debugBandCountProvider = { [weak self] in
+            self?.gridHitTester?.lastBandCount ?? -1
+        }
+        #endif
         // M18 T05：多选栏提示跟随轨迹活跃状态与按下帧锚点语义（覆盖层由 T06 退役）。
         controller.onTrailActiveChanged = { [weak self] active in
             guard let self else { return }
             self.selectionModeHintLabel.isHidden = !active
             if active {
                 self.selectionModeHintLabel.text = self.selectionController?.anchorInitiallySelected == true
-                    ? "滑过即取消" : "滑过即选"
+                    ? "整行取消中" : "整行选择中"
             }
         }
         selectionController = controller
@@ -859,7 +864,7 @@ final class LibraryViewController: UIViewController {
         let key = "library.slideSelectHintShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        showTopBanner(text: "滑过照片即选中，往回滑可取消；单指上下滑动仍可滚动", duration: 2)
+        showTopBanner(text: "长按照片后可下滑整行选中，往回滑可取消；单指上下滑动仍可滚动", duration: 2)
     }
 
     /// 月份头/月份面板「选择本月全部」（docs/13 S10）：scope = 该月 items + scopeID = "month:<id>"；
@@ -1343,6 +1348,8 @@ final class LibraryViewController: UIViewController {
             return 1
         }()
         let trailPath = sel?.debugTrailPathCount ?? -1
+        let band = sel?.debugBandCount ?? -1
+        let exp = sel?.debugExpandedCount ?? -1
         let lastDelta = sel?.debugLastDelta ?? "-"
         let tdBase = sel?.debugTouchDownBaseCount ?? -1
         let tdHit = sel?.debugTouchDownHitID ?? "-"
@@ -1354,7 +1361,7 @@ final class LibraryViewController: UIViewController {
         viewModel.debugFilteredCount = "\(viewModel.filteredItems.count)"
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) band=\(band) exp=\(exp) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
         #endif
     }
 
