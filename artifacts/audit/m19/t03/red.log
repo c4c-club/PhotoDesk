@@ -1,0 +1,219 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[1/10] Write swift-version-24593BA9C3E375BF.txt
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[3/11] Emitting module PhotoDeskCoreTests
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:24:32: error: cannot find type 'RowBandItem' in scope
+ 22 |     }
+ 23 | 
+ 24 |     private func ids(_ items: [RowBandItem]) -> [String] {
+    |                                `- error: cannot find type 'RowBandItem' in scope
+ 25 |         items.map { "s\($0.section)-i\($0.item)" }
+ 26 |     }
+[4/11] Compiling PhotoDeskCoreTests RowBandTrailTests.swift
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:24:32: error: cannot find type 'RowBandItem' in scope
+ 22 |     }
+ 23 | 
+ 24 |     private func ids(_ items: [RowBandItem]) -> [String] {
+    |                                `- error: cannot find type 'RowBandItem' in scope
+ 25 |         items.map { "s\($0.section)-i\($0.item)" }
+ 26 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:29:17: error: value of type 'RowBandMap' has no member 'items'
+ 27 | 
+ 28 |     private func bandIDs(_ map: RowBandMap, _ bands: [Int]) -> [String] {
+ 29 |         ids(map.items(forBandIndices: bands))
+    |                 `- error: value of type 'RowBandMap' has no member 'items'
+ 30 |     }
+ 31 | 
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:36:25: error: value of type 'RowBandMap' has no member 'items'
+ 34 |     func testExpandForwardThreeBandsRowMajorNineItems() {
+ 35 |         let map = makeMap()
+ 36 |         let items = map.items(forBandIndices: [0, 1, 2])
+    |                         `- error: value of type 'RowBandMap' has no member 'items'
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:38:13: error: cannot find 'RowBandItem' in scope
+ 36 |         let items = map.items(forBandIndices: [0, 1, 2])
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+    |             `- error: cannot find 'RowBandItem' in scope
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:38:47: error: cannot find 'RowBandItem' in scope
+ 36 |         let items = map.items(forBandIndices: [0, 1, 2])
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+    |                                               `- error: cannot find 'RowBandItem' in scope
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:38:81: error: cannot find 'RowBandItem' in scope
+ 36 |         let items = map.items(forBandIndices: [0, 1, 2])
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+    |                                                                                 `- error: cannot find 'RowBandItem' in scope
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:39:13: error: cannot find 'RowBandItem' in scope
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+    |             `- error: cannot find 'RowBandItem' in scope
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:39:47: error: cannot find 'RowBandItem' in scope
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+    |                                               `- error: cannot find 'RowBandItem' in scope
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:39:81: error: cannot find 'RowBandItem' in scope
+ 37 |         XCTAssertEqual(items, [
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+    |                                                                                 `- error: cannot find 'RowBandItem' in scope
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:40:13: error: cannot find 'RowBandItem' in scope
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+    |             `- error: cannot find 'RowBandItem' in scope
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+ 42 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:40:47: error: cannot find 'RowBandItem' in scope
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+    |                                               `- error: cannot find 'RowBandItem' in scope
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+ 42 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:40:81: error: cannot find 'RowBandItem' in scope
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+ 40 |             RowBandItem(section: 0, item: 6), RowBandItem(section: 0, item: 7), RowBandItem(section: 0, item: 8),
+    |                                                                                 `- error: cannot find 'RowBandItem' in scope
+ 41 |         ], "3 行带 × 3 列 = 9 item，行主序（行序 + 行内列序）")
+ 42 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:37:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+ 35 |         let map = makeMap()
+ 36 |         let items = map.items(forBandIndices: [0, 1, 2])
+ 37 |         XCTAssertEqual(items, [
+    |         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+ 38 |             RowBandItem(section: 0, item: 0), RowBandItem(section: 0, item: 1), RowBandItem(section: 0, item: 2),
+ 39 |             RowBandItem(section: 0, item: 3), RowBandItem(section: 0, item: 4), RowBandItem(section: 0, item: 5),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:46:57: error: cannot find 'RowBandItem' in scope
+ 44 |     func testExpandPartialLastRowOnlyRealItems() {
+ 45 |         let map = makeMap()
+ 46 |         XCTAssertEqual(map.items(forBandIndices: [3]), [RowBandItem(section: 0, item: 9)],
+    |                                                         `- error: cannot find 'RowBandItem' in scope
+ 47 |                        "末行不满只展开真实 item")
+ 48 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:46:9: error: type 'Any' cannot conform to 'Equatable'
+ 44 |     func testExpandPartialLastRowOnlyRealItems() {
+ 45 |         let map = makeMap()
+ 46 |         XCTAssertEqual(map.items(forBandIndices: [3]), [RowBandItem(section: 0, item: 9)],
+    |         |- error: type 'Any' cannot conform to 'Equatable'
+    |         |- note: only concrete types such as structs, enums and classes can conform to protocols
+    |         `- note: requirement from conditional conformance of '[Any]' to 'Equatable'
+ 47 |                        "末行不满只展开真实 item")
+ 48 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:46:28: error: value of type 'RowBandMap' has no member 'items'
+ 44 |     func testExpandPartialLastRowOnlyRealItems() {
+ 45 |         let map = makeMap()
+ 46 |         XCTAssertEqual(map.items(forBandIndices: [3]), [RowBandItem(section: 0, item: 9)],
+    |                            `- error: value of type 'RowBandMap' has no member 'items'
+ 47 |                        "末行不满只展开真实 item")
+ 48 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:52:27: error: value of type 'RowBandMap' has no member 'items'
+ 50 |     func testExpandReverseSequenceMirrorsOrder() {
+ 51 |         let map = makeMap()
+ 52 |         let forward = map.items(forBandIndices: [0, 1, 2])
+    |                           `- error: value of type 'RowBandMap' has no member 'items'
+ 53 |         let backward = map.items(forBandIndices: [2, 1, 0])
+ 54 |         XCTAssertEqual(backward, forward.reversed(), "反向 bandSequence 展开顺序反向（回滑截断前提）")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:53:28: error: value of type 'RowBandMap' has no member 'items'
+ 51 |         let map = makeMap()
+ 52 |         let forward = map.items(forBandIndices: [0, 1, 2])
+ 53 |         let backward = map.items(forBandIndices: [2, 1, 0])
+    |                            `- error: value of type 'RowBandMap' has no member 'items'
+ 54 |         XCTAssertEqual(backward, forward.reversed(), "反向 bandSequence 展开顺序反向（回滑截断前提）")
+ 55 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:59:28: error: value of type 'RowBandMap' has no member 'items'
+ 57 |     func testExpandDedupKeepsFirstOccurrence() {
+ 58 |         let map = makeMap()
+ 59 |         XCTAssertEqual(map.items(forBandIndices: [0, 1, 0]), map.items(forBandIndices: [0, 1]),
+    |                            `- error: value of type 'RowBandMap' has no member 'items'
+ 60 |                        "重复行带去重保首现顺序")
+ 61 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:59:66: error: value of type 'RowBandMap' has no member 'items'
+ 57 |     func testExpandDedupKeepsFirstOccurrence() {
+ 58 |         let map = makeMap()
+ 59 |         XCTAssertEqual(map.items(forBandIndices: [0, 1, 0]), map.items(forBandIndices: [0, 1]),
+    |                                                                  `- error: value of type 'RowBandMap' has no member 'items'
+ 60 |                        "重复行带去重保首现顺序")
+ 61 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:65:25: error: value of type 'RowBandMap' has no member 'items'
+ 63 |     func testExpandCrossSectionFlatOrder() {
+ 64 |         let map = makeMap()
+ 65 |         let items = map.items(forBandIndices: [2, 3, 4])
+    |                         `- error: value of type 'RowBandMap' has no member 'items'
+ 66 |         XCTAssertEqual(items.first?.section, 0)
+ 67 |         XCTAssertEqual(items.last, RowBandItem(section: 1, item: 3), "跨段展开按 section 升序平铺")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:67:36: error: cannot find 'RowBandItem' in scope
+ 65 |         let items = map.items(forBandIndices: [2, 3, 4])
+ 66 |         XCTAssertEqual(items.first?.section, 0)
+ 67 |         XCTAssertEqual(items.last, RowBandItem(section: 1, item: 3), "跨段展开按 section 升序平铺")
+    |                                    `- error: cannot find 'RowBandItem' in scope
+ 68 |         XCTAssertEqual(items.count, 3 + 1 + 4)
+ 69 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:73:28: error: value of type 'RowBandMap' has no member 'items'
+ 71 |     func testExpandInvalidBandIndexIgnored() {
+ 72 |         let map = makeMap()
+ 73 |         XCTAssertEqual(map.items(forBandIndices: [-1, 0, 99]), map.items(forBandIndices: [0]),
+    |                            `- error: value of type 'RowBandMap' has no member 'items'
+ 74 |                        "越界行带下标防御性忽略")
+ 75 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:73:68: error: value of type 'RowBandMap' has no member 'items'
+ 71 |     func testExpandInvalidBandIndexIgnored() {
+ 72 |         let map = makeMap()
+ 73 |         XCTAssertEqual(map.items(forBandIndices: [-1, 0, 99]), map.items(forBandIndices: [0]),
+    |                                                                    `- error: value of type 'RowBandMap' has no member 'items'
+ 74 |                        "越界行带下标防御性忽略")
+ 75 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandTrailTests.swift:189:30: error: value of type 'RowBandMap' has no member 'items'
+187 |         XCTAssertEqual(map.count, 40 * 84, "1 万 item → 3360 行带")
+188 |         let start = ContinuousClock.now
+189 |         let allIDs = ids(map.items(forBandIndices: map.bandSequence(from: 0, to: map.count - 1)))
+    |                              `- error: value of type 'RowBandMap' has no member 'items'
+190 |         var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+191 |         let delta = trail.consume(allIDs)
+error: fatalError
+[X] swift test 失败（exit 1）
