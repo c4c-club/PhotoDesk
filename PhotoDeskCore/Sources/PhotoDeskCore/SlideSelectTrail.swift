@@ -4,8 +4,9 @@
 // 最近一次出现（出栈 cell 回 base 态）、新 id 入栈并按 mode 改变选中；
 // target = select ? base ∪ Set(path) : base − Set(path)，按事件增量维护（O(delta)，不整集重算、
 // 不 sorted() 全量重排——最终落地由 SelectionState.applyDelta 承担）。
-// 净差语义：帧内记录每 id 的「最后一次事件方向」（入/出）；同帧 A→B→A→B 只留最后事件，
-// 即 delta = 本帧相对上一帧 target 的净差（docs/38 §2.3 第 5 行），O(delta) 无 subtracting 全量运算。
+// 净差语义：帧内每 id 在首个触碰事件前记录帧起点 target 状态，帧尾按「终点 vs 起点」合成净 delta——
+// 回滑弹出又重入、base 内 id 空触碰等同态 id 零净差（docs/38 §2.3：delta = 本帧相对上一帧 target 的净差），
+// O(delta) 无 subtracting 全量运算（M19 T03 回滑整行组合修正：末次事件方向无法表达「起点同态」）。
 // 帧累计器为结构体持久存储（removeAll(keepingCapacity:)），连跑上万帧零重复分配。
 // 不变量：path 内无重复 id（append 前提 occurrences[id] 为 nil，截断同步清除出栈项），
 // 故 occurrences 用 [String: Int]（最近一次出现下标）即精确等价于 docs/38 §2.3 的 [String: [Int]]。
@@ -49,9 +50,10 @@ public struct SlideSelectTrail: Sendable {
 
     /// id → 在 path 中的最近一次出现下标（path 无重复不变量下即「已访问」判定）。
     private var occurrences: [String: Int]
-    /// 帧内每 id 的最后一次事件方向（true = 加入 target / false = 移出 target）；
-    /// 帧尾合成净 delta 后清空（保留容量，跨帧零分配）。
-    private var frameLastOp: [String: Bool]
+    /// 帧内被触碰 id 的帧起点 target 状态（首个触碰事件前记录一次）；
+    /// 帧尾按「终点 vs 起点」合成净 delta 后清空（保留容量，跨帧零分配）。
+    /// 帧起点/终点同态 → 零净差（覆盖回滑弹出又重入、base 内 id 空触碰，docs/38 §2.3 净差契约）。
+    private var frameStartState: [String: Bool]
 
     public init(base: Set<String>, anchorInitiallySelected: Bool, scope: Set<String>? = nil) {
         let scopedScope = scope.map { Set($0) }
@@ -61,7 +63,7 @@ public struct SlideSelectTrail: Sendable {
         self.path = []
         self.target = self.base
         self.occurrences = [:]
-        self.frameLastOp = [:]
+        self.frameStartState = [:]
     }
 
     /// 消费一帧有序命中 id（线段扫掠按进入顺序输出）；返回相对上一帧的净 add/remove。
@@ -88,33 +90,37 @@ public struct SlideSelectTrail: Sendable {
                 enterTrail(id)
             }
         }
-        guard !frameLastOp.isEmpty else { return SlideSelectDelta() }
-        var addSet = Set<String>(minimumCapacity: frameLastOp.count)
+        guard !frameStartState.isEmpty else { return SlideSelectDelta() }
+        var addSet = Set<String>(minimumCapacity: frameStartState.count)
         var removeSet = Set<String>()
-        for (id, joined) in frameLastOp {
-            if joined { addSet.insert(id) } else { removeSet.insert(id) }
+        for (id, startInTarget) in frameStartState {
+            let nowInTarget = target.contains(id)
+            if nowInTarget == startInTarget { continue }   // 帧起点/终点同态 → 净差为零
+            if nowInTarget { addSet.insert(id) } else { removeSet.insert(id) }
         }
-        frameLastOp.removeAll(keepingCapacity: true)
+        frameStartState.removeAll(keepingCapacity: true)
         return SlideSelectDelta(add: addSet, remove: removeSet)
     }
 
-    /// 新 id 入栈对 target 的影响；返回值即事件是否真实改变 target（base 内 id 入栈无净差）。
+    /// 新 id 入栈对 target 的影响（base 内 id 入栈无净差；起点状态已在首个触碰时记录）。
     private mutating func enterTrail(_ id: String) {
+        if frameStartState[id] == nil { frameStartState[id] = target.contains(id) }
         switch mode {
         case .select:
-            if target.insert(id).inserted { frameLastOp[id] = true }
+            target.insert(id)
         case .deselect:
-            if target.remove(id) != nil { frameLastOp[id] = false }
+            target.remove(id)
         }
     }
 
     /// 出栈 cell 回 base 态（docs/38 §2.3：回滑恢复由 base 决定，不由路径栈决定）。
     private mutating func restoreToBase(_ id: String) {
+        if frameStartState[id] == nil { frameStartState[id] = target.contains(id) }
         switch mode {
         case .select:
-            if !base.contains(id), target.remove(id) != nil { frameLastOp[id] = false }
+            if !base.contains(id) { target.remove(id) }
         case .deselect:
-            if base.contains(id), target.insert(id).inserted { frameLastOp[id] = true }
+            if base.contains(id) { target.insert(id) }
         }
     }
 }

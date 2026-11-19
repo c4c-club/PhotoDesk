@@ -120,14 +120,18 @@ try {
     Add-Check 'production-trail-provider-band' 'BLOCKING' $(if ($hasBand) { 'PASS' } else { 'FAIL' }) "trailHitProvider 必须走行带展开（rowBandHitTest）；直连 hitTestLine = 逐格语义残留（docs/42 §3.2）" $hits
     }
 
-    # B3 行带几何必须 scope 过滤（Core 侧：RowBandMap 供 scope 能力）
-    $relMap = 'PhotoDeskCore/Sources/PhotoDeskCore/RowBandMap.swift'
-    if (File-Missing $relMap) {
-        Add-Check 'band-scope-core' 'BLOCKING' 'FAIL' "$relMap 文件不存在（T02 交付）" @()
-    } else {
-        $hits = Find-Hits @($relMap) 'scope'
-    Add-Check 'band-scope-core' 'BLOCKING' $(if ($hits.Count -gt 0) { 'PASS' } else { 'FAIL' }) "RowBandMap 必须具备 scope 过滤能力（单月 scope 轨迹不泄漏，docs/42 §1 行为表）" $hits
+    # B3 行带链路 scope 过滤（Core 侧：T01 修订 docs/42 §10.1 —— RowBandExpander 不新增，
+    # Core 只产 RowBandItem 数值单元；id 级 scope 过滤由 SlideSelectTrail.consume 承担）
+    $relTrail = 'PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectTrail.swift'
+    $relItem = 'PhotoDeskCore/Sources/PhotoDeskCore/RowBandItem.swift'
+    $b3hits = @()
+    if (File-Missing $relTrail) { $b3hits += 'SlideSelectTrail.swift 不存在（M18 T02 交付）' }
+    if (File-Missing $relItem) { $b3hits += 'RowBandItem.swift 不存在（T03 交付）' }
+    if (-not $b3hits.Count) {
+        $trailHits = Find-Hits @($relTrail) 'scope'
+        if (-not $trailHits.Count) { $b3hits += 'SlideSelectTrail.swift 无 scope 过滤（consume 必须忽略 scope 外 id）' }
     }
+    Add-Check 'band-scope-core' 'BLOCKING' $(if ($b3hits.Count -eq 0) { 'PASS' } else { 'FAIL' }) "行带链路 scope 过滤：SlideSelectTrail.consume 忽略 scope 外 id + RowBandItem 展开单元在位（docs/42 §10.1）" $b3hits
 
     # B4 App 侧事务构造必须带 scope（唯一写入口的 scope 输入）
     $relCtl = 'PhotoDesk/Features/Library/LibrarySelectionController.swift'
@@ -139,6 +143,7 @@ try {
     }
 
     # B5 行带展开必须行主序（几何派生自真实 attributes 字段，禁 DSSpacing 推算）
+    $relMap = 'PhotoDeskCore/Sources/PhotoDeskCore/RowBandMap.swift'
     if (File-Missing $relMap) {
         Add-Check 'band-row-major-core' 'BLOCKING' 'FAIL' "$relMap 文件不存在（T02 交付）" @()
     } else {

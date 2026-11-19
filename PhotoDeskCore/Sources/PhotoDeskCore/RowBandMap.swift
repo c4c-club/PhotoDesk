@@ -108,6 +108,23 @@ public struct RowBandMap: Sendable {
         return Array((hi...lo).reversed())
     }
 
+    /// 行带下标序列 → 有序 item 展开（行主序：行序 + 行内列序；重复行带去重保首现；
+    /// 越界下标防御性忽略）。产纯数值 RowBandItem（docs/42 §10.1），scope 过滤在 trail consume 层。
+    public func items(forBandIndices bandIndices: [Int]) -> [RowBandItem] {
+        guard count > 0, !bandIndices.isEmpty else { return [] }
+        var out: [RowBandItem] = []
+        out.reserveCapacity(bandIndices.count)
+        var seenBands = Set<Int>(minimumCapacity: bandIndices.count)
+        for bandIndex in bandIndices {
+            guard bandIndex >= 0, bandIndex < count, seenBands.insert(bandIndex).inserted else { continue }
+            let b = band(at: bandIndex)
+            for item in b.items {
+                out.append(RowBandItem(section: b.section, item: item))
+            }
+        }
+        return out
+    }
+
     /// 二分：第一个 lastMaxY ≥ effectiveY 的段；全部段 lastMaxY < effectiveY 时返回末段（越界钳末带）。
     private func sectionIndexForLookup(_ effectiveY: Double) -> Int {
         var lo = 0
