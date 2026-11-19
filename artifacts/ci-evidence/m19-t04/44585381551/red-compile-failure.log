@@ -1,0 +1,8 @@
+build	Test (simulator)	2026-11-19T18:27:32.9475710Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:536:34: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:32.9781660Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:556:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.0088540Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:574:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.0397990Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:589:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.0709770Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:605:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.1017460Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:619:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.1278990Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:645:26: error: value of type 'GridHitTester' has no member 'rowBandHitTest'
+build	Test (simulator)	2026-11-19T18:27:33.1586100Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:650:27: error: value of type 'GridHitTester' has no member 'rowBandHitTest'

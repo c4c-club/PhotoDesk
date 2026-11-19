@@ -1,0 +1,4 @@
+build	Test (simulator)	2026-11-19T17:47:38.6258060Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:702:1: error: extraneous '}' at top level
+build	Test (simulator)	2026-11-19T17:47:40.3657420Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:702:1: error: Extraneous '}' at top level
+build	Performance tests (5,000+ photos)	2026-11-19T18:05:10.4203590Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:702:1: error: extraneous '}' at top level
+build	Performance tests (5,000+ photos)	2026-11-19T18:05:11.5699130Z /Users/runner/work/PhotoDesk/PhotoDesk/PhotoDeskTests/LibraryGridGeometryTests.swift:702:1: error: Extraneous '}' at top level

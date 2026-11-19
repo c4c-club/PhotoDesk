@@ -1,0 +1,30 @@
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:13.6315093Z 	 Executed 9 tests, with 0 failures (0 unexpected) in 0.108 (0.108) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:13.6324638Z 	 Executed 9 tests, with 0 failures (0 unexpected) in 0.105 (0.105) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:13.6353310Z 	 Executed 11 tests, with 0 failures (0 unexpected) in 0.104 (0.104) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:13.6365069Z 	 Executed 11 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1556993Z 	 Executed 8 tests, with 0 failures (0 unexpected) in 0.101 (0.101) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1578797Z 	 Executed 11 tests, with 0 failures (0 unexpected) in 0.319 (0.319) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1592573Z 	 Executed 10 tests, with 0 failures (0 unexpected) in 0.102 (0.102) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1594191Z Test Case 'GridHitRegionTests.testCrossSectionCellsHitByGeometry' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1609096Z 	 Executed 15 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1625157Z 	 Executed 13 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1667665Z 	 Executed 24 tests, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1682730Z 	 Executed 9 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1710994Z 	 Executed 19 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1739005Z 	 Executed 22 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1759076Z 	 Executed 15 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.1770265Z 	 Executed 8 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.2751535Z 	 Executed 13 tests, with 0 failures (0 unexpected) in 0.102 (0.102) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:14.3771898Z 	 Executed 19 tests, with 0 failures (0 unexpected) in 0.102 (0.102) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8477164Z 	 Executed 10 tests, with 0 failures (0 unexpected) in 0.201 (0.201) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8485870Z 	 Executed 8 tests, with 0 failures (0 unexpected) in 3.17 (3.17) seconds
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8487627Z Test Case 'RowBandMapTests.testBandCountSumsCeilRowsAndSkipsInvalidSections' passed (0.1 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8488941Z Test Case 'RowBandMapTests.testBandIndexBeyondLastRowClampsToLastBand' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8490114Z Test Case 'RowBandMapTests.testBandIndexClampsToFirstVisibleRowBelowClipTop' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8491256Z Test Case 'RowBandMapTests.testBandIndexHitsRowTopAndBottomMinusEpsilon' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8492325Z Test Case 'RowBandMapTests.testBandIndexNegativeYClampsToFirstBand' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8493477Z Test Case 'RowBandMapTests.testBandIndexPrefersNextSectionOnGapTie' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8494593Z Test Case 'RowBandMapTests.testBandIndexReturnsNilInWideInterSectionGap' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8495696Z Test Case 'RowBandMapTests.testBandIndexReturnsNilWhenAllRowsOccluded' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8496856Z Test Case 'RowBandMapTests.testBandIndexRowBottomBoundaryBelongsToNextRow' passed (0.0 seconds)
+core-linux	Test PhotoDeskCore (with coverage)	2026-11-19T19:46:17.8716368Z Test Case 'RowBandMapTests.testBandIndexSnapsAcrossSectionGapWithinTolerance' passed (0.0 seconds)
