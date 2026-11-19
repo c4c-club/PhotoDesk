@@ -6,6 +6,9 @@
 // 全扫根治）；矩形上边钳到视口顶 + 粘性头高，被钉住头完全遮住与已滚出屏的 cell 不命中
 // （docs/31 G11 / docs/32 §2.4 第 6 步）。缓存随 snapshot apply / 列数变化 / 布局 pass 由 VC
 // 调 invalidateGeometry() 失效。DEBUG lastQueryCount 供测试断言缓存已热帧 ≤ 60 次查询。
+// M19 T04：行带命中 rowBandHitTest——两点 y → bandIndex(clipTop) → bandSequence → 整行 IndexPath 展开；
+// RowBandMap 缓存由段几何派生（禁 DSSpacing 推算），随 invalidateGeometry() 失效；
+// hitTestLine 保留为降级路径（docs/42 §3.2/§10.4），生产主路径 T05 切换。
 
 import UIKit
 import PhotoDeskCore
@@ -25,6 +28,8 @@ final class GridHitTester {
     private weak var collectionView: UICollectionView?
     private var sections: [SectionGeometry] = []
     private var derivedColumns = 0
+    /// 行带平铺缓存（段几何派生；invalidateGeometry 失效后惰性重建）
+    private var rowBandMap: RowBandMap?
 
     #if DEBUG
     /// 最近一次 hitTest 的 layoutAttributesForItem 查询次数（含缓存构建帧；断言 ≤ 60 须在缓存已热帧）。
@@ -39,6 +44,7 @@ final class GridHitTester {
     func invalidateGeometry() {
         sections = []
         derivedColumns = 0
+        rowBandMap = nil
     }
 
     // MARK: - 缓存
@@ -223,5 +229,52 @@ final class GridHitTester {
             expansion: Double(SlideSelectConfig.hitExpansion),
             epsilon: Double(SlideSelectConfig.segmentEpsilon))
         return orderedIDs.compactMap { pathByID[$0] }
+    }
+
+    // MARK: - M19 T04：行带命中（docs/42 §3.2：两点 → 行带序列 → 整行 IndexPath）
+
+    /// 行带缓存惰性构建：字段全部来自 item attributes 派生的段几何（禁 DSSpacing 推算），
+    /// headerHeight 收粘性头高（docs/42 §10.5：App 换算、Core 收 Double）。
+    private func ensureRowBandMap() -> RowBandMap? {
+        ensureCache()
+        guard !sections.isEmpty, derivedColumns >= 1 else { return nil }
+        if let cached = rowBandMap { return cached }
+        let bandSections = sections.map { geo in
+            RowBandSection(section: geo.section,
+                           itemCount: geo.itemCount,
+                           columns: derivedColumns,
+                           rowHeight: geo.rowHeight,
+                           firstRowMinY: geo.firstRowMinY,
+                           headerHeight: Double(DSSpacing.monthHeaderHeight))
+        }
+        let map = RowBandMap(sections: bandSections)
+        rowBandMap = map
+        return map
+    }
+
+    /// 两点（内容坐标）→ 各自所在行带（粘性头 clipTop 生效）→ 行带平铺序列 → 整行 IndexPath
+    /// （行主序：行序 + 行内列序）。零长度线段 = 该点所在整行；跨 section 按平铺序自然覆盖
+    /// 中间 section 整段；无可命中行带（空网格/全遮挡）返回空。
+    func rowBandHitTest(from: CGPoint, to: CGPoint) -> [IndexPath] {
+        #if DEBUG
+        lastQueryCount = 0
+        #endif
+        guard let collectionView,
+              from.x.isFinite, from.y.isFinite, to.x.isFinite, to.y.isFinite else { return [] }
+        guard let map = ensureRowBandMap() else { return [] }
+        // 粘性头钳制与 hitTestLine 同源：视口顶所在段有钉住头 → 有效命中自头底边起
+        let viewportTop = Double(collectionView.contentOffset.y)
+            + Double(collectionView.adjustedContentInset.top)
+        let clipTop: Double
+        if sectionIndex(containingContentY: viewportTop) != nil {
+            clipTop = viewportTop + Double(DSSpacing.monthHeaderHeight)
+        } else {
+            clipTop = -Double.infinity
+        }
+        guard let fromBand = map.bandIndex(atContentY: Double(from.y), clipTop: clipTop),
+              let toBand = map.bandIndex(atContentY: Double(to.y), clipTop: clipTop) else { return [] }
+        let sequence = map.bandSequence(from: fromBand, to: toBand)
+        return map.items(forBandIndices: sequence)
+            .map { IndexPath(item: $0.item, section: $0.section) }
     }
 }
