@@ -1,0 +1,62 @@
+# T05 — Controller/VC 接线、DEBUG 与文案
+
+> 自包含任务卡。只读本文件 + `docs/42 §3.2` + `docs/45 §1/§5`。
+
+## 0. 目标
+
+把选择链路从 `hitTestLine` 切到 `rowBandHitTest`；保持「唯一写入口」「允许滚动」「回滑取消」；文案改成用户能听懂的「下滑整行选中」。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`
+- `PhotoDesk/Features/Library/LibraryViewController.swift`（`setupSelectionController`、`applySelectionChanges`、文案、DEBUG Summary）
+- `PhotoDesk/Features/Library/GridHitTester.swift`（T04 产物）
+- `docs/04-UIUX设计文档.md` §7（中文文案口径）
+
+## 2. 步骤
+
+1. 红：改 `LibrarySelectionController` 的注入名与调用点（先只改签名/不实现），推 CI 得真实编译红；记录 run id；提交红。
+2. `LibrarySelectionController`：
+   - `trailHitProvider` → `rowBandHitProvider: (CGPoint, CGPoint) -> [String]`（返回**已展开、行主序**的 assetID）；
+   - `beginTrail` 帧用 `(press, press)` 取整行（零长度 = 所在整行），先 `consume` 该行，再继续拖；
+   - `processTrail` 改为「行带序列 id 喂事务」，净 delta 落地；`delta.isEmpty` 不触发触觉；
+   - DEBUG：`debugTrailPathCount` 改名/补充为 `debugBandCount` + `debugExpandedCount`（保留旧字段则标 deprecated，避免 UI 旧断言断链）；
+   - 方向锁、`releaseScroll`、`holdElapsed` 双通道、逐帧边缘监视**不动**。
+3. `LibraryViewController`：
+   - 注入 `rowBandHitProvider` = `tester.rowBandHitTest(from:to:)` → `itemIdentifier` → 有序 `[String]`；
+   - `applySelectionChanges(add:remove:)` 保持唯一写入口（`SelectionState.applyDelta`）；
+   - 首入提示改「长按照片后可下滑整行选中，往回滑可取消；单指上下滑动仍可滚动」；
+   - 拖动横幅：select →「整行选择中」，deselect →「整行取消中」；
+   - DEBUG `Library-DebugSummary` 增加 `band=`（本次事务行带数）与 `exp=`（展开格数），保留 `path=`。
+4. 推 CI 定向 `build + LibraryGridGeometryTests`；修复编译/行为红，记录链路 run id。
+5. 更新 `docs/05`、`progress-m19`：T05 DONE。
+
+## 3. 验收
+
+- 生产代码不再以 `hitTestLine` 作为选择结果来源（`trailHitProvider` 0 引用或仅 deprecated 包装）。
+- `grep -R "applySelectionDelta" PhotoDesk/` 只有控制器调用 + VC 实现；无第二条写入口。
+- 用户可见文案无「框选」「矩形」「逐格」；「整行」允许且必须出现一次（用于解释下滑整行）。
+- 纵向直接拖仍滚动：不改 `SelectionGestureMachine`。
+
+## 4. Git
+
+1. `test(selection): 行带接线红用例`
+2. `feat(selection): 行带命中接线与整行选择`
+3. `fix(selection): CI 失败链修复`（按真实红逐轮提交）
+4. `docs(m19): T05 进度与证据`
+
+## 5. 完成后
+
+只输出：T05 完成后，只读 T06-行为矩阵收口.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

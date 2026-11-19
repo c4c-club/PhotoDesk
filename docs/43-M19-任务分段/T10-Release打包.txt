@@ -1,0 +1,59 @@
+# T10 — Release 1.8.0 (9)
+
+> 自包含任务卡。只读本文件 + `docs/42 §8` + `.github/workflows/ios.yml` + `project.yml`。
+
+## 0. 目标
+
+产出未签名 Release IPA，归档到固定路径，汇报**完整绝对路径**与 SHA256。
+
+## 1. 步骤
+
+1. 前置：T01–T09 全部 DONE（真机可 BLOCKED）。
+2. `project.yml` → `MARKETING_VERSION = 1.8.0`、`CURRENT_PROJECT_VERSION = 9`；部署目标保持 16.0；`DEVELOPMENT_TEAM` 仍由环境变量注入。
+3. 提交 `chore(release): 1.8.0 (9)`；push 触发完整 CI。
+4. 等真实 CI：core-linux 全绿；macos-15 + Xcode 16.4 + iOS 16.4 模拟器 build/单测/UI/Performance；`Verify deployment target` 与 `Verify unsigned ipa` 通过。
+5. 下载 artifact，写入：
+   - `artifacts/release/1.8.0/PhotoDesk-1.8.0-build9-unsigned.ipa`
+   - `artifacts/release/1.8.0/PhotoDesk-1.8.0-build9-unsigned.ipa.sha256`
+   - `artifacts/release/1.8.0/release-manifest.json`（version/build/run id/head sha/minos/SHA256/真机状态）
+6. 本机复算 SHA256，必须与 CI 一致；两串写进 `docs/46`。
+7. 若 T09 设备可用：用该 Release 包装机复验 6 条冒烟（安装/长按/右列下滑整行/回滑取消/纵向滚动/退出复位）；不可用沿用 BLOCKED，不得用旧包结果冒充。
+8. 更新 `docs/05` M19 ✅ 100% + 变更日志；`progress-m19` T10 DONE；`docs/46` 终稿。
+9. 最终提交 `docs(m19): Release 1.8.0 (9) 验收记录`（大 IPA 不入库；manifest 如需入库用 `git add -f`）。
+
+## 2. 验收
+
+- 版本号双处一致；`minos=16.0`；IPA 内 `Payload/PhotoDesk.app/PhotoDesk` 存在；SHA256 双端一致。
+- 不得把模拟器 `.app.zip` 当最终 IPA；不得声称已签名。
+
+## 3. Git
+
+1. `chore(release): 1.8.0 (9)`
+2. `docs(m19): Release 1.8.0 (9) 验收记录`（含 docs/05、docs/46、progress-m19 用 `git add -f`）
+
+## 4. 最终输出（执行 Agent 对用户）
+
+```text
+Release 完成
+IPA：<Windows 完整绝对路径>
+SHA256：<64 位>
+CI run：<id> / head：<sha>
+真机：<12/12 PASS | BLOCKED 原因>
+证据：docs/46-M19-验收记录.md、artifacts/plan/progress-m19.md
+```
+
+## 5. 完成后
+
+全部任务结束；不再读取任何任务卡。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

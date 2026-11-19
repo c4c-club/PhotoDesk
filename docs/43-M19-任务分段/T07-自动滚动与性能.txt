@@ -1,0 +1,55 @@
+# T07 — 边缘自动滚动、粘性头与性能预算
+
+> 自包含任务卡。只读本文件 + `docs/42 §5` + `docs/45 §7`。
+
+## 0. 目标
+
+行带语义在边缘自动滚动下仍连续、不跳行、不漏行；粘性头遮挡不误选；性能达标。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（`autoScrollTick`、`feedEdgeEvents`、`endTrail`）
+- `PhotoDesk/Features/Library/GridHitTester.swift`（`clipTop`、缓存失效）
+- `docs/42 §5`
+
+## 2. 步骤
+
+1. 红（UI）：补 2 条用例：
+   - 长按后拖到底缘保持 2s：`band=` 持续增长、计数单调增、屏外指定 assetID 命中、松手后停；
+   - 滚到第 3 屏后长按下拖 3 行：整行计数精确（验证缓存失效后行带重建正确）。
+   推 CI 定向拿红/绿证据。
+2. 修 `autoScrollTick`：滚动前后同一窗口坐标换算 `before→after`，行带序列按内容流过方向推进；`clampedOffset` 不改；离开边缘必须停 displayLink。
+3. 粘性头：`clipTop` 只裁遮挡区；行带起点若落在被遮住区域，钳到第一条可见行；不得整段偏移。
+4. 性能测量（DEBUG 计数）：
+   - 单帧行带解析 p50/p95；展开 + `applyDelta` 耗时；
+   - 2 万张全库扫一遍内存峰值；
+   - 记录到 `artifacts/audit/m19/t07/perf.txt`；超预算（§5）必须优化后再提交。
+5. 更新 `docs/05`、`progress-m19`：T07 DONE。
+
+## 3. 验收
+
+- 两条 UI 用例绿；自动滚动期间无重复行带、无逆序、无跳行。
+- 性能：单帧 ≤4ms、滚动 ≥55FPS、内存 <250MB（模拟器仅参考，注明）。
+- 触觉 ≤16 次/秒（`debugHapticCount`）。
+
+## 4. Git
+
+1. `test(selection): 自动滚动整行红用例`
+2. `fix(selection): 自动滚动行带推进与粘性头裁剪`
+3. `docs(m19): T07 进度与性能证据`
+
+## 5. 完成后
+
+只输出：T07 完成后，只读 T08-UI套件重写与CI.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

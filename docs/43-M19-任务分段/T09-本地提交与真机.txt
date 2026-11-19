@@ -1,0 +1,46 @@
+# T09 — 本地提交检查点与 AltServer 真机验收
+
+> 自包含任务卡。只读本文件 + `docs/42 §8`。
+
+## 0. 目标
+
+本地 git 历史干净可追溯；把当前未签名 IPA 装到 iPhone 做 12 条实测（重点：右列下滑整行）；设备不可用如实 BLOCKED。
+
+## 1. 步骤
+
+1. `git status --short` 干净；`git log --oneline -20` 列出 T01–T08 提交并写入 `progress-m19`。
+2. 跑 `scripts/test-core.ps1` 记录 Core 终测；跑 `scripts/audit-m19.ps1 -Strict` 确认 0 blocking。
+3. 取 T08 绿 run 的 `PhotoDesk-unsigned-ipa`；校验 `MinimumOSVersion=16.0`、SHA256、run id。
+4. AltServer 通道：探测设备/AltServer；可用则签名安装（免费账号 7 天）；不可用写 **BLOCKED**。
+5. 12 条真机清单（逐条 PASS/FAIL/BLOCKED + 现象）：
+   ① 安装首启授权 ② 长按进入多选 ③ **右列下滑 3 行整行选中（计数=3×列）** ④ 左列下滑同样整行 ⑤ 横向拖动整行 ⑥ 斜向行带 ⑦ 回滑整行取消 ⑧ 从已选起手取消 + 回滑恢复 ⑨ 未长按纵向滚动计数不变 ⑩ 底缘自动滚动连续整行 ⑪ 跨月/粘性头不误选 ⑫ 单月 scope、全选后取消、退出复位、深色/VoiceOver。
+6. 真机缺陷回到对应任务卡范围修复并重跑最小 CI。
+7. `docs/46-M19-验收记录.md` 写初稿；`docs/05`、`progress-m19`：T09 DONE 或 BLOCKED。
+
+## 2. 验收
+
+- 提交分段可追溯、无未提交代码。
+- 12 条有明确状态；BLOCKED 时写清设备/AltServer/账号原因。
+- 红线 1 不越界（只验证「移到最近删除」）。
+
+## 3. Git
+
+1. `docs(m19): T09 本地提交检查点与真机清单`
+2. `fix(selection): 真机缺陷修复`（如有）
+3. `docs(m19): T09 验收结果`
+
+## 4. 完成后
+
+只输出：T09 完成后，只读 T10-Release打包.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

@@ -1,0 +1,64 @@
+# T04 — App 行带命中（真实布局）
+
+> 自包含任务卡。只读本文件 + `docs/45 §3` + `docs/42 §3.2/§4`。
+
+## 0. 目标
+
+在 `GridHitTester` 增加 `rowBandHitTest(from:to:) -> [IndexPath]`：真实 `layoutAttributes` 建 `RowBandMap` 缓存；两点 → 行带序列 → 展开为整行 `IndexPath`（行序 + 列序）。**本卡只改命中层与单测，不改控制器**。
+
+## 1. 只读范围
+
+- `PhotoDesk/Features/Library/GridHitTester.swift`（全文）
+- `PhotoDesk/Features/Library/LibraryGridLayout.swift`
+- `PhotoDeskCore/Sources/PhotoDeskCore/RowBandMap.swift`、`RowBandExpander.swift`
+- `PhotoDeskTests/LibraryGridGeometryTests.swift`（现有真布局测试风格，尤其 dataSource 强持有注释）
+
+## 2. 步骤
+
+1. 红：在 `LibraryGridGeometryTests` 新增 ≥8 条用例：
+   - 2/3/4/5 列 × `contentOffset.y ∈ {0,2000,8000,20000}`：右列起点向下 3 行 → 结果 == 手工按 attributes 计算的「3 行 × columns」精确 `IndexPath` 序列（整行）；
+   - 左列同样整行（左右一致）；
+   - 同一行内横向拖动 → 恰好该行全列；
+   - 斜向拖动 → 行带序列（含中间行）；
+   - 末行不满 → 只含实际 item；
+   - 粘性头钉住时头下第一行可命中、被完全遮住的行不命中；
+   - `invalidateGeometry()` 后重建一致；
+   - 缓存热帧 `lastQueryCount ≤ 60`。
+   - 保留 `UICollectionView.dataSource` 强持有（历史踩坑：弱引用导致 0 段空网格假绿）。
+2. 推 CI 定向 `-only-testing:PhotoDeskTests/LibraryGridGeometryTests` 得真实编译红（`cannot find 'rowBandHitTest'`），记录 run id + log；提交红测试。
+3. 改 `GridHitTester`：
+   - 私有 `rowBandMap` 缓存 + `rowBandMapStale` 标记，随 `invalidateGeometry()` 失效；
+   - 用现有真实字段建 `RowBandSection`（`section/itemCount/columns/rowHeight/firstRowMinY/headerHeight`）；
+   - `clipTop` 沿用现有粘性头逻辑（视口顶 + 头高）；
+   - `rowBandHitTest(from:to:)`：两点 y → bandIndex（`clipTop` 生效）→ `bandSequence` → `RowBandExpander` → `(section,item) → IndexPath`；零长度线段返回该点所在整行；
+   - 若两点分别落在不同 section，按平铺序自然跨 section（中间 section 整段）；
+   - 旧 `hitTestLine` 标 `@available(*, deprecated, message: "M19 起选择单元为行带")`，生产路径不再调用。
+4. CI 定向绿；记录用例数、`lastQueryCount`、耗时；更新 `docs/05`、`progress-m19`：T04 DONE。
+
+## 3. 验收
+
+- ≥8 用例全绿；「右列下滑 3 行 == 3 × columns」是最关键断言，必须逐 id 比较而非计数。
+- 命中计算不得用 `DSSpacing` 推算；只用 attributes 派生值。
+- 无新增 Xcode 警告；iOS 16 基线不抬高。
+
+## 4. Git
+
+1. `test(selection): 行带真布局红用例`
+2. `feat(selection): GridHitTester 行带命中`
+3. `docs(m19): T04 进度与 CI 证据`
+
+## 5. 完成后
+
+只输出：T04 完成后，只读 T05-App接线与文案.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

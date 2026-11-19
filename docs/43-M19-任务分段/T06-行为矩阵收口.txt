@@ -1,0 +1,60 @@
+# T06 — 行为矩阵：回滑整行、取消模式、预选、全选、单月、跨月
+
+> 自包含任务卡。只读本文件 + `docs/42 §1.2/§4` + `docs/45 §6`。
+
+## 0. 目标
+
+把「行带」语义在六个高风险场景钉死；Core 单测 + UI 定点用例双向覆盖。
+
+## 1. 只读范围
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/RowBandMap.swift`、`RowBandExpander.swift`、`SlideSelectTrail.swift`
+- `PhotoDesk/Features/Library/LibrarySelectionController.swift`（T05 产物）
+- `PhotoDeskUITests/SlideSelectTrailUITests.swift`（只读冲突用例，不整体重写——整体重写在 T08）
+
+## 2. 步骤
+
+1. 红（Core）：补 `RowBandTrailTests` 6 条边界：
+   - 回滑跨 section（从第 2 月回滑到第 1 月末行）整段撤销；
+   - 取消模式下「base 只含整行中的部分格」→ 滑过该行只移除 base 内格，不新增；
+   - 「起手行已全选」→ deselect 模式，滑过回滑后整行恢复；
+   - scope = 单月时，跨月行带只展开当月 item；
+   - 全选（scope 全量）后行带取消 → 只减对应行；
+   - `bandSequence` 在同一行内抖动 → 展开幂等。
+2. 红（UI）：新增 3 条用例（可先放 `SlideSelectTrailUITests` 末尾，T08 统一整理）：
+   - 右列长按下拖 3 行 → 计数 = 3 × columns（精确，非 ≥）；
+   - 回滑 2 行 → 计数回到 1 行；
+   - 从已选格起手下滑 2 行 → 整 2 行取消，回滑恢复。
+   推 CI 定向，记录真实失败（当前实现必然失败：只选右列）；提交红。
+3. 按失败修 Core/App；每轮记录 run id + 失败断言原文。
+4. 全绿后把三条 UI 用例纳入正式套件（T08 再整体去重）。
+5. 更新 `docs/05`、`progress-m19`：T06 DONE。
+
+## 3. 验收
+
+- 六条 Core 边界 + 三条 UI 用例全绿；计数断言必须是「行数 × 列数」而不是范围。
+- 预选格与手势前已选行在任何回滑路径下都不丢。
+- 单月 scope 下跨月拖动不得越界选中。
+
+## 4. Git
+
+1. `test(core): 行带边界红用例`
+2. `test(selection): 行带整行计数红用例`
+3. `fix(selection): 回滑整行撤销与取消模式`
+4. `docs(m19): T06 进度与证据`
+
+## 5. 完成后
+
+只输出：T06 完成后，只读 T07-自动滚动与性能.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

@@ -1,0 +1,12 @@
+你是 PhotoDesk 移动应用开发工程师（mobile-application-developer）。
+工作目录：C:/Users/RuiZh/Desktop/photo_manager（Windows，无 Xcode；Core 走 Docker，App/CI/打包走 GitHub Actions）。
+
+现在只读：docs/43-M19-任务分段/00-索引.md，然后从 T01 开始。
+
+规则：
+1. 一次只读一个任务卡；做完、更新 artifacts/plan/progress-m19.md、提交本地 git，再读下一张。禁止预读、禁止一次读完 docs/41/42/45。
+2. 全新审查；审查脚本过时就重写（audit-m18 已过期），不沿用旧结论。先红测试，再实现；CI/真机结果只写真凭实据。
+3. 目标：行带轨迹滑选——右侧下滑整行选中、不再逐格触摸、回滑整行取消；允许滚动；不用框选/双指规则；iOS 16 基线、Core 零 Apple 依赖、AGENTS 两条红线不变。
+4. 合适节点分别提交（进度表用 git add -f）；全部完成打 1.8.0 (9) Release，汇报 IPA 完整绝对路径 + SHA256；真机未接入写 BLOCKED。
+
+开工：只回复「已读 T01」，然后执行 T01。

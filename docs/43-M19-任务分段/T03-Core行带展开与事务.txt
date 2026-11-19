@@ -1,0 +1,61 @@
+# T03 — Core 行带展开与路径事务组合
+
+> 自包含任务卡。只读本文件 + `docs/45 §2/§5` + `docs/42 §1.2/§3.1`。
+
+## 0. 目标
+
+把「行带下标序列」展开成**有序 item 序列**，并与既有 `SlideSelectTrail` 组合，证明：正向整行加选、回滑整行撤销、预选不受影响、取消模式整行恢复。
+
+## 1. 只读范围
+
+- `PhotoDeskCore/Sources/PhotoDeskCore/RowBandMap.swift`（T02 产物）
+- `PhotoDeskCore/Sources/PhotoDeskCore/SlideSelectTrail.swift`
+- `PhotoDeskCore/Tests/PhotoDeskCoreTests/SlideSelectTrailTests.swift`
+- `PhotoDeskCore/Sources/PhotoDeskCore/SelectionPolicy.swift`（`applyDelta` 契约）
+
+## 2. 步骤
+
+1. 红测试 `RowBandTrailTests.swift`（≥10 条）：
+   - 行带 0..2 × 3 列 → 展开 9 个 item，行主序；
+   - 末行不满 → 只展开实际 item；
+   - `bandSequence` 反向 → 展开顺序反向（供回滑截断）；
+   - 与 `SlideSelectTrail` 组合：正向选 3 行后 target = 9 格；回滑到第 1 行后 target = 3 格；再正向回到第 3 行恢复 9 格；
+   - 预选 X（不在路径行内）全程保持；预选 Y（在路径行内、base 已含）回滑后仍保持；
+   - deselect 模式：从已选行起拖，滑过 2 行后移除对应格，回滑恢复；
+   - scope 过滤：行带含 scope 外 item 时不展开；
+   - 10k item 全库扫一遍展开 + consume <10ms。
+2. 跑 Core 得真实编译失败/断言失败，归档 `artifacts/audit/m19/t03/red.log`；提交红测试。
+3. 新增 `PhotoDeskCore/Sources/PhotoDeskCore/RowBandItem.swift` + `RowBandExpander.swift`：
+   - `RowBandItem(section:item:)`（`Hashable/Sendable`）
+   - `RowBandExpander.items(bandIndices:in map:) -> [RowBandItem]`：行序 + 行内列序；去重保序。
+   - `RowBandExpander.orderedIDs(bandIndices:in map:scope:resolve:) -> [String]`（`resolve` 为 App 注入的 `(RowBandItem) -> String?` 闭包；Core 不做 id 映射）。
+   - scope 过滤放在展开阶段（不是事后 intersection）。
+4. Core 全绿；记录组合用例与性能；CI core-linux 复验。
+5. 更新 `docs/05`、`progress-m19`：T03 DONE。
+
+## 3. 验收
+
+- ≥10 用例；`RowBandExpander` 仅 Foundation；闭包注入不破坏 Sendable（若需要，标注 `@Sendable` 并说明）。
+- 回滑整行撤销、取消模式恢复、预选保持三条断言必须真实存在。
+
+## 4. Git
+
+1. `test(core): 行带展开与事务组合红用例`
+2. `feat(core): RowBandExpander 行主序展开`
+3. `docs(m19): T03 进度与证据`
+
+## 5. 完成后
+
+只输出：T03 完成后，只读 T04-App行带命中.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+

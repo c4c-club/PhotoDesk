@@ -1,0 +1,78 @@
+# T01 — 全新审查与审查脚本重写
+
+> 自包含任务卡。**禁止沿用 docs/37/38 的「cell 级命中」结论**；本卡只读本文件 + `docs/41-M19-审查基线.md` + 当前源码。
+
+## 0. 目标
+
+1. 从当前 HEAD 新建 `feat/m19-row-band` 分支。
+2. **重写**过期审查脚本为 `scripts/audit-m19.ps1`（`audit-m18.ps1` 只读归档、不改）。
+3. 用真实行为证据证明「右列下滑只选右列」，作为红基线。
+4. 写 `docs/45-M19-审查报告.md`（回答 `docs/41 §7` 的 10 个问题）。
+5. 复核并修订 `docs/42-M19-实施规划.md`，作为 T02–T10 唯一事实源。
+
+## 1. 只读范围
+
+- `AGENTS.md`
+- `docs/41-M19-审查基线.md`
+- `docs/42-M19-实施规划.md`（§1–§3、§9）
+- `scripts/audit-m18.ps1`（只用于证明过期，不改）
+- `PhotoDeskCore/Sources/PhotoDeskCore/`：`SlideSelectTrail.swift`、`TrailHitResolver.swift`、`GridCellFrame.swift`、`SelectionGestureMachine.swift`、`SelectionPolicy.swift`、`SlideSelectConfig.swift`
+- `PhotoDesk/Features/Library/`：`GridHitTester.swift`、`LibrarySelectionController.swift`、`LibraryViewController.swift`、`PhotoGridCell.swift`
+- `PhotoDeskUITests/SlideSelectTrailUITests.swift`、`PhotoDeskTests/LibraryGridGeometryTests.swift`
+- `.github/workflows/ios.yml`、`project.yml`
+
+## 2. 步骤
+
+1. `git status --short` 必须干净；`git switch -c feat/m19-row-band`；记录 HEAD、`project.yml` 版本到进度表。
+2. **重写脚本**：新建 `scripts/audit-m19.ps1`（UTF-8 **带 BOM**；PS 5.1 可读；只读；除 `generatedAt` 外确定性；退出码 0/2/3）。
+   - 至少 20 条检查，必须含：
+     - BLOCKING：Core 出现非 Foundation import；App 出现 iOS 17+ API；`minimumNumberOfTouches = 2`；Feature 层 `PHAsset`；`彻底删除|永久删除`；活跃框选符号（`MarqueeOverlayView|Marquee-Overlay|lastMarqueeRect|hitTest\(rectInContent:|HitRect|MarqueeSelectionPolicy\.resolved`）；`try!|as!`。
+     - BLOCKING（本轮新增）：`GridHitTester` 不存在 `rowBandHitTest`；生产路径仍以 `hitTestLine` 作为选择结果（`trailHitProvider` 直接等于 `hitTestLine` 而无行带展开）；行带展开缺少 scope 过滤；行带展开未按行主序。
+     - BLOCKING（测试契约）：UI/单测仍断言「左列下滑右列不得入选」「斜拖不补全」「整行是 bug」等旧语义。
+     - PRESENT：`RowBandMap.swift`、`rowBandHitTest`、`rowBandHitProvider`、`RowBandMapTests`、行带 UI 套件文件、DEBUG `band=` 字段。
+     - INFO：版本号/部署目标/CI 产物名/release 目录/`hitTestLine` 是否仍被引用。
+   - 文件不存在必须显式 FAIL，不得静默跳过；所有命中输出 文件:行号 原文。
+3. 连跑两次到 `artifacts/audit/m19/baseline-A|B`：忽略 `generatedAt` 后 md/json/stdout 必须一致，写 `determinism.txt`。
+4. **红基线（行为）**：跑 CI 定向 `-only-testing:PhotoDeskUITests/SlideSelectTrailUITests/testLeftColumnTrailExcludesRightColumn`，把当前「右列不入选」当成**通过**的证据保存（这正是要推翻的行为）；同时跑一条新写的临时探针用例（可放同一文件、标 `XCTSkip` 不计入正式套件，或直接在 T04 前用单测探针）：长按后右列下滑 3 行 → 记录实际计数 ≠ 3×列数。把 run id、截图、计数写入报告；探针在 T06/T08 转为正式断言。
+5. 跑 `scripts/test-core.ps1` 记录 Core 基线用例数（预期 483+ 全绿）。
+6. 写 `docs/45-M19-审查报告.md`：
+   - §0 结论摘要（≤10 条，每条带 文件:行号）
+   - §1 选择链路完整调用图（touchDown→machine→hit→trail→applyDelta→cell）
+   - §2 「逐格」根因链（`hitTestLine` → `TrailHitResolver` → `consume`）
+   - §3 行带几何可行性（现有缓存字段、误差、跨 section、末行、粘性头）
+   - §4 手势仲裁结论（长按后纵向拖是否已能进入 dragging；证据）
+   - §5 唯一写入口核查（是否存在第二条选择写入路径）
+   - §6 冲突测试清单（5 条 + 行号 + 新断言口径）
+   - §7 性能预算与测量方法
+   - §8 Release/真机证据链
+   - §9 与旧文档冲突声明（docs/25 §2.4、docs/38 §1.2#2、docs/37 命中单元）
+7. 修订 `docs/42`：与实测不符处当场改，写「T01 修订」。
+8. 写 `artifacts/audit/m19/t02-red-test-list.md`：T02 要新增的 ≥12 条用例名与断言。
+9. 更新 `docs/05`（M19 行 🟨 5% + 变更日志）、`artifacts/plan/progress-m19.md`：T01 DONE。
+
+## 3. 验收
+
+- `audit-m19.ps1` 两次输出一致；`-Strict` 在改造前能报出 BLOCKING（真实存在）。
+- 报告每条现状可用 文件:行号 复核，不得复制旧结论。
+- 红基线有真实 run id + 计数证据；`git status` 干净。
+
+## 4. Git
+
+1. `test(audit): 重写 M19 行带审查脚本并归档红基线`
+2. `docs(m19): 全新审查报告与实施定稿`（含 docs/05、progress-m19）
+
+## 5. 完成后
+
+只输出：T01 完成后，只读 T02-Core行带几何.txt。
+
+## 通用前置（每张卡都先执行）
+
+1. `Set-Location C:/Users/RuiZh/Desktop/photo_manager`；`git status --short` 必须干净。
+2. 打开 `artifacts/plan/progress-m19.md`：上一任务必须是 DONE；否则停止并报告。
+3. **只读本卡 + 本卡点名的小节/文件**；禁止预读后续任务卡，禁止一次读完 `docs/41/42/45`。
+4. 先写红测试并跑出**真实失败**（Core 用 Docker；App 用 CI），再改实现；禁止弱化断言、禁止编造结果。
+5. 每个任务在「红测试」「实现/修复」「进度文档」三个节点做本地 git；提交信息 `type(scope): 中文摘要`。
+6. 进度提交必须 `git add -f artifacts/plan/progress-m19.md`（`artifacts/` 被 ignore）。
+7. 更新 `docs/05-开发进程与里程碑.md` 与 `artifacts/plan/progress-m19.md`（提交号、测试数字、证据路径）。
+8. 只输出一句交接：`Txx 完成后，只读 <下一张文件名>`。
+
