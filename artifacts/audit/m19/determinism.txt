@@ -1,0 +1,8 @@
+audit-m19.ps1 确定性验证（T01 步骤 3）
+
+- 对比对象：baseline-A 与 baseline-B 两次独立运行输出（audit-m19.md / audit-m19.json / audit-m19.stdout.txt）。
+- 方法：剔除唯一非确定字段 generatedAt 行后 diff。
+- 结果：三类输出全部一致（SAME×3）。
+- baseline-strict（-Strict）：exitCode=2（PRESENT 失败计入退出码）。
+- 非严格红基线：exitCode=2，checks=24（PASS 8 / BLOCKING FAIL 5 / PRESENT FAIL 6 / INFO 5）。
+- 结论：脚本确定性满足；改造前红基线中 5 条 BLOCKING + 6 条 PRESENT 全部为真实存在的缺失/违规。
