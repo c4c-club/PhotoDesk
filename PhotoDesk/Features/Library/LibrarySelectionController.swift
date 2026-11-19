@@ -11,7 +11,7 @@
 //   scrollViewWillBeginDragging（VC 转发）→ scrollStarted
 // 效果执行：enterSelection → VC 进多选并选锚点；beginTrail / endTrail 与 isScrollEnabled
 // 成对（docs/32 §2.3「进入 armed 后禁滚动」；releaseScroll 由机器在方向让位/收尾时配对补发）；
-// updateTrail → trailHitProvider 线段有序命中 + SlideSelectTrail 路径事务净 delta
+// updateTrail → rowBandHitProvider 行带展开有序命中 + SlideSelectTrail 路径事务净 delta
 //（滑到哪选到哪、回滑截断出栈、delta 空不触觉）；startAutoScroll / stopAutoScroll →
 // CADisplayLink 60fps（边缘 60pt、2–12pt/帧，Core edgeVelocity + clampedOffset）；
 // 自动滚动 tick 以滚动前后同一窗口坐标换算的 content 两点喂轨迹（屏外内容按序入栈）。
@@ -26,9 +26,9 @@ final class LibrarySelectionController: NSObject {
     // MARK: VC 注入
 
     var isSelectionMode: () -> Bool = { false }
-    /// 线段（内容坐标起止）→ 有序命中 id 序列（GridHitTester.hitTestLine + dataSource 映射，
-    /// 只过滤 nil、保持扫掠顺序，docs/38 §3）。
-    var trailHitProvider: (CGPoint, CGPoint) -> [String] = { _, _ in [] }
+    /// 行带（内容坐标起止）→ 已展开、行主序 assetID 序列（GridHitTester.rowBandHitTest + dataSource 映射，
+    /// 只过滤 nil、保持行带平铺序；零长度 = 所在整行，docs/42 §3.2）。
+    var rowBandHitProvider: (CGPoint, CGPoint) -> [String] = { _, _ in [] }
     /// 路径事务净增量落地（applySelectionChanges：SelectionState.applyDelta + 可见 cell diff）。
     var applySelectionDelta: (Set<String>, Set<String>) -> Void = { _, _ in }
     var scopeProvider: () -> Set<String>? = { nil }
@@ -371,7 +371,7 @@ final class LibrarySelectionController: NSObject {
     private func processTrail(from: CGPoint, to: CGPoint) {
         guard machine.state == .dragging || machine.state == .autoScrolling,
               var current = trail else { return }
-        let orderedIDs = trailHitProvider(from, to)
+        let orderedIDs = rowBandHitProvider(from, to)
         if orderedIDs.isEmpty, isApplyingSnapshotProvider() { return }
         let delta = current.consume(orderedIDs)
         trail = current
