@@ -865,4 +865,56 @@ final class SlideSelectTrailUITests: XCTestCase {
                        "旧覆盖层元素必须不存在")
         snap(app, "m18-debug-fields")
     }
+
+    // MARK: - T01 红基线临时探针（docs/43 T01 步骤 4；T06/T08 转正式断言）
+
+    /// 探针：长按最右列锚点下滑 3 行 → 记录实际计数 vs 行带目标 3×列数。
+    /// 现实现为线段扫掠语义（只选中扫过的列内格），预期 actual < bandTarget——证据供 docs/45 §2。
+    /// 证据采集后 XCTSkip：不计入正式套件判定；T06/T08 改为正式断言 actual == 3×列数。
+    func testProbeRightColumnSlideDownThreeRowsEvidence() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+        // 首行同视觉行格 → 列数；锚点 = 最右列
+        let anchorFrame = collection.cells.element(boundBy: 0).frame
+        var rowCells: [Int] = []
+        for index in 0..<collection.cells.count {
+            let cell = collection.cells.element(boundBy: index)
+            guard cell.exists, cell.frame.width > 1 else { continue }
+            if abs(cell.frame.midY - anchorFrame.midY) < 8 { rowCells.append(index) }
+        }
+        rowCells.sort {
+            collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
+        }
+        let columns = rowCells.count
+        let anchorIndex = rowCells.last ?? 0
+        let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
+        let safeBottom = collection.frame.maxY - 80
+        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+        let geometry = "probe-geometry: anchorIndex=\(anchorIndex) columns=\(columns) " +
+            "sameColumnVisible=\(column.count) safeBelow=\(safeColumn.count)"
+        func attach(_ name: String, _ value: String) {
+            let a = XCTAttachment(string: value)
+            a.name = name
+            a.lifetime = .keepAlways
+            add(a)
+        }
+        attach("m19-probe-geometry", geometry)
+        guard columns >= 2, safeColumn.count >= 4 else {
+            snap(app, "m19-probe-right-column-3rows")
+            throw XCTSkip("T01 探针几何不足，未采证：\(geometry)")
+        }
+        let targetIndex = safeColumn[3]   // 锚点下方第 3 行（同列）
+        longPressDrag(in: collection, fromIndex: anchorIndex, toIndex: targetIndex)
+        _ = waitForSelectionCountEqual(app, to: 3 * columns, timeout: 3)
+        let actual = selectionCount(app)
+        let selected = selectedVisibleIDs(collection).sorted()
+        let bandTarget = 3 * columns
+        attach("m19-probe-result",
+               "probe-result: actual=\(actual) bandTarget=\(bandTarget) " +
+               "sweptColumnCells=\(min(4, safeColumn.count)) selected=\(selected)")
+        snap(app, "m19-probe-right-column-3rows")
+        throw XCTSkip("T01 临时探针：证据已采集（actual=\(actual) bandTarget=\(bandTarget)）；" +
+                      "T06/T08 转正断言 actual == 3×columns")
+    }
 }
