@@ -13,4 +13,8 @@ public enum SlideSelectConfig {
     public static let hitExpansion: Double = 1
     /// 线段退化分支阈值（pt）：|dx|/|dy| ≤ epsilon 视为垂直/水平分量（近垂直拖动按列命中）（M18 T03）
     public static let segmentEpsilon: Double = 0.5
+    /// 行带段间空隙吸附容差（pt）：指尖落段间隙时距某行带边缘 ≤ 容差吸附该行带，超出 → nil（M19 T02）
+    public static let rowBandSnapTolerance: Double = 12
+    /// 单帧行带展开上限（0 = 不限）：自动滚动位移已由 minStep/maxStep 钳制，T07 实测异常才启用（M19 docs/42 §10.2）
+    public static let rowBandMaxExpandPerFrame: Int = 0
 }
