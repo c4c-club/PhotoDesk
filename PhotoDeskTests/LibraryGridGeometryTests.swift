@@ -699,4 +699,3 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
                                  "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
     }
 }
-}
