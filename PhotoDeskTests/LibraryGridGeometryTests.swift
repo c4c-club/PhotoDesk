@@ -510,6 +510,21 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         return out
     }
 
+    /// 独立口径：offset 视口内可安全起拖的行号——行中心 ≥ clipTop（不被粘性头钳制），
+    /// 且 row..row+2 仍在段内（末行不满按真实 item）。行距由 attributes 派生，不经命中器。
+    private func safeAnchorRow(offset: CGFloat, section: Int, columns: Int,
+                               layout: UICollectionViewCompositionalLayout) -> Int {
+        guard let a0 = layout.layoutAttributesForItem(at: IndexPath(item: 0, section: section)),
+              let a1 = layout.layoutAttributesForItem(at: IndexPath(item: columns, section: section)) else { return 0 }
+        let firstRowMinY = a0.frame.minY
+        let pitch = a1.frame.minY - a0.frame.minY
+        let clipTop = offset + CGFloat(DSSpacing.monthHeaderHeight)
+        let firstSafeRow = Int(((clipTop - firstRowMinY) / pitch).rounded(.up)) + 1
+        let visibleRow = Int(((offset + 500 - firstRowMinY) / pitch).rounded(.down))
+        let rowsPerSection = Int((50.0 / Double(columns)).rounded(.up))   // 参数网格 50 item/段
+        return min(max(visibleRow, firstSafeRow), rowsPerSection - 3)
+    }
+
     private func warmUp(_ cv: UICollectionView, offset: CGFloat) {
         cv.layoutIfNeeded()
         cv.setContentOffset(CGPoint(x: 0, y: offset), animated: false)
@@ -526,9 +541,9 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
                 let tester = GridHitTester(collectionView: cv)
                 warmUp(cv, offset: offset)
                 let section = sectionAtContentY(offset + 400, layout: layout, sectionCount: 40)
-                let row = 2
+                let row = safeAnchorRow(offset: offset, section: section, columns: columns, layout: layout)
                 let anchor = IndexPath(item: row * columns + (columns - 1), section: section)
-                let below = IndexPath(item: (row + 2) * columns + (columns - 1), section: section)
+                let below = IndexPath(item: min((row + 2) * columns + (columns - 1), 49), section: section)
                 let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor),
                                       "columns=\(columns) offset=\(offset) 锚点 attributes 缺失")
                 let b = try XCTUnwrap(layout.layoutAttributesForItem(at: below),
@@ -548,7 +563,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let tester = GridHitTester(collectionView: cv)
         warmUp(cv, offset: 2000)
         let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
-        let row = 2
+        let row = safeAnchorRow(offset: 2000, section: section, columns: columns, layout: layout)
         let anchor = IndexPath(item: row * columns, section: section)
         let below = IndexPath(item: (row + 2) * columns, section: section)
         let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor))
@@ -566,7 +581,7 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let tester = GridHitTester(collectionView: cv)
         warmUp(cv, offset: 2000)
         let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
-        let row = 2
+        let row = safeAnchorRow(offset: 2000, section: section, columns: columns, layout: layout)
         let left = IndexPath(item: row * columns, section: section)
         let right = IndexPath(item: row * columns + columns - 1, section: section)
         let a = try XCTUnwrap(layout.layoutAttributesForItem(at: left))
@@ -584,12 +599,14 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let tester = GridHitTester(collectionView: cv)
         warmUp(cv, offset: 2000)
         let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
-        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 2 * columns, section: section)))
-        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 5 * columns + columns - 1, section: section)))
+        let row = min(safeAnchorRow(offset: 2000, section: section, columns: columns, layout: layout),
+                      Int((50.0 / Double(columns)).rounded(.up)) - 4)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: row * columns, section: section)))
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: min((row + 3) * columns + columns - 1, 49), section: section)))
         let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
                                         to: CGPoint(x: b.frame.midX, y: b.frame.midY))
-        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: 2, rowCount: 4, columns: columns),
-                       "斜拖 (row2,col0)→(row5,colLast) 必须命中 row2..row5 全部整行（行主序）")
+        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: row, rowCount: 4, columns: columns),
+                       "斜拖 (row\(row),col0)→(row\(row+3),colLast) 必须命中 row\(row)..row\(row+3) 全部整行（行主序）")
     }
 
     /// 末行不满 → 只含实际 item（50 项/4 列 → 13 行，末行 2 项）。
@@ -597,14 +614,14 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         let columns = 4
         let (cv, layout, gridData) = makeParamGrid(columns: columns)
         let tester = GridHitTester(collectionView: cv)
-        warmUp(cv, offset: 2000)
-        let section = 3
+        warmUp(cv, offset: 0)   // offset 0：末行 y≈1735 > clipTop 48，不被钳制
+        let section = 0
         let lastRow = 12   // 50 项 / 4 列 → 行 0..12，末行 item 48..49
         let anchor = IndexPath(item: lastRow * columns, section: section)
         let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor))
         let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
                                         to: CGPoint(x: a.frame.midX, y: a.frame.midY))
-        XCTAssertEqual(hit, [IndexPath(item: 48, section: 3), IndexPath(item: 49, section: 3)],
+        XCTAssertEqual(hit, [IndexPath(item: 48, section: 0), IndexPath(item: 49, section: 0)],
                        "末行不满只展开真实 item（零长线段 = 指尖所在整行）")
     }
 
