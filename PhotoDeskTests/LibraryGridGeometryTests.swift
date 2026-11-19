@@ -472,4 +472,231 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertEqual(hit, [IndexPath(item: 7, section: 3)],
                        "零长度线段只命中起手格（相邻格 0.5pt 内不得误命中）")
     }
+
+    // MARK: - M19 T04：rowBandHitTest 行带命中（docs/42 §3.2/§4、docs/43 T04）——
+    // 关键断言：右列下滑 3 行 == 3 × columns 整行，逐 id 比较（非计数）。
+    // 独立口径：期望序列由 attributes 手工派生（不经 RowBandMap/命中器），锚点段用
+    // sectionAtContentY 独立定位；dataSource 强持有（历史踩坑：弱引用 0 段空网格假绿）。
+
+    /// 独立口径：内容 y 所在段（段首行 minY ≤ y < 下一段首行 minY），不经命中器。
+    private func sectionAtContentY(_ y: CGFloat,
+                                   layout: UICollectionViewCompositionalLayout,
+                                   sectionCount: Int) -> Int {
+        for s in 0..<sectionCount {
+            guard let a0 = layout.layoutAttributesForItem(at: IndexPath(item: 0, section: s)) else { continue }
+            let start = a0.frame.minY
+            let end: CGFloat
+            if s + 1 < sectionCount,
+               let next = layout.layoutAttributesForItem(at: IndexPath(item: 0, section: s + 1)) {
+                end = next.frame.minY
+            } else {
+                end = .greatestFiniteMagnitude
+            }
+            if start <= y, y < end { return s }
+        }
+        return sectionCount - 1
+    }
+
+    /// 行带期望：锚点 (section, fromRow) 起 rowCount 行的全部 item（行主序），按段内 item 上界截断。
+    private func expectedBandItems(section: Int, fromRow: Int, rowCount: Int,
+                                   columns: Int, itemsPerSection: Int = 50) -> [IndexPath] {
+        var out: [IndexPath] = []
+        for r in fromRow..<(fromRow + rowCount) {
+            for c in 0..<columns {
+                let item = r * columns + c
+                if item < itemsPerSection { out.append(IndexPath(item: item, section: section)) }
+            }
+        }
+        return out
+    }
+
+    private func warmUp(_ cv: UICollectionView, offset: CGFloat) {
+        cv.layoutIfNeeded()
+        cv.setContentOffset(CGPoint(x: 0, y: offset), animated: false)
+        cv.collectionViewLayout.invalidateLayout()
+        cv.layoutIfNeeded()
+    }
+
+    /// 最关键断言：右列起点向下 3 行 → 3 × columns 整行（行主序逐 id）。
+    /// 2/3/4/5 列 × contentOffset.y ∈ {0, 2000, 8000, 20000}。
+    func testRowBandHitTestRightColumnThreeRowsWholeBandsExactIDs() throws {
+        for columns in [2, 3, 4, 5] {
+            for offset in [CGFloat(0), 2000, 8000, 20000] {
+                let (cv, layout, gridData) = makeParamGrid(columns: columns)
+                let tester = GridHitTester(collectionView: cv)
+                warmUp(cv, offset: offset)
+                let section = sectionAtContentY(offset + 400, layout: layout, sectionCount: 40)
+                let row = 2
+                let anchor = IndexPath(item: row * columns + (columns - 1), section: section)
+                let below = IndexPath(item: (row + 2) * columns + (columns - 1), section: section)
+                let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor),
+                                      "columns=\(columns) offset=\(offset) 锚点 attributes 缺失")
+                let b = try XCTUnwrap(layout.layoutAttributesForItem(at: below),
+                                      "columns=\(columns) offset=\(offset) 终点 attributes 缺失")
+                let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                                to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+                XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: row, rowCount: 3, columns: columns),
+                               "columns=\(columns) offset=\(offset)：右列下滑 3 行必须命中 3×\(columns) 整行（行主序逐 id）")
+            }
+        }
+    }
+
+    /// 左列同样整行（左右一致，docs/41 §3）。
+    func testRowBandHitTestLeftColumnAlsoWholeRow() throws {
+        let columns = 3
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
+        let row = 2
+        let anchor = IndexPath(item: row * columns, section: section)
+        let below = IndexPath(item: (row + 2) * columns, section: section)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor))
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: below))
+        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: row, rowCount: 3, columns: columns),
+                       "左列下滑 3 行必须同样命中整行")
+    }
+
+    /// 同一行内横向拖动 → 恰好该行全列（不扩散到相邻行）。
+    func testRowBandHitTestHorizontalDragExactRow() throws {
+        let columns = 3
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
+        let row = 2
+        let left = IndexPath(item: row * columns, section: section)
+        let right = IndexPath(item: row * columns + columns - 1, section: section)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: left))
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: right))
+        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: row, rowCount: 1, columns: columns),
+                       "横拖必须恰好命中该行全列")
+    }
+
+    /// 斜向拖动 → 经过行带序列（含中间行）全部整行，行主序；不产生矩形外的行。
+    func testRowBandHitTestDiagonalCoversBandSequence() throws {
+        let columns = 3
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 2 * columns, section: section)))
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 5 * columns + columns - 1, section: section)))
+        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: 2, rowCount: 4, columns: columns),
+                       "斜拖 (row2,col0)→(row5,colLast) 必须命中 row2..row5 全部整行（行主序）")
+    }
+
+    /// 末行不满 → 只含实际 item（50 项/4 列 → 13 行，末行 2 项）。
+    func testRowBandHitTestPartialLastRowRealItemsOnly() throws {
+        let columns = 4
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let section = 3
+        let lastRow = 12   // 50 项 / 4 列 → 行 0..12，末行 item 48..49
+        let anchor = IndexPath(item: lastRow * columns, section: section)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: anchor))
+        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                        to: CGPoint(x: a.frame.midX, y: a.frame.midY))
+        XCTAssertEqual(hit, [IndexPath(item: 48, section: 3), IndexPath(item: 49, section: 3)],
+                       "末行不满只展开真实 item（零长线段 = 指尖所在整行）")
+    }
+
+    /// 零长度线段返回该点所在整行（非末行）。
+    func testRowBandHitTestZeroLengthReturnsWholeBand() throws {
+        let columns = 3
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)))
+        let center = CGPoint(x: a.frame.midX, y: a.frame.midY)
+        let hit = tester.rowBandHitTest(from: center, to: center)
+        XCTAssertEqual(hit, expectedBandItems(section: 3, fromRow: 2, rowCount: 1, columns: columns),
+                       "零长度线段 = 指尖所在整行（a3-7 在 row2 → 命中 a3-6/7/8）")
+    }
+
+    /// 粘性头钉住：起点位于遮挡区 → 钳到头下缘最近可见行带；被完全遮住的行不得出现在结果。
+    func testRowBandHitTestClampsToFirstVisibleRowBelowStickyHeader() throws {
+        let columns = 3
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        let offset: CGFloat = 8000
+        warmUp(cv, offset: offset)
+        let section = sectionAtContentY(offset + 400, layout: layout, sectionCount: 40)
+        let clipTop = offset + CGFloat(DSSpacing.monthHeaderHeight)
+        // 独立口径：clipTop 所在可见行 k（段首行 minY 与次行 minY 派生行距）
+        let a0 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 0, section: section)))
+        let a1 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: columns, section: section)))
+        let firstRowMinY = a0.frame.minY
+        let pitch = a1.frame.minY - a0.frame.minY
+        let k = max(0, Int(((clipTop - firstRowMinY) / pitch).rounded(.down)))
+        // 起点 y 在遮挡区内（= offset < clipTop），终点 = 可见首行下方第 2 行右列
+        let fromY = offset
+        let toRow = k + 2
+        let to = IndexPath(item: toRow * columns + columns - 1, section: section)
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: to))
+        let anchorX = a0.frame.midX
+        let hit = tester.rowBandHitTest(from: CGPoint(x: anchorX, y: fromY),
+                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: k, rowCount: 3, columns: columns),
+                       "起点在遮挡区必须钳到头下缘最近可见行带 k=\(k)，且不含被完全遮住的行")
+        // 零长线段完全落在遮挡区 → 同样钳到头下缘最近可见行带（非 nil、非遮挡行）
+        let zero = tester.rowBandHitTest(from: CGPoint(x: anchorX, y: fromY),
+                                         to: CGPoint(x: anchorX, y: fromY))
+        XCTAssertEqual(zero, expectedBandItems(section: section, fromRow: k, rowCount: 1, columns: columns),
+                       "遮挡区内零长线段 = 头下缘最近可见整行")
+    }
+
+    /// 跨段：中间 section 整段按平铺序入选（末行不满段也按真实 item）。
+    func testRowBandHitTestCrossSectionCoversWholeIntermediateSections() throws {
+        let columns = 2   // 50 项/2 列 → 25 行，末行 item 48..49
+        let (cv, layout, gridData) = makeParamGrid(columns: columns)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let from = IndexPath(item: 20 * columns, section: 1)
+        let to = IndexPath(item: 2 * columns + columns - 1, section: 2)
+        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: from))
+        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: to))
+        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
+                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
+        var expected: [IndexPath] = []
+        expected += expectedBandItems(section: 1, fromRow: 20, rowCount: 5, columns: columns)
+        expected += expectedBandItems(section: 2, fromRow: 0, rowCount: 3, columns: columns)
+        XCTAssertEqual(hit, expected, "跨段必须按平铺序覆盖中间 section 整段（含末行真实 item）")
+        XCTAssertEqual(hit.count, 10 + 6, "段 1 剩余 5 行(10 item) + 段 2 前 3 行(6 item)")
+    }
+
+    /// invalidateGeometry() 后重建一致（rowBandMap 缓存随失效重建）。
+    func testRowBandHitTestInvalidateGeometryRebuildsConsistently() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 4)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 2000)
+        let from = CGPoint(x: 100, y: 2100)
+        let to = CGPoint(x: 100, y: 2800)
+        let before = tester.rowBandHitTest(from: from, to: to)
+        tester.invalidateGeometry()
+        let after = tester.rowBandHitTest(from: from, to: to)
+        XCTAssertEqual(before, after, "缓存失效重建后行带命中序列必须一致")
+        XCTAssertFalse(after.isEmpty)
+    }
+
+    /// 缓存热帧查询数 ≤ 60（行带路径热帧零 attributes 查询，全缓存命中）。
+    func testRowBandHitTestQueryCountBoundedAtDeepOffset() throws {
+        let (cv, layout, gridData) = makeParamGrid(columns: 3)
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 8000)
+        let from = CGPoint(x: 100, y: 8100)
+        let to = CGPoint(x: 100, y: 8800)
+        _ = tester.rowBandHitTest(from: from, to: to)   // 冷帧建缓存
+        _ = tester.rowBandHitTest(from: from, to: to)   // 热帧
+        XCTAssertLessThanOrEqual(tester.lastQueryCount, 60,
+                                 "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
+    }
+}
 }
