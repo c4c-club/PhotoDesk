@@ -1,0 +1,238 @@
+﻿{
+    "generatedAt":  "2026-11-19T17:19:19Z",
+    "root":  "C:\\Users\\RuiZh\\Desktop\\photo_manager",
+    "strict":  false,
+    "totals":  {
+                   "checks":  24,
+                   "pass":  12,
+                   "failBlocking":  3,
+                   "failPresent":  4,
+                   "info":  5
+               },
+    "exitCode":  2,
+    "checks":  [
+                   {
+                       "id":  "core-import-foundation-only",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDeskCore/Sources 只允许 import Foundation（AGENTS.md 红线 2）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "app-no-ios17-api",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/ 禁 iOS 17+ API：@Observable/@Bindable/ContentUnavailableView/.scrollTargetBehavior/.scrollPosition/SwiftData",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "app-no-two-finger",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/ 禁 minimumNumberOfTouches = 2（双指轨迹退役）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "feature-no-phasset",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/Features/ 禁直接引用 PHAsset（统一 PhotoItem）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "wording-no-permanent-delete",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/ 禁肯定语气的「彻底删除/永久删除」文案（排除否定句：不提供/不能/不会/不可/无法/禁用/永不/只把/吗）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "app-no-marquee-symbols",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/ 禁活跃框选符号：MarqueeOverlayView/Marquee-Overlay/lastMarqueeRect/hitTest(rectInContent:/HitRect/MarqueeSelectionPolicy.resolved",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "no-try-bang-as-bang",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "PhotoDesk/ 与 PhotoDeskCore/Sources 禁 try! / as!",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "gridhittester-rowbandhittest",
+                       "level":  "BLOCKING",
+                       "status":  "FAIL",
+                       "detail":  "GridHitTester 必须实现 func rowBandHitTest(from:to:)（行带命中唯一单元）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "production-trail-provider-band",
+                       "level":  "BLOCKING",
+                       "status":  "FAIL",
+                       "detail":  "trailHitProvider 必须走行带展开（rowBandHitTest）；直连 hitTestLine = 逐格语义残留（docs/42 §3.2）",
+                       "hits":  [
+                                    "LibraryViewController.swift: trailHitProvider 闭包内引用 hitTestLine（未接行带展开）"
+                                ]
+                   },
+                   {
+                       "id":  "band-scope-core",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "行带链路 scope 过滤：SlideSelectTrail.consume 忽略 scope 外 id + RowBandItem 展开单元在位（docs/42 §10.1）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "band-scope-app",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "LibrarySelectionController 构造 SlideSelectTrail 必须传 scope: scopeProvider()",
+                       "hits":  [
+                                    "PhotoDesk/Features/Library/LibrarySelectionController.swift:279: scope: scopeProvider())"
+                                ]
+                   },
+                   {
+                       "id":  "band-row-major-core",
+                       "level":  "BLOCKING",
+                       "status":  "PASS",
+                       "detail":  "RowBandMap 行主序几何必须基于真实 attributes 派生字段 firstRowMinY/rowHeight/columns",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "tests-old-cell-contract",
+                       "level":  "BLOCKING",
+                       "status":  "FAIL",
+                       "detail":  "UI/单测不得保留旧语义断言：左列下滑右列不得入选/斜拖不补全等（5 条冲突用例，docs/41 §4；T06/T08 重写）",
+                       "hits":  [
+                                    "PhotoDeskUITests/SlideSelectTrailUITests.swift:405: func testLeftColumnTrailExcludesRightColumn() throws {",
+                                    "PhotoDeskUITests/SlideSelectTrailUITests.swift:453: func testDiagonalTrailDoesNotFillRectangle() throws {",
+                                    "PhotoDeskUITests/SlideSelectTrailUITests.swift:592: func testPreSelectedCellSurvivesTrail() throws {",
+                                    "PhotoDeskUITests/SlideSelectTrailUITests.swift:713: func testSelectAllTrailDeselectExactAndExitResets() throws {",
+                                    "PhotoDeskUITests/SlideSelectTrailUITests.swift:804: func testHorizontalPressDragTrailSelectsExactRow() throws {"
+                                ]
+                   },
+                   {
+                       "id":  "present-rowbandmap-swift",
+                       "level":  "PRESENT",
+                       "status":  "PASS",
+                       "detail":  "RowBandMap.swift 存在",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "present-rowbandhittest-symbol",
+                       "level":  "PRESENT",
+                       "status":  "FAIL",
+                       "detail":  "PhotoDesk/ 必须出现 rowBandHitTest 符号（App 侧行带命中）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "present-rowbandprovider-symbol",
+                       "level":  "PRESENT",
+                       "status":  "FAIL",
+                       "detail":  "PhotoDesk/ 必须出现 rowBandHitProvider 符号（VC 注入行带命中提供者，docs/42 §3.2）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "present-rowbandmap-tests",
+                       "level":  "PRESENT",
+                       "status":  "PASS",
+                       "detail":  "PhotoDeskCore/Tests 必须出现 RowBandMapTests",
+                       "hits":  [
+                                    "PhotoDeskCore/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:1: // MARK: - RowBandMapTests：行带平铺几何与序列红/绿（M19 T02，docs/42 §3.1、docs/45 §3）——",
+                                    "PhotoDeskCore/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:12: final class RowBandMapTests: XCTestCase {"
+                                ]
+                   },
+                   {
+                       "id":  "present-band-ui-suite",
+                       "level":  "PRESENT",
+                       "status":  "FAIL",
+                       "detail":  "PhotoDeskUITests/RowBandSlideSelectUITests.swift 不存在（T08 行带 UI 套件）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "present-band-debug-field",
+                       "level":  "PRESENT",
+                       "status":  "FAIL",
+                       "detail":  "LibraryViewController DEBUG Summary 必须暴露 band= 字段（行带深度取证）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "info-version",
+                       "level":  "INFO",
+                       "status":  "INFO",
+                       "detail":  "MARKETING_VERSION=1.7.0 CURRENT_PROJECT_VERSION=8（T10 目标 1.8.0 (9)）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "info-deployment-target",
+                       "level":  "INFO",
+                       "status":  "INFO",
+                       "detail":  "deploymentTarget iOS=16.0 IPHONEOS_DEPLOYMENT_TARGET=16.0（基线 16.0）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "info-ci-artifacts",
+                       "level":  "INFO",
+                       "status":  "INFO",
+                       "detail":  "ios.yml 产物名：unsigned-ipa=True simulator-app-zip=True",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "info-release-dir",
+                       "level":  "INFO",
+                       "status":  "INFO",
+                       "detail":  "artifacts/release/1.8.0/ 存在=False（T10 产出）",
+                       "hits":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "info-hitTestLine-refs",
+                       "level":  "INFO",
+                       "status":  "INFO",
+                       "detail":  "PhotoDesk/ 内 hitTestLine 引用（行带改造后应仅剩降级路径或清零）：",
+                       "hits":  [
+                                    "PhotoDesk/Features/Library/GridHitTester.swift:149: func hitTestLine(from: CGPoint, to: CGPoint) -\u003e [IndexPath] {",
+                                    "PhotoDesk/Features/Library/LibrarySelectionController.swift:29: /// 线段（内容坐标起止）→ 有序命中 id 序列（GridHitTester.hitTestLine + dataSource 映射，",
+                                    "PhotoDesk/Features/Library/LibraryViewController.swift:800: for path in tester.hitTestLine(from: from, to: to) {"
+                                ]
+                   }
+               ]
+}
