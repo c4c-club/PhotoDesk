@@ -1,0 +1,177 @@
+[OK] Docker daemon 就绪（Server 29.8.2）
+..  运行 swift test（PhotoDeskCore，容器 swift:6.0-noble）...
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[1/10] Write swift-version-24593BA9C3E375BF.txt
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[3/11] Emitting module PhotoDeskCoreTests
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:17:38: error: cannot find type 'RowBandMap' in scope
+ 15 | 
+ 16 |     /// 默认两段布局：S0(10 项/3 列/4 行, y 100..580) + S1(7 项/4 列/2 行, y 680..920)，段间空隙 100pt
+ 17 |     private func makeDefaultMap() -> RowBandMap {
+    |                                      `- error: cannot find type 'RowBandMap' in scope
+ 18 |         RowBandMap(sections: [
+ 19 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:25:34: error: cannot find type 'RowBandMap' in scope
+ 23 | 
+ 24 |     /// 平局布局：S0(2 行, y 0..200) + S1(1 行, y 224..324)，空隙 24pt = 2×rowBandSnapTolerance
+ 25 |     private func makeTieMap() -> RowBandMap {
+    |                                  `- error: cannot find type 'RowBandMap' in scope
+ 26 |         RowBandMap(sections: [
+ 27 |             RowBandSection(section: 0, itemCount: 2, columns: 1, rowHeight: 100, firstRowMinY: 0, headerHeight: 48),
+[4/11] Compiling PhotoDeskCoreTests RowBandMapTests.swift
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:17:38: error: cannot find type 'RowBandMap' in scope
+ 15 | 
+ 16 |     /// 默认两段布局：S0(10 项/3 列/4 行, y 100..580) + S1(7 项/4 列/2 行, y 680..920)，段间空隙 100pt
+ 17 |     private func makeDefaultMap() -> RowBandMap {
+    |                                      `- error: cannot find type 'RowBandMap' in scope
+ 18 |         RowBandMap(sections: [
+ 19 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:25:34: error: cannot find type 'RowBandMap' in scope
+ 23 | 
+ 24 |     /// 平局布局：S0(2 行, y 0..200) + S1(1 行, y 224..324)，空隙 24pt = 2×rowBandSnapTolerance
+ 25 |     private func makeTieMap() -> RowBandMap {
+    |                                  `- error: cannot find type 'RowBandMap' in scope
+ 26 |         RowBandMap(sections: [
+ 27 |             RowBandSection(section: 0, itemCount: 2, columns: 1, rowHeight: 100, firstRowMinY: 0, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:35:19: error: cannot find 'RowBandMap' in scope
+ 33 | 
+ 34 |     func testBandCountSumsCeilRowsAndSkipsInvalidSections() {
+ 35 |         let map = RowBandMap(sections: [
+    |                   `- error: cannot find 'RowBandMap' in scope
+ 36 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:36:13: error: cannot find 'RowBandSection' in scope
+ 34 |     func testBandCountSumsCeilRowsAndSkipsInvalidSections() {
+ 35 |         let map = RowBandMap(sections: [
+ 36 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+ 38 |             RowBandSection(section: 2, itemCount: 7, columns: 4, rowHeight: 120, firstRowMinY: 800, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:37:13: error: cannot find 'RowBandSection' in scope
+ 35 |         let map = RowBandMap(sections: [
+ 36 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 38 |             RowBandSection(section: 2, itemCount: 7, columns: 4, rowHeight: 120, firstRowMinY: 800, headerHeight: 48),
+ 39 |             RowBandSection(section: 3, itemCount: 5, columns: 0, rowHeight: 120, firstRowMinY: 1100, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:38:13: error: cannot find 'RowBandSection' in scope
+ 36 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+ 38 |             RowBandSection(section: 2, itemCount: 7, columns: 4, rowHeight: 120, firstRowMinY: 800, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 39 |             RowBandSection(section: 3, itemCount: 5, columns: 0, rowHeight: 120, firstRowMinY: 1100, headerHeight: 48),
+ 40 |             RowBandSection(section: 4, itemCount: 5, columns: 3, rowHeight: -1, firstRowMinY: 1200, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:39:13: error: cannot find 'RowBandSection' in scope
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+ 38 |             RowBandSection(section: 2, itemCount: 7, columns: 4, rowHeight: 120, firstRowMinY: 800, headerHeight: 48),
+ 39 |             RowBandSection(section: 3, itemCount: 5, columns: 0, rowHeight: 120, firstRowMinY: 1100, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 40 |             RowBandSection(section: 4, itemCount: 5, columns: 3, rowHeight: -1, firstRowMinY: 1200, headerHeight: 48),
+ 41 |             RowBandSection(section: 5, itemCount: 1, columns: 1, rowHeight: 90, firstRowMinY: 1400, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:40:13: error: cannot find 'RowBandSection' in scope
+ 38 |             RowBandSection(section: 2, itemCount: 7, columns: 4, rowHeight: 120, firstRowMinY: 800, headerHeight: 48),
+ 39 |             RowBandSection(section: 3, itemCount: 5, columns: 0, rowHeight: 120, firstRowMinY: 1100, headerHeight: 48),
+ 40 |             RowBandSection(section: 4, itemCount: 5, columns: 3, rowHeight: -1, firstRowMinY: 1200, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 41 |             RowBandSection(section: 5, itemCount: 1, columns: 1, rowHeight: 90, firstRowMinY: 1400, headerHeight: 48),
+ 42 |         ])
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:41:13: error: cannot find 'RowBandSection' in scope
+ 39 |             RowBandSection(section: 3, itemCount: 5, columns: 0, rowHeight: 120, firstRowMinY: 1100, headerHeight: 48),
+ 40 |             RowBandSection(section: 4, itemCount: 5, columns: 3, rowHeight: -1, firstRowMinY: 1200, headerHeight: 48),
+ 41 |             RowBandSection(section: 5, itemCount: 1, columns: 1, rowHeight: 90, firstRowMinY: 1400, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+ 42 |         ])
+ 43 |         XCTAssertEqual(map.count, 4 + 2 + 1, "行数 = Σ ceil(itemCount/columns)；非法段（空段/零列/负行高）跳过且后续索引连续")
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:35:13: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+ 33 | 
+ 34 |     func testBandCountSumsCeilRowsAndSkipsInvalidSections() {
+ 35 |         let map = RowBandMap(sections: [
+    |             `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+ 36 |             RowBandSection(section: 0, itemCount: 10, columns: 3, rowHeight: 120, firstRowMinY: 100, headerHeight: 48),
+ 37 |             RowBandSection(section: 1, itemCount: 0, columns: 3, rowHeight: 120, firstRowMinY: 700, headerHeight: 48),
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:76:37: error: type 'SlideSelectConfig' has no member 'rowBandSnapTolerance'
+ 74 |     func testBandIndexSnapsAcrossSectionGapWithinTolerance() {
+ 75 |         let map = makeDefaultMap()
+ 76 |         let tol = SlideSelectConfig.rowBandSnapTolerance
+    |                                     `- error: type 'SlideSelectConfig' has no member 'rowBandSnapTolerance'
+ 77 |         XCTAssertLessThanOrEqual(tol, 50, "默认布局空隙 100pt，容差必须小于空隙一半才有 nil 区")
+ 78 |         XCTAssertEqual(map.bandIndex(atContentY: 680 - 10, clipTop: 0), 4,
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:159:19: error: cannot find 'RowBandMap' in scope
+157 | 
+158 |     func testSingleColumnSectionOneItemPerBand() {
+159 |         let map = RowBandMap(sections: [
+    |                   `- error: cannot find 'RowBandMap' in scope
+160 |             RowBandSection(section: 0, itemCount: 3, columns: 1, rowHeight: 100, firstRowMinY: 0, headerHeight: 48),
+161 |         ])
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:160:13: error: cannot find 'RowBandSection' in scope
+158 |     func testSingleColumnSectionOneItemPerBand() {
+159 |         let map = RowBandMap(sections: [
+160 |             RowBandSection(section: 0, itemCount: 3, columns: 1, rowHeight: 100, firstRowMinY: 0, headerHeight: 48),
+    |             `- error: cannot find 'RowBandSection' in scope
+161 |         ])
+162 |         XCTAssertEqual(map.count, 3)
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:167:19: error: cannot find 'RowBandMap' in scope
+165 | 
+166 |     func testEmptyMapReturnsNilAndEmpty() {
+167 |         let map = RowBandMap(sections: [])
+    |                   `- error: cannot find 'RowBandMap' in scope
+168 |         XCTAssertEqual(map.count, 0)
+169 |         XCTAssertNil(map.bandIndex(atContentY: 100, clipTop: 0))
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:176:48: error: type 'SlideSelectConfig' has no member 'rowBandSnapTolerance'
+174 | 
+175 |     func testSlideSelectConfigRowBandConstantsExist() {
+176 |         XCTAssertGreaterThan(SlideSelectConfig.rowBandSnapTolerance, 0, "吸附容差常量在位（禁散落魔法数字）")
+    |                                                `- error: type 'SlideSelectConfig' has no member 'rowBandSnapTolerance'
+177 |         XCTAssertEqual(SlideSelectConfig.rowBandMaxExpandPerFrame, 0, "单帧行带展开上限默认 0 = 不限（docs/42 §10.2）")
+178 |     }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:177:42: error: type 'SlideSelectConfig' has no member 'rowBandMaxExpandPerFrame'
+175 |     func testSlideSelectConfigRowBandConstantsExist() {
+176 |         XCTAssertGreaterThan(SlideSelectConfig.rowBandSnapTolerance, 0, "吸附容差常量在位（禁散落魔法数字）")
+177 |         XCTAssertEqual(SlideSelectConfig.rowBandMaxExpandPerFrame, 0, "单帧行带展开上限默认 0 = 不限（docs/42 §10.2）")
+    |                                          `- error: type 'SlideSelectConfig' has no member 'rowBandMaxExpandPerFrame'
+178 |     }
+179 | 
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:181:24: error: cannot find type 'RowBandSection' in scope
+179 | 
+180 |     func testBuildAndThousandQueriesWithinBudget() {
+181 |         var sections: [RowBandSection] = []
+    |                        `- error: cannot find type 'RowBandSection' in scope
+182 |         for s in 0..<40 {
+183 |             sections.append(RowBandSection(section: s, itemCount: 500, columns: 3, rowHeight: 120,
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:183:29: error: cannot find 'RowBandSection' in scope
+181 |         var sections: [RowBandSection] = []
+182 |         for s in 0..<40 {
+183 |             sections.append(RowBandSection(section: s, itemCount: 500, columns: 3, rowHeight: 120,
+    |                             `- error: cannot find 'RowBandSection' in scope
+184 |                                            firstRowMinY: Double(100 + s * 20_240), headerHeight: 48))
+185 |         }
+
+/workspace/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:187:19: error: cannot find 'RowBandMap' in scope
+185 |         }
+186 |         let start = ContinuousClock.now
+187 |         let map = RowBandMap(sections: sections)
+    |                   `- error: cannot find 'RowBandMap' in scope
+188 |         var sink = 0
+189 |         for i in 0..<1000 {
+error: fatalError
+[X] swift test 失败（exit 1）
