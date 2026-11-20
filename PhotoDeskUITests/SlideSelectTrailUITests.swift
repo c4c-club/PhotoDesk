@@ -1080,4 +1080,120 @@ final class SlideSelectTrailUITests: XCTestCase {
             return
         }
     }
+
+    // MARK: - M19 T07 自动滚动与跨滚动行带（docs/43 T07、docs/42 §5）
+
+    /// T07-① 底缘按住 2s：行带语义下自动滚动连续入集——屏外 assetID 命中、band=/exp= 就位、
+    /// path= 随滚动增长 ≥ 计数、触觉节流、实际滚动位移 ≥100pt；松手即停（计数冻结、offset 有界漂移）。
+    func testBottomEdgeHoldBandTrailGrowsAndStopsOnRelease() throws {
+        let app = XCUIApplication()
+        let collection = launchSelectableGrid(app)
+        let preDragIDs = Set((0..<collection.cells.count).filter { collection.cells.element(boundBy: $0).exists }
+            .map { cellID(collection.cells.element(boundBy: $0)) })
+        XCTAssertGreaterThan(preDragIDs.count, 5, "首屏必须有足够可见 cell")
+        guard let offStart = waitForOffsetY(app) else {
+            return XCTFail("Library-DebugSummary 必须暴露 off=\n\(hierarchy(app))")
+        }
+        let hapBefore = readHapticCount(app)
+        let start = collection.cells.element(boundBy: 0)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let bottomEdge = collection.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.99))
+        start.press(forDuration: 0.4, thenDragTo: bottomEdge, withVelocity: .slow, thenHoldForDuration: 2.0)
+        let count = waitForSelectionCount(app, atLeast: 6, timeout: 10)
+        XCTAssertGreaterThanOrEqual(count, 6, "底缘按住 2s 必须自动滚动入集（count=\(count)）")
+        XCTAssertGreaterThan(count, preDragIDs.count,
+                             "屏外 assetID 必须命中（preDrag=\(preDragIDs.count) count=\(count)）")
+        let hapAfter = readHapticCount(app)
+        XCTAssertLessThanOrEqual(hapAfter - hapBefore, 64,
+                                 "触觉必须 60ms 节流（≤16 次/秒，delta=\(hapAfter - hapBefore)）")
+        let raw = bannerRaw(app)
+        let band = Self.parseDoubleField(raw, "band") ?? -1
+        let expanded = Self.parseDoubleField(raw, "exp") ?? -1
+        XCTAssertGreaterThanOrEqual(band, 1, "自动滚动帧必须命中行带（band=\(band)）\n\(raw)")
+        XCTAssertGreaterThanOrEqual(expanded, 1, "自动滚动帧必须展开整行（exp=\(expanded)）\n\(raw)")
+        let pathCount = readTrailPathCount(app)
+        XCTAssertGreaterThanOrEqual(pathCount, count,
+                                    "路径栈深度必须 ≥ 计数（path=\(pathCount) count=\(count)）")
+        let offAfter = waitForOffsetIncrease(app, from: offStart, atLeast: 100, timeout: 3)
+        XCTAssertGreaterThanOrEqual(offAfter - offStart, 100,
+                                    "按住期间必须实际滚动（offStart=\(offStart) off=\(offAfter)）")
+        // 松手即停：settle 后计数冻结、offset 有界漂移（displayLink 停止喂轨迹）
+        Thread.sleep(forTimeInterval: 1.5)
+        let countSettled = selectionCount(app)
+        let offSettled = readOffsetY(app) ?? offAfter
+        Thread.sleep(forTimeInterval: 1.5)
+        let countFinal = selectionCount(app)
+        let offFinal = readOffsetY(app) ?? offSettled
+        XCTAssertEqual(countFinal, countSettled,
+                       "松手后计数必须冻结（settled=\(countSettled) final=\(countFinal)）")
+        XCTAssertLessThanOrEqual(offFinal - offSettled, 60,
+                                 "松手后不得继续自动滚动（drift=\(offFinal - offSettled)pt）")
+        assertAlive(app, "自动滚动收尾后")
+        snap(app, "m19-t07-autoscroll-band")
+    }
+
+    /// T07-② 滚两屏后长按下拖 3 行：行带缓存跨滚动正确——计数 = 3×columns 精确、
+    /// 3 个整行集合与独立复算一致（粘性头 clipTop 在新视口生效；锚点取视口内完整可见格）。
+    func testThirdScreenScrollThenBandDragExactRows() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            app.swipeUp()
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.8)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 5), "滚动后无 cell")
+            var anchorVisible = -1
+            for index in 0..<collection.cells.count {
+                let cell = collection.cells.element(boundBy: index)
+                guard cell.exists, cell.frame.width > 1 else { continue }
+                let frame = cell.frame
+                if frame.minY > collection.frame.minY + 60, frame.maxY < collection.frame.maxY {
+                    anchorVisible = index
+                    break
+                }
+            }
+            guard anchorVisible >= 0 else {
+                if attempt == 2 { XCTFail("滚动后无完整可见 cell\n\(hierarchy(app))") }
+                continue
+            }
+            let anchorFrame = collection.cells.element(boundBy: anchorVisible).frame
+            var rowCells: [Int] = []
+            for index in 0..<collection.cells.count {
+                let cell = collection.cells.element(boundBy: index)
+                guard cell.exists, cell.frame.width > 1 else { continue }
+                if abs(cell.frame.midY - anchorFrame.midY) < 8 { rowCells.append(index) }
+            }
+            rowCells.sort {
+                collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
+            }
+            let columns = rowCells.count
+            let column = sameColumnIndices(in: collection, anchorIndex: anchorVisible)
+            let safeBottom = collection.frame.maxY - 80
+            let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
+            guard columns >= 2, safeColumn.count >= 3 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(columns) safeRows=\(safeColumn.count)")
+                }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: safeColumn[0], toIndex: safeColumn[2])
+            let bandTarget = 3 * columns
+            let count = waitForSelectionCountEqual(app, to: bandTarget, timeout: 6)
+            guard count == bandTarget else {
+                if attempt == 2 {
+                    XCTFail("第 3 屏下滑 3 行计数必须 = 3×\(columns)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            let rowYs = safeColumn.prefix(3).map { collection.cells.element(boundBy: $0).frame.midY }
+            let expected = fullRowIDs(in: collection, rowMidYs: Array(rowYs))
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "3 个整行必须全选（got=\(selected.sorted()) expected=\(expected.sorted())）")
+            snap(app, "m19-t07-third-screen-band")
+            return
+        }
+    }
 }
