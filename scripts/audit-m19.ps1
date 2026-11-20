@@ -174,7 +174,7 @@ try {
     Add-Check 'present-rowbandprovider-symbol' 'PRESENT' $(if ($hits.Count -gt 0) { 'PASS' } else { 'FAIL' }) "PhotoDesk/ 必须出现 rowBandHitProvider 符号（VC 注入行带命中提供者，docs/42 §3.2）" $hits
     $hits = Find-Hits $coreTests 'RowBandMapTests'
     Add-Check 'present-rowbandmap-tests' 'PRESENT' $(if ($hits.Count -gt 0) { 'PASS' } else { 'FAIL' }) "PhotoDeskCore/Tests 必须出现 RowBandMapTests" $hits
-    $uiSuite = 'PhotoDeskUITests/RowBandSlideSelectUITests.swift'
+    $uiSuite = 'PhotoDeskUITests/RowBandSelectUITests.swift'   # T08 卡片 prescribed 命名（git mv 自 SlideSelectTrailUITests.swift）
     if (File-Missing $uiSuite) {
         Add-Check 'present-band-ui-suite' 'PRESENT' 'FAIL' "$uiSuite 不存在（T08 行带 UI 套件）" @()
     } else {
