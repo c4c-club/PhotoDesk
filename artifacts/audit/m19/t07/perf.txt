@@ -1,0 +1,43 @@
+T07 性能证据（docs/42 §5 预算）— 2026-11-20
+====================================================
+
+[预算（docs/42 §5）]
+  单帧行带解析        ≤ 2ms（iPhone 11 / 2 万张）
+  单帧展开+applyDelta ≤ 4ms
+  滚动帧率            ≥ 55 FPS
+  内存峰值            < 250MB
+  触觉                ≤16 次/秒
+
+[Core 实测 — Docker swift:6.0-noble debug（-Onone），RowBandPerfTests 600 帧采样]
+  规模：2 万 item（40 段 × 500 项 × 4 列 × 120pt），每帧 bandIndex+bandSequence(4 行带)+items 整行展开
+  T07-PERF parse+expand p50=0.016ms  p95=0.026ms   → 预算 ≤2ms：余量 ~77×  ✓
+  T07-PERF applyDelta        p50=2.103ms p95=3.208ms   → 预算 ≤4ms：余量 1.25× ✓（20k 全选集上 12 格 remove/add 往返）
+  绝对回归闸（M18 T02/T03 先例，Docker debug 口径）：<20ms，双双通过
+  证据：artifacts/audit/m19/t07/core-run.log（525/525，0 failures）
+
+[App 单帧行带解析（DEBUG 计数，T07 实现）]
+  GridHitTester.rowBandHitTest 环形采样 512 帧 → debugRowBandP50Ms/P95Ms；
+  Library-DebugSummary 暴露 perf=p50/p95ms 字段（T05 的 band=/exp= 保留）。
+  CI 模拟器 debug 未单独断言数值（预算口径为 iPhone 11）；真机 T09 复测采集留痕。
+
+[内存峰值 — CI run 44644633379 Performance tests (5,000+ photos)，XCTMemoryMetric，模拟器口径仅参考]
+  网格滚动（6 上 2 下 × 3 迭代）Memory Peak Physical：34,309.5 kB ≈ 33.5 MB  → <250MB ✓（余量 ~7.5×）
+  查看器 100 次连滑    Memory Peak Physical：37,722.9 kB ≈ 36.8 MB  → <250MB ✓
+  Clock Monotonic（滚动 8 次滑动 3 迭代均值）：11.844s
+  注：docs/06 §3.2 模拟器性能 ≠ 真机；iOS 真机复测在 T09。
+
+[滚动帧率]
+  模拟器 FPS 不具参考性（docs/06 §3.2 / PerformanceUITests.swift 文件头口径）——真机 T09 留痕。
+
+[触觉]
+  ≤16 次/秒由 60ms 机器节流承担（G6 闸门 + debugHapticCount）；T07-① UI 用例断言 delta ≤64/2s ✓
+  （run 44644633379 testBottomEdgeHoldBandTrailGrowsAndStopsOnRelease passed 25.155s）。
+
+[CI 链路]
+  run 44644633379 @b2bbb61：geometry 23/23 ✓ + Performance 4/4 ✓ + T07 UI 用例真红
+    testThirdScreenScrollThenBandDragExactRows FAILED（count=0）
+  run 44648526747 @ac809c8：静止等待修复后仍 count=0 → 根因实为锚点半遮格中心落钉住头遮挡区
+  run 44764473663 @63823ce：锚点避让后前进到几何余量失败（belowRows=2 < 3）
+  run 44770333450 @d80dc43：3 行带 = 锚点行 + 下方 2 行 → **全绿 2/2 + Performance 4/4**（最终）
+  run 44644095663 @2077cce：被 dispatch 竞态取消（concurrency cancel-in-progress，T04 同型）
+  run F 复测内存峰值：滚动 34,932.1 kB / 查看器连滑 37,837.6 kB（与 run C 一致，稳定）
