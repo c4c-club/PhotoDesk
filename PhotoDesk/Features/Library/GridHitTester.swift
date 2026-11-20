@@ -37,6 +37,26 @@ final class GridHitTester {
     /// UI 取证（M19 T05）：最近一次 rowBandHitTest 的行带数与展开格数。
     private(set) var lastBandCount = 0
     private(set) var lastExpandedCount = 0
+    /// M19 T07（docs/42 §5）：rowBandHitTest 单帧耗时环形采样（ms，512 帧窗口）与 p50/p95。
+    private var debugRowBandMs: [Double] = []
+    private(set) var debugRowBandP50Ms: Double = -1
+    private(set) var debugRowBandP95Ms: Double = -1
+
+    private func recordRowBandSample(_ ms: Double) {
+        debugRowBandMs.append(ms)
+        if debugRowBandMs.count > 512 {
+            debugRowBandMs.removeFirst(debugRowBandMs.count - 512)
+        }
+        let sorted = debugRowBandMs.sorted()
+        debugRowBandP50Ms = percentile(of: sorted, 0.5)
+        debugRowBandP95Ms = percentile(of: sorted, 0.95)
+    }
+
+    private func percentile(of sorted: [Double], _ p: Double) -> Double {
+        guard !sorted.isEmpty else { return -1 }
+        let index = min(sorted.count - 1, max(0, Int((Double(sorted.count) * p).rounded(.up)) - 1))
+        return sorted[index]
+    }
     #endif
 
     init(collectionView: UICollectionView) {
@@ -261,6 +281,8 @@ final class GridHitTester {
     func rowBandHitTest(from: CGPoint, to: CGPoint) -> [IndexPath] {
         #if DEBUG
         lastQueryCount = 0
+        let perfStarted = CACurrentMediaTime()
+        defer { recordRowBandSample((CACurrentMediaTime() - perfStarted) * 1000) }
         #endif
         guard let collectionView,
               from.x.isFinite, from.y.isFinite, to.x.isFinite, to.y.isFinite else { return [] }

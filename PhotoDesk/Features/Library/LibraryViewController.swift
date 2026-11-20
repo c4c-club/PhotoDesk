@@ -1358,10 +1358,14 @@ final class LibraryViewController: UIViewController {
         let vB = Int(sel?.debugViewportBottom ?? -1)
         let stateName = sel?.debugStateName ?? "none"
         let panMin = collectionView.panGestureRecognizer.minimumNumberOfTouches
+        // M19 T07（docs/42 §5）：单帧行带解析 p50/p95（Debug 计数；perf.txt 采集口径）
+        let perfP50 = gridHitTester?.debugRowBandP50Ms ?? -1
+        let perfP95 = gridHitTester?.debugRowBandP95Ms ?? -1
         viewModel.debugFilteredCount = "\(viewModel.filteredItems.count)"
         viewModel.debugScrollNote = "off=\(off)/\(maxOffset) anchor=\(anchor) visualY=\(visualY) "
             + "sec=\(sections) cells=\(cells) panMin=\(panMin) "
-            + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) band=\(band) exp=\(exp) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName)"
+            + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) band=\(band) exp=\(exp) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName) "
+            + "perf=\(String(format: "%.2f", perfP50))/\(String(format: "%.2f", perfP95))ms"
         #endif
     }
 
