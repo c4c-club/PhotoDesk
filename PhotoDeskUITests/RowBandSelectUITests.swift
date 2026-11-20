@@ -259,9 +259,12 @@ final class RowBandSelectUITests: XCTestCase {
 
     // MARK: - 用例（docs/42 §4 测试矩阵）
 
-    /// ① 长按 0.4s 进入多选：锚点入选（计数 1）、多选栏出现、无任何覆盖层元素残留。
+    /// ① 长按 0.4s 进入多选：M19 行带语义下长按起手 = 锚点整行入选（count = columns，
+    /// docs/42 §1.2 行为表「长按起手整行」；全量 run 44783255716 实锤 count=3）——
+    /// 断言整行精确复算、多选栏出现、无任何覆盖层元素残留。
     func testLongPressEntersSelectionWithAnchorCount() throws {
         var count = -1
+        var columns = -1
         var entered = false
         var appRef: XCUIApplication!
         for attempt in 1...2 {
@@ -271,19 +274,25 @@ final class RowBandSelectUITests: XCTestCase {
             let first = collection.cells.firstMatch
             XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
             first.press(forDuration: 0.4)
-            count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
-            if count == 1 { entered = true; break }
+            columns = bandGeometry(in: collection, columnChoice: 0).columns
+            count = waitForSelectionCountEqual(app, to: columns, timeout: 5)
+            if count == columns { entered = true; break }
             if attempt == 1 { usleep(500_000) }
         }
-        XCTAssertEqual(count, 1, "长按 0.4s 必须进入多选且锚点入选（count=\(count)）")
+        XCTAssertGreaterThanOrEqual(columns, 2, "首行列数探测异常（columns=\(columns)）")
+        XCTAssertEqual(count, columns,
+                       "长按 0.4s 必须进入多选且整行入选（count=\(count) columns=\(columns)）")
         XCTAssertTrue(entered, "长按进入路径必须发生")
         XCTAssertTrue(anyElement(appRef, identifier: "Selection-Count").exists,
                       "长按进入后必须出现多选栏")
-        XCTAssertTrue(cellIsSelected(appRef.collectionViews.firstMatch.cells.firstMatch),
-                      "锚点 cell AX 必须同步 selected（视觉/AX 同源）")
+        let grid = appRef.collectionViews.firstMatch
+        let rowIDs = fullRowIDs(in: grid, rowMidYs: [grid.cells.element(boundBy: 0).frame.midY])
+        let selected = waitForSelectedSet(grid, equals: rowIDs)
+        XCTAssertEqual(selected, rowIDs,
+                       "长按后必须整行 selected（got=\(selected.sorted()) expected=\(rowIDs.sorted())）")
         XCTAssertFalse(appRef.descendants(matching: .any)[retiredOverlayID].exists,
                        "M18 起不得存在任何覆盖层元素")
-        snap(appRef, "m18-longpress-enter")
+        snap(appRef, "m19-band-longpress-enter")
     }
 
     /// ② 左列长按下拖 3 行：整行语义与 M19-① 列对称——计数 = 3×columns 精确、
@@ -1038,20 +1047,36 @@ final class RowBandSelectUITests: XCTestCase {
                 continue
             }
             usleep(500_000)
-            // 视口内找一个「悬停中部」的月份头（非钉住态）：头上下都有可拖拽空间
+            // 视口内找一个「悬停中部」的月份头（非钉住态）：头上下都有可拖拽空间。
+            // 全量 run 44783255716 实锤两次 swipeUp 后中部可能无头（落点全贴顶/贴底）——
+            // 最多追加 2 次 swipeUp 并逐次静止等待后再扫。
             let headers = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'"))
             let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
             var boundaryY: CGFloat?
-            for index in 0..<headers.count {
-                let header = headers.element(boundBy: index)
-                guard header.exists else { continue }
-                let frame = header.frame
-                if frame.minY > collection.frame.minY + headerHeight + 100,
-                   frame.maxY < collection.frame.maxY - 200 {
-                    boundaryY = frame.midY
-                    break
+            for _ in 0..<3 {
+                for index in 0..<headers.count {
+                    let header = headers.element(boundBy: index)
+                    guard header.exists else { continue }
+                    let frame = header.frame
+                    if frame.minY > collection.frame.minY + headerHeight + 60,
+                       frame.maxY < collection.frame.maxY - 120 {
+                        boundaryY = frame.midY
+                        break
+                    }
                 }
+                if boundaryY != nil { break }
+                app.swipeUp()
+                let extraDeadline = Date().addingTimeInterval(6)
+                var extraSettled = false
+                while Date() < extraDeadline {
+                    usleep(600_000)
+                    let now = readOffsetY(app) ?? -2
+                    usleep(600_000)
+                    let again = readOffsetY(app) ?? -3
+                    if abs(now - again) < 0.5 { extraSettled = true; break }
+                }
+                guard extraSettled else { break }
             }
             guard let boundary = boundaryY else {
                 if attempt == 2 { XCTFail("视口内无悬停月份头（跨月边界不可用）\n\(hierarchy(app))") }
