@@ -1185,14 +1185,20 @@ final class SlideSelectTrailUITests: XCTestCase {
             let columns = rowCells.count
             let column = sameColumnIndices(in: collection, anchorIndex: anchorVisible)
             let safeBottom = collection.frame.maxY - 80
-            let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
-            guard columns >= 2, safeColumn.count >= 3 else {
+            // 拖拽起点必须用「完整可见、中心避开钉住头」的锚点格：头下缘半遮格的中心可能落在
+            // 头遮挡区 → indexPathForItem 命中 supplementary → 手势不起步（run 44644633379/
+            // 44648526747 实锤 count=0）。锚点行起拖，终点取锚点下方第 3 行。
+            let below = column.filter {
+                let frame = collection.cells.element(boundBy: $0).frame
+                return frame.minY >= anchorFrame.maxY - 4 && frame.maxY < safeBottom
+            }
+            guard columns >= 2, below.count >= 3 else {
                 if attempt == 2 {
-                    XCTFail("几何不足 columns=\(columns) safeRows=\(safeColumn.count)")
+                    XCTFail("几何不足 columns=\(columns) belowRows=\(below.count)")
                 }
                 continue
             }
-            longPressDrag(in: collection, fromIndex: safeColumn[0], toIndex: safeColumn[2])
+            longPressDrag(in: collection, fromIndex: anchorVisible, toIndex: below[2])
             let bandTarget = 3 * columns
             let count = waitForSelectionCountEqual(app, to: bandTarget, timeout: 6)
             guard count == bandTarget else {
@@ -1202,7 +1208,8 @@ final class SlideSelectTrailUITests: XCTestCase {
                 }
                 continue
             }
-            let rowYs = safeColumn.prefix(3).map { collection.cells.element(boundBy: $0).frame.midY }
+            let rowYs = [anchorFrame.midY]
+                + below.prefix(2).map { collection.cells.element(boundBy: $0).frame.midY }
             let expected = fullRowIDs(in: collection, rowMidYs: Array(rowYs))
             let selected = waitForSelectedSet(collection, equals: expected)
             XCTAssertEqual(selected, expected,
