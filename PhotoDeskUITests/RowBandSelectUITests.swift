@@ -1028,7 +1028,9 @@ final class RowBandSelectUITests: XCTestCase {
     func testBandDragAcrossMonthBoundary() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
-            let collection = launchSelectableGrid(app)
+            // 全量 run 44783255716/44805219332 实锤：select 模式下 MonthHeader-Menu-* 不可枚举
+            // （⑪ 用例在 plain 网格可枚举）——改用 plain 网格 + 长按起手自带进入多选（②⑤ 同款）
+            let collection = launchPlainGrid(app)
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
             app.swipeUp()
             app.swipeUp()
@@ -1050,7 +1052,7 @@ final class RowBandSelectUITests: XCTestCase {
             // 视口内找一个「悬停中部」的月份头（非钉住态）：头上下都有可拖拽空间。
             // 全量 run 44783255716 实锤两次 swipeUp 后中部可能无头（落点全贴顶/贴底）——
             // 最多追加 2 次 swipeUp 并逐次静止等待后再扫。
-            let headers = app.descendants(matching: .any)
+            let headers = app.buttons
                 .matching(NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'"))
             let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
             var boundaryY: CGFloat?
