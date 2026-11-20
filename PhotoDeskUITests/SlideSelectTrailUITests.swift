@@ -1141,7 +1141,22 @@ final class SlideSelectTrailUITests: XCTestCase {
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
             app.swipeUp()
             app.swipeUp()
-            Thread.sleep(forTimeInterval: 0.8)
+            // CI 实锤（run 44644633379：count=0）：swipeUp 惯性衰减慢于固定 0.8s，内容移动中
+            // 按压点漂移超 allowableMovement → 长按识别失败。等 off= 连续两次采样静止再取几何。
+            let settleDeadline = Date().addingTimeInterval(10)
+            var settled = false
+            while Date() < settleDeadline {
+                usleep(600_000)
+                let now = readOffsetY(app) ?? -2
+                usleep(600_000)
+                let again = readOffsetY(app) ?? -3
+                if abs(now - again) < 0.5 { settled = true; break }
+            }
+            guard settled else {
+                if attempt == 2 { XCTFail("滚动未静止（off= 持续变化）") }
+                continue
+            }
+            usleep(500_000)
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 5), "滚动后无 cell")
             var anchorVisible = -1
             for index in 0..<collection.cells.count {
