@@ -1,16 +1,15 @@
-// MARK: - SlideSelectTrailUITests：轨迹滑选精确路径验收（M18 T08，docs/38 §4，docs/37 §8）——
-// 旧选择契约（覆盖层/行带/双指规则）整体退役：断言一律为「精确 assetID 集合 + 计数 + offset +
-// DEBUG 轨迹取证字段」。期望集合由测试内独立暴力基准计算（真实 cell frame + Liang-Barsky
-// 线段扫掠，与 T07 LibraryGridGeometryTests 同口径），不依赖实现内部，防「实现自证」。
-// 两段式手势口径：XCUI 单段拖拽无法合成「同一手势内回滑」，A→B→C→B 语义映射为
-// G1 选择 A→C（途经 B）+ G2 从 C（已选 → 取消模式）拖回 B + G3 从 B（未选 → 选择模式）拖回 C，
-// 等价覆盖「回滑取消 / 按模式恢复 / 基线保持」；同手势回滑的路径栈语义由 Core
-// SlideSelectTrailTests 锁定（docs/38 §2.3）。
+// MARK: - RowBandSelectUITests：行带轨迹滑选精确路径验收（M19 T08，docs/42 §1.2/§4）——
+// M19 行带契约：右侧/左列下滑整行选中、回滑整行取消、跨月跨段平铺；断言一律为
+// 「精确 assetID 集合 + 行数×列数计数 + DEBUG 行带取证字段（band=/exp=）」。期望集合由
+// 测试内独立暴力基准计算（真实 cell frame 按行 span 复算整行，fullRowIDs），不依赖实现
+// 内部，防「实现自证」。两段式手势口径：XCUI 单段拖拽无法合成「同一手势内回滑」，
+// 正向→反向语义映射为 G1 选择拖 + G2 取消模式拖；同手势回滑的路径栈语义由 Core
+// SlideSelectTrailTests/RowBandTrailTests 锁定（docs/42 §2.3）。
 
 import XCTest
 import UIKit
 
-final class SlideSelectTrailUITests: XCTestCase {
+final class RowBandSelectUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -241,93 +240,7 @@ final class SlideSelectTrailUITests: XCTestCase {
         return Self.parseCount(((label.value as? String) ?? label.label))
     }
 
-    // MARK: - UI 层暴力基准（docs/37 §8：期望集合独立复算，防实现自证）
-
-    /// 以真实 cell frame（屏幕坐标）对线段做 Liang-Barsky 求交，与生产 hitTestLine 同口径
-    ///（expansion=1、epsilon=0.5、(t, id) 升序——SlideSelectConfig 常量在 UI 测试内镜像）。
-    /// 仅覆盖当前可见 cell（屏外 cell 无有效 frame）；用例须保证命中全程在屏内。
-    private func expectedLineHitIDs(in collection: XCUIElement,
-                                    from startIndex: Int,
-                                    to endIndex: Int,
-                                    startOffset: CGVector = CGVector(dx: 0.5, dy: 0.5),
-                                    endOffset: CGVector = CGVector(dx: 0.5, dy: 0.5)) -> [String] {
-        let startFrame = collection.cells.element(boundBy: startIndex).frame
-        let endFrame = collection.cells.element(boundBy: endIndex).frame
-        let from = CGPoint(x: startFrame.minX + startFrame.width * CGFloat(startOffset.dx),
-                           y: startFrame.minY + startFrame.height * CGFloat(startOffset.dy))
-        let to = CGPoint(x: endFrame.minX + endFrame.width * CGFloat(endOffset.dx),
-                         y: endFrame.minY + endFrame.height * CGFloat(endOffset.dy))
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let expansion: CGFloat = 1   // SlideSelectConfig.hitExpansion
-        let epsilon: CGFloat = 0.5   // SlideSelectConfig.segmentEpsilon
-        var hits: [(t: Double, id: String)] = []
-        for index in 0..<collection.cells.count {
-            let cell = collection.cells.element(boundBy: index)
-            guard cell.exists else { continue }
-            let frame = cell.frame
-            guard frame.width > 1, frame.height > 1 else { continue }   // 屏外 cell frame 无效
-            let minX = frame.minX - expansion
-            let maxX = frame.maxX + expansion
-            let minY = frame.minY - expansion
-            let maxY = frame.maxY + expansion
-            var tEnter = 0.0
-            var tExit = 1.0
-            var miss = false
-            if abs(dx) <= epsilon {
-                if from.x < minX || from.x > maxX { miss = true }
-            } else {
-                let t1 = Double((minX - from.x) / dx)
-                let t2 = Double((maxX - from.x) / dx)
-                tEnter = max(tEnter, min(t1, t2))
-                tExit = min(tExit, max(t1, t2))
-            }
-            if abs(dy) <= epsilon {
-                if from.y < minY || from.y > maxY { miss = true }
-            } else {
-                let t1 = Double((minY - from.y) / dy)
-                let t2 = Double((maxY - from.y) / dy)
-                tEnter = max(tEnter, min(t1, t2))
-                tExit = min(tExit, max(t1, t2))
-            }
-            guard !miss, tEnter <= tExit else { continue }
-            hits.append((tEnter, cellID(cell)))
-        }
-        return hits.sorted { $0.t != $1.t ? $0.t < $1.t : $0.id < $1.id }.map(\.id)
-    }
-
-    /// 路径走廊：沿线等距采样 40 点，frame 膨胀 tolerance pt 后含任一采样点的可见 cell
-    ///（frame 口径，与生产 hitTest 的 frame 相交判定同侧度——弧线扫过格边角即算走廊内）。
-    /// XCUI 合成拖拽为样条弧线，中段可侧摆 ~20-40pt（第 4/9/12/13 轮 ±1 格实锤），
-    /// 斜拖用例以此作「滑到哪选到哪」与弧度噪声的边界；对角矩形远角仍在走廊外。
-    private func expectedCorridorIDs(in collection: XCUIElement,
-                                     from startIndex: Int,
-                                     to endIndex: Int,
-                                     startOffset: CGVector,
-                                     endOffset: CGVector,
-                                     tolerance: CGFloat) -> [String] {
-        let startFrame = collection.cells.element(boundBy: startIndex).frame
-        let endFrame = collection.cells.element(boundBy: endIndex).frame
-        let from = CGPoint(x: startFrame.minX + startFrame.width * CGFloat(startOffset.dx),
-                           y: startFrame.minY + startFrame.height * CGFloat(startOffset.dy))
-        let to = CGPoint(x: endFrame.minX + endFrame.width * CGFloat(endOffset.dx),
-                         y: endFrame.minY + endFrame.height * CGFloat(endOffset.dy))
-        var samples: [CGPoint] = []
-        let steps = 40
-        for step in 0...steps {
-            let t = CGFloat(step) / CGFloat(steps)
-            samples.append(CGPoint(x: from.x + (to.x - from.x) * t,
-                                   y: from.y + (to.y - from.y) * t))
-        }
-        var result: [String] = []
-        for index in 0..<collection.cells.count {
-            let cell = collection.cells.element(boundBy: index)
-            guard cell.exists, cell.frame.width > 1 else { continue }
-            let inflated = cell.frame.insetBy(dx: -tolerance, dy: -tolerance)
-            if samples.contains(where: inflated.contains) { result.append(cellID(cell)) }
-        }
-        return result
-    }
+    // MARK: - UI 层暴力基准（docs/42 §4：期望集合独立复算，防实现自证）
 
     /// 可见 cell 中与 anchor 同列（minX 差 ≤ 半格）的下标列表，按 y 升序
     private func sameColumnIndices(in collection: XCUIElement, anchorIndex: Int) -> [Int] {
@@ -344,7 +257,7 @@ final class SlideSelectTrailUITests: XCTestCase {
         return result.sorted { $0.y < $1.y }.map(\.index)
     }
 
-    // MARK: - 用例（docs/38 §4 第 5-9 行）
+    // MARK: - 用例（docs/42 §4 测试矩阵）
 
     /// ① 长按 0.4s 进入多选：锚点入选（计数 1）、多选栏出现、无任何覆盖层元素残留。
     func testLongPressEntersSelectionWithAnchorCount() throws {
@@ -373,170 +286,104 @@ final class SlideSelectTrailUITests: XCTestCase {
         snap(appRef, "m18-longpress-enter")
     }
 
-    /// ② 长按不抬手继续竖拖：命中集合 == 独立暴力基准（精确 assetID 集合 + 有序）。
-    func testLongPressTrailSelectsExactIDSequence() throws {
+    /// ② 左列长按下拖 3 行：整行语义与 M19-① 列对称——计数 = 3×columns 精确、
+    /// 3 个整行全选、行带外第 4 行不入选。
+    func testLeftColumnBandDragSelectsThreeFullRows() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
-            let collection = launchPlainGrid(app)
-            let first = collection.cells.firstMatch
-            XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-            let expected = expectedLineHitIDs(in: collection, from: 0, to: 12)
-            guard expected.count >= 3 else {
-                if attempt == 2 { XCTFail("首屏可见基准命中不足（expected=\(expected)）") }
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            let geo = bandGeometry(in: collection, columnChoice: 0)   // 最左列锚点
+            guard geo.columns >= 2, geo.safeColumn.count >= 4 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(geo.columns) safeRows=\(geo.safeColumn.count)")
+                }
                 continue
             }
-            longPressDrag(in: collection, fromIndex: 0, toIndex: 12)
+            longPressDrag(in: collection, fromIndex: geo.anchorIndex, toIndex: geo.safeColumn[2])
+            let bandTarget = 3 * geo.columns
+            let count = waitForSelectionCountEqual(app, to: bandTarget, timeout: 6)
+            guard count == bandTarget else {
+                if attempt == 2 {
+                    XCTFail("左列下滑 3 行计数必须 = 3×\(geo.columns)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
+                continue
+            }
+            let rowYs = geo.safeColumn.prefix(3).map { collection.cells.element(boundBy: $0).frame.midY }
+            let expected = fullRowIDs(in: collection, rowMidYs: Array(rowYs))
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "3 个整行必须全选（got=\(selected.sorted()) expected=\(expected.sorted())）")
+            XCTAssertFalse(cellIsSelected(collection.cells.element(boundBy: geo.safeColumn[3])),
+                           "行带外第 4 行不得入选（精确断言，非 ≥）")
+            snap(app, "m19-band-left-column-3rows")
+            return
+        }
+    }
+
+    /// ④ 斜向拖动的行带序列：从首行最左格斜拖到末安全行最右格——行带语义锁定
+    /// 「起点行→终点行之间每一整行全选（与列无关）」，期望 = 行 span 的整行精确复算；
+    /// 行带外行不得入选（无矩形补全，docs/42 §1.2 斜向行）。
+    func testDiagonalBandTrailFollowsRowSequence() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            let geo = bandGeometry(in: collection, columnChoice: 0)
+            guard geo.columns >= 2, geo.safeColumn.count >= 4 else {
+                if attempt == 2 {
+                    XCTFail("几何不足 columns=\(geo.columns) safeRows=\(geo.safeColumn.count)")
+                }
+                continue
+            }
+            // 终点 = 最后一条安全行的最右列格（斜向跨全部列 + 全部安全行）
+            let lastRowIndex = geo.safeColumn[geo.safeColumn.count - 1]
+            let endFrame = collection.cells.element(boundBy: lastRowIndex).frame
+            var endRowCells: [Int] = []
+            for index in 0..<collection.cells.count {
+                let cell = collection.cells.element(boundBy: index)
+                guard cell.exists, cell.frame.width > 1 else { continue }
+                if abs(cell.frame.midY - endFrame.midY) < 8, cell.frame.minX >= endFrame.minX {
+                    endRowCells.append(index)
+                }
+            }
+            endRowCells.sort {
+                collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
+            }
+            guard let endIndex = endRowCells.last else {
+                if attempt == 2 { XCTFail("末安全行无最右格") }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: geo.anchorIndex, toIndex: endIndex)
+            let rowYs = geo.safeColumn.map { collection.cells.element(boundBy: $0).frame.midY }
+            let expected = fullRowIDs(in: collection, rowMidYs: rowYs)
             let count = waitForSelectionCountEqual(app, to: expected.count, timeout: 6)
             guard count == expected.count else {
                 if attempt == 2 {
-                    XCTFail("轨迹计数必须等于基准 \(expected.count)（count=\(count)，expected=\(expected)）")
+                    XCTFail("斜向行带计数必须 = 行数×列数 \(expected.count)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted()) "
+                            + "expected=\(expected.sorted())）")
                 }
                 continue
             }
-            let selected = waitForSelectedSet(collection, equals: Set(expected))
-            XCTAssertEqual(selected, Set(expected),
-                           "轨迹命中必须精确等于暴力基准集合（got=\(selected.sorted()) expected=\(expected)）")
-            snap(app, "m18-longpress-trail")
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "斜向行带必须精确 = 起终点行间全部整行（got=\(selected.sorted()) "
+                           + "expected=\(expected.sorted())）")
+            snap(app, "m19-band-diagonal-sequence")
             return
         }
     }
 
-    /// ③ 左列竖拖：右列 assetID 不得出现（列隔离，滑到哪选到哪不外扩）。
-    func testLeftColumnTrailExcludesRightColumn() throws {
-        for attempt in 1...2 {
-            let app = XCUIApplication()
-            let collection = launchSelectableGrid(app)
-            let column = sameColumnIndices(in: collection, anchorIndex: 0)
-            guard column.count >= 3 else {
-                if attempt == 2 { XCTFail("首屏同列可见格不足（column=\(column)）") }
-                continue
-            }
-            // 终点必须远离底缘 60pt 自动滚动触发区（留 80pt 余量）：慢速/停留会触发
-            // 边缘滚动，内容坐标下路径延长多扫一格（T08 第 4 轮 CI 实锤 +1）
-            let safeBottom = collection.frame.maxY - 80
-            let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
-            guard safeColumn.count >= 3 else {
-                if attempt == 2 { XCTFail("同列远离底缘的可见格不足（column=\(column)）") }
-                continue
-            }
-            let lastInColumn = safeColumn[safeColumn.count - 1]
-            let expectedIDs = safeColumn.map { cellID(collection.cells.element(boundBy: $0)) }
-            longPressDrag(in: collection, fromIndex: 0, toIndex: lastInColumn)
-            let count = waitForSelectionCountEqual(app, to: safeColumn.count, timeout: 6)
-            guard count == safeColumn.count else {
-                if attempt == 2 { XCTFail("左列竖拖计数必须 \(safeColumn.count)（count=\(count)）") }
-                continue
-            }
-            let selected = waitForSelectedSet(collection, equals: Set(expectedIDs))
-            XCTAssertEqual(selected, Set(expectedIDs),
-                           "命中必须精确 = 同列 assetID（got=\(selected.sorted()) expected=\(expectedIDs)）")
-            // 右列邻格必须全部未选中（以首格右邻为例）
-            let anchorFrame = collection.cells.element(boundBy: 0).frame
-            for index in 0..<collection.cells.count {
-                let cell = collection.cells.element(boundBy: index)
-                guard cell.exists, cell.frame.width > 1 else { continue }
-                let frame = cell.frame
-                let isRightNeighbor = frame.minY >= anchorFrame.minY - 5
-                    && frame.minY <= anchorFrame.maxY + 5
-                    && frame.minX > anchorFrame.maxX
-                if isRightNeighbor {
-                    XCTAssertFalse(cellIsSelected(cell),
-                                   "右列邻格 idx \(index)（\(cellID(cell))）不得被左列竖拖命中")
-                }
-            }
-            snap(app, "m18-left-column")
-            return
-        }
-    }
-
-    /// ④ 斜拖不补全对角矩形：命中 = 线段扫掠集（≠ 外接矩形集），外接矩形内的「离线 filler 格」不得选中。
-    func testDiagonalTrailDoesNotFillRectangle() throws {
-        for attempt in 1...2 {
-            let app = XCUIApplication()
-            let collection = launchSelectableGrid(app)
-            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-            // 终点远离底缘 80pt 余量（同 ③：避免边缘滚动延长路径）
-            let diagSafeBottom = collection.frame.maxY - 80
-            var diagEnd = -1
-            for index in (1...10).reversed() {
-                let frame = collection.cells.element(boundBy: index).frame
-                if frame.width > 1, frame.maxY < diagSafeBottom { diagEnd = index; break }
-            }
-            guard diagEnd >= 3 else {
-                if attempt == 2 { XCTFail("远离底缘的对角终点格不足（diagEnd=\(diagEnd)）") }
-                continue
-            }
-            // 角内偏移 (0.3,0.3)→(0.7,0.7)：线段从格内部穿过，距角落 ≥24pt，
-            // 避开中心-中心对角线贴角 ±1 格的路径曲率噪声（第 4/9 轮 CI 实锤）
-            let diagOffsetStart = CGVector(dx: 0.3, dy: 0.3)
-            let diagOffsetEnd = CGVector(dx: 0.7, dy: 0.7)
-            let lineHit = expectedLineHitIDs(in: collection, from: 0, to: diagEnd,
-                                             startOffset: diagOffsetStart, endOffset: diagOffsetEnd)
-            guard lineHit.count >= 3 else {
-                if attempt == 2 { XCTFail("斜线基准命中不足（\(lineHit)）") }
-                continue
-            }
-            // 外接矩形集（矩形语义的反例集）：两对角格围成矩形内的可见格
-            let startFrame = collection.cells.element(boundBy: 0).frame
-            let endFrame = collection.cells.element(boundBy: diagEnd).frame
-            let bound = startFrame.union(endFrame)
-            var rectFillers: [String] = []
-            for index in 0..<collection.cells.count {
-                let cell = collection.cells.element(boundBy: index)
-                guard cell.exists, cell.frame.width > 1 else { continue }
-                let id = cellID(cell)
-                let center = CGPoint(x: cell.frame.midX, y: cell.frame.midY)
-                if bound.contains(center), !lineHit.contains(id) {
-                    rectFillers.append(id)
-                }
-            }
-            guard !rectFillers.isEmpty else {
-                if attempt == 2 { XCTFail("本几何下矩形 filler 与线段命中重合，用例失去判别力") }
-                continue
-            }
-            longPressDrag(in: collection, fromIndex: 0, toIndex: diagEnd,
-                          startOffset: diagOffsetStart, endOffset: diagOffsetEnd)
-            let selected = waitForSelectionCountEqual(app, to: lineHit.count, timeout: 6)
-            guard selected == lineHit.count else {
-                if attempt == 2 {
-                    let got = selectedVisibleIDs(collection).sorted()
-                    XCTFail("斜拖计数必须 = 线段扫掠数 \(lineHit.count)（count=\(selected) got=\(got)；\n"
-                            + "若等于矩形数则实现退回矩形语义）")
-                }
-                continue
-            }
-            let got = selectedVisibleIDs(collection)
-            // XCUI 合成拖拽是带弧度的样条路径（非理想直线），中段可侧摆 ~10-20pt，
-            // 会把与线段贴近的侧邻格翻进/翻出（第 4/9/12 轮实锤 ±1）；契约锁定的是
-            // 「不补全对角矩形」：filler 格严格排除，线段格允许 ±1 弧度噪声（路径走廊）。
-            let corridor = Set(expectedCorridorIDs(in: collection, from: 0, to: diagEnd,
-                                                   startOffset: diagOffsetStart, endOffset: diagOffsetEnd,
-                                                   tolerance: 36))
-            for filler in rectFillers where !corridor.contains(filler) {
-                XCTAssertFalse(got.contains(filler),
-                               "矩形 filler 格 \(filler) 不得被斜拖命中（滑到哪选到哪）")
-            }
-            let strays = got.subtracting(corridor)
-            XCTAssertTrue(strays.isEmpty,
-                          "斜拖命中不得越出路径走廊（strays=\(strays.sorted()) lineHit=\(lineHit)）")
-            XCTAssertLessThanOrEqual(abs(got.count - lineHit.count), 1,
-                                     "弧度噪声至多 ±1 格（got=\(got.count) lineHit=\(lineHit.count)）")
-            XCTAssertEqual(got.contains(cellID(collection.cells.element(boundBy: 0))) &&
-                           got.contains(cellID(collection.cells.element(boundBy: diagEnd))), true,
-                           "对角两端点必须入选")
-            snap(app, "m18-diagonal-no-fill")
-            return
-        }
-    }
-
-    /// ⑤ A→B→C→B 回滑语义（两段式映射，见文件头）：G1 选 {A,B,C} → G2 锚点已选取消模式
-    /// 拖 C→B（C 取消、B 取消、A 保持）→ G3 从 B（未选 → 选择模式）拖回 C（B/C 恢复）。
-    func testTrailReverseCancelsThenRestores() throws {
+    /// ⑤ 同一行内往返抖动幂等（Core RowBandTrailTests 同行抖动镜像，docs/43 T06 边界 6）：
+    /// 行内 A→C 整行入选 → C→A 取消模式整行退出 → A→C 再度整行恢复；行内往返不产生跨行污染。
+    func testRowBandSameRowRoundTripIdempotent() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
             let collection = launchPlainGrid(app)
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-            // 取同一视觉行的前三格（A 左、B 中、C 右）——几何自适应，不依赖分段模型
+            // 取同一视觉行（A 最左 → C 最右）——几何自适应，不依赖分段模型
             let anchorFrame = collection.cells.element(boundBy: 0).frame
             var rowCells: [Int] = []
             for index in 0..<collection.cells.count {
@@ -547,49 +394,47 @@ final class SlideSelectTrailUITests: XCTestCase {
                 }
             }
             guard rowCells.count >= 3 else {
-                if attempt == 2 { XCTFail("首行同 row 可见格不足 3（rowCells=\(rowCells)）") }
+                if attempt == 2 { XCTFail("首行同 row 可见格不足 3（rowCells=\(rowCells.count)）") }
                 continue
             }
-            let (a, b, c) = (rowCells[0], rowCells[1], rowCells[2])
-            let ids = { (index: Int) in self.cellID(collection.cells.element(boundBy: index)) }
-            // G1：长按 A → 拖 C（途经 B）
+            let (a, c) = (rowCells[0], rowCells[rowCells.count - 1])
+            let rowIDs = Set(rowCells.map { cellID(collection.cells.element(boundBy: $0)) })
+            let columns = rowCells.count
+            // G1：行内 A→C 整行入选
             longPressDrag(in: collection, fromIndex: a, toIndex: c)
-            var count = waitForSelectionCountEqual(app, to: 3, timeout: 6)
-            guard count == 3 else {
-                if attempt == 2 { XCTFail("G1 选择 A→C 必须选 3 格（count=\(count)）") }
+            var count = waitForSelectionCountEqual(app, to: columns, timeout: 6)
+            guard count == columns else {
+                if attempt == 2 { XCTFail("G1 行内 A→C 必须整行入选 \(columns)（count=\(count)）") }
                 continue
             }
-            var selected = waitForSelectedSet(collection, equals: Set([ids(a), ids(b), ids(c)]))
-            XCTAssertEqual(selected, Set([ids(a), ids(b), ids(c)]), "G1 后必须恰好 {A,B,C}")
-            // G2：锚点 C 已选 → 取消模式，C→B：C、B 出栈（取消），A 保持
-            longPressDrag(in: collection, fromIndex: c, toIndex: b)
-            count = waitForSelectionCountEqual(app, to: 1, timeout: 6)
-            guard count == 1 else {
-                if attempt == 2 { XCTFail("G2 取消 C→B 后必须剩 1 格（count=\(count)）") }
+            // G2：锚点 C 已选 → 取消模式，C→A 整行退出
+            longPressDrag(in: collection, fromIndex: c, toIndex: a)
+            count = waitForSelectionCountEqual(app, to: 0, timeout: 6)
+            guard count == 0 else {
+                if attempt == 2 {
+                    XCTFail("G2 行内 C→A 取消后必须清零（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
                 continue
             }
-            selected = waitForSelectedSet(collection, equals: Set([ids(a)]))
-            XCTAssertEqual(selected, Set([ids(a)]), "G2 后必须恰 {A}（A 不受出栈影响）")
-            XCTAssertFalse(collection.cells.element(boundBy: c).exists &&
-                           cellIsSelected(collection.cells.element(boundBy: c)), "C 必须已取消")
-            XCTAssertFalse(collection.cells.element(boundBy: b).exists &&
-                           cellIsSelected(collection.cells.element(boundBy: b)), "B 必须已取消")
-            // G3：锚点 B 已取消 → 选择模式，B→C：B、C 恢复
-            longPressDrag(in: collection, fromIndex: b, toIndex: c)
-            count = waitForSelectionCountEqual(app, to: 3, timeout: 6)
-            guard count == 3 else {
-                if attempt == 2 { XCTFail("G3 恢复 B→C 必须回 3 格（count=\(count)）") }
+            // G3：A→C 再度整行恢复（幂等：无跨行污染）
+            longPressDrag(in: collection, fromIndex: a, toIndex: c)
+            count = waitForSelectionCountEqual(app, to: columns, timeout: 6)
+            guard count == columns else {
+                if attempt == 2 { XCTFail("G3 行内 A→C 恢复必须整行 \(columns)（count=\(count)）") }
                 continue
             }
-            selected = waitForSelectedSet(collection, equals: Set([ids(a), ids(b), ids(c)]))
-            XCTAssertEqual(selected, Set([ids(a), ids(b), ids(c)]), "G3 后 {A,B,C} 全部恢复")
-            snap(app, "m18-reverse-cancel-restore")
+            let selected = waitForSelectedSet(collection, equals: rowIDs)
+            XCTAssertEqual(selected, rowIDs,
+                           "恢复后必须恰为整行（got=\(selected.sorted()) expected=\(rowIDs.sorted())）")
+            snap(app, "m19-band-same-row-roundtrip")
             return
         }
     }
 
-    /// ⑥ 手势前已选 X 不受任何出栈影响：X 在路径外，选择/取消两轮轨迹后仍保持。
-    func testPreSelectedCellSurvivesTrail() throws {
+    /// ⑥ 手势前已选 X 不受行带影响（影响范围口径，docs/42 §1.2 预选行）：X 在行带外，
+    /// 行带拖拽选第 2-3 整行后 X 仍保持且 2 个整行精确入选。
+    func testPreSelectedCellSurvivesBandTrail() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
@@ -597,21 +442,20 @@ final class SlideSelectTrailUITests: XCTestCase {
         collection.cells.element(boundBy: 0).tap()
         XCTAssertEqual(waitForSelectionCountEqual(app, to: 1, timeout: 5), 1, "预选 X")
         let xID = cellID(collection.cells.element(boundBy: 0))
-        // 竖拖（从第 2 行同列起拖；终点远离底缘 80pt 余量，同 ③）
-        let column = sameColumnIndices(in: collection, anchorIndex: 0)
-        XCTAssertGreaterThanOrEqual(column.count, 3, "同列可见格不足")
-        let safeBottom = collection.frame.maxY - 80
-        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
-        XCTAssertGreaterThanOrEqual(safeColumn.count, 3, "同列远离底缘的可见格不足")
-        let fromIndex = safeColumn[1]
-        let toIndex = safeColumn[safeColumn.count - 1]
-        longPressDrag(in: collection, fromIndex: fromIndex, toIndex: toIndex)
-        let trailIDs = Set(safeColumn[1...].map { cellID(collection.cells.element(boundBy: $0)) })
-        let expected = trailIDs.union([xID])
+        // 行带拖拽：从第 2 安全行下滑到第 3 安全行 → 第 2、3 整行入选
+        let geo = bandGeometry(in: collection, columnChoice: 0)
+        XCTAssertGreaterThanOrEqual(geo.safeColumn.count, 3, "同列安全行不足")
+        longPressDrag(in: collection, fromIndex: geo.safeColumn[1], toIndex: geo.safeColumn[2])
+        let rowYs = [geo.safeColumn[1], geo.safeColumn[2]].map {
+            collection.cells.element(boundBy: $0).frame.midY
+        }
+        let bandIDs = fullRowIDs(in: collection, rowMidYs: rowYs)
+        let expected = bandIDs.union([xID])
         let selected = waitForSelectedSet(collection, equals: expected)
         XCTAssertEqual(selected, expected,
-                       "路径外预选 X 必须保持 + 轨迹格入选（got=\(selected.sorted()) expected=\(expected.sorted())）")
-        snap(app, "m18-preselected-survives")
+                       "路径外预选 X 必须保持 + 行带整行入选（got=\(selected.sorted()) "
+                       + "expected=\(expected.sorted())）")
+        snap(app, "m19-band-preselected-survives")
     }
 
     /// ⑦ 单指纵向快速滑：contentOffset.y 增量 >200 且计数不变（允许滚动，docs/38 §1.2 #4）。
@@ -709,8 +553,9 @@ final class SlideSelectTrailUITests: XCTestCase {
         snap(app, "m18-sticky-header")
     }
 
-    /// ⑩ 全选后轨迹取消 + 退出多选计数归零（多选栏消失）。
-    func testSelectAllTrailDeselectExactAndExitResets() throws {
+    /// ⑩ 全选后行带取消（整行口径）+ 退出多选计数归零：竖拖取消 2 个整行（2×columns），
+    /// remaining = filtered − 2×columns 精确；多选栏消失。
+    func testSelectAllBandDeselectExactAndExitResets() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         let selectAll = anyElement(app, identifier: "Batch-SelectAll")
@@ -720,16 +565,14 @@ final class SlideSelectTrailUITests: XCTestCase {
         let total = waitForSelectionCount(app, atLeast: 1, timeout: 5)
         XCTAssertEqual(total, filtered,
                        "全选计数必须 = filteredItems.count（total=\(total) filtered=\(filtered)）")
-        // 锚点已选 → 取消模式：竖拖取消一列可见格（终点远离底缘 80pt 余量，同 ③）
-        let column = sameColumnIndices(in: collection, anchorIndex: 0)
-        XCTAssertGreaterThanOrEqual(column.count, 2, "同列可见格不足")
-        let safeBottom = collection.frame.maxY - 80
-        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
-        XCTAssertGreaterThanOrEqual(safeColumn.count, 2, "同列远离底缘的可见格不足")
-        longPressDrag(in: collection, fromIndex: safeColumn[0], toIndex: safeColumn[safeColumn.count - 1])
-        let remaining = waitForSelectionCountEqual(app, to: total - safeColumn.count, timeout: 6)
-        XCTAssertEqual(remaining, total - safeColumn.count,
-                       "取消模式竖拖必须恰好取消 \(safeColumn.count) 格（remaining=\(remaining)）")
+        // 锚点已选 → 取消模式：竖拖取消 2 个整行（行带口径 = 2×columns，非逐格数）
+        let geo = bandGeometry(in: collection, columnChoice: 0)
+        XCTAssertGreaterThanOrEqual(geo.safeColumn.count, 2, "同列安全行不足")
+        longPressDrag(in: collection, fromIndex: geo.safeColumn[0], toIndex: geo.safeColumn[1])
+        let rowsDeselected = 2 * geo.columns
+        let remaining = waitForSelectionCountEqual(app, to: total - rowsDeselected, timeout: 6)
+        XCTAssertEqual(remaining, total - rowsDeselected,
+                       "取消模式行带必须恰好取消 \(rowsDeselected) 格（remaining=\(remaining)）")
         // 退出多选：计数归零、多选栏消失
         let done = anyElement(app, identifier: "Batch-Done")
         XCTAssertTrue(done.waitForExistence(timeout: 5), "缺完成按钮")
@@ -738,7 +581,7 @@ final class SlideSelectTrailUITests: XCTestCase {
         let goneDeadline = Date().addingTimeInterval(2)
         while Date() < goneDeadline && countLabel.exists { usleep(100_000) }
         XCTAssertFalse(countLabel.exists, "退出后多选栏必须消失")
-        snap(app, "m18-selectall-exit")
+        snap(app, "m19-band-selectall-exit")
     }
 
     /// ⑪ 单月 scope 轨迹不泄漏：月份 scope 全选后，相邻月 cell 轨迹不得改计数。
@@ -800,8 +643,9 @@ final class SlideSelectTrailUITests: XCTestCase {
         XCTAssertTrue(cellIsSelected(first), "轻点后徽标与 AX 同步 selected")
     }
 
-    /// ⑬ 无长按横向按压拖（pressing 横向占优）：行内线段扫掠精确命中 + 路径取证。
-    func testHorizontalPressDragTrailSelectsExactRow() throws {
+    /// ⑬ 无长按横向按压拖（pressing 横向占优）：行内横拖锁定整行（行带语义）——
+    /// 行内全部格精确入选 + 路径取证（docs/42 §1.2 横向行）。
+    func testHorizontalPressDragSelectsWholeRow() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
             let collection = launchPlainGrid(app)
@@ -821,11 +665,7 @@ final class SlideSelectTrailUITests: XCTestCase {
             }
             let firstIdx = rowCells[0]
             let lastIdx = rowCells[rowCells.count - 1]
-            let expected = expectedLineHitIDs(in: collection, from: firstIdx, to: lastIdx)
-            guard expected.count == rowCells.count else {
-                if attempt == 2 { XCTFail("同行横线基准应覆盖全行（expected=\(expected)）") }
-                continue
-            }
+            let expected = Set(rowCells.map { cellID(collection.cells.element(boundBy: $0)) })
             let start = collection.cells.element(boundBy: firstIdx)
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
             let end = collection.cells.element(boundBy: lastIdx)
@@ -833,92 +673,44 @@ final class SlideSelectTrailUITests: XCTestCase {
             start.press(forDuration: 0.05, thenDragTo: end)
             let count = waitForSelectionCountEqual(app, to: expected.count, timeout: 6)
             guard count == expected.count else {
-                if attempt == 2 { XCTFail("横向按压拖计数必须 \(expected.count)（count=\(count)）") }
+                if attempt == 2 { XCTFail("横向按压拖必须整行 \(expected.count)（count=\(count)）") }
                 continue
             }
-            let selected = waitForSelectedSet(collection, equals: Set(expected))
-            XCTAssertEqual(selected, Set(expected),
-                           "横向轨迹必须精确 = 行内 assetID 集合（got=\(selected.sorted())）")
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "横向拖动必须精确 = 整行 assetID 集合（got=\(selected.sorted())）")
             let pathCount = readTrailPathCount(app)
             XCTAssertGreaterThanOrEqual(pathCount, expected.count,
                                         "路径栈深度必须 ≥ 行内格数（path=\(pathCount)）")
-            snap(app, "m18-horizontal-press")
+            snap(app, "m19-band-horizontal-row")
             return
         }
     }
 
-    /// ⑭ 横幅取证字段与覆盖层缺席：轨迹后 trail=/path=/delta= 就位、旧覆盖层元素恒不存在。
-    func testTrailDebugFieldsPresentAndOverlayAbsent() throws {
+    /// ⑭ 横幅取证字段与覆盖层缺席：行带字段 band=/exp= 就位、path=/hap=/delta= 保持、
+    /// 旧 ov= 与覆盖层元素恒不存在（docs/43 T08 保留清单）。
+    func testBandDebugFieldsPresentAndOverlayAbsent() throws {
         let app = XCUIApplication()
         let collection = launchSelectableGrid(app)
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
         longPressDrag(in: collection, fromIndex: 0, toIndex: 3)
         _ = waitForSelectionCount(app, atLeast: 1, timeout: 6)
         let raw = bannerRaw(app)
+        XCTAssertNotNil(Self.parseDoubleField(raw, "band"),
+                        "DEBUG 汇总必须暴露 band= 字段（行带命中帧）\n\(raw)")
+        XCTAssertNotNil(Self.parseDoubleField(raw, "exp"),
+                        "DEBUG 汇总必须暴露 exp= 字段（行带展开数）\n\(raw)")
         XCTAssertNotNil(Self.parseDoubleField(raw, "path"),
                         "DEBUG 汇总必须暴露 path= 字段\n\(raw)")
         XCTAssertNotNil(Self.parseDoubleField(raw, "hap"), "DEBUG 汇总必须暴露 hap= 字段")
-        XCTAssertTrue(raw.contains("trail="), "DEBUG 汇总必须暴露 trail= 字段\n\(raw)")
         XCTAssertTrue(raw.contains("delta="), "DEBUG 汇总必须暴露 delta= 字段\n\(raw)")
         XCTAssertFalse(raw.contains("ov="), "旧 ov* 覆盖层取证字段必须已退役\n\(raw)")
         XCTAssertFalse(app.descendants(matching: .any)[retiredOverlayID].exists,
                        "旧覆盖层元素必须不存在")
-        snap(app, "m18-debug-fields")
+        snap(app, "m19-band-debug-fields")
     }
 
-    // MARK: - T01 红基线临时探针（docs/43 T01 步骤 4；T06/T08 转正式断言）
-
-    /// 探针：长按最右列锚点下滑 3 行 → 记录实际计数 vs 行带目标 3×列数。
-    /// 现实现为线段扫掠语义（只选中扫过的列内格），预期 actual < bandTarget——证据供 docs/45 §2。
-    /// 证据采集后 XCTSkip：不计入正式套件判定；T06/T08 改为正式断言 actual == 3×列数。
-    func testProbeRightColumnSlideDownThreeRowsEvidence() throws {
-        let app = XCUIApplication()
-        let collection = launchSelectableGrid(app)
-        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-        // 首行同视觉行格 → 列数；锚点 = 最右列
-        let anchorFrame = collection.cells.element(boundBy: 0).frame
-        var rowCells: [Int] = []
-        for index in 0..<collection.cells.count {
-            let cell = collection.cells.element(boundBy: index)
-            guard cell.exists, cell.frame.width > 1 else { continue }
-            if abs(cell.frame.midY - anchorFrame.midY) < 8 { rowCells.append(index) }
-        }
-        rowCells.sort {
-            collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
-        }
-        let columns = rowCells.count
-        let anchorIndex = rowCells.last ?? 0
-        let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
-        let safeBottom = collection.frame.maxY - 80
-        let safeColumn = column.filter { collection.cells.element(boundBy: $0).frame.maxY < safeBottom }
-        let geometry = "probe-geometry: anchorIndex=\(anchorIndex) columns=\(columns) " +
-            "sameColumnVisible=\(column.count) safeBelow=\(safeColumn.count)"
-        func attach(_ name: String, _ value: String) {
-            let a = XCTAttachment(string: value)
-            a.name = name
-            a.lifetime = .keepAlways
-            add(a)
-        }
-        attach("m19-probe-geometry", geometry)
-        guard columns >= 2, safeColumn.count >= 4 else {
-            snap(app, "m19-probe-right-column-3rows")
-            throw XCTSkip("T01 探针几何不足，未采证：\(geometry)")
-        }
-        let targetIndex = safeColumn[3]   // 锚点下方第 3 行（同列）
-        longPressDrag(in: collection, fromIndex: anchorIndex, toIndex: targetIndex)
-        _ = waitForSelectionCountEqual(app, to: 3 * columns, timeout: 3)
-        let actual = selectionCount(app)
-        let selected = selectedVisibleIDs(collection).sorted()
-        let bandTarget = 3 * columns
-        attach("m19-probe-result",
-               "probe-result: actual=\(actual) bandTarget=\(bandTarget) " +
-               "sweptColumnCells=\(min(4, safeColumn.count)) selected=\(selected)")
-        snap(app, "m19-probe-right-column-3rows")
-        throw XCTSkip("T01 临时探针：证据已采集（actual=\(actual) bandTarget=\(bandTarget)）；" +
-                      "T06/T08 转正断言 actual == 3×columns")
-    }
-
-    // MARK: - M19 行为矩阵（docs/43 T06、docs/42 §1.2 行为表：精确 行数×列数 断言）
+    // MARK: - M19 行为矩阵（docs/43 T06/T08、docs/42 §1.2 行为表：精确 行数×列数 断言）
 
     /// 首行几何：columns、第 choice 列 anchor 及其同列远离底缘 80pt 的行序列（y 升序）。
     private func bandGeometry(in collection: XCUIElement, columnChoice: Int)
@@ -1217,6 +1009,115 @@ final class SlideSelectTrailUITests: XCTestCase {
             XCTAssertEqual(selected, expected,
                            "3 个整行必须全选（got=\(selected.sorted()) expected=\(expected.sorted())）")
             snap(app, "m19-t07-third-screen-band")
+            return
+        }
+    }
+
+    /// M19 跨月：行带跨月段拖拽（起点在月份头上方、终点在其下方，Core RowBandMapTests
+    /// 跨段镜像，docs/43 T06 边界 4）：行带序列跨 section 连续平铺——头两侧的整行都入选，
+    /// 计数 =（上方行数 + 下方行数）×columns 精确。
+    func testBandDragAcrossMonthBoundary() throws {
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchSelectableGrid(app)
+            XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
+            app.swipeUp()
+            app.swipeUp()
+            // 滚动静止等待（T07-② 同款：off= 连续两次采样差 <0.5pt）
+            let settleDeadline = Date().addingTimeInterval(10)
+            var settled = false
+            while Date() < settleDeadline {
+                usleep(600_000)
+                let now = readOffsetY(app) ?? -2
+                usleep(600_000)
+                let again = readOffsetY(app) ?? -3
+                if abs(now - again) < 0.5 { settled = true; break }
+            }
+            guard settled else {
+                if attempt == 2 { XCTFail("滚动未静止（off= 持续变化）") }
+                continue
+            }
+            usleep(500_000)
+            // 视口内找一个「悬停中部」的月份头（非钉住态）：头上下都有可拖拽空间
+            let headers = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'"))
+            let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
+            var boundaryY: CGFloat?
+            for index in 0..<headers.count {
+                let header = headers.element(boundBy: index)
+                guard header.exists else { continue }
+                let frame = header.frame
+                if frame.minY > collection.frame.minY + headerHeight + 100,
+                   frame.maxY < collection.frame.maxY - 200 {
+                    boundaryY = frame.midY
+                    break
+                }
+            }
+            guard let boundary = boundaryY else {
+                if attempt == 2 { XCTFail("视口内无悬停月份头（跨月边界不可用）\n\(hierarchy(app))") }
+                continue
+            }
+            // 锚点 = 头上方最后一个完整可见格（中心避开头）；终点 = 头下方第一个
+            // 完整可见同列格（远离底缘 80pt 安全区）
+            var anchorIndex = -1
+            for index in 0..<collection.cells.count {
+                let cell = collection.cells.element(boundBy: index)
+                guard cell.exists, cell.frame.width > 1 else { continue }
+                let frame = cell.frame
+                if frame.minY > collection.frame.minY + headerHeight + 60, frame.maxY < boundary - 6 {
+                    anchorIndex = index
+                }
+            }
+            guard anchorIndex >= 0 else {
+                if attempt == 2 { XCTFail("月份头上方无完整可见格") }
+                continue
+            }
+            let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
+            let safeBottom = collection.frame.maxY - 80
+            let below = column.filter {
+                let frame = collection.cells.element(boundBy: $0).frame
+                return frame.minY > boundary + headerHeight && frame.maxY < safeBottom
+            }
+            guard let endIndex = below.first else {
+                if attempt == 2 { XCTFail("月份头下方无完整可见同列格") }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: anchorIndex, toIndex: endIndex)
+            // 期望：锚点行..头上最后一行 + 头下首行..终点行（下方同一行带）整行全选
+            let anchorFrame = collection.cells.element(boundBy: anchorIndex).frame
+            let aboveRows = column.filter {
+                let frame = collection.cells.element(boundBy: $0).frame
+                return frame.minY >= anchorFrame.minY - 4 && frame.maxY < boundary - 6
+            }
+            let belowRows = column.filter {
+                let frame = collection.cells.element(boundBy: $0).frame
+                return frame.minY > boundary + headerHeight
+                    && frame.maxY < collection.cells.element(boundBy: endIndex).frame.maxY + 4
+            }
+            let rowYs = (aboveRows + belowRows).map { collection.cells.element(boundBy: $0).frame.midY }
+            let expected = fullRowIDs(in: collection, rowMidYs: rowYs)
+            let count = waitForSelectionCountEqual(app, to: expected.count, timeout: 6)
+            guard count == expected.count else {
+                if attempt == 2 {
+                    XCTFail("跨月行带计数必须 = \(expected.count)（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted()) "
+                            + "expected=\(expected.sorted())）")
+                }
+                continue
+            }
+            let selected = waitForSelectedSet(collection, equals: expected)
+            XCTAssertEqual(selected, expected,
+                           "跨月行带必须精确 = 头两侧整行（got=\(selected.sorted()) "
+                           + "expected=\(expected.sorted())）")
+            let aboveIDs = Set(aboveRows.compactMap {
+                cellID(collection.cells.element(boundBy: $0))
+            })
+            let belowIDs = Set(belowRows.compactMap {
+                cellID(collection.cells.element(boundBy: $0))
+            })
+            XCTAssertTrue(!selected.isDisjoint(with: aboveIDs) && !selected.isDisjoint(with: belowIDs),
+                          "跨月行带必须两侧都有命中（above=\(aboveIDs.count) below=\(belowIDs.count)）")
+            snap(app, "m19-band-cross-month")
             return
         }
     }

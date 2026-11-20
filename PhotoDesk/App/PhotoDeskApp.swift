@@ -20,7 +20,7 @@ struct PhotoDeskApp: App {
             UIView.setAnimationsEnabled(false)
         }
         // M17 T09 全量轮实锤（run 43662103747）：GridPinchUITests 捏合持久化 grid.columns
-        // 且按字母序先于按 3 列几何校准的选择类套件（SlideSelectTrail/PageRegression/Stability）执行，
+        // 且按字母序先于按 3 列几何校准的选择类套件（RowBandSelect/PageRegression/Stability）执行，
         // 列数污染令其 14 条崩。凡带种子 flag 的启动（几何校准套件；GridPinch 不带）强制回 3 列。
         if UITestHooks.enabled("-uiTestingSeedDatedPhotos") {
             UserDefaults.standard.set(3, forKey: "grid.columns")
