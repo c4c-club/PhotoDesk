@@ -1192,13 +1192,15 @@ final class SlideSelectTrailUITests: XCTestCase {
                 let frame = collection.cells.element(boundBy: $0).frame
                 return frame.minY >= anchorFrame.maxY - 4 && frame.maxY < safeBottom
             }
-            guard columns >= 2, below.count >= 3 else {
+            // 3 行带 = 锚点行 + 下方 2 行；safeBottom 80pt 余量占视口较大比例（run 44764473663
+            // 实锤 belowRows=2），故只要求下方 2 行完整可见
+            guard columns >= 2, below.count >= 2 else {
                 if attempt == 2 {
                     XCTFail("几何不足 columns=\(columns) belowRows=\(below.count)")
                 }
                 continue
             }
-            longPressDrag(in: collection, fromIndex: anchorVisible, toIndex: below[2])
+            longPressDrag(in: collection, fromIndex: anchorVisible, toIndex: below[1])
             let bandTarget = 3 * columns
             let count = waitForSelectionCountEqual(app, to: bandTarget, timeout: 6)
             guard count == bandTarget else {
