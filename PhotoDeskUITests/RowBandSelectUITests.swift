@@ -1162,14 +1162,18 @@ final class RowBandSelectUITests: XCTestCase {
                 }
                 continue
             }
-            // 锚点 = 头上方最后一个完整可见格（中心避开头）；终点 = 头下方第一个
-            // 完整可见同列格（远离底缘 80pt 安全区）
+            // 锚点 = 头上方第一个完整可见格；终点 = 头下方第一个完整可见同列格
+            // （远离底缘 80pt 安全区）。run 44858932161 实锤：取「最后一个」会命中
+            // 最右列，而边界下方首行可能是残行（旧月仅 2 张 → 无最右列格），拖拽
+            // 终点落到下一行 → 行带多跨一行。取第一个（第 0 列，任何行都存在）保证
+            // 锚点列在头下首行必有同列格。
             var anchorIndex = -1
             for index in 0..<collection.cells.count {
                 let cell = collection.cells.element(boundBy: index)
                 guard cell.exists, cell.frame.width > 1 else { continue }
                 let frame = cell.frame
-                if frame.minY > collection.frame.minY + headerHeight + 60, frame.maxY < boundary - 6 {
+                if anchorIndex == -1,
+                   frame.minY > collection.frame.minY + headerHeight + 60, frame.maxY < boundary - 6 {
                     anchorIndex = index
                 }
             }
