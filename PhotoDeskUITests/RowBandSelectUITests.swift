@@ -1183,9 +1183,12 @@ final class RowBandSelectUITests: XCTestCase {
             }
             let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
             let safeBottom = collection.frame.maxY - 80
+            // boundary = 头 midY；首行 minY = header.maxY + 间距 ≈ boundary +
+            // headerHeight/2 + 2 —— 用 +headerHeight 会跳过头下首行（run 44858932161/
+            // 44871405304 实锤多跨一行 7≠4），改用 +headerHeight/2 = header.maxY。
             let below = column.filter {
                 let frame = collection.cells.element(boundBy: $0).frame
-                return frame.minY > boundary + headerHeight && frame.maxY < safeBottom
+                return frame.minY > boundary + headerHeight / 2 && frame.maxY < safeBottom
             }
             guard let endIndex = below.first else {
                 if attempt == 2 { XCTFail("月份头下方无完整可见同列格") }
@@ -1200,7 +1203,7 @@ final class RowBandSelectUITests: XCTestCase {
             }
             let belowRows = column.filter {
                 let frame = collection.cells.element(boundBy: $0).frame
-                return frame.minY > boundary + headerHeight
+                return frame.minY > boundary + headerHeight / 2
                     && frame.maxY < collection.cells.element(boundBy: endIndex).frame.maxY + 4
             }
             let rowYs = (aboveRows + belowRows).map { collection.cells.element(boundBy: $0).frame.midY }
