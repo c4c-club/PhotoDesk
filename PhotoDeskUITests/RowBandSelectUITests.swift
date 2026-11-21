@@ -1022,6 +1022,30 @@ final class RowBandSelectUITests: XCTestCase {
         }
     }
 
+    /// 读取钉住态月份头（视窗顶部 80-170pt 内的 MonthHeader-Menu-*）的月份后缀，
+    /// 用于检测 swipeUp 是否越过月界（钉住头换月）。
+    private static func pinnedMonthSuffix(headers: XCUIElementQuery) -> String? {
+        for index in 0..<headers.count {
+            let header = headers.element(boundBy: index)
+            guard header.exists else { continue }
+            let minY = header.frame.minY
+            if minY > 80, minY < 170 {
+                return header.identifier.replacingOccurrences(of: "MonthHeader-Menu-", with: "")
+            }
+        }
+        return nil
+    }
+
+    /// 内容坐标拖拽滚动（plain 网格；dy>0 内容下移=向上滚，单位 pt，短按不触发长按选择）。
+    private static func dragContent(_ app: XCUIApplication, dy: CGFloat) {
+        let appFrame = app.frame
+        let startDy = dy >= 0 ? 0.30 : 0.65
+        let endDy = startDy + dy / appFrame.height
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startDy))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endDy))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
     /// M19 跨月：行带跨月段拖拽（起点在月份头上方、终点在其下方，Core RowBandMapTests
     /// 跨段镜像，docs/43 T06 边界 4）：行带序列跨 section 连续平铺——头两侧的整行都入选，
     /// 计数 =（上方行数 + 下方行数）×columns 精确。
@@ -1049,39 +1073,87 @@ final class RowBandSelectUITests: XCTestCase {
                 continue
             }
             usleep(500_000)
-            // 视口内找一个「悬停中部」的月份头（非钉住态）：头上下都有可拖拽空间。
-            // 全量 run 44783255716 实锤两次 swipeUp 后中部可能无头（落点全贴顶/贴底）——
-            // 最多追加 2 次 swipeUp 并逐次静止等待后再扫。
+            // 视口内找一个「悬停中部」的月份头（非钉住态）。全量 run 44827223992 实锤：
+            // 种子把 167 张集中在当前月（~56 行 ≈ 7600pt），固定 2-3 次 swipeUp 的落点
+            // 永远在月内——改为逐次 swipeUp + 每步扫描；swipeUp 步距 ~730pt 可跳过 660pt
+            // 视窗，用钉住头 identifier 换月检测越过边界，越过后 120pt 小步回拖至边界头
+            // 重新入窗。
             let headers = app.buttons
                 .matching(NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'"))
             let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
+            let initialPinned = Self.pinnedMonthSuffix(headers: headers)
             var boundaryY: CGFloat?
-            for _ in 0..<3 {
+            var boundaryMinY: CGFloat = 0
+            let scanWindow: (XCUIElement) -> Bool = { header in
+                let frame = header.frame
+                return frame.minY > collection.frame.minY + headerHeight + 60
+                    && frame.maxY < collection.frame.maxY - 120
+            }
+            for _ in 0..<14 {
                 for index in 0..<headers.count {
                     let header = headers.element(boundBy: index)
-                    guard header.exists else { continue }
-                    let frame = header.frame
-                    if frame.minY > collection.frame.minY + headerHeight + 60,
-                       frame.maxY < collection.frame.maxY - 120 {
-                        boundaryY = frame.midY
-                        break
-                    }
+                    guard header.exists, scanWindow(header) else { continue }
+                    boundaryY = header.frame.midY
+                    boundaryMinY = header.frame.minY
+                    break
                 }
                 if boundaryY != nil { break }
-                app.swipeUp()
-                let extraDeadline = Date().addingTimeInterval(6)
-                var extraSettled = false
-                while Date() < extraDeadline {
-                    usleep(600_000)
-                    let now = readOffsetY(app) ?? -2
-                    usleep(600_000)
-                    let again = readOffsetY(app) ?? -3
-                    if abs(now - again) < 0.5 { extraSettled = true; break }
+                if let pinned = Self.pinnedMonthSuffix(headers: headers), pinned != initialPinned {
+                    // 已越过边界（钉住头换月）——小步回拖让边界头重新进入视窗
+                    for _ in 0..<5 {
+                        Self.dragContent(app, dy: 120)
+                        usleep(800_000)
+                        for index in 0..<headers.count {
+                            let header = headers.element(boundBy: index)
+                            guard header.exists, scanWindow(header) else { continue }
+                            boundaryY = header.frame.midY
+                            boundaryMinY = header.frame.minY
+                            break
+                        }
+                        if boundaryY != nil { break }
+                    }
+                    break
                 }
-                guard extraSettled else { break }
+                app.swipeUp()
+                usleep(900_000)
             }
-            guard let boundary = boundaryY else {
+            guard let foundBoundary = boundaryY else {
                 if attempt == 2 { XCTFail("视口内无悬停月份头（跨月边界不可用）\n\(hierarchy(app))") }
+                continue
+            }
+            var boundary = foundBoundary
+            // 精调：边界头 minY 落在 (350.7, 434.7) 才同时满足锚点行/终点行约束
+            // （行 pitch 136pt，run 44827223992 实锤）——坐标拖拽挪到目标带后整帧复测。
+            if boundaryMinY < 351 {
+                Self.dragContent(app, dy: 390 - boundaryMinY)
+            } else if boundaryMinY > 434 {
+                Self.dragContent(app, dy: -(boundaryMinY - 390))
+            }
+            let adjustDeadline = Date().addingTimeInterval(8)
+            var adjustedSettled = false
+            while Date() < adjustDeadline {
+                usleep(600_000)
+                let now = readOffsetY(app) ?? -2
+                usleep(600_000)
+                let again = readOffsetY(app) ?? -3
+                if abs(now - again) < 0.5 { adjustedSettled = true; break }
+            }
+            guard adjustedSettled else {
+                if attempt == 2 { XCTFail("边界精调后滚动未静止") }
+                continue
+            }
+            usleep(400_000)
+            boundary = 0
+            var adjusted = false
+            for index in 0..<headers.count {
+                let header = headers.element(boundBy: index)
+                guard header.exists, scanWindow(header) else { continue }
+                boundary = header.frame.midY
+                adjusted = header.frame.minY > 350 && header.frame.minY < 435
+                break
+            }
+            guard adjusted, boundary > 0 else {
+                if attempt == 2 { XCTFail("边界头精调失败（minY 未落入锚点/终点可行带 350-435pt）") }
                 continue
             }
             // 锚点 = 头上方最后一个完整可见格（中心避开头）；终点 = 头下方第一个
