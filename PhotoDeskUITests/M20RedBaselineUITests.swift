@@ -5,9 +5,9 @@
 // ③ denied 页必须有「去系统设置」、limited 0 张必须有「管理可见照片」、authorized 空库必须有
 //    「导入照片」（Permission-Open-Settings / Permission-Manage-Limited / Library-Import，T03 才实现）。
 // 编译口径：只引用现有公开 AX ID 与 launchArguments（Selection-Count / Library-DebugSummary /
-// 「允许访问照片」与 RowBandSelectUITests 同款基建）。T03 落地 -uiTestingPermissionState /
-// -uiTestingEmptyLibrary 注入后，网格用例经 authorized 直达网格（避免系统弹窗派发时机
-// 竞态——run 44950888882 实锤：冷启动 intro 晚于 10s 窗口出现导致授权点按漏发）。
+// 「允许访问照片」与 RowBandSelectUITests 同款基建）。网格用例不注入授权态：xcodebuild
+// 重装清 TCC（run 44957483731 实锤），真实授权只能走 intro 点按 + 中断监视器；
+// -uiTestingPermissionState 注入仅授权探针用例使用（T03 落地）。
 // 失败信息一律带 expected / actual / DEBUG 取证 / AX hierarchy 摘要，并落截图与完整层级附件（T01 §5）。
 
 import XCTest
@@ -47,13 +47,18 @@ final class M20RedBaselineUITests: XCTestCase {
         installPermissionMonitor()
         app.launchArguments += Self.baseLaunchArguments + extra
         app.launch()
+        // 网格用例的真实授权路径（run 44950888882/44954610723/44957483731 三轮实锤）：
+        // xcodebuild 重装清 TCC → 首启必是 notDetermined → intro 必现；注入 authorized
+        // 只改 App 内部态，真实 TCC notDetermined 下 PHAsset 枚举恒为 0 → .empty 死路。
+        // 冷启动 intro 可晚于 13s 出现（run 44950888882），等待窗放宽到 25s；授权后
+        // seeder 播种 167 张才进 .ready，网格等待放宽到 45s。
         let intro = app.buttons["允许访问照片"]
-        if intro.waitForExistence(timeout: 10) {
+        if intro.waitForExistence(timeout: 25) {
             intro.tap()
-            app.tap()
+            app.tap()   // 触发中断监视器派发；弹窗稍后出现，网格轮询期间监视器自动点 Allow
         }
         let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchySummary(app))")
+        XCTAssertTrue(collection.waitForExistence(timeout: 45), "照片网格未出现\n\(hierarchySummary(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)  // 布局/inset 稳定：静止按压期间内容位移 >8pt 会使长按失效
         return collection
@@ -149,7 +154,7 @@ final class M20RedBaselineUITests: XCTestCase {
 
     func testLongPressAnchorSelectsExactlyOneCell() throws {
         let app = XCUIApplication()
-        let collection = launchGrid(app, extra: ["-uiTestingPermissionState", "authorized"])
+        let collection = launchGrid(app)
         let anchor = collection.cells.element(boundBy: 0)
         XCTAssertTrue(anchor.waitForExistence(timeout: 10), "网格无 cell\n\(hierarchySummary(app))")
         anchor.press(forDuration: 0.8)
@@ -174,7 +179,7 @@ final class M20RedBaselineUITests: XCTestCase {
 
     func testSelectButtonDirectHorizontalDragStartsTrail() throws {
         let app = XCUIApplication()
-        let collection = launchGrid(app, extra: ["-uiTestingSelectMode", "-uiTestingPermissionState", "authorized"])
+        let collection = launchGrid(app, extra: ["-uiTestingSelectMode"])
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10),
                       "网格无 cell\n\(hierarchySummary(app))")
         XCTAssertTrue(collection.cells.count >= 4,

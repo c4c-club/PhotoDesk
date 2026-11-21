@@ -152,15 +152,13 @@ jobs:
           # 进程拉起后零输出 9 分钟判死；fresh springboard + 清缓存可显著降低复发）
           reset_sim() {
             xcrun simctl shutdown all 2>/dev/null || true
+            # 重装 App 会清 TCC 授权（run 44957483731 实锤：安装后 grant 也会被 xcodebuild
+            # 重装清回 notDetermined——RowBandSelect 的 intro 重新出现即证据），工作流侧
+            # grant 全部是装饰性兜底；真实授权路径 = 测试内 intro 点按 + 中断监视器点 Allow
+            xcrun simctl privacy $SIM_UDID grant photos com.example.PhotoDesk 2>/dev/null || true
             sleep 3
             xcrun simctl boot $SIM_UDID 2>/dev/null || true
             xcrun simctl bootstatus $SIM_UDID -b
-            # TCC 授权只能对已安装 bundle 生效（run 44950888882 实锤：安装前 grant 静默失败
-            # → 首启 notDetermined，intro/系统弹窗派发竞态令照片网格判定超时；xcodebuild
-            # 重装不清 TCC——T03 run 44942323769 perf 步骤同型时序全绿）。先装 Build 步骤
-            # 产物再授权，首启即 authorized：日期种子/照片枚举/网格出现全部确定。
-            xcrun simctl install $SIM_UDID build/DerivedData/Build/Products/Debug-iphonesimulator/PhotoDesk.app
-            xcrun simctl privacy $SIM_UDID grant photos com.example.PhotoDesk || true
           }
           DEST="id=$SIM_UDID"
           echo "SIM_UDID=$SIM_UDID"
