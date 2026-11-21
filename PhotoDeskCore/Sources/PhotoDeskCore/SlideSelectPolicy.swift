@@ -5,7 +5,30 @@
 
 import Foundation
 
+/// 混合命中模式（M20 T04，docs/49 T04 §2.2）：同带/横向占优按 cell 扫掠，纵向跨带占优按整行展开。
+public enum SlideSelectHitMode: Equatable, Sendable {
+    case cells
+    case rows
+}
+
 public enum SlideSelectPolicy {
+    /// 线段命中模式判定（docs/49 T04 §2.2）：fromBand == toBand → .cells；
+    /// |dy| ≥ |dx| × verticalDominanceRatio → .rows；其余 → .cells；
+    /// 非有限 dx/dy/ratio 或非正 ratio → .cells（不崩溃）。
+    public static func hitMode(
+        dx: Double,
+        dy: Double,
+        fromBand: Int,
+        toBand: Int,
+        verticalDominanceRatio: Double
+    ) -> SlideSelectHitMode {
+        guard dx.isFinite, dy.isFinite,
+              verticalDominanceRatio.isFinite, verticalDominanceRatio > 0 else { return .cells }
+        guard fromBand != toBand else { return .cells }
+        if abs(dy) >= abs(dx) * verticalDominanceRatio { return .rows }
+        return .cells
+    }
+
     /// 顶部缓冲区返回负速度，底部缓冲区返回正速度；缓冲区外返回 0。
     /// 速度按「距边距离 / buffer」线性映射 minStep...maxStep，非法输入返回 0。
     public static func edgeVelocity(

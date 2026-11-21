@@ -306,4 +306,58 @@ final class GridHitTester {
         #endif
         return expanded.map { IndexPath(item: $0.item, section: $0.section) }
     }
+
+    // MARK: - M20 T04：混合命中 trailHitTest（docs/49 T04 §3.1）——
+    // 先判模式再选路径：任一带 nil（空网格/全遮挡/空隙中部）→ 降级 cell 扫掠，不得回退整行；
+    // 同带或横向占优 → hitTestLine（滑到哪选到哪，零长度 = 起手格）；纵向跨带占优向下 →
+    // RowBandMap 整行展开（行主序、列升序，不过滤 trail.path——控制器职责）；向上 → 只回卷
+    // 终带最后一个 item + hitTestLine fallback（不返回整行）。生产接线 T05 才切换，本卡不动
+    // rowBandHitProvider。
+
+    /// 两点（内容坐标）混合命中（docs/49 T04 §3.1）。clipTop 由调用方按视口粘性头语义传入，
+    /// 与 rowBandHitTest 内部计算口径一致（视口顶所在段钉住头底边）。
+    func trailHitTest(from: CGPoint, to: CGPoint, clipTop: CGFloat) -> GridTrailHit {
+        guard from.x.isFinite, from.y.isFinite, to.x.isFinite, to.y.isFinite else {
+            return GridTrailHit(mode: .cells, indexPaths: [], rewindIndexPath: nil)
+        }
+        let mode: SlideSelectHitMode
+        let paths: [IndexPath]
+        var rewind: IndexPath?
+        if let map = ensureRowBandMap(),
+           let fromBand = map.bandIndex(atContentY: Double(from.y), clipTop: Double(clipTop)),
+           let toBand = map.bandIndex(atContentY: Double(to.y), clipTop: Double(clipTop)) {
+            mode = SlideSelectPolicy.hitMode(dx: Double(to.x - from.x),
+                                             dy: Double(to.y - from.y),
+                                             fromBand: fromBand,
+                                             toBand: toBand,
+                                             verticalDominanceRatio: SlideSelectConfig.rowBandVerticalRatio)
+            switch mode {
+            case .cells:
+                paths = hitTestLine(from: from, to: to)
+            case .rows:
+                if toBand > fromBand {
+                    paths = map.items(forBandIndices: map.bandSequence(from: fromBand, to: toBand))
+                        .map { IndexPath(item: $0.item, section: $0.section) }
+                } else {
+                    let band = map.band(at: toBand)
+                    if let last = band.items.last {
+                        rewind = IndexPath(item: last, section: band.section)
+                    }
+                    paths = hitTestLine(from: from, to: to)
+                }
+            }
+        } else {
+            mode = .cells
+            paths = hitTestLine(from: from, to: to)
+        }
+        return GridTrailHit(mode: mode, indexPaths: paths, rewindIndexPath: rewind)
+    }
+}
+
+/// 混合命中结果值类型（M20 T04，docs/49 T04 §3.1）：模式 + 有序命中 + 向上回卷锚
+/// （rewindIndexPath 仅向上整行模式非 nil = 终带最后一个 item）。
+struct GridTrailHit {
+    let mode: SlideSelectHitMode
+    let indexPaths: [IndexPath]
+    let rewindIndexPath: IndexPath?
 }

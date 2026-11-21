@@ -715,4 +715,245 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertLessThanOrEqual(tester.lastQueryCount, 60,
                                  "缓存已热帧查询数 \(tester.lastQueryCount) 必须 ≤ 60")
     }
+
+    // MARK: - M20 T04：trailHitTest 混合命中（docs/49 T04 §3.2）——
+    // fixture：生产布局工厂 4 列 + 段 item 数 [12, 10]（段 1 末行残 2 格，破坏「每段每行满 4」假设），
+    // 全部 offset 0、clipTop = 头高（段 0 被钉住 → 视口顶钳制生效但无 cell 被完全遮挡）。
+    // 独立口径：整行期望由全部 item attributes 按 (minY, minX) 暴力重算（不经 trailHitTest 自证）；
+    // cells 期望复用既有 bruteForceLineHit（Liang-Barsky 独立实现）。
+
+    /// 段 item 数可配的数据源（dataSource 强持有：弱引用陷阱 M17 T04 实锤）。
+    private final class TrailGridDataSource: NSObject, UICollectionViewDataSource {
+        let itemsPerSection: [Int]
+
+        init(itemsPerSection: [Int]) {
+            self.itemsPerSection = itemsPerSection
+            super.init()
+        }
+
+        func numberOfSections(in collectionView: UICollectionView) -> Int { itemsPerSection.count }
+
+        func collectionView(_ collectionView: UICollectionView,
+                            numberOfItemsInSection section: Int) -> Int {
+            itemsPerSection[section]
+        }
+
+        func collectionView(_ collectionView: UICollectionView,
+                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+            collectionView.dequeueReusableCell(withReuseIdentifier: "trail-cell", for: indexPath)
+        }
+
+        func collectionView(_ collectionView: UICollectionView,
+                            viewForSupplementaryElementOfKind kind: String,
+                            at indexPath: IndexPath) -> UICollectionReusableView {
+            collectionView.dequeueReusableSupplementaryView(ofKind: kind,
+                                                            withReuseIdentifier: "trail-header",
+                                                            for: indexPath)
+        }
+    }
+
+    /// 4 列 + 段 item 数 [12, 10] 的 fixture（390×844，offset 0 预热）。
+    private func makeTrailGrid() -> (collectionView: UICollectionView,
+                                     layout: UICollectionViewCompositionalLayout,
+                                     dataSource: TrailGridDataSource) {
+        let layout = LibraryGridLayout.make(columns: 4)
+        let cv = UICollectionView(frame: CGRect(x: 0, y: 0, width: 390, height: 844),
+                                  collectionViewLayout: layout)
+        let dataSource = TrailGridDataSource(itemsPerSection: [12, 10])
+        cv.dataSource = dataSource
+        cv.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "trail-cell")
+        cv.register(UICollectionReusableView.self,
+                    forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+                    withReuseIdentifier: "trail-header")
+        return (cv, layout, dataSource)
+    }
+
+    /// 独立口径（整行展开期望）：anchor/target 各取真实 attributes，取全部 item 中
+    /// frame.minY ∈ [min(两行 minY)−0.5, max(两行 minY)+0.5] 的 item，按 (minY, minX) 行主序。
+    /// 段按内容 y 堆叠，全局排序即行主序；期望不经命中器。
+    private func bruteForceRowSlice(cv: UICollectionView,
+                                    layout: UICollectionViewLayout,
+                                    anchor: IndexPath,
+                                    target: IndexPath) -> [IndexPath] {
+        guard let fa = layout.layoutAttributesForItem(at: anchor)?.frame,
+              let fb = layout.layoutAttributesForItem(at: target)?.frame else { return [] }
+        let lo = min(fa.minY, fb.minY) - 0.5
+        let hi = max(fa.minY, fb.minY) + 0.5
+        var rows: [(minY: CGFloat, minX: CGFloat, path: IndexPath)] = []
+        for section in 0..<cv.numberOfSections {
+            for item in 0..<cv.numberOfItems(inSection: section) {
+                let path = IndexPath(item: item, section: section)
+                guard let f = layout.layoutAttributesForItem(at: path)?.frame else { continue }
+                if f.minY >= lo, f.minY <= hi {
+                    rows.append((f.minY, f.minX, path))
+                }
+            }
+        }
+        return rows.sorted { left, right in
+            if left.minY != right.minY { return left.minY < right.minY }
+            if left.minX != right.minX { return left.minX < right.minX }
+            return left.path < right.path
+        }.map { $0.path }
+    }
+
+    /// 独立口径（向上回卷锚期望）：target 所在行（同段、minY 差 ≤0.5）中 minX 最大的 item。
+    private func bruteForceRowLastItem(cv: UICollectionView,
+                                       layout: UICollectionViewLayout,
+                                       target: IndexPath) -> IndexPath? {
+        guard let ft = layout.layoutAttributesForItem(at: target)?.frame else { return nil }
+        var bestPath: IndexPath?
+        var bestX = -CGFloat.greatestFiniteMagnitude
+        for item in 0..<cv.numberOfItems(inSection: target.section) {
+            let path = IndexPath(item: item, section: target.section)
+            guard let f = layout.layoutAttributesForItem(at: path)?.frame else { continue }
+            if abs(f.minY - ft.minY) <= 0.5, f.minX > bestX {
+                bestX = f.minX
+                bestPath = path
+            }
+        }
+        return bestPath
+    }
+
+    private func trailCenter(_ layout: UICollectionViewLayout,
+                             _ path: IndexPath) throws -> CGPoint {
+        CGPoint(x: try XCTUnwrap(layout.layoutAttributesForItem(at: path)).frame.midX,
+                y: try XCTUnwrap(layout.layoutAttributesForItem(at: path)).frame.midY)
+    }
+
+    /// 零长度起手 → 恰好 1 个 cell（不再返回整行，docs/49 T04 验收第 3 条）。
+    func testTrailHitTestZeroLengthHitsAnchorCellOnly() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let center = try trailCenter(layout, IndexPath(item: 5, section: 0))   // row2col2
+        let hit = tester.trailHitTest(from: center, to: center,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .cells, "零长度必须按 cell 模式")
+        XCTAssertEqual(hit.indexPaths, [IndexPath(item: 5, section: 0)], "零长度只命中起手格")
+        XCTAssertNil(hit.rewindIndexPath, "cells 模式无回卷锚")
+    }
+
+    /// (1,1)→(1,4)：同行横向 → 4 个 cell，扫掠顺序 1..4。
+    func testTrailHitTestHorizontalReturnsCellsInSweepOrder() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 0, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .cells, "同带横向必须按 cell 模式")
+        XCTAssertEqual(hit.indexPaths, (0...3).map { IndexPath(item: $0, section: 0) },
+                       "同行横向 → 4 格顺序 1..4")
+        XCTAssertNil(hit.rewindIndexPath)
+    }
+
+    /// (3,4)→(3,2)：同行向左 → 倒序 3,4、3,3、3,2（扫掠语义）。
+    func testTrailHitTestLeftwardReturnsReversedSweepOrder() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 11, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 9, section: 0))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .cells)
+        XCTAssertEqual(hit.indexPaths, [11, 10, 9].map { IndexPath(item: $0, section: 0) },
+                       "向左线段必须倒序扫掠 3,4、3,3、3,2")
+    }
+
+    /// (1,4)→(2,4)：跨带纵向向下 → 8 个整行（行主序），期望暴力重算。
+    func testTrailHitTestDownOneRowExpandsFullRows() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 7, section: 0))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .rows, "跨带纵向向下必须整行模式")
+        XCTAssertEqual(hit.indexPaths,
+                       bruteForceRowSlice(cv: cv, layout: layout,
+                                          anchor: IndexPath(item: 3, section: 0),
+                                          target: IndexPath(item: 7, section: 0)),
+                       "下滑 1 行必须展开两整行（行主序，暴力重算口径）")
+        XCTAssertEqual(hit.indexPaths.count, 8, "4 列 × 2 行 = 8 个")
+        XCTAssertNil(hit.rewindIndexPath)
+    }
+
+    /// (1,4)→(3,4)：下滑两行 → 12 个（含第 1 行起算的 3 整行）。
+    func testTrailHitTestDownTwoRowsExpandsTwelve() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 11, section: 0))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .rows)
+        XCTAssertEqual(hit.indexPaths.count, 12, "4 列 × 3 行 = 12 个")
+        XCTAssertEqual(hit.indexPaths,
+                       bruteForceRowSlice(cv: cv, layout: layout,
+                                          anchor: IndexPath(item: 3, section: 0),
+                                          target: IndexPath(item: 11, section: 0)),
+                       "下滑 2 行必须展开 3 整行（行主序）")
+    }
+
+    /// (3,4)→(1,4)：向上 → 回卷终带（第 1 行）最后一个 item，线段扫掠 fallback，不返回整行。
+    func testTrailHitTestUpRewindsToTargetRowLastItem() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 11, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .rows, "向上跨带也是整行模式（带回卷）")
+        XCTAssertEqual(hit.rewindIndexPath,
+                       bruteForceRowLastItem(cv: cv, layout: layout,
+                                             target: IndexPath(item: 3, section: 0)),
+                       "回卷锚 = 终带最后一个 item（暴力重算口径）")
+        XCTAssertEqual(hit.indexPaths,
+                       bruteForceLineHit(cv: cv, layout: layout, from: from, to: to),
+                       "向上路径 = 线段扫掠 fallback（独立 Liang-Barsky 口径）")
+        XCTAssertEqual(hit.indexPaths.count, 3, "竖向回滑只扫 3 格，不展开整行")
+    }
+
+    /// 对角线横向占优（跨带）→ .cells，命中等于暴力基准。
+    func testTrailHitTestDiagonalHorizontalDominantUsesCellSweep() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 0, section: 0))
+        let toRow2 = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 0))).frame
+        let to = CGPoint(x: from.x + 300, y: toRow2.midY)   // 跨带（row1→row2）但 dx=300 横向占优
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .cells, "横向占优跨带必须降级 cell 扫掠")
+        XCTAssertEqual(hit.indexPaths,
+                       bruteForceLineHit(cv: cv, layout: layout, from: from, to: to),
+                       "cells 路径必须等于独立暴力基准")
+        XCTAssertNil(hit.rewindIndexPath)
+    }
+
+    /// 跨段下滑：bandSequence 覆盖段 0 剩余行 + 段 1 全部行（末行残 2 格按真实 item），
+    /// 不假设每段 4 列；期望暴力重算。
+    func testTrailHitTestCrossSectionExpandsBandSequenceWithoutColumnAssumption() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let from = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let to = try trailCenter(layout, IndexPath(item: 9, section: 1))
+        let hit = tester.trailHitTest(from: from, to: to,
+                                      clipTop: CGFloat(DSSpacing.monthHeaderHeight))
+        XCTAssertEqual(hit.mode, .rows)
+        let expected = bruteForceRowSlice(cv: cv, layout: layout,
+                                          anchor: IndexPath(item: 3, section: 0),
+                                          target: IndexPath(item: 9, section: 1))
+        XCTAssertEqual(hit.indexPaths, expected, "跨段整行展开必须等于暴力重算口径")
+        XCTAssertEqual(expected.count, 22, "段 0 三整行(12) + 段 1 全部(10，末行 2 格) = 22")
+        XCTAssertEqual(expected.last, IndexPath(item: 9, section: 1),
+                       "末带残行必须按真实 item 收尾（不补满 4 列）")
+        XCTAssertNil(hit.rewindIndexPath)
+    }
 }

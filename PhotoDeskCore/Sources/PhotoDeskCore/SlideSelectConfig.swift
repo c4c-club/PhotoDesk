@@ -17,4 +17,6 @@ public enum SlideSelectConfig {
     public static let rowBandSnapTolerance: Double = 12
     /// 单帧行带展开上限（0 = 不限）：自动滚动位移已由 minStep/maxStep 钳制，T07 实测异常才启用（M19 docs/42 §10.2）
     public static let rowBandMaxExpandPerFrame: Int = 0
+    /// 纵向跨带判定系数（M20 T04）：|dy| ≥ |dx| × 该系数 → 整行命中（混合命中模式，测试可注入）
+    public static let rowBandVerticalRatio: Double = 1.2
 }
