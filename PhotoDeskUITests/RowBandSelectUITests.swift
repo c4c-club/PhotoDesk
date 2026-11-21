@@ -1036,29 +1036,55 @@ final class RowBandSelectUITests: XCTestCase {
         return nil
     }
 
-    /// 内容坐标拖拽滚动（plain 网格；dy>0 内容下移=向上滚，单位 pt，短按不触发长按
-    /// 选择；velocity 30 低速 + 释放前保持 0.4s 抑制惯性，位移 ≈ dy）。
-    private static func dragContent(_ app: XCUIApplication, dy: CGFloat) {
-        let appFrame = app.frame
-        let startDy = dy >= 0 ? 0.30 : 0.65
-        let endDy = startDy + dy / appFrame.height
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startDy))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endDy))
-        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: 30, thenHoldForDuration: 0.4)
+    /// 月份跳转启动（PositionRestoreUITests 同款两段式：面板渲染轮复位 → 跳转轮直达
+    /// 目标月顶部）。种子分布实锤：2020–2026 每月 2 张 = 1 行——跳到 2024-05 后钉住头
+    /// 下即当月 1 行、再下即 2024-04 头 + 1 行，边界天然悬停视窗中部。
+    private func launchMonthJumpGrid(_ app: XCUIApplication, sectionID: String,
+                                     headerText: String) -> XCUIElement {
+        installPermissionMonitor()
+        app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
+                                "-uiTestingKeepChrome", "-uiTestingFilterYear", "0",
+                                "-uiTestingLongPressMovement", "-uiTestingOpenMonthJump"]
+        app.launch()
+        let intro = app.buttons["允许访问照片"]
+        if intro.waitForExistence(timeout: 10) {
+            intro.tap()
+            app.tap()
+        }
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-uiTestingOpenMonthJump" }
+        app.launchArguments += ["-uiTestingMonthJump", sectionID]
+        app.launch()
+        XCTAssertTrue(collection.waitForExistence(timeout: 30), "跳转后网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        let headers = collection.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS '月 ·'"))
+        let deadline = Date().addingTimeInterval(15)
+        var topOK = false
+        while Date() < deadline {
+            if headers.count > 0, headers.firstMatch.label.contains(headerText) { topOK = true; break }
+            usleep(300_000)
+        }
+        XCTAssertTrue(topOK, "月份跳转后顶部应为 \(headerText)（顶部：\(headers.firstMatch.label)）\n\(hierarchy(app))")
+        usleep(1_500_000)
+        return collection
     }
 
     /// M19 跨月：行带跨月段拖拽（起点在月份头上方、终点在其下方，Core RowBandMapTests
     /// 跨段镜像，docs/43 T06 边界 4）：行带序列跨 section 连续平铺——头两侧的整行都入选，
-    /// 计数 =（上方行数 + 下方行数）×columns 精确。
+    /// 计数 =（上方行数 + 下方行数）×columns 精确。定位策略（八轮 CI 实锤演化）：种子
+    /// 167 张集中当前月（~7600pt）使固定 swipeUp/逐屏扫描/闭环精调均不可靠，最终改用
+    /// 月份跳转钩子直达「次旧月」顶部，边界头天然悬停视窗中部。
     func testBandDragAcrossMonthBoundary() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
-            // 全量 run 44783255716/44805219332 实锤：select 模式下 MonthHeader-Menu-* 不可枚举
-            // （⑪ 用例在 plain 网格可枚举）——改用 plain 网格 + 长按起手自带进入多选（②⑤ 同款）
-            let collection = launchPlainGrid(app)
+            // 月份跳转直达 2024-05 顶部（PositionRestoreUITests 同款钩子，plain 网格 +
+            // 长按起手自带进入多选）：当月 2 张 = 1 行，钉住头下即当月行、再下即
+            // 2024-04 头 + 行——边界天然悬停视窗中部，零扫描零精调。
+            let collection = launchMonthJumpGrid(app, sectionID: "2024-05", headerText: "2024年5月")
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
-            app.swipeUp()
-            app.swipeUp()
             // 滚动静止等待（T07-② 同款：off= 连续两次采样差 <0.5pt）
             let settleDeadline = Date().addingTimeInterval(10)
             var settled = false
@@ -1074,106 +1100,38 @@ final class RowBandSelectUITests: XCTestCase {
                 continue
             }
             usleep(500_000)
-            // 视口内找一个「悬停中部」的月份头（非钉住态）。全量 run 44827223992 实锤：
-            // 种子把 167 张集中在当前月（~56 行 ≈ 7600pt），固定 2-3 次 swipeUp 的落点
-            // 永远在月内——改为逐次 swipeUp + 每步扫描；swipeUp 步距 ~730pt 可跳过 660pt
-            // 视窗，用钉住头 identifier 换月检测越过边界，越过后 120pt 小步回拖至边界头
-            // 重新入窗。
             let headers = app.buttons
                 .matching(NSPredicate(format: "identifier BEGINSWITH 'MonthHeader-Menu-'"))
             let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
-            let initialPinned = Self.pinnedMonthSuffix(headers: headers)
-            var boundaryY: CGFloat?
-            var boundaryId = ""
-            let scanWindow: (XCUIElement) -> Bool = { header in
-                let frame = header.frame
-                return frame.minY > collection.frame.minY + headerHeight + 60
-                    && frame.maxY < collection.frame.maxY - 120
-            }
-            for _ in 0..<14 {
-                for index in 0..<headers.count {
-                    let header = headers.element(boundBy: index)
-                    guard header.exists, scanWindow(header) else { continue }
-                    boundaryY = header.frame.midY
-                    boundaryId = header.identifier
-                    break
-                }
-                if boundaryY != nil { break }
-                if let pinned = Self.pinnedMonthSuffix(headers: headers), pinned != initialPinned {
-                    // 已越过边界（钉住头换月）——小步回拖让边界头重新进入视窗
-                    for _ in 0..<5 {
-                        Self.dragContent(app, dy: 120)
-                        usleep(800_000)
-                        for index in 0..<headers.count {
-                            let header = headers.element(boundBy: index)
-                            guard header.exists, scanWindow(header) else { continue }
-                            boundaryY = header.frame.midY
-                            boundaryId = header.identifier
-                            break
-                        }
-                        if boundaryY != nil { break }
-                    }
-                    break
-                }
-                app.swipeUp()
-                usleep(900_000)
-            }
-            guard boundaryY != nil, !boundaryId.isEmpty else {
-                if attempt == 2 { XCTFail("视口内无悬停月份头（跨月边界不可用）\n\(hierarchy(app))") }
-                continue
-            }
-            let boundaryHeader = app.buttons[boundaryId]
-            // 精调前先整帧静止（T07-② 同款 off= 采样）。
-            let adjustDeadline = Date().addingTimeInterval(10)
-            var adjustSettled = false
-            while Date() < adjustDeadline {
-                usleep(600_000)
-                let now = readOffsetY(app) ?? -2
-                usleep(600_000)
-                let again = readOffsetY(app) ?? -3
-                if abs(now - again) < 0.5 { adjustSettled = true; break }
-            }
-            guard adjustSettled else {
-                if attempt == 2 { XCTFail("边界精调前滚动未静止") }
-                continue
-            }
-            usleep(400_000)
-            // 精调：边界头 minY 落在 (351, 434) 才同时满足锚点行/终点行约束（行 pitch
-            // 136pt）。press-drag 释放自带惯性（run 44844924180 实锤预判式单次拖拽落点
-            // 偏差超可行带）——改低速拖拽（velocity 30 + 释放前保持抑制惯性）+ 按
-            // identifier 闭环迭代：测量→拖→复测，直至落入可行带。
-            var boundary: CGFloat = 0
-            var positioned = false
-            for _ in 0..<5 {
-                guard boundaryHeader.exists else { break }
-                let minY = boundaryHeader.frame.minY
-                if minY > 351, minY < 434 {
-                    boundary = boundaryHeader.frame.midY
-                    positioned = true
-                    break
-                }
-                let delta = minY < 351 ? (390 - minY) : -(minY - 390)
-                Self.dragContent(app, dy: delta)
-                usleep(1_200_000)
-            }
-            guard positioned, boundary > 0 else {
+            guard Self.pinnedMonthSuffix(headers: headers) == "2024-05" else {
                 if attempt == 2 {
-                    XCTFail("边界头精调失败（\(boundaryId) minY 未落入锚点/终点可行带 351-434pt）\n\(hierarchy(app))")
+                    XCTFail("钉住头应为 2024-05（实际 \(Self.pinnedMonthSuffix(headers: headers) ?? "nil")）\n\(hierarchy(app))")
                 }
                 continue
             }
-            // 锚点 = 头上方第一个完整可见格；终点 = 头下方第一个完整可见同列格
-            // （远离底缘 80pt 安全区）。run 44858932161 实锤：取「最后一个」会命中
-            // 最右列，而边界下方首行可能是残行（旧月仅 2 张 → 无最右列格），拖拽
-            // 终点落到下一行 → 行带多跨一行。取第一个（第 0 列，任何行都存在）保证
-            // 锚点列在头下首行必有同列格。
+            // 边界头 = 下月 2024-04 的头，按 identifier 直取；跳转后必悬停视窗中部
+            let boundaryEl = app.buttons["MonthHeader-Menu-2024-04"]
+            guard boundaryEl.waitForExistence(timeout: 10) else {
+                if attempt == 2 { XCTFail("视窗内应有 2024-04 边界头\n\(hierarchy(app))") }
+                continue
+            }
+            let boundary = boundaryEl.frame
+            guard boundary.minY > collection.frame.minY + headerHeight + 4,
+                  boundary.maxY < collection.frame.maxY - 80 else {
+                if attempt == 2 { XCTFail("2024-04 头未悬停视窗中部（frame=\(boundary)）\n\(hierarchy(app))") }
+                continue
+            }
+            // 锚点 = 边界头上方最后一个完整可见的第 0 列格（2024-05 当月行；第 0 列任何
+            // 行必有格，残行不破坏列对称——run 44858932161 实锤取最右列时头下首行可能
+            // 无同列格）。自然头不遮格，行 maxY 只需严格高于头 minY。
             var anchorIndex = -1
             for index in 0..<collection.cells.count {
                 let cell = collection.cells.element(boundBy: index)
                 guard cell.exists, cell.frame.width > 1 else { continue }
                 let frame = cell.frame
-                if anchorIndex == -1,
-                   frame.minY > collection.frame.minY + headerHeight + 60, frame.maxY < boundary - 6 {
+                if frame.minX < 40,
+                   frame.minY > collection.frame.minY + headerHeight + 4,
+                   frame.maxY < boundary.minY {
                     anchorIndex = index
                 }
             }
@@ -1183,12 +1141,11 @@ final class RowBandSelectUITests: XCTestCase {
             }
             let column = sameColumnIndices(in: collection, anchorIndex: anchorIndex)
             let safeBottom = collection.frame.maxY - 80
-            // boundary = 头 midY；首行 minY = header.maxY + 间距 ≈ boundary +
-            // headerHeight/2 + 2 —— 用 +headerHeight 会跳过头下首行（run 44858932161/
-            // 44871405304 实锤多跨一行 7≠4），改用 +headerHeight/2 = header.maxY。
+            // 头下首行 minY = boundary.maxY + 间距，用 boundary.maxY 阈值首行必中
+            // （run 44871405304 实锤 +headerHeight 阈值恒跳过首行）。
             let below = column.filter {
                 let frame = collection.cells.element(boundBy: $0).frame
-                return frame.minY > boundary + headerHeight / 2 && frame.maxY < safeBottom
+                return frame.minY > boundary.maxY && frame.maxY < safeBottom
             }
             guard let endIndex = below.first else {
                 if attempt == 2 { XCTFail("月份头下方无完整可见同列格") }
@@ -1199,11 +1156,11 @@ final class RowBandSelectUITests: XCTestCase {
             let anchorFrame = collection.cells.element(boundBy: anchorIndex).frame
             let aboveRows = column.filter {
                 let frame = collection.cells.element(boundBy: $0).frame
-                return frame.minY >= anchorFrame.minY - 4 && frame.maxY < boundary - 6
+                return frame.minY >= anchorFrame.minY - 4 && frame.maxY < boundary.minY
             }
             let belowRows = column.filter {
                 let frame = collection.cells.element(boundBy: $0).frame
-                return frame.minY > boundary + headerHeight / 2
+                return frame.minY > boundary.maxY
                     && frame.maxY < collection.cells.element(boundBy: endIndex).frame.maxY + 4
             }
             let rowYs = (aboveRows + belowRows).map { collection.cells.element(boundBy: $0).frame.midY }
