@@ -11,7 +11,7 @@
 //   scrollViewWillBeginDragging（VC 转发）→ scrollStarted
 // 效果执行：enterSelection → VC 进多选并选锚点；beginTrail / endTrail 与 isScrollEnabled
 // 成对（docs/32 §2.3「进入 armed 后禁滚动」；releaseScroll 由机器在方向让位/收尾时配对补发）；
-// updateTrail → rowBandHitProvider 行带展开有序命中 + SlideSelectTrail 路径事务净 delta
+// updateTrail → trailHitProvider 混合命中（cells 扫掠 / rows 整行展开/回卷）+ SlideSelectTrail 路径事务净 delta
 //（滑到哪选到哪、回滑截断出栈、delta 空不触觉）；startAutoScroll / stopAutoScroll →
 // CADisplayLink 60fps（边缘 60pt、2–12pt/帧，Core edgeVelocity + clampedOffset）；
 // 自动滚动 tick 以滚动前后同一窗口坐标换算的 content 两点喂轨迹（屏外内容按序入栈）。
@@ -26,9 +26,11 @@ final class LibrarySelectionController: NSObject {
     // MARK: VC 注入
 
     var isSelectionMode: () -> Bool = { false }
-    /// 行带（内容坐标起止）→ 已展开、行主序 assetID 序列（GridHitTester.rowBandHitTest + dataSource 映射，
-    /// 只过滤 nil、保持行带平铺序；零长度 = 所在整行，docs/42 §3.2）。
-    var rowBandHitProvider: (CGPoint, CGPoint) -> [String] = { _, _ in [] }
+    /// 混合命中（内容坐标线段）→ 模式 + 有序 assetID + 向上回卷锚（GridHitTester.trailHitTest +
+    /// dataSource 映射，docs/49 T05 §3.2；T04 的 rowBandHitProvider 已退役）。
+    var trailHitProvider: (CGPoint, CGPoint) -> SelectionTrailHit = { _, _ in
+        SelectionTrailHit(mode: .cells, orderedIDs: [], rewindID: nil)
+    }
     /// 路径事务净增量落地（applySelectionChanges：SelectionState.applyDelta + 可见 cell diff）。
     var applySelectionDelta: (Set<String>, Set<String>) -> Void = { _, _ in }
     var scopeProvider: () -> Set<String>? = { nil }
@@ -44,6 +46,8 @@ final class LibrarySelectionController: NSObject {
     private var gestureConfig = SelectionGestureConfig()
     /// 本次手势的路径事务（beginTrail 构造、consume 逐帧推进；endTrail/finishSelection 销毁）。
     private var trail: SlideSelectTrail?
+    /// 本次事务是否已进入行模式（首个 .rows(rewindID == nil) 帧 rebase 后置位；beginTrail/收尾复位）。
+    private var rowModeEngaged = false
     /// 最近一次轨迹命中点（content 坐标）：线段起点；autoScroll 前后两点取同一窗口坐标换算。
     private var lastTrailContentPoint: CGPoint?
     /// enterSelection 交付的锚点 id（beginTrail 帧构造事务的起点 cell）。
@@ -229,7 +233,24 @@ final class LibrarySelectionController: NSObject {
         lastPanTranslation = .zero
         consumedTouch = false
         machine = SelectionGestureMachine(config: machine.config)
+        rowModeEngaged = false
     }
+
+    /// VC 显式同步多选态（docs/49 T05 §3.2）：按钮进出多选立即生效，不等下一次手势事件；
+    /// feed 仍按 isSelectionMode() 逐事件校准，两者保持一致。
+    func syncSelectionModeActive(_ active: Bool) {
+        machine.isSelectionModeActive = active
+    }
+
+    #if DEBUG
+    // MARK: 单测接缝（docs/49 T05 §7）：不触 UIKit 手势/窗口直接驱动状态机与轨迹推进；生产路径零改动。
+
+    /// 直接喂机器事件（feed 透传，绕过识别器）。
+    func debugFeed(_ event: SelectionGestureEvent) { feed(event) }
+
+    /// 直接推进轨迹线段（apply(.updateTrail) 的窗口换算在无 window 环境不可用）。
+    func debugProcessTrail(from: CGPoint, to: CGPoint) { processTrail(from: from, to: to) }
+    #endif
 
     // MARK: 机器效果执行
 
@@ -274,30 +295,25 @@ final class LibrarySelectionController: NSObject {
                 consumedTouch = true
                 trailAnchorID = anchorID
                 onSelectionEntered(anchorID)
-            case .beginTrail:
+            case .beginTrail(let anchorID):
                 consumedTouch = true
                 // armed 即禁滚动（docs/32 §2.3）；endTrail/releaseScroll 成对恢复
                 collectionView?.isScrollEnabled = false
-                // 事务基集 = enterSelection 之后的真实选中集（含锚点），按下帧锚点语义定 mode
-                guard let anchor = trailAnchorID else { break }
+                // 事务基集 = enterSelection 之后的真实选中集（含锚点），按下帧锚点语义定 mode；
+                // 起手绝不整行（docs/49 T05 §3.1：M19 的 (press, press) 行带起手分支删除——
+                // 长按/横向锁定起手只选锚点一格，行模式由 processTrail 首个 rows 帧再展开）
+                guard !anchorID.isEmpty else { break }
+                trailAnchorID = anchorID
                 var started = SlideSelectTrail(base: selectedIDsProvider(),
                                                anchorInitiallySelected: anchorInitiallySelected,
                                                scope: scopeProvider())
-                // M19（docs/43 T05）：零长度 (press, press) 取锚点所在整行——长按先整行入选/取消再拖；
-                // provider 不可用（apply 窗口/几何未热）退回单锚点，processTrail 下一帧自愈
-                var beginIDs = [anchor]
-                if let press = machine.pressPoint {
-                    let pressPoint = CGPoint(x: press.x, y: press.y)
-                    let rowIDs = rowBandHitProvider(pressPoint, pressPoint)
-                    if rowIDs.contains(anchor) { beginIDs = rowIDs }
-                    lastTrailContentPoint = pressPoint
-                }
-                let delta = started.consume(beginIDs)
+                let delta = started.consume([anchorID])
                 trail = started
+                rowModeEngaged = false
+                lastTrailContentPoint = machine.pressPoint.map { CGPoint(x: $0.x, y: $0.y) }
                 #if DEBUG
                 debugTrailPathCount = started.path.count
-                debugExpandedCount = beginIDs.count
-                debugBandCount = debugBandCountProvider()
+                debugExpandedCount = 1
                 debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
                 #endif
                 if !delta.isEmpty {
@@ -313,6 +329,7 @@ final class LibrarySelectionController: NSObject {
             case .endTrail:
                 collectionView?.isScrollEnabled = true
                 trail = nil
+                rowModeEngaged = false
                 lastTrailContentPoint = nil
                 onTrailActiveChanged(false)
             case .releaseScroll:
@@ -378,21 +395,52 @@ final class LibrarySelectionController: NSObject {
     /// VC 注入：内容坐标 → 命中 cell 的 assetID（indexPathForItem + dataSource）。
     var hitIDAtContentPoint: (CGPoint) -> String? = { _ in nil }
 
-    /// 一段轨迹推进：from→to 线段取有序命中 id 喂 SlideSelectTrail.consume，净增量落地。
+    /// 一段轨迹推进（docs/49 T05 §3.1）：trailHitProvider 混合命中——cells 线段扫掠逐 id
+    /// consume；rows 向下首次进入先 rebase（cells 路径栈作废）再喂行主序种子/增量，
+    /// rows 向上 rewind ∈ path 只 consume 回卷锚（截断到目的行末项）。
     /// delta 空 → 不置触觉、不触发 apply（G6 闸门；docs/38 §2.3 第 5 行）。
     /// apply 窗口内命中为空：保持线段起点不前进，下一帧重扫同段（M17 T07 语义；
     /// 快照完成后几何自愈，无需帧数上限——endTrail/finishSelection 收口）。
     private func processTrail(from: CGPoint, to: CGPoint) {
         guard machine.state == .dragging || machine.state == .autoScrolling,
               var current = trail else { return }
-        let orderedIDs = rowBandHitProvider(from, to)
-        if orderedIDs.isEmpty, isApplyingSnapshotProvider() { return }
-        let delta = current.consume(orderedIDs)
+        let hit = trailHitProvider(from, to)
+        if hit.orderedIDs.isEmpty, hit.rewindID == nil, isApplyingSnapshotProvider() { return }
+        var delta = SlideSelectDelta()
+        switch hit.mode {
+        case .cells:
+            delta = current.consume(hit.orderedIDs)
+        case .rows:
+            if let rewindID = hit.rewindID {
+                // 向上：rewind ∈ path → 只 consume 回卷锚（截断到目的行末项）；不在 path 按 fallback 线段喂
+                delta = current.path.contains(rewindID)
+                    ? current.consume([rewindID])
+                    : current.consume(hit.orderedIDs)
+            } else {
+                if !rowModeEngaged {
+                    // 首次进入行模式：rebase 事务——base 取当前选中集（含已落地增量）、mode 保留，
+                    // 当前段行主序种子一次 consume
+                    var rebased = SlideSelectTrail(base: selectedIDsProvider(),
+                                                   anchorInitiallySelected: anchorInitiallySelected,
+                                                   scope: scopeProvider())
+                    delta = rebased.consume(hit.orderedIDs)
+                    current = rebased
+                    rowModeEngaged = true
+                }
+                // 续帧喂「orderedIDs − path」：同带重入不得触发回卷截断；过滤后为空 = 成功帧
+                let remaining = hit.orderedIDs.filter { !current.path.contains($0) }
+                let extra = current.consume(remaining)
+                if !extra.isEmpty {
+                    delta = SlideSelectDelta(add: delta.add.union(extra.add),
+                                             remove: delta.remove.union(extra.remove))
+                }
+            }
+        }
         trail = current
         lastTrailContentPoint = to
         #if DEBUG
         debugTrailPathCount = current.path.count
-        debugExpandedCount = orderedIDs.count
+        debugExpandedCount = hit.orderedIDs.count
         debugBandCount = debugBandCountProvider()
         debugLastDelta = "+\(delta.add.count)/-\(delta.remove.count)"
         #endif
@@ -499,6 +547,15 @@ final class LibrarySelectionController: NSObject {
         guard let collectionView, collectionView.window != nil else { return nil }
         return collectionView.convert(windowPoint, from: nil)
     }
+}
+
+/// 混合命中结果的 id 域视图（M20 T05，docs/49 T05 §3.1/§3.2）：VC 注入闭包把
+/// GridTrailHit.indexPaths 映射为有序 assetID、rewindIndexPath 映射为 rewindID，
+/// 控制器不持有 dataSource。
+struct SelectionTrailHit {
+    let mode: SlideSelectHitMode
+    let orderedIDs: [String]
+    let rewindID: String?
 }
 
 // MARK: - 手势仲裁（docs/32 §2.3：识别器只允许「命中 cell」起步，与滚动/长按互相让位）

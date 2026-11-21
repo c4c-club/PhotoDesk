@@ -3,8 +3,8 @@
 // 事件枚举在 docs/32 §2.2 六个事件之外补 edgeEntered(direction:)/edgeExited：
 // 状态表第 7/8 行「指尖进/离边缘」必须有事件载体才能全覆盖单测（机器只判定，App 层检测边缘）。
 // 效果序列契约（M18 T04 起轨迹命名）：
-//   holdElapsed → [haptic(.impactLight), enterSelection(anchorID), beginTrail]（表第 2 行副作用顺序）
-//   pressing 横向锁定 → dragging + [enterSelection(未在多选时)/无, beginTrail]（表第 3 行「必要时先进入多选」）
+//   holdElapsed → [haptic(.impactLight), enterSelection(anchorID), beginTrail(anchorID:)]（表第 2 行副作用顺序）
+//   pressing 横向锁定 → dragging + [enterSelection(未在多选时)/无, beginTrail(anchorID:)]（表第 3 行「必要时先进入多选」）
 //   dragging moved → [updateTrail] + 受 hapticMinInterval 节流的 haptic(.selectionChanged)
 //   ended/cancelled 收尾（表第 9 行）：armed [endTrail]；dragging [endTrail, releaseScroll]；
 //   autoScrolling [stopAutoScroll, endTrail, releaseScroll]；收尾后状态 .ending，下一事件先复位 idle。
@@ -61,7 +61,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         let effects = arm(&machine, id: "a", holdAt: 0.28)
         XCTAssertEqual(effects, [.haptic(kind: .impactLight),
                                  .enterSelection(anchorID: "a"),
-                                 .beginTrail])
+                                 .beginTrail(anchorID: "a")])
         XCTAssertEqual(machine.state, .armed)
     }
 
@@ -99,7 +99,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         machine.isSelectionModeActive = false
         press(&machine, at: 0)
         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
-        XCTAssertEqual(effects, [.enterSelection(anchorID: "a"), .beginTrail])
+        XCTAssertEqual(effects, [.enterSelection(anchorID: "a"), .beginTrail(anchorID: "a")])
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -108,7 +108,7 @@ final class SelectionGestureMachineTests: XCTestCase {
         machine.isSelectionModeActive = true
         press(&machine, at: 0)
         let effects = machine.handle(.moved(dx: 9, dy: 0), now: 0.1)
-        XCTAssertEqual(effects, [.beginTrail], "已在多选模式不得重复 enterSelection")
+        XCTAssertEqual(effects, [.beginTrail(anchorID: "a")], "已在多选模式不得重复 enterSelection")
         XCTAssertEqual(machine.state, .dragging)
     }
 
@@ -441,7 +441,7 @@ final class SelectionGestureMachineTests: XCTestCase {
     func testArmedMovedSequenceIsBeginTrailThenUpdateTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         let armEffects = arm(&machine)
-        XCTAssertEqual(armEffects.last, .beginTrail, "armed 进入序列以 beginTrail 收尾")
+        XCTAssertEqual(armEffects.last, .beginTrail(anchorID: "a"), "armed 进入序列以 beginTrail(anchorID:) 收尾")
         let moveEffects = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)
         XCTAssertEqual(moveEffects.first, .updateTrail, "armed moved 首个效果是 updateTrail")
         XCTAssertEqual(machine.state, .dragging)
@@ -451,7 +451,7 @@ final class SelectionGestureMachineTests: XCTestCase {
     func testReverseMovedAfterLockEmitsOnlyUpdateTrail() {
         var machine = SelectionGestureMachine(config: defaultConfig)
         machine.isSelectionModeActive = true
-        _ = arm(&machine)                                     // haptic@0.28 + beginTrail（触觉节流器就位）
+        _ = arm(&machine)                                     // haptic@0.28 + beginTrail(anchorID:)（触觉节流器就位）
         _ = machine.handle(.moved(dx: 6, dy: 0), now: 0.29)   // updateTrail（0.01 < 0.06 无触觉）
         let reverse = machine.handle(.moved(dx: -10, dy: 0), now: 0.30)
         XCTAssertEqual(reverse, [.updateTrail], "反向拖仅上报 updateTrail（docs/38 §2.3 收缩在事务侧）")
@@ -484,7 +484,20 @@ final class SelectionGestureMachineTests: XCTestCase {
         _ = machine.handle(.holdElapsed, now: 0.49)
         XCTAssertEqual(machine.state, .pressing, "0.49 < 自定义 longPressDuration=0.5 不得 armed")
         let armed = machine.handle(.holdElapsed, now: 0.5)
-        XCTAssertEqual(armed, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a"), .beginTrail])
+        XCTAssertEqual(armed, [.haptic(kind: .impactLight), .enterSelection(anchorID: "a"), .beginTrail(anchorID: "a")])
+        XCTAssertEqual(machine.state, .armed)
+    }
+
+    // MARK: - T05 新增：beginTrail 携带锚点载荷（docs/49 T05 §2.2）
+
+    /// hitID 为空串：beginTrail(anchorID: "") 仍发出——语义过滤交给控制器（§3.1 防御性 guard），机器不做裁剪
+    func testEmptyAnchorStillEmitsBeginTrailPayload() {
+        var machine = SelectionGestureMachine(config: defaultConfig)
+        press(&machine, id: "", at: 0)
+        let effects = machine.handle(.holdElapsed, now: 0.28)
+        XCTAssertEqual(effects, [.haptic(kind: .impactLight),
+                                 .enterSelection(anchorID: ""),
+                                 .beginTrail(anchorID: "")])
         XCTAssertEqual(machine.state, .armed)
     }
 }

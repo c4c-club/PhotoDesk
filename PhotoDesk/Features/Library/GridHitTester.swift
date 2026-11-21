@@ -311,8 +311,8 @@ final class GridHitTester {
     // 先判模式再选路径：任一带 nil（空网格/全遮挡/空隙中部）→ 降级 cell 扫掠，不得回退整行；
     // 同带或横向占优 → hitTestLine（滑到哪选到哪，零长度 = 起手格）；纵向跨带占优向下 →
     // RowBandMap 整行展开（行主序、列升序，不过滤 trail.path——控制器职责）；向上 → 只回卷
-    // 终带最后一个 item + hitTestLine fallback（不返回整行）。生产接线 T05 才切换，本卡不动
-    // rowBandHitProvider。
+    // 终带最后一个 item + hitTestLine fallback（不返回整行）。生产接线已在 T05 切换
+    //（LibraryViewController 注入 trailHitProvider）。
 
     /// 两点（内容坐标）混合命中（docs/49 T04 §3.1）。clipTop 由调用方按视口粘性头语义传入，
     /// 与 rowBandHitTest 内部计算口径一致（视口顶所在段钉住头底边）。
@@ -351,6 +351,18 @@ final class GridHitTester {
             paths = hitTestLine(from: from, to: to)
         }
         return GridTrailHit(mode: mode, indexPaths: paths, rewindIndexPath: rewind)
+    }
+
+    /// 视口粘性头 clipTop（docs/49 T05 §3.2）：trailHitTest 调用方取值入口，口径与
+    /// rowBandHitTest 内部一致——视口顶所在段钉住头底边；不在段内 = -∞ 不裁剪。
+    func currentClipTop() -> CGFloat {
+        guard let collectionView else { return -.infinity }
+        let viewportTop = Double(collectionView.contentOffset.y)
+            + Double(collectionView.adjustedContentInset.top)
+        if sectionIndex(containingContentY: viewportTop) != nil {
+            return CGFloat(viewportTop + Double(DSSpacing.monthHeaderHeight))
+        }
+        return -.infinity
     }
 }
 

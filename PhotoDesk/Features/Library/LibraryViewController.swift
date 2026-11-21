@@ -792,17 +792,22 @@ final class LibraryViewController: UIViewController {
         // M17 T07（docs/32 §2.6）：apply 窗口取证——快照 apply 期间线段命中为空按保留路径重扫处理
         controller.isApplyingSnapshotProvider = { [weak self] in self?.isApplyingSnapshot ?? false }
         gridHitTester = GridHitTester(collectionView: collectionView)
-        // M19 T05（docs/42 §3.2）：行带命中 → 整行有序 id（行主序展开、零长度 = 所在整行）
-        controller.rowBandHitProvider = { [weak self] from, to in
-            guard let self, let tester = self.gridHitTester else { return [] }
+        // M20 T05（docs/49 §3.2）：混合命中 → 模式 + 有序 id + 向上回卷锚
+        //（indexPath→id 映射在此；clipTop 与 rowBandHitTest 粘性头口径同源）
+        controller.trailHitProvider = { [weak self] from, to in
+            guard let self, let tester = self.gridHitTester else {
+                return SelectionTrailHit(mode: .cells, orderedIDs: [], rewindID: nil)
+            }
+            let hit = tester.trailHitTest(from: from, to: to, clipTop: tester.currentClipTop())
             var ids: [String] = []
-            ids.reserveCapacity(16)
-            for path in tester.rowBandHitTest(from: from, to: to) {
+            ids.reserveCapacity(hit.indexPaths.count)
+            for path in hit.indexPaths {
                 if let item = self.dataSource.itemIdentifier(for: path) {
                     ids.append(item.id)
                 }
             }
-            return ids
+            let rewindID = hit.rewindIndexPath.flatMap { self.dataSource.itemIdentifier(for: $0)?.id }
+            return SelectionTrailHit(mode: hit.mode, orderedIDs: ids, rewindID: rewindID)
         }
         #if DEBUG
         controller.debugBandCountProvider = { [weak self] in
@@ -846,6 +851,7 @@ final class LibraryViewController: UIViewController {
     private func enterSelectionMode(selecting id: String?, scopeOverride: Set<String>? = nil) {
         guard !isSelecting else { return }
         isSelecting = true
+        selectionController?.syncSelectionModeActive(true)   // M20 T05 §3.2：立即生效，不等下一次手势
         // M17 T07（A08）：scope 取 filteredItems 全量——快照在 apply 窗口/索引补齐期间滞后
         let scope = scopeOverride ?? viewModel.selectionScopeIDs
         selectionState.begin(scope: scope, initial: id)
@@ -875,6 +881,7 @@ final class LibraryViewController: UIViewController {
         let monthItems = currentItemsBySection[safe: section] ?? []
         guard !monthItems.isEmpty else { return }
         isSelecting = true
+        selectionController?.syncSelectionModeActive(true)
         let scope = Set(monthItems.map(\.id))
         let sectionID = currentSections[section].id
         selectionState.begin(scope: scope, initial: nil, scopeID: "month:\(sectionID)")
@@ -896,6 +903,7 @@ final class LibraryViewController: UIViewController {
 
     private func exitSelectionMode() {
         selectionController?.finishSelection()
+        selectionController?.syncSelectionModeActive(false)
         // M17 T07（docs/32 §4.3）：退出复位同步完成（不 async）——隐身选框/恢复滚动由
         // finishSelection 成对交付，allowsSelection 一并复位。
         collectionView.allowsSelection = true

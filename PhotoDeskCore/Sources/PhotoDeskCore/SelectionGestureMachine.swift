@@ -9,7 +9,7 @@
 // 迁移契约（每条都有单测，SelectionGestureMachineTests）：
 // - touchDown：hitID 为 nil 或触点非有限 → 忽略；否则入 pressing 并记录真实按下点（G3 锚点取证）。
 // - holdElapsed：now − 按下 ≥ longPressDuration 且累计位移 ≤ allowableMovement 才 armed；
-//   副作用 [haptic(.impactLight), enterSelection(anchorID:), beginTrail]（表第 2 行，轨迹事务开启）。
+//   副作用 [haptic(.impactLight), enterSelection(anchorID:), beginTrail(anchorID:)]（表第 2 行，轨迹事务开启）。
 // - pressing moved：累计距离 ≥ directionLockDistance 时定方向——横向占优（|dx| > |dy|·horizontalRatio）
 //   → dragging，未在多选时先 enterSelection（表第 3 行「必要时先进入多选」，App 侧最终把关）；
 //   纵向占优（|dy| ≥ |dx|·horizontalRatio）→ idle + releaseScroll（让位滚动，G2）。
@@ -64,7 +64,7 @@ public struct SelectionGestureConfig: Equatable, Sendable {
 
 public enum SelectionGestureEffect: Equatable, Sendable {
     case enterSelection(anchorID: String)
-    case beginTrail
+    case beginTrail(anchorID: String)
     case updateTrail
     case endTrail
     case releaseScroll
@@ -148,7 +148,7 @@ public struct SelectionGestureMachine: Sendable {
             lastHapticAt = now
         }
         effects.append(.enterSelection(anchorID: anchor))
-        effects.append(.beginTrail)
+        effects.append(.beginTrail(anchorID: anchor))
         return effects
     }
 
@@ -183,7 +183,7 @@ public struct SelectionGestureMachine: Sendable {
                 if !isSelectionModeActive, let anchor = anchorID {
                     effects.append(.enterSelection(anchorID: anchor))
                 }
-                effects.append(.beginTrail)
+                effects.append(.beginTrail(anchorID: anchorID ?? ""))
                 return effects
             }
             if abs(totalDY) >= abs(totalDX) * config.horizontalRatio {
