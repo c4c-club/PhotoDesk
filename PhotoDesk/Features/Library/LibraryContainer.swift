@@ -20,6 +20,10 @@ struct LibraryRootView: View {
     @State private var viewerContext: ViewerContext?
     @State private var showSearch = false
     @State private var showFilterSheet = false
+    /// docs/49 T03：authorized 空态「导入照片」sheet
+    @State private var showImportSheet = false
+    /// docs/49 T03：recheck 后仍 denied 的内联提示（跨重渲染保留）
+    @State private var recheckHintVisible = false
     @State private var showMonthJump = false
     @State private var showVault = false
     /// R07：左上「工具」按钮 → ToolsView sheet
@@ -45,22 +49,30 @@ struct LibraryRootView: View {
         Group {
             switch viewModel.viewState {
             case .notDetermined:
-                PermissionIntroView(mode: .intro) {
-                    Task { await viewModel.requestAccess() }
-                }
+                PermissionIntroView(mode: .intro,
+                                    onAllow: { Task { await viewModel.requestAccess() } })
             case .denied:
-                PermissionIntroView(mode: .denied) {
-                    Task { await viewModel.requestAccess() }
-                }
+                // docs/49 T03 §2.3：denied 主按钮去系统设置（不假装弹窗），recheck 只刷新
+                PermissionIntroView(mode: .denied,
+                                    onOpenSettings: { openSystemSettings() },
+                                    onRecheck: { recheckAccess() },
+                                    showsRecheckHint: recheckHintVisible)
             case .restricted:
-                PermissionIntroView(mode: .restricted, action: nil)
+                PermissionIntroView(mode: .restricted, onRecheck: { recheckAccess() })
             case .loading:
                 DSEmptyState(kind: .loading)
             case .empty:
-                DSEmptyState(kind: .empty)
+                // docs/49 T03 §2.3：authorized 空态导入入口
+                DSEmptyState(kind: .empty,
+                             actionTitle: "导入照片",
+                             actionAccessibilityID: "Library-Import",
+                             onAction: { showImportSheet = true })
             case .limited:
-                // docs/49 T02 §2.3：受限可见集空态先接现成 kind（T03 再加按钮/ID）
-                DSEmptyState(kind: .limited)
+                // docs/49 T03 §2.3：limited 0 张 → 管理可见照片入口（导入不可达）
+                DSEmptyState(kind: .limited,
+                             actionTitle: "管理可见照片",
+                             actionAccessibilityID: "Permission-Manage-Limited",
+                             onAction: { viewModel.requestManageLimitedPhotos() })
             case .ready:
                 // docs/16 M12：只剩网格（五段 ScopePicker 整行已移除 → 顶部栏分类菜单）；
                 // 顶部栏由 LibraryContainer 的 UINavigationController 承载（无 App 标题）
@@ -93,6 +105,16 @@ struct LibraryRootView: View {
                         filterEmptyState
                             .allowsHitTesting(false)
                     }
+                    if viewModel.isLimitedAccess {
+                        // docs/49 T03 §2.3：受限授权网格底部横幅（管理入口同 ID）
+                        VStack {
+                            Spacer()
+                            DSEmptyState(kind: .limited,
+                                         actionTitle: "管理可见照片",
+                                         actionAccessibilityID: "Permission-Manage-Limited",
+                                         onAction: { viewModel.requestManageLimitedPhotos() })
+                        }
+                    }
                 }
             }
         }
@@ -105,6 +127,10 @@ struct LibraryRootView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             LibraryFilterSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showImportSheet) {
+            // docs/49 T03 §2.4：authorized 空库导入入口（成功后依赖 PhotoChangeObserver 增量同步）
+            PhotoImportSheet(onClose: { showImportSheet = false })
         }
         .sheet(isPresented: $showMonthJump) {
             // docs/13 S09/S10：月份面板（跳转 / 单月全选 / 回到顶部）
@@ -168,6 +194,7 @@ struct LibraryRootView: View {
             ViewerCover(context: context, viewerContext: $viewerContext)
         }
         .onAppear {
+            wireManageLimitedPhotosIfNeeded()
             Task { await viewModel.start() }
             // 重启恢复：读取未过期 ActionLog（即刻提示，保持至撤销或窗口过期）
             recoveryCount = undoCenter.recoverableCount()
@@ -177,7 +204,10 @@ struct LibraryRootView: View {
             runHooksIfNeeded()
         #endif
         }
-        .onChange(of: viewModel.viewState) { _ in
+        .onChange(of: viewModel.viewState) { state in
+            if state != .denied {
+                recheckHintVisible = false
+            }
             #if DEBUG
             runHooksIfNeeded()
             #endif
@@ -190,6 +220,9 @@ struct LibraryRootView: View {
             // docs/13 S04/S11：进后台/失活立即保存位置（杀进程前最后一道保存）
             if phase != .active {
                 selectionBridge.controller?.savePositionNow(reason: "scenePhase")
+            } else {
+                // docs/49 T03 §2.3：回前台（含从系统设置/limited picker 返回）自动刷新授权与库
+                Task { await viewModel.refreshAccessAndReload() }
             }
         }
         .onReceive(service.$access) { _ in
@@ -236,6 +269,37 @@ struct LibraryRootView: View {
                 .accessibilityValue(viewModel.debugFilteredCount)
         }
         #endif
+    }
+
+    // MARK: - 授权恢复（docs/49 T03 §2.3）
+
+    /// 去系统设置（denied 主按钮；不调用 requestAccess 假装弹窗）
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    /// 重新检查授权：只刷新状态，不重复弹系统框；仍 denied 则显示内联提示
+    private func recheckAccess() {
+        Task {
+            await viewModel.refreshAccessAndReload(force: true)
+            recheckHintVisible = (viewModel.viewState == .denied)
+        }
+    }
+
+    /// limited 空态无网格 VC：缺省用 key window 顶层 VC 调起系统选择器（网格内由 LibraryViewController 接管）
+    private func wireManageLimitedPhotosIfNeeded() {
+        guard viewModel.onManageLimitedPhotos == nil else { return }
+        viewModel.onManageLimitedPhotos = { [weak service] in
+            guard let service,
+                  let scene = UIApplication.shared.connectedScenes
+                      .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                  let window = scene.windows.first(where: { $0.isKeyWindow }) else { return }
+            var top: UIViewController? = window.rootViewController
+            while let presented = top?.presentedViewController { top = presented }
+            guard let anchor = top else { return }
+            service.presentLimitedLibraryPicker(from: anchor)
+        }
     }
 
     // MARK: - 筛选无结果空态（docs/09 D10 §6）

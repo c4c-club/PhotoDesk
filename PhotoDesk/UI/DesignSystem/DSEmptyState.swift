@@ -14,7 +14,11 @@ struct DSEmptyState: View {
     }
 
     let kind: Kind
-    /// .limited 的「管理」按钮 / .denied 的「去系统设置」回调
+    /// 可选动作按钮标题（.empty 导入照片 / .limited 管理可见照片；nil = 不显示按钮、不占位，docs/49 T03）
+    var actionTitle: String? = nil
+    /// 动作按钮 AX 标识（Library-Import / Permission-Manage-Limited）
+    var actionAccessibilityID: String? = nil
+    /// 动作回调（.limited 的「管理」/ .denied 的「去系统设置」）
     var onAction: (() -> Void)?
 
     var body: some View {
@@ -32,6 +36,21 @@ struct DSEmptyState: View {
                 Text("去拍一张或导入几张试试")
                     .font(.subheadline)
                     .foregroundColor(Color(ds: DSColor.textSecondary))
+                if let actionTitle {
+                    Button {
+                        onAction?()
+                    } label: {
+                        Text(actionTitle)
+                            .font(.body)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color(ds: DSColor.tint))
+                            .cornerRadius(DSSpacing.buttonCornerRadius)
+                    }
+                    .accessibilityIdentifier(actionAccessibilityID ?? "")
+                    .padding(.top, 8)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .denied:
@@ -70,10 +89,11 @@ struct DSEmptyState: View {
                 Button {
                     onAction?()
                 } label: {
-                    Text("管理")
+                    Text(actionTitle ?? "管理")
                         .font(.subheadline)
                         .foregroundColor(Color(ds: DSColor.tint))
                 }
+                .accessibilityIdentifier(actionAccessibilityID ?? "")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

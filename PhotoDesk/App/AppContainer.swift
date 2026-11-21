@@ -4,6 +4,7 @@
 // @MainActor：App/UI 侧组合发生在主线程。
 
 import Foundation
+import Photos
 import UIKit
 
 @MainActor
@@ -11,7 +12,8 @@ final class AppContainer: ObservableObject {
     static let shared = AppContainer()
 
     let settings = SettingsStore()
-    let libraryService = PhotoLibraryService()
+    /// docs/49 T03 §2.5：-uiTestingPermissionState 注入固定授权态（生产路径保持真实 PhotoKit）
+    let libraryService: PhotoLibraryService
     let assetRepository: AssetRepositoryProtocol
     let imagePipeline: ImagePipelineProtocol
     let photoWriter = PhotoWriter()
@@ -72,6 +74,32 @@ final class AppContainer: ObservableObject {
     #if DEBUG
     /// -uiTestingSessionMock：mock writer 调用计数（UI 测试断言「提交恰好 1 次」的信号源）
     let mockPhotoWriter: MockPhotoWriter?
+
+    // MARK: - UI 测试授权注入（docs/49 T03 §2.5）
+
+    /// 解析 -uiTestingPermissionState notDetermined/denied/restricted/limited/authorized（nil = 未注入）
+    private static func uiTestingPermissionState() -> LibraryAccess? {
+        guard let raw = UITestHooks.stringValue("-uiTestingPermissionState") else { return nil }
+        switch raw {
+        case "notDetermined": return .notDetermined
+        case "denied":        return .denied
+        case "restricted":    return .restricted
+        case "limited":       return .limited
+        case "authorized":    return .authorized
+        default:              return nil
+        }
+    }
+
+    /// LibraryAccess → PHAuthorizationStatus（注入 statusProvider 钉死用）
+    private static func photoKitStatus(of access: LibraryAccess) -> PHAuthorizationStatus {
+        switch access {
+        case .notDetermined: return .notDetermined
+        case .denied:        return .denied
+        case .restricted:    return .restricted
+        case .limited:       return .limited
+        case .authorized:    return .authorized
+        }
+    }
     #endif
 
     lazy var libraryViewModel = LibraryViewModel(service: libraryService,
@@ -140,7 +168,22 @@ final class AppContainer: ObservableObject {
 
     private init() {
         let persistence = PersistenceController.shared
+        #if DEBUG
+        // docs/49 T03 §2.5：UI 测试注入授权态与空库。statusProvider 必须一并钉死注入值——
+        // 否则 LibraryViewModel.start() 的 refreshAccess() 会用模拟器真实授权覆盖注入（CI 预授权 → denied 用例必挂）
+        if let injected = Self.uiTestingPermissionState() {
+            libraryService = PhotoLibraryService(initialAccess: injected,
+                                                 statusProvider: { Self.photoKitStatus(of: injected) })
+        } else {
+            libraryService = PhotoLibraryService()
+        }
+        assetRepository = UITestHooks.enabled("-uiTestingEmptyLibrary")
+            ? EmptyAssetRepositoryStub()
+            : AssetRepository()
+        #else
+        libraryService = PhotoLibraryService()
         assetRepository = AssetRepository()
+        #endif
         // 捕获 settings 实例本身（不能引用 AppContainer.shared：静态 let 初始化进行中会死锁）
         let settingsRef = settings
         let writerRef = photoWriter
@@ -177,3 +220,33 @@ final class AppContainer: ObservableObject {
         #endif
     }
 }
+
+#if DEBUG
+/// docs/49 T03 §2.5：-uiTestingEmptyLibrary 空库仓库（全部查询 0 条，不触 PhotoKit；
+/// limited 0 张与 authorized 0 张空态分别可断言）。仅 DEBUG 编译，普通启动不受影响。
+private final class EmptyAssetRepositoryStub: AssetRepositoryProtocol {
+    func prepare(scope: PhotoScope) async -> Int { 0 }
+
+    func prepare(scope: PhotoScope, sortAscending: Bool) async -> Int { 0 }
+
+    func fetch(scope: PhotoScope, offset: Int, limit: Int) async -> [PhotoItem] { [] }
+
+    func fetch(ids: [String]) async -> [PhotoItem] { [] }
+
+    func globalIndex(of assetID: String, scope: PhotoScope) async -> Int? { nil }
+
+    func count(scope: PhotoScope) async -> Int { 0 }
+
+    var latestResult: PHFetchResult<PHAsset>? { nil }
+    func latestResult(for scope: PhotoScope) -> PHFetchResult<PHAsset>? { nil }
+    func replaceResult(_ result: PHFetchResult<PHAsset>, for scope: PhotoScope) {}
+    func map(_ asset: PHAsset) -> PhotoItem {
+        PhotoItem(id: "empty",
+                  mediaType: .image, mediaSubtypes: [],
+                  creationDate: nil, modificationDate: nil,
+                  pixelWidth: 1, pixelHeight: 1, duration: 0,
+                  isFavorite: false, isHidden: false,
+                  location: nil, burstIdentifier: nil, isCloudOnly: false)
+    }
+}
+#endif
