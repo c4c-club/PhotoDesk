@@ -1,7 +1,7 @@
 // MARK: - 职责说明：M20 红基线（T01，docs/49-M20-任务分段/T01-红基线与复现.md §3）——把三条
 // 用户问题固化为可重复的失败证据；本文件不改任何生产代码：
 // ① 长按 (1,1) 必须只选 1 张（当前行带语义把长按起手展开成整行）；
-// ② 多选模式下从 cell0 直接横拖到 cell3 必须开始轨迹选择（当前触摸被消费、无 trail）；
+// ② 多选模式下从 cell0 直接横拖到 cell2（3 列首行）必须开始轨迹选择（当前触摸被消费、无 trail）；
 // ③ denied 页必须有「去系统设置」、limited 0 张必须有「管理可见照片」、authorized 空库必须有
 //    「导入照片」（Permission-Open-Settings / Permission-Manage-Limited / Library-Import，T03 才实现）。
 // 编译口径：只引用现有公开 AX ID 与 launchArguments（Selection-Count / Library-DebugSummary /
@@ -55,7 +55,11 @@ final class M20RedBaselineUITests: XCTestCase {
         let intro = app.buttons["允许访问照片"]
         if intro.waitForExistence(timeout: 25) {
             intro.tap()
-            app.tap()   // 触发中断监视器派发；弹窗稍后出现，网格轮询期间监视器自动点 Allow
+            // app.tap() 是中断监视器的唯一派发点：必须等系统弹窗真正上屏再触发，
+            // 否则 0.5s 竞态内弹窗未现、后续网格轮询不再派发（run 44960446428 test1 实锤）
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            _ = springboard.alerts.firstMatch.waitForExistence(timeout: 8)
+            app.tap()
         }
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 45), "照片网格未出现\n\(hierarchySummary(app))")
@@ -184,21 +188,24 @@ final class M20RedBaselineUITests: XCTestCase {
                       "网格无 cell\n\(hierarchySummary(app))")
         XCTAssertTrue(collection.cells.count >= 4,
                       "可见 cell 不足 4 个（环境问题，不计入红基线）\n\(hierarchySummary(app))")
-        let frames = (0..<4).map { collection.cells.element(boundBy: $0).frame }
+        let frames = (0..<3).map { collection.cells.element(boundBy: $0).frame }
         let geometry = frames.enumerated()
             .map { "c\($0.offset)=(x:\($0.element.minX), y:\($0.element.minY), \($0.element.width)x\($0.element.height))" }
             .joined(separator: " ")
+        // -uiTestingSeedDatedPhotos 强制 3 列（docs/49 M17 T09 稳定性约定）：首行 = cell0..2，
+        // cell3 已是第二行首格——拖 cell3 实为竖拖（新行为交还滚动，run 44960446428 实锤），
+        // 红基线②的「直接横拖」必须取同行 cell0→cell2
         let start = collection.cells.element(boundBy: 0)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let end = collection.cells.element(boundBy: 3)
+        let end = collection.cells.element(boundBy: 2)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: end)
-        let count = waitForSelectionCountEqual(app, to: 4, timeout: 5)
+        let count = waitForSelectionCountEqual(app, to: 3, timeout: 5)
         let debug = trailDebugFields(app)
         attachHierarchy(app, name: "m20-red-2-hierarchy")
-        XCTAssertEqual(count, 4,
-                       "红基线②：选择模式下从 cell0 直接横拖到 cell3 必须开始轨迹选择——" +
-                       "expected=4, actual=\(count)（-1 = Selection-Count 不存在）, " +
+        XCTAssertEqual(count, 3,
+                       "红基线②：选择模式下从 cell0 直接横拖到 cell2（3 列首行）必须开始轨迹选择——" +
+                       "expected=3, actual=\(count)（-1 = Selection-Count 不存在）, " +
                        "DEBUG[\(debug)]（当前触摸被消费、滚动被禁用、无 trail）, " +
                        "geometry: \(geometry)" +
                        "\nAX 摘要：\(hierarchySummary(app))")
