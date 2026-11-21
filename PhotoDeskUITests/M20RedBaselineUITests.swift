@@ -5,8 +5,9 @@
 // ③ denied 页必须有「去系统设置」、limited 0 张必须有「管理可见照片」、authorized 空库必须有
 //    「导入照片」（Permission-Open-Settings / Permission-Manage-Limited / Library-Import，T03 才实现）。
 // 编译口径：只引用现有公开 AX ID 与 launchArguments（Selection-Count / Library-DebugSummary /
-// 「允许访问照片」与 RowBandSelectUITests 同款基建）；-uiTestingPermissionState /
-// -uiTestingEmptyLibrary 为尚未实现的参数，传入后被当前 App 忽略 → 对应断言按预期失败。
+// 「允许访问照片」与 RowBandSelectUITests 同款基建）。T03 落地 -uiTestingPermissionState /
+// -uiTestingEmptyLibrary 注入后，网格用例经 authorized 直达网格（避免系统弹窗派发时机
+// 竞态——run 44950888882 实锤：冷启动 intro 晚于 10s 窗口出现导致授权点按漏发）。
 // 失败信息一律带 expected / actual / DEBUG 取证 / AX hierarchy 摘要，并落截图与完整层级附件（T01 §5）。
 
 import XCTest
@@ -148,7 +149,7 @@ final class M20RedBaselineUITests: XCTestCase {
 
     func testLongPressAnchorSelectsExactlyOneCell() throws {
         let app = XCUIApplication()
-        let collection = launchGrid(app)
+        let collection = launchGrid(app, extra: ["-uiTestingPermissionState", "authorized"])
         let anchor = collection.cells.element(boundBy: 0)
         XCTAssertTrue(anchor.waitForExistence(timeout: 10), "网格无 cell\n\(hierarchySummary(app))")
         anchor.press(forDuration: 0.8)
@@ -173,7 +174,7 @@ final class M20RedBaselineUITests: XCTestCase {
 
     func testSelectButtonDirectHorizontalDragStartsTrail() throws {
         let app = XCUIApplication()
-        let collection = launchGrid(app, extra: ["-uiTestingSelectMode"])
+        let collection = launchGrid(app, extra: ["-uiTestingSelectMode", "-uiTestingPermissionState", "authorized"])
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10),
                       "网格无 cell\n\(hierarchySummary(app))")
         XCTAssertTrue(collection.cells.count >= 4,

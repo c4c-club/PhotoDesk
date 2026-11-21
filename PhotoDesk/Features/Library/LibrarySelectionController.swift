@@ -246,7 +246,14 @@ final class LibrarySelectionController: NSObject {
     // MARK: 单测接缝（docs/49 T05 §7）：不触 UIKit 手势/窗口直接驱动状态机与轨迹推进；生产路径零改动。
 
     /// 直接喂机器事件（feed 透传，绕过识别器）。
-    func debugFeed(_ event: SelectionGestureEvent) { feed(event) }
+    func debugFeed(_ event: SelectionGestureEvent) {
+        // 镜像 handleTouchDown 的按下帧取证（docs/25 §6.1）：接缝直达 feed 绕过 UIKit 处理器，
+        // 起手已选 → 取消模式的锚点语义必须与生产路径同帧同源
+        if case .touchDown(_, let hitID) = event, let hitID {
+            anchorInitiallySelected = selectedIDsProvider().contains(hitID)
+        }
+        feed(event)
+    }
 
     /// 直接推进轨迹线段（apply(.updateTrail) 的窗口换算在无 window 环境不可用）。
     func debugProcessTrail(from: CGPoint, to: CGPoint) { processTrail(from: from, to: to) }
