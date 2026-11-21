@@ -25,6 +25,7 @@ final class LibraryViewModel: ObservableObject {
         case loading
         case ready
         case empty
+        case limited
         case denied
         case restricted
     }
@@ -47,6 +48,8 @@ final class LibraryViewModel: ObservableObject {
     /// 完整索引是否就绪（docs/13 S04/S10：位置恢复等待 + 单月全选范围判定）
     @Published private(set) var isIndexComplete = false
     @Published private(set) var isLimitedAccess = false
+    /// limited 选择器调整后置位：选择集变化不改授权状态，下次 refreshAccessAndReload 强制重载（docs/49 T02）
+    private(set) var limitedPickerNeedsReload = false
     @Published private(set) var isLoadingMore = false
     /// head 回填代际（v6 §5.4）：每个 head 批次前插后 +1；恢复状态机据此判定「连续两轮不变」
     @Published private(set) var headInsertGeneration = 0
@@ -124,6 +127,7 @@ final class LibraryViewModel: ObservableObject {
 
     /// 进入照片库 / 从设置页返回 / 回前台时调用：按当前授权状态推进
     func start() async {
+        service.refreshAccess()                       // docs/49 T02：设置页/前台返回可能改变授权，先刷新再分支
         guard viewState != .loading else { return }   // 首载进行中不接受状态重入
         switch service.access {
         case .notDetermined:
@@ -138,13 +142,40 @@ final class LibraryViewModel: ObservableObject {
     }
 
     /// 授权引导页按钮：触发系统弹窗；结果经 service.access 驱动
+    /// docs/49 T02：请求后按授权是否实际变化决定重载；未变化（用户关掉弹窗）不重载、不重复弹框
     func requestAccess() async {
+        let previous = service.access
         await service.requestAccess()
+        await refreshAccessAndReload(force: service.access != previous)
+    }
+
+    /// docs/49 T02 §2.2：比较前后授权；force/授权变化/limited 选择器调整才取消索引、
+    /// 重置数据源并重走 start()，否则仅刷新状态
+    func refreshAccessAndReload(force: Bool = false) async {
+        let previous = service.access
+        let current = service.refreshAccess()
+        let shouldReload = force || current != previous || limitedPickerNeedsReload
+        limitedPickerNeedsReload = false
+        guard shouldReload else { return }
+        indexingTask?.cancel()
+        indexingTask = nil
+        hasLoadedOnce = false
+        isIndexComplete = false
+        isIndexing = false
+        allItems = []
+        visibleItems = []
+        filteredItems = []
+        sections = []
+        itemsBySection = []
+        indexProgress = (0, 0)
+        changeObserver = nil   // 授权/选择集变化后按新结果重新注册（restartObserving 同款语义）
         await start()
     }
 
     /// 「管理」按钮：调起系统 limited 选择器（新增/移除由 ChangeObserver 增量同步）
+    /// docs/49 T02：选择集变化不改授权状态，置位待重载标志，由 refreshAccessAndReload 消费
     func requestManageLimitedPhotos() {
+        limitedPickerNeedsReload = true
         onManageLimitedPhotos?()
     }
 
@@ -290,7 +321,7 @@ final class LibraryViewModel: ObservableObject {
         await UITestDatedPhotoSeeder.seedIfNeeded()
         #endif
         guard !hasLoadedOnce else {
-            viewState = allItems.isEmpty ? .empty : .ready
+            viewState = allItems.isEmpty ? (isLimitedAccess ? .limited : .empty) : .ready
             return
         }
         viewState = .loading
@@ -303,7 +334,7 @@ final class LibraryViewModel: ObservableObject {
             // 空索引视同完成（同 reloadForQuery：恢复状态机不得等待不会到来的索引）
             isIndexComplete = true
             rebuildDerived(animated: false)
-            viewState = .empty
+            viewState = isLimitedAccess ? .limited : .empty
             return
         }
         // docs/16 M12 R03：锚点窗口优先——首批以锚点为中心（前后各半批），锚点页首帧即位、零可见跳转；

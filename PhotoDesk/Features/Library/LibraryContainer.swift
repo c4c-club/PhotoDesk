@@ -58,6 +58,9 @@ struct LibraryRootView: View {
                 DSEmptyState(kind: .loading)
             case .empty:
                 DSEmptyState(kind: .empty)
+            case .limited:
+                // docs/49 T02 §2.3：受限可见集空态先接现成 kind（T03 再加按钮/ID）
+                DSEmptyState(kind: .limited)
             case .ready:
                 // docs/16 M12：只剩网格（五段 ScopePicker 整行已移除 → 顶部栏分类菜单）；
                 // 顶部栏由 LibraryContainer 的 UINavigationController 承载（无 App 标题）
