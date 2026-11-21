@@ -1,0 +1,28 @@
+{
+  "version": "1.8.0",
+  "build": 9,
+  "runId": 44906882778,
+  "headSha": "8c6e754a6a5c7d551299a1cebd2da16b34921137",
+  "branch": "feat/m19-row-band",
+  "minos": "16.0",
+  "sha256": "ce045ab583d2177e28811a622f190cd615c868bb1953f7e347c24cd39a91803c",
+  "ipaFile": "PhotoDesk-1.8.0-build9-unsigned.ipa",
+  "ipaBytes": 1285904,
+  "bundleIdentifier": "com.example.PhotoDesk",
+  "signed": false,
+  "deviceStatus": "BLOCKED（AltServer 未安装/真机未接入/交互实测需人工——docs/46 §1）",
+  "gates": {
+    "coreLinux": "success",
+    "verifyDeploymentTarget": "success",
+    "buildUnsignedIpa": "success",
+    "verifyUnsignedIpa": "success",
+    "simulatorSmoke": "success",
+    "performanceTests": "4/4 passed",
+    "testSimulator": "77 tests 1 failure（唯一失败 = StabilityUITests.testDynamicTypeTopBarDoesNotClip，M18 历史冻结，非 M19 引入）"
+  },
+  "evidence": {
+    "releaseRunLog": "artifacts/release/1.8.0/release-run-build.log",
+    "sha256Sidecar": "artifacts/release/1.8.0/PhotoDesk-1.8.0-build9-unsigned.ipa.sha256",
+    "acceptance": "docs/46-M19-验收记录.md"
+  }
+}
