@@ -1,0 +1,45 @@
+audit-m19 root=C:\Users\RuiZh\Desktop\photo_manager strict=False checks=24 pass=19 failBlocking=0 failPresent=0 info=5 exitCode=0
+[PASS] BLOCKING core-import-foundation-only :: PhotoDeskCore/Sources 只允许 import Foundation（AGENTS.md 红线 2）
+[PASS] BLOCKING app-no-ios17-api :: PhotoDesk/ 禁 iOS 17+ API：@Observable/@Bindable/ContentUnavailableView/.scrollTargetBehavior/.scrollPosition/SwiftData
+[PASS] BLOCKING app-no-two-finger :: PhotoDesk/ 禁 minimumNumberOfTouches = 2（双指轨迹退役）
+[PASS] BLOCKING feature-no-phasset :: PhotoDesk/Features/ 禁直接引用 PHAsset（统一 PhotoItem）
+[PASS] BLOCKING wording-no-permanent-delete :: PhotoDesk/ 禁肯定语气的「彻底删除/永久删除」文案（排除否定句：不提供/不能/不会/不可/无法/禁用/永不/只把/吗）
+[PASS] BLOCKING app-no-marquee-symbols :: PhotoDesk/ 禁活跃框选符号：MarqueeOverlayView/Marquee-Overlay/lastMarqueeRect/hitTest(rectInContent:/HitRect/MarqueeSelectionPolicy.resolved
+[PASS] BLOCKING no-try-bang-as-bang :: PhotoDesk/ 与 PhotoDeskCore/Sources 禁 try! / as!
+[PASS] BLOCKING gridhittester-rowbandhittest :: GridHitTester 必须实现 func rowBandHitTest(from:to:)（行带命中唯一单元）
+    PhotoDesk/Features/Library/GridHitTester.swift:281: func rowBandHitTest(from: CGPoint, to: CGPoint) -> [IndexPath] {
+[PASS] BLOCKING production-trail-provider-band :: rowBandHitProvider 必须走行带展开（rowBandHitTest）且旧名 trailHitProvider 清零（docs/42 §3.2）
+[PASS] BLOCKING band-scope-core :: 行带链路 scope 过滤：SlideSelectTrail.consume 忽略 scope 外 id + RowBandItem 展开单元在位（docs/42 §10.1）
+[PASS] BLOCKING band-scope-app :: LibrarySelectionController 构造 SlideSelectTrail 必须传 scope: scopeProvider()
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:285: scope: scopeProvider())
+[PASS] BLOCKING band-row-major-core :: RowBandMap 行主序几何必须基于真实 attributes 派生字段 firstRowMinY/rowHeight/columns
+[PASS] BLOCKING tests-old-cell-contract :: UI/单测不得保留旧语义断言：左列下滑右列不得入选/斜拖不补全等（5 条冲突用例，docs/41 §4；T06/T08 重写）
+[PASS] PRESENT present-rowbandmap-swift :: RowBandMap.swift 存在
+[PASS] PRESENT present-rowbandhittest-symbol :: PhotoDesk/ 必须出现 rowBandHitTest 符号（App 侧行带命中）
+    PhotoDesk/Features/Library/GridHitTester.swift:9: // M19 T04：行带命中 rowBandHitTest——两点 y → bandIndex(clipTop) → bandSequence → 整行 IndexPath 展开；
+    PhotoDesk/Features/Library/GridHitTester.swift:37: /// UI 取证（M19 T05）：最近一次 rowBandHitTest 的行带数与展开格数。
+    PhotoDesk/Features/Library/GridHitTester.swift:40: /// M19 T07（docs/42 §5）：rowBandHitTest 单帧耗时环形采样（ms，512 帧窗口）与 p50/p95。
+    PhotoDesk/Features/Library/GridHitTester.swift:281: func rowBandHitTest(from: CGPoint, to: CGPoint) -> [IndexPath] {
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:29: /// 行带（内容坐标起止）→ 已展开、行主序 assetID 序列（GridHitTester.rowBandHitTest + dataSource 映射，
+    PhotoDesk/Features/Library/LibraryViewController.swift:800: for path in tester.rowBandHitTest(from: from, to: to) {
+[PASS] PRESENT present-rowbandprovider-symbol :: PhotoDesk/ 必须出现 rowBandHitProvider 符号（VC 注入行带命中提供者，docs/42 §3.2）
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:14: // updateTrail → rowBandHitProvider 行带展开有序命中 + SlideSelectTrail 路径事务净 delta
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:31: var rowBandHitProvider: (CGPoint, CGPoint) -> [String] = { _, _ in [] }
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:291: let rowIDs = rowBandHitProvider(pressPoint, pressPoint)
+    PhotoDesk/Features/Library/LibrarySelectionController.swift:388: let orderedIDs = rowBandHitProvider(from, to)
+    PhotoDesk/Features/Library/LibraryViewController.swift:796: controller.rowBandHitProvider = { [weak self] from, to in
+[PASS] PRESENT present-rowbandmap-tests :: PhotoDeskCore/Tests 必须出现 RowBandMapTests
+    PhotoDeskCore/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:1: // MARK: - RowBandMapTests：行带平铺几何与序列红/绿（M19 T02，docs/42 §3.1、docs/45 §3）——
+    PhotoDeskCore/Tests/PhotoDeskCoreTests/RowBandMapTests.swift:12: final class RowBandMapTests: XCTestCase {
+    PhotoDeskCore/Tests/PhotoDeskCoreTests/RowBandPerfTests.swift:12: /// 40 段 × 500 项（2 万 item）× 4 列 × 120pt 行高（与 RowBandMapTests 预算用例同规模）
+[PASS] PRESENT present-band-ui-suite :: 行带 UI 套件文件存在
+[PASS] PRESENT present-band-debug-field :: LibraryViewController DEBUG Summary 必须暴露 band= 字段（行带深度取证）
+    PhotoDesk/Features/Library/LibraryViewController.swift:1367: + "slide=ticks=\(ticks) hap=\(hap) trail=\(trailMode) path=\(trailPath) band=\(band) exp=\(exp) delta=\(lastDelta) td=\(tdBase)/\(tdHit) edge=\(edge) vy=\(vy) vB=\(vB) state=\(stateName) "
+[INFO] INFO info-version :: MARKETING_VERSION=1.7.0 CURRENT_PROJECT_VERSION=8（T10 目标 1.8.0 (9)）
+[INFO] INFO info-deployment-target :: deploymentTarget iOS=16.0 IPHONEOS_DEPLOYMENT_TARGET=16.0（基线 16.0）
+[INFO] INFO info-ci-artifacts :: ios.yml 产物名：unsigned-ipa=True simulator-app-zip=True
+[INFO] INFO info-release-dir :: artifacts/release/1.8.0/ 存在=False（T10 产出）
+[INFO] INFO info-hitTestLine-refs :: PhotoDesk/ 内 hitTestLine 引用（行带改造后应仅剩降级路径或清零）：
+    PhotoDesk/Features/Library/GridHitTester.swift:11: // hitTestLine 保留为降级路径（docs/42 §3.2/§10.4），生产主路径 T05 切换。
+    PhotoDesk/Features/Library/GridHitTester.swift:178: func hitTestLine(from: CGPoint, to: CGPoint) -> [IndexPath] {
+    PhotoDesk/Features/Library/GridHitTester.swift:290: // 粘性头钳制与 hitTestLine 同源：视口顶所在段有钉住头 → 有效命中自头底边起
