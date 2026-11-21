@@ -1036,14 +1036,15 @@ final class RowBandSelectUITests: XCTestCase {
         return nil
     }
 
-    /// 内容坐标拖拽滚动（plain 网格；dy>0 内容下移=向上滚，单位 pt，短按不触发长按选择）。
+    /// 内容坐标拖拽滚动（plain 网格；dy>0 内容下移=向上滚，单位 pt，短按不触发长按
+    /// 选择；velocity 30 低速 + 释放前保持 0.4s 抑制惯性，位移 ≈ dy）。
     private static func dragContent(_ app: XCUIApplication, dy: CGFloat) {
         let appFrame = app.frame
         let startDy = dy >= 0 ? 0.30 : 0.65
         let endDy = startDy + dy / appFrame.height
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startDy))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endDy))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: 30, thenHoldForDuration: 0.4)
     }
 
     /// M19 跨月：行带跨月段拖拽（起点在月份头上方、终点在其下方，Core RowBandMapTests
@@ -1083,7 +1084,7 @@ final class RowBandSelectUITests: XCTestCase {
             let headerHeight: CGFloat = 48   // DSSpacing.monthHeaderHeight（UI 测试镜像）
             let initialPinned = Self.pinnedMonthSuffix(headers: headers)
             var boundaryY: CGFloat?
-            var boundaryMinY: CGFloat = 0
+            var boundaryId = ""
             let scanWindow: (XCUIElement) -> Bool = { header in
                 let frame = header.frame
                 return frame.minY > collection.frame.minY + headerHeight + 60
@@ -1094,7 +1095,7 @@ final class RowBandSelectUITests: XCTestCase {
                     let header = headers.element(boundBy: index)
                     guard header.exists, scanWindow(header) else { continue }
                     boundaryY = header.frame.midY
-                    boundaryMinY = header.frame.minY
+                    boundaryId = header.identifier
                     break
                 }
                 if boundaryY != nil { break }
@@ -1107,7 +1108,7 @@ final class RowBandSelectUITests: XCTestCase {
                             let header = headers.element(boundBy: index)
                             guard header.exists, scanWindow(header) else { continue }
                             boundaryY = header.frame.midY
-                            boundaryMinY = header.frame.minY
+                            boundaryId = header.identifier
                             break
                         }
                         if boundaryY != nil { break }
@@ -1117,43 +1118,48 @@ final class RowBandSelectUITests: XCTestCase {
                 app.swipeUp()
                 usleep(900_000)
             }
-            guard let foundBoundary = boundaryY else {
+            guard boundaryY != nil, !boundaryId.isEmpty else {
                 if attempt == 2 { XCTFail("视口内无悬停月份头（跨月边界不可用）\n\(hierarchy(app))") }
                 continue
             }
-            var boundary = foundBoundary
-            // 精调：边界头 minY 落在 (350.7, 434.7) 才同时满足锚点行/终点行约束
-            // （行 pitch 136pt，run 44827223992 实锤）——坐标拖拽挪到目标带后整帧复测。
-            if boundaryMinY < 351 {
-                Self.dragContent(app, dy: 390 - boundaryMinY)
-            } else if boundaryMinY > 434 {
-                Self.dragContent(app, dy: -(boundaryMinY - 390))
-            }
-            let adjustDeadline = Date().addingTimeInterval(8)
-            var adjustedSettled = false
+            let boundaryHeader = app.buttons[boundaryId]
+            // 精调前先整帧静止（T07-② 同款 off= 采样）。
+            let adjustDeadline = Date().addingTimeInterval(10)
+            var adjustSettled = false
             while Date() < adjustDeadline {
                 usleep(600_000)
                 let now = readOffsetY(app) ?? -2
                 usleep(600_000)
                 let again = readOffsetY(app) ?? -3
-                if abs(now - again) < 0.5 { adjustedSettled = true; break }
+                if abs(now - again) < 0.5 { adjustSettled = true; break }
             }
-            guard adjustedSettled else {
-                if attempt == 2 { XCTFail("边界精调后滚动未静止") }
+            guard adjustSettled else {
+                if attempt == 2 { XCTFail("边界精调前滚动未静止") }
                 continue
             }
             usleep(400_000)
-            boundary = 0
-            var adjusted = false
-            for index in 0..<headers.count {
-                let header = headers.element(boundBy: index)
-                guard header.exists, scanWindow(header) else { continue }
-                boundary = header.frame.midY
-                adjusted = header.frame.minY > 350 && header.frame.minY < 435
-                break
+            // 精调：边界头 minY 落在 (351, 434) 才同时满足锚点行/终点行约束（行 pitch
+            // 136pt）。press-drag 释放自带惯性（run 44844924180 实锤预判式单次拖拽落点
+            // 偏差超可行带）——改低速拖拽（velocity 30 + 释放前保持抑制惯性）+ 按
+            // identifier 闭环迭代：测量→拖→复测，直至落入可行带。
+            var boundary: CGFloat = 0
+            var positioned = false
+            for _ in 0..<5 {
+                guard boundaryHeader.exists else { break }
+                let minY = boundaryHeader.frame.minY
+                if minY > 351, minY < 434 {
+                    boundary = boundaryHeader.frame.midY
+                    positioned = true
+                    break
+                }
+                let delta = minY < 351 ? (390 - minY) : -(minY - 390)
+                Self.dragContent(app, dy: delta)
+                usleep(1_200_000)
             }
-            guard adjusted, boundary > 0 else {
-                if attempt == 2 { XCTFail("边界头精调失败（minY 未落入锚点/终点可行带 350-435pt）") }
+            guard positioned, boundary > 0 else {
+                if attempt == 2 {
+                    XCTFail("边界头精调失败（\(boundaryId) minY 未落入锚点/终点可行带 351-434pt）\n\(hierarchy(app))")
+                }
                 continue
             }
             // 锚点 = 头上方最后一个完整可见格（中心避开头）；终点 = 头下方第一个
