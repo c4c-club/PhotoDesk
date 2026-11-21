@@ -171,9 +171,12 @@ final class AppContainer: ObservableObject {
         #if DEBUG
         // docs/49 T03 §2.5：UI 测试注入授权态与空库。statusProvider 必须一并钉死注入值——
         // 否则 LibraryViewModel.start() 的 refreshAccess() 会用模拟器真实授权覆盖注入（CI 预授权 → denied 用例必挂）
+        // requestProvider 一并钉死注入值：任何注入态下的 request 调用都返回钉死状态，
+        // 绝不触真实系统弹窗（docs/49 T03 取证：泄漏的真实 requestProvider 会把 CI TCC 翻成 denied）
         if let injected = Self.uiTestingPermissionState() {
             libraryService = PhotoLibraryService(initialAccess: injected,
-                                                 statusProvider: { Self.photoKitStatus(of: injected) })
+                                                 statusProvider: { Self.photoKitStatus(of: injected) },
+                                                 requestProvider: { Self.photoKitStatus(of: injected) })
         } else {
             libraryService = PhotoLibraryService()
         }

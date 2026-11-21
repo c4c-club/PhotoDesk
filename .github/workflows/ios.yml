@@ -359,6 +359,10 @@ jobs:
         run: |
           rm -rf /tmp/simphotos
           bash scripts/sim-photos.sh 5000
+          # docs/49 T03 取证（run 44935410043/44937607529）：预安装期 grant 会被后续重装
+          # 失效（smoke 截图实锤 state=denied），perf 用例的 intro 点按流被 denied 页卡死。
+          # 授权后网格 ≤5s 就位（T02 run 44931789421 trace 实测），故 perf 前无条件补 grant。
+          xcrun simctl privacy $SIM_UDID grant photos com.example.PhotoDesk || true
           xcodebuild -project PhotoDesk.xcodeproj -scheme PhotoDesk \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
