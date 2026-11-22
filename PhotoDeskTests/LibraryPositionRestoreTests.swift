@@ -310,11 +310,12 @@ final class LibraryPositionRestoreTests: XCTestCase {
                                          itemsBySection: [items],
                                          queryKey: viewModel.query.key,
                                          indexComplete: true)
+        // docs/49 T07：currentSections 在 diffable apply 完成回调才赋值（VC :1220），
+        // 先转 runloop 让 apply 落地，再设偏移——空内容期设偏移会被布局钳回 0，
+        // 锚点退化成首格（定向复验 45016425998 实锤）
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         controller.test_collectionView.contentOffset = CGPoint(x: 0, y: 240)
         controller.test_collectionView.layoutIfNeeded()
-        // docs/49 T07：currentSections 在 diffable apply 完成回调才赋值（VC :1220），
-        // 推快照后必须转 runloop 让 apply completion 落地，否则快照守卫判空丢弃保存
-        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         controller.savePositionNow(reason: "v3-unit")
         let restored = store.load(queryKey: viewModel.query.key)
         XCTAssertNotNil(restored)

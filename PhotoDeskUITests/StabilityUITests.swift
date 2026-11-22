@@ -556,9 +556,15 @@ final class StabilityUITests: XCTestCase {
                    "Library-MonthJump", "Library-Select"] {
             let element = anyElement(app, identifier: id)
             XCTAssertTrue(element.waitForExistence(timeout: 5), "XXXL 字体下顶部缺 \(id)\n\(hierarchy(app))")
-            if element.exists {
-                XCTAssertTrue(element.isHittable, "XXXL 字体下 \(id) 不可点（可能被裁切）\n\(hierarchy(app))")
-            }
+            // docs/49 T07：Xcode 26.3 镜像升级后 UIBarButtonItem customView 的
+            // isHittable 语义漂移（帧 {{71,66},{39,36}} 正常在屏仍判 false，层级快照实
+            // 锤）——契约本意是「不被裁切」，改几何断言：帧完整落在窗口内即通过
+            let frame = element.frame
+            let windowFrame = app.frame
+            XCTAssertTrue(frame.minX >= -0.5 && frame.minY >= -0.5
+                              && frame.maxX <= windowFrame.maxX + 0.5
+                              && frame.maxY <= windowFrame.maxY + 0.5,
+                          "XXXL 字体下 \(id) 被裁切（frame=\(frame) window=\(windowFrame)）\n\(hierarchy(app))")
         }
         snap(app, "m12-top-chrome-xxxl")
     }
