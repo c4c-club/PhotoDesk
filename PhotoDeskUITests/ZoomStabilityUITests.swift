@@ -485,6 +485,13 @@ final class ZoomStabilityUITests: XCTestCase {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 1.0)
         app.activate()
+        // docs/49 T07：马拉松全量下 activate 到状态翻转有延迟（run 45057547741
+        // state=3 实锤，前两轮全量与历次隔离均绿）——轮询等回前台再断言。
+        let foregroundDeadline = Date().addingTimeInterval(10)
+        while app.state != .runningForeground && Date() < foregroundDeadline {
+            Thread.sleep(forTimeInterval: 0.3)
+            app.activate()
+        }
         XCTAssertEqual(app.state, .runningForeground, "回前台失败")
         Thread.sleep(forTimeInterval: 0.5)
         let inner = currentViewport(app)

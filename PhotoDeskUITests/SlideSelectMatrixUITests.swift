@@ -286,8 +286,17 @@ final class SlideSelectMatrixUITests: XCTestCase {
             if attempt == 2 {
                 XCTAssertEqual(count, 4, "矩阵⑥选择按钮后直接横拖必须轨迹选 4 格（count=\(count)，"
                     + "选中=\(selectedVisibleIDs(collection).sorted())）")
-                XCTAssertEqual(offAfter, offBefore,
-                               "直接横拖不得进入滚动（off \(String(describing: offBefore)) → \(String(describing: offAfter))）")
+                // 轨迹主契约由 count==4 精确锁定；off 只防「拖拽被滚动吞没」（吞没时
+                // count=1、漂移≈拖距）。马拉松下事件合并的首帧竖向抖动可产生顶部橡皮
+                // 筋 ≤50pt（run 45022894921/45039701426/45057547741 三轮 off 0→-44、
+                // count 恒=4 实锤）——界内视为合成手势环境噪声。
+                guard let before = offBefore, let after = offAfter else {
+                    XCTFail("DEBUG 汇总 off= 字段缺失（before=\(String(describing: offBefore)) "
+                            + "after=\(String(describing: offAfter))）")
+                    return
+                }
+                XCTAssertLessThanOrEqual(abs(after - before), 50,
+                                         "直接横拖不得被滚动吞没（off \(before) → \(after)）")
             }
         }
     }
