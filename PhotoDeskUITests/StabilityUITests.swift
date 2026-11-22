@@ -557,7 +557,7 @@ final class StabilityUITests: XCTestCase {
             let element = anyElement(app, identifier: id)
             XCTAssertTrue(element.waitForExistence(timeout: 5), "XXXL 字体下顶部缺 \(id)\n\(hierarchy(app))")
             if element.exists {
-                XCTAssertTrue(element.isHittable, "XXXL 字体下 \(id) 不可点（可能被裁切）")
+                XCTAssertTrue(element.isHittable, "XXXL 字体下 \(id) 不可点（可能被裁切）\n\(hierarchy(app))")
             }
         }
         snap(app, "m12-top-chrome-xxxl")
