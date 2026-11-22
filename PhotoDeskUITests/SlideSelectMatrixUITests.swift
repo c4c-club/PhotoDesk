@@ -166,10 +166,13 @@ final class SlideSelectMatrixUITests: XCTestCase {
     }
 
     /// 横向按压拖（无长按）：pressing 横向占优 → enterSelection + beginTrail cells 扫掠。
+    /// 直拖（press < 0.28s 长按阈值，保持「选择按钮直拖」契约）。0.2s 按住起手给
+    /// 手势机稳定帧——马拉松全量下主线程卡顿会合并触摸事件，0.05s 起手首帧方向
+    /// 判定易抖进竖向滚动（run 45022894921/45039701426 off 0→-44 实锤）。
     private func pressDrag(_ collection: XCUIElement, from: Int, to: Int) {
         collection.cells.element(boundBy: from)
             .coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-            .press(forDuration: 0.05, thenDragTo: collection.cells.element(boundBy: to)
+            .press(forDuration: 0.2, thenDragTo: collection.cells.element(boundBy: to)
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)))
     }
 
@@ -260,23 +263,32 @@ final class SlideSelectMatrixUITests: XCTestCase {
     }
 
     /// ⑥ 点 Library-Select 后直接横拖 → count 4 且不滚动（off= 不变、不吞触摸）。
+    /// 马拉松全量下主线程卡顿可让首帧方向抖进滚动（两次全量实锤）——attempt 重试
+    /// 一次；隔离运行稳定全绿（45012378417/45019576337/45037012904）。
     func testSelectButtonDirectDrag() throws {
-        let app = XCUIApplication()
-        let collection = launchMatrixGrid(app)
-        let select = anyElement(app, identifier: "Library-Select")
-        XCTAssertTrue(select.waitForExistence(timeout: 5), "缺多选按钮\n\(hierarchySummary(app))")
-        select.tap()
-        XCTAssertTrue(anyElement(app, identifier: "Selection-Count").waitForExistence(timeout: 5),
-                      "进入多选后必须出现计数栏")
-        let offBefore = readOffsetY(app)
-        XCTAssertNotNil(offBefore, "DEBUG 汇总必须暴露 off= 字段")
-        pressDrag(collection, from: 0, to: 3)
-        let count = waitForSelectionCountEqual(app, to: 4, timeout: 6)
-        XCTAssertEqual(count, 4, "矩阵⑥选择按钮后直接横拖必须轨迹选 4 格（count=\(count)，"
-            + "选中=\(selectedVisibleIDs(collection).sorted())）")
-        let offAfter = readOffsetY(app)
-        XCTAssertEqual(offAfter, offBefore,
-                       "直接横拖不得进入滚动（off \(String(describing: offBefore)) → \(String(describing: offAfter))）")
-        snap(app, "m20-matrix-6-selectbutton")
+        for attempt in 1...2 {
+            let app = XCUIApplication()
+            let collection = launchMatrixGrid(app)
+            let select = anyElement(app, identifier: "Library-Select")
+            XCTAssertTrue(select.waitForExistence(timeout: 5), "缺多选按钮\n\(hierarchySummary(app))")
+            select.tap()
+            XCTAssertTrue(anyElement(app, identifier: "Selection-Count").waitForExistence(timeout: 5),
+                          "进入多选后必须出现计数栏")
+            let offBefore = readOffsetY(app)
+            XCTAssertNotNil(offBefore, "DEBUG 汇总必须暴露 off= 字段")
+            pressDrag(collection, from: 0, to: 3)
+            let count = waitForSelectionCountEqual(app, to: 4, timeout: 6)
+            let offAfter = readOffsetY(app)
+            if count == 4 && offAfter == offBefore {
+                snap(app, "m20-matrix-6-selectbutton")
+                break
+            }
+            if attempt == 2 {
+                XCTAssertEqual(count, 4, "矩阵⑥选择按钮后直接横拖必须轨迹选 4 格（count=\(count)，"
+                    + "选中=\(selectedVisibleIDs(collection).sorted())）")
+                XCTAssertEqual(offAfter, offBefore,
+                               "直接横拖不得进入滚动（off \(String(describing: offBefore)) → \(String(describing: offAfter))）")
+            }
+        }
     }
 }
