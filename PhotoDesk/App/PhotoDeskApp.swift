@@ -25,6 +25,11 @@ struct PhotoDeskApp: App {
         if UITestHooks.enabled("-uiTestingSeedDatedPhotos") {
             UserDefaults.standard.set(3, forKey: "grid.columns")
         }
+        // M20 T06（docs/49 T06 §6）：四列滑选矩阵固定列数——在种子 flag 强制 3 列之后覆盖，
+        // 仅矩阵套件传 -uiTestingColumnCount 4，其余套件不受影响（GridPinch 列数污染防护保持）
+        if let forcedColumns = UITestHooks.intValue("-uiTestingColumnCount") {
+            UserDefaults.standard.set(forcedColumns, forKey: "grid.columns")
+        }
         #endif
     }
 

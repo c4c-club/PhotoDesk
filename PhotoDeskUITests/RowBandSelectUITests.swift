@@ -36,7 +36,9 @@ final class RowBandSelectUITests: XCTestCase {
         }
     }
 
-    /// 多选模式网格（清位置 + 直入多选，首屏几何确定）
+    /// 多选模式网格（清位置 + 直入多选，首屏几何确定）。授权时序与 M20RedBaselineUITests
+    /// 同款加固（M20 T06：intro 25s / springboard 弹窗 30s 再派发监视器 / 网格 45s——
+    /// 冷启动 intro 可晚于 13s、弹窗可迟到数十秒，run 44950888882/44962688531 实锤）
     private func launchSelectableGrid(_ app: XCUIApplication) -> XCUIElement {
         installPermissionMonitor()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
@@ -44,31 +46,38 @@ final class RowBandSelectUITests: XCTestCase {
                                 "-uiTestingFilterYear", "0", "-uiTestingLongPressMovement"]
         app.launch()
         let intro = app.buttons["允许访问照片"]
-        if intro.waitForExistence(timeout: 10) {
+        if intro.waitForExistence(timeout: 25) {
             intro.tap()
-            app.tap()
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            if springboard.alerts.firstMatch.waitForExistence(timeout: 30) {
+                app.tap()
+            }
         }
         let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.waitForExistence(timeout: 45), "照片网格未出现\n\(hierarchy(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)  // 启动布局/inset 稳定：静止按压期间内容位移 >8pt 会使长按失效
         return collection
     }
 
-    /// 普通网格（不带 -uiTestingSelectMode：长按进入路径用，清位置 + 筛选清空）
-    private func launchPlainGrid(_ app: XCUIApplication) -> XCUIElement {
+    /// 普通网格（不带 -uiTestingSelectMode：长按进入路径用，清位置 + 筛选清空），extra 供用例追加
+    ///（授权时序加固同 launchSelectableGrid，M20 T06）
+    private func launchPlainGrid(_ app: XCUIApplication, extra: [String] = []) -> XCUIElement {
         installPermissionMonitor()
         app.launchArguments += ["-uiTestingSeedDatedPhotos", "-uiTestingClearPosition",
                                 "-uiTestingKeepChrome", "-uiTestingFilterYear", "0",
-                                "-uiTestingLongPressMovement"]
+                                "-uiTestingLongPressMovement"] + extra
         app.launch()
         let intro = app.buttons["允许访问照片"]
-        if intro.waitForExistence(timeout: 10) {
+        if intro.waitForExistence(timeout: 25) {
             intro.tap()
-            app.tap()
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            if springboard.alerts.firstMatch.waitForExistence(timeout: 30) {
+                app.tap()
+            }
         }
         let collection = app.collectionViews.firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 30), "照片网格未出现\n\(hierarchy(app))")
+        XCTAssertTrue(collection.waitForExistence(timeout: 45), "照片网格未出现\n\(hierarchy(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
         usleep(1_500_000)
         return collection
@@ -259,40 +268,24 @@ final class RowBandSelectUITests: XCTestCase {
 
     // MARK: - 用例（docs/42 §4 测试矩阵）
 
-    /// ① 长按 0.4s 进入多选：M19 行带语义下长按起手 = 锚点整行入选（count = columns，
-    /// docs/42 §1.2 行为表「长按起手整行」；全量 run 44783255716 实锤 count=3）——
-    /// 断言整行精确复算、多选栏出现、无任何覆盖层元素残留。
+    /// ① 长按 0.4s 进入多选：M20 语义起手只选锚点一格（docs/49 T06 §2.4；旧「长按整行」
+    /// 断言删除，T05 已实锤 beginTrail 单锚点）——计数 1、锚点 selected、多选栏出现、无覆盖层残留。
     func testLongPressEntersSelectionWithAnchorCount() throws {
-        var count = -1
-        var columns = -1
-        var entered = false
-        var appRef: XCUIApplication!
-        for attempt in 1...2 {
-            let app = XCUIApplication()
-            appRef = app
-            let collection = launchPlainGrid(app)
-            let first = collection.cells.firstMatch
-            XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
-            first.press(forDuration: 0.4)
-            columns = bandGeometry(in: collection, columnChoice: 0).columns
-            count = waitForSelectionCountEqual(app, to: columns, timeout: 5)
-            if count == columns { entered = true; break }
-            if attempt == 1 { usleep(500_000) }
-        }
-        XCTAssertGreaterThanOrEqual(columns, 2, "首行列数探测异常（columns=\(columns)）")
-        XCTAssertEqual(count, columns,
-                       "长按 0.4s 必须进入多选且整行入选（count=\(count) columns=\(columns)）")
-        XCTAssertTrue(entered, "长按进入路径必须发生")
-        XCTAssertTrue(anyElement(appRef, identifier: "Selection-Count").exists,
+        let app = XCUIApplication()
+        let collection = launchPlainGrid(app)
+        let first = collection.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "网格无 cell")
+        first.press(forDuration: 0.4)
+        let count = waitForSelectionCountEqual(app, to: 1, timeout: 5)
+        XCTAssertEqual(count, 1,
+                       "长按 0.4s 必须进入多选且只选锚点一格（count=\(count)，"
+                       + "选中=\(selectedVisibleIDs(collection).sorted())）")
+        XCTAssertTrue(anyElement(app, identifier: "Selection-Count").exists,
                       "长按进入后必须出现多选栏")
-        let grid = appRef.collectionViews.firstMatch
-        let rowIDs = fullRowIDs(in: grid, rowMidYs: [grid.cells.element(boundBy: 0).frame.midY])
-        let selected = waitForSelectedSet(grid, equals: rowIDs)
-        XCTAssertEqual(selected, rowIDs,
-                       "长按后必须整行 selected（got=\(selected.sorted()) expected=\(rowIDs.sorted())）")
-        XCTAssertFalse(appRef.descendants(matching: .any)[retiredOverlayID].exists,
+        XCTAssertTrue(cellIsSelected(collection.cells.element(boundBy: 0)), "锚点 cell 必须 selected")
+        XCTAssertFalse(app.descendants(matching: .any)[retiredOverlayID].exists,
                        "M18 起不得存在任何覆盖层元素")
-        snap(appRef, "m19-band-longpress-enter")
+        snap(app, "m20-longpress-anchor-only")
     }
 
     /// ② 左列长按下拖 3 行：整行语义与 M19-① 列对称——计数 = 3×columns 精确、
@@ -652,12 +645,13 @@ final class RowBandSelectUITests: XCTestCase {
         XCTAssertTrue(cellIsSelected(first), "轻点后徽标与 AX 同步 selected")
     }
 
-    /// ⑬ 无长按横向按压拖（pressing 横向占优）：行内横拖锁定整行（行带语义）——
-    /// 行内全部格精确入选 + 路径取证（docs/42 §1.2 横向行）。
-    func testHorizontalPressDragSelectsWholeRow() throws {
+    /// ⑬ 无长按横向按压拖（pressing 横向占优 → enterSelection + beginTrail cells 扫掠）：
+    /// 4 列固定（-uiTestingColumnCount）下首行第 1 格拖到第 4 格 → 恰好 4 格（扫过格），
+    /// 不是整行展开（docs/49 T06 §2.4：旧「横拖整行」契约删除重写为本用例）。
+    func testHorizontalPressDragSelectsTrailingCells() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
-            let collection = launchPlainGrid(app)
+            let collection = launchPlainGrid(app, extra: ["-uiTestingColumnCount", "4"])
             XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 10), "网格无 cell")
             let anchorFrame = collection.cells.element(boundBy: 0).frame
             var rowCells: [Int] = []
@@ -668,30 +662,31 @@ final class RowBandSelectUITests: XCTestCase {
                     rowCells.append(index)
                 }
             }
-            guard rowCells.count >= 3 else {
-                if attempt == 2 { XCTFail("首行可见格不足 3") }
+            guard rowCells.count >= 4 else {
+                if attempt == 2 { XCTFail("首行可见格不足 4（rowCells=\(rowCells.count)，需 4 列 fixture）") }
                 continue
             }
-            let firstIdx = rowCells[0]
-            let lastIdx = rowCells[rowCells.count - 1]
-            let expected = Set(rowCells.map { cellID(collection.cells.element(boundBy: $0)) })
-            let start = collection.cells.element(boundBy: firstIdx)
+            let expected = Set(rowCells.prefix(4).map { cellID(collection.cells.element(boundBy: $0)) })
+            let start = collection.cells.element(boundBy: rowCells[0])
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-            let end = collection.cells.element(boundBy: lastIdx)
+            let end = collection.cells.element(boundBy: rowCells[3])
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5))
             start.press(forDuration: 0.05, thenDragTo: end)
-            let count = waitForSelectionCountEqual(app, to: expected.count, timeout: 6)
-            guard count == expected.count else {
-                if attempt == 2 { XCTFail("横向按压拖必须整行 \(expected.count)（count=\(count)）") }
+            let count = waitForSelectionCountEqual(app, to: 4, timeout: 6)
+            guard count == 4 else {
+                if attempt == 2 {
+                    XCTFail("横拖到第 4 格必须恰好 4 格、不得整行展开（count=\(count)，"
+                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
+                }
                 continue
             }
             let selected = waitForSelectedSet(collection, equals: expected)
             XCTAssertEqual(selected, expected,
-                           "横向拖动必须精确 = 整行 assetID 集合（got=\(selected.sorted())）")
+                           "选中必须恰为首行 4 格 assetID 集合（got=\(selected.sorted())）")
             let pathCount = readTrailPathCount(app)
-            XCTAssertGreaterThanOrEqual(pathCount, expected.count,
-                                        "路径栈深度必须 ≥ 行内格数（path=\(pathCount)）")
-            snap(app, "m19-band-horizontal-row")
+            XCTAssertGreaterThanOrEqual(pathCount, 4,
+                                        "路径栈深度必须 ≥ 4（path=\(pathCount)）")
+            snap(app, "m20-horizontal-trailing-cells")
             return
         }
     }

@@ -574,23 +574,9 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
                        "左列下滑 3 行必须同样命中整行")
     }
 
-    /// 同一行内横向拖动 → 恰好该行全列（不扩散到相邻行）。
-    func testRowBandHitTestHorizontalDragExactRow() throws {
-        let columns = 3
-        let (cv, layout, gridData) = makeParamGrid(columns: columns)
-        let tester = GridHitTester(collectionView: cv)
-        warmUp(cv, offset: 2000)
-        let section = sectionAtContentY(2400, layout: layout, sectionCount: 40)
-        let row = safeAnchorRow(offset: 2000, section: section, columns: columns, layout: layout)
-        let left = IndexPath(item: row * columns, section: section)
-        let right = IndexPath(item: row * columns + columns - 1, section: section)
-        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: left))
-        let b = try XCTUnwrap(layout.layoutAttributesForItem(at: right))
-        let hit = tester.rowBandHitTest(from: CGPoint(x: a.frame.midX, y: a.frame.midY),
-                                        to: CGPoint(x: b.frame.midX, y: b.frame.midY))
-        XCTAssertEqual(hit, expectedBandItems(section: section, fromRow: row, rowCount: 1, columns: columns),
-                       "横拖必须恰好命中该行全列")
-    }
+    // M20 T06（docs/49 T06 §2.1）：旧「横拖 = 整行」rowBand 契约用例已删除——
+    // 横向拖动 = cells 线扫掠（testTrailHitTestHorizontalReturnsCellsInSweepOrder 锁定），
+    // 旧契约随 rowBandHitProvider 退役，不再保留兼容断言。
 
     /// 斜向拖动 → 经过行带序列（含中间行）全部整行，行主序；不产生矩形外的行。
     func testRowBandHitTestDiagonalCoversBandSequence() throws {
@@ -625,18 +611,9 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
                        "末行不满只展开真实 item（零长线段 = 指尖所在整行）")
     }
 
-    /// 零长度线段返回该点所在整行（非末行）。
-    func testRowBandHitTestZeroLengthReturnsWholeBand() throws {
-        let columns = 3
-        let (cv, layout, gridData) = makeParamGrid(columns: columns)
-        let tester = GridHitTester(collectionView: cv)
-        warmUp(cv, offset: 2000)
-        let a = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 7, section: 3)))
-        let center = CGPoint(x: a.frame.midX, y: a.frame.midY)
-        let hit = tester.rowBandHitTest(from: center, to: center)
-        XCTAssertEqual(hit, expectedBandItems(section: 3, fromRow: 2, rowCount: 1, columns: columns),
-                       "零长度线段 = 指尖所在整行（a3-7 在 row2 → 命中 a3-6/7/8）")
-    }
+    // M20 T06（docs/49 T06 §2.1）：旧「零长度 = 整行」rowBand 契约用例已删除——
+    // 零长度线段 = 锚点一格（testTrailHitTestZeroLengthHitsAnchorCellOnly 锁定），
+    // 旧契约随 rowBandHitProvider 退役，不再保留兼容断言。
 
     /// 粘性头钉住：起点位于遮挡区 → 钳到头下缘最近可见行带；被完全遮住的行不得出现在结果。
     func testRowBandHitTestClampsToFirstVisibleRowBelowStickyHeader() throws {
@@ -955,5 +932,67 @@ final class LibraryGridGeometryTests: XCTestCase, UICollectionViewDataSource {
         XCTAssertEqual(expected.last, IndexPath(item: 9, section: 1),
                        "末带残行必须按真实 item 收尾（不补满 4 列）")
         XCTAssertNil(hit.rewindIndexPath)
+    }
+
+    /// 4 列 5 步矩阵（docs/49 T06 §2.1）：每段 trailHitTest 精确集合 + 按控制器喂入策略
+    /// 累计计数 1→4→8→12→10（rows 首帧 rebase + 种子、续帧过滤、cells 左回回卷）；
+    /// 期望由真实 frame 独立暴力计算（bruteForceRowSlice/bruteForceLineHit），不经命中器自证。
+    func testTrailHitFourColumnFiveStepMatrix() throws {
+        let (cv, layout, trailData) = makeTrailGrid()
+        let tester = GridHitTester(collectionView: cv)
+        warmUp(cv, offset: 0)
+        let clip = CGFloat(DSSpacing.monthHeaderHeight)
+        // 段 ①：零长度 (1,1) → cells [item0]
+        let c0 = try trailCenter(layout, IndexPath(item: 0, section: 0))
+        let h1 = tester.trailHitTest(from: c0, to: c0, clipTop: clip)
+        XCTAssertEqual(h1.mode, .cells, "① 零长度必须 cells 模式")
+        XCTAssertEqual(h1.indexPaths, [IndexPath(item: 0, section: 0)], "① 零长度 = 锚点一格")
+        // 段 ②：(1,1)→(1,4) 横扫 → cells [0..3]
+        let c3 = try trailCenter(layout, IndexPath(item: 3, section: 0))
+        let h2 = tester.trailHitTest(from: c0, to: c3, clipTop: clip)
+        XCTAssertEqual(h2.mode, .cells, "② 同带横扫必须 cells 模式")
+        XCTAssertEqual(h2.indexPaths, (0...3).map { IndexPath(item: $0, section: 0) }, "② 右扫第 1 行 4 格")
+        // 段 ③：(1,4)→(2,4) 下拖 → rows 两整行（暴力口径）
+        let c7 = try trailCenter(layout, IndexPath(item: 7, section: 0))
+        let h3 = tester.trailHitTest(from: c3, to: c7, clipTop: clip)
+        XCTAssertEqual(h3.mode, .rows, "③ 跨带下拖必须 rows 模式")
+        XCTAssertEqual(h3.indexPaths,
+                       bruteForceRowSlice(cv: cv, layout: layout,
+                                          anchor: IndexPath(item: 3, section: 0),
+                                          target: IndexPath(item: 7, section: 0)),
+                       "③ 下拖 1 行 = 第 1、2 行整行（暴力重算口径）")
+        XCTAssertEqual(h3.indexPaths.count, 8, "③ 4 列 × 2 行 = 8")
+        // 段 ④：(2,4)→(3,4) 续拖 → rows 第 2、3 行（累计 3 整行）
+        let c11 = try trailCenter(layout, IndexPath(item: 11, section: 0))
+        let h4 = tester.trailHitTest(from: c7, to: c11, clipTop: clip)
+        XCTAssertEqual(h4.mode, .rows, "④ 跨带续拖必须 rows 模式")
+        XCTAssertEqual(h4.indexPaths,
+                       bruteForceRowSlice(cv: cv, layout: layout,
+                                          anchor: IndexPath(item: 7, section: 0),
+                                          target: IndexPath(item: 11, section: 0)),
+                       "④ 续拖 = 第 2、3 行整行（暴力重算口径）")
+        XCTAssertEqual(h4.indexPaths.count, 8, "④ 4 列 × 2 行 = 8")
+        // 段 ⑤：(3,4)→(3,2) 左回 → cells 倒序 [11,10,9]
+        let c9 = try trailCenter(layout, IndexPath(item: 9, section: 0))
+        let h5 = tester.trailHitTest(from: c11, to: c9, clipTop: clip)
+        XCTAssertEqual(h5.mode, .cells, "⑤ 同带左回必须 cells 模式")
+        XCTAssertEqual(h5.indexPaths, [11, 10, 9].map { IndexPath(item: $0, section: 0) }, "⑤ 左回倒序扫掠")
+        XCTAssertNil(h5.rewindIndexPath)
+        // 累计：按 T05 控制器喂入策略走一遍 5 段，锁定计数 1→4→8→12→10
+        let idOf: (IndexPath) -> String = { "s\($0.section)-i\($0.item)" }
+        var trail = SlideSelectTrail(base: [], anchorInitiallySelected: false)
+        _ = trail.consume([idOf(h1.indexPaths[0])])
+        XCTAssertEqual(trail.target.count, 1, "① 累计 1")
+        _ = trail.consume(h2.indexPaths.map(idOf))
+        XCTAssertEqual(trail.target.count, 4, "② 累计 4")
+        trail = SlideSelectTrail(base: trail.target, anchorInitiallySelected: false)   // ③ 首帧 rebase
+        _ = trail.consume(h3.indexPaths.map(idOf))
+        XCTAssertEqual(trail.target.count, 8, "③ 累计 8")
+        let remaining = h4.indexPaths.map(idOf).filter { !trail.path.contains($0) }   // ④ 续帧过滤
+        _ = trail.consume(remaining)
+        XCTAssertEqual(trail.target.count, 12, "④ 累计 12")
+        _ = trail.consume(h5.indexPaths.map(idOf))   // ⑤ 左回回卷截断
+        XCTAssertEqual(trail.target.count, 10, "⑤ 累计 10")
+        XCTAssertEqual(trail.path.count, 10, "路径栈无重复且收缩到 10")
     }
 }
