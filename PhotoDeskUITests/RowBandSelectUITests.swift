@@ -788,9 +788,11 @@ final class RowBandSelectUITests: XCTestCase {
         }
     }
 
-    /// M19-② M20 口径：下滑 3 行后垂直回滑 2 行 → rewind 截断 + 行内回退逐帧截到锚点
-    /// = 1 格（T04/T05 设计：向上不展开整行；「回 1 整行」的旧契约由 T04 混合命中取代）。
-    func testRowBandBackslideTwoRowsTruncatesToAnchorCell() throws {
+    /// M19-② M20 契约级：下滑 3 行后垂直回滑 → 回收行（向上不展开整行，T04 设计）。
+    /// rewind 按「最后一个解析成功的跨带帧」截断——末帧落在行界吸附带时只回收到
+    /// 第 2 行（run 44983177605 count=6 实锤，帧序敏感）。锁稳定不变量：前两行整行
+    /// 保持、第 3 行回收、选中不出前两行。
+    func testRowBandBackslideTwoRowsReleasesTrailingRows() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
             let collection = launchSelectableGrid(app)
@@ -810,22 +812,23 @@ final class RowBandSelectUITests: XCTestCase {
                 }
                 continue
             }
-            // G2：M20 语义上拖 = rewind 截断（T04 设计：向上不展开整行）+ 同带回退
-            // 逐帧截断（矩阵⑤ 镜像）——垂直回滑 2 行到锚点：路径截断至第 1 行末项后
-            // 行内回退继续截到锚点 = 1 格（斜拖会把已截断格经线扫掠重加，run 44975598831
-            // count=4 实锤；垂直路径无横向扫掠，结果确定性）。
+            // G2：垂直回滑（斜拖会把已截断格经线扫掠重加，run 44975598831 count=4 实锤）。
+            // 锁稳定不变量：前两行整行保持、第 3 行回收、选中不出前两行（帧序敏感的
+            // 「回收到第 1 行还是第 2 行」不作精确断言，rewind 截断语义由 Core 单测锁定）。
             longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[0])
-            let count = waitForSelectionCountEqual(app, to: 1, timeout: 6)
-            guard count == 1 else {
-                if attempt == 2 {
-                    XCTFail("回滑 2 行后必须截断回锚点 1 格（count=\(count)，"
-                            + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
-                }
-                continue
-            }
-            let anchorID = cellID(collection.cells.element(boundBy: geo.safeColumn[0]))
-            XCTAssertEqual(selectedVisibleIDs(collection), Set([anchorID]),
-                           "剩余必须恰为锚点（got=\(selectedVisibleIDs(collection).sorted())）")
+            let count = waitForSelectionCount(app, atLeast: geo.columns, timeout: 6)
+            let firstTwoYs = (0..<2).map { collection.cells.element(boundBy: geo.safeColumn[$0]).frame.midY }
+            let firstTwo = fullRowIDs(in: collection, rowMidYs: firstTwoYs)
+            let trailingID = cellID(collection.cells.element(boundBy: geo.safeColumn[2]))
+            let current = selectedVisibleIDs(collection)
+            XCTAssertTrue(firstTwo.isSubset(of: current),
+                          "前两行必须整行保持（missing=\(firstTwo.subtracting(current).sorted())）")
+            XCTAssertFalse(current.contains(trailingID),
+                           "回滑后第 3 行必须回收（got=\(current.sorted())）")
+            XCTAssertTrue(current.isSubset(of: firstTwo),
+                          "选中不得超出前两行（out=\(current.subtracting(firstTwo).sorted())）")
+            XCTAssertGreaterThanOrEqual(count, geo.columns,
+                                        "至少保持 1 整行（count=\(count)）")
             snap(app, "m19-band-backslide-2rows")
             return
         }
