@@ -107,7 +107,9 @@ final class LibraryPositionRestoreTests: XCTestCase {
 
     private func makeViewModel(repository: AssetRepositoryProtocol,
                                store: LibraryPositionStore) -> LibraryViewModel {
-        let vm = LibraryViewModel(service: PhotoLibraryService(initialAccess: .authorized),
+        // docs/49 T07：statusProvider 钉死注入值（同 LibraryViewModelTests——CI 宿主
+        // 真实 PhotoKit = notDetermined，refreshAccess 会覆盖 initialAccess）
+        let vm = LibraryViewModel(service: PhotoLibraryService(initialAccess: .authorized, statusProvider: { .authorized }),
                                   repository: repository,
                                   pipeline: FakeAnchorPipeline(),
                                   writer: writer,

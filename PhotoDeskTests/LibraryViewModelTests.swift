@@ -114,7 +114,9 @@ final class LibraryViewModelTests: XCTestCase {
     }
 
     private func makeViewModel(_ repo: FakeAssetRepository) -> LibraryViewModel {
-        let service = PhotoLibraryService(initialAccess: .authorized)
+        // docs/49 T07：statusProvider 钉死注入值——T02 起 start() 先 refreshAccess，
+        // CI 宿主真实 PhotoKit = notDetermined 会覆盖 initialAccess 并卡死索引门禁
+        let service = PhotoLibraryService(initialAccess: .authorized, statusProvider: { .authorized })
         let vm = LibraryViewModel(service: service,
                                   repository: repo,
                                   pipeline: FakeImagePipeline(),
