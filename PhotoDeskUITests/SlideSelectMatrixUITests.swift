@@ -57,6 +57,13 @@ final class SlideSelectMatrixUITests: XCTestCase {
         let collection = app.collectionViews.firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 45), "照片网格未出现\n\(hierarchySummary(app))")
         XCTAssertTrue(collection.cells.firstMatch.waitForExistence(timeout: 15), "网格无 cell")
+        // docs/49 T07：马拉松全量下前序用例累计播种照片，网格就位后仍可能收尾滚动
+        // （run 44999656228 / 45022894921 矩阵⑥ off=-44 直拖进滚动）——等 off==0 再交互。
+        let settleDeadline = Date().addingTimeInterval(20)
+        while Date() < settleDeadline {
+            if readOffsetY(app) == 0 { break }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
         // 4 列 fixture 校验（docs/49 T06 §3）：首行 4 格、宽度 > 1；记录设备型号供矩阵口径
         let anchorFrame = collection.cells.element(boundBy: 0).frame
         var firstRowCount = 0
