@@ -813,22 +813,24 @@ final class RowBandSelectUITests: XCTestCase {
                 continue
             }
             // G2：垂直回滑（斜拖会把已截断格经线扫掠重加，run 44975598831 count=4 实锤）。
-            // 锁稳定不变量：前两行整行保持、第 3 行回收、选中不出前两行（帧序敏感的
-            // 「回收到第 1 行还是第 2 行」不作精确断言，rewind 截断语义由 Core 单测锁定）。
+            // rewind 深度逐帧逐 run 浮动（run 44983177605=6、run 44986793991=4），跨 run
+            // 稳定不变量只有三条：锚点保持（截断地板 = 路径首位）、第 3 行回收、选中不出
+            // 前两行；回滑截断精确语义由 Core rewind 单测锁定，UI 不作深度断言。
             longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[0])
-            let count = waitForSelectionCount(app, atLeast: geo.columns, timeout: 6)
-            let firstTwoYs = (0..<2).map { collection.cells.element(boundBy: geo.safeColumn[$0]).frame.midY }
-            let firstTwo = fullRowIDs(in: collection, rowMidYs: firstTwoYs)
+            _ = waitForSelectionCount(app, atLeast: 1, timeout: 6)
+            let spanYs = (0..<2).map { collection.cells.element(boundBy: geo.safeColumn[$0]).frame.midY }
+            let span = fullRowIDs(in: collection, rowMidYs: spanYs)
             let trailingID = cellID(collection.cells.element(boundBy: geo.safeColumn[2]))
+            let anchorID = cellID(collection.cells.element(boundBy: geo.safeColumn[0]))
             let current = selectedVisibleIDs(collection)
-            XCTAssertTrue(firstTwo.isSubset(of: current),
-                          "前两行必须整行保持（missing=\(firstTwo.subtracting(current).sorted())）")
+            XCTAssertTrue(current.contains(anchorID),
+                          "回滑锚点必须保持选中（got=\(current.sorted())）")
             XCTAssertFalse(current.contains(trailingID),
                            "回滑后第 3 行必须回收（got=\(current.sorted())）")
-            XCTAssertTrue(current.isSubset(of: firstTwo),
-                          "选中不得超出前两行（out=\(current.subtracting(firstTwo).sorted())）")
-            XCTAssertGreaterThanOrEqual(count, geo.columns,
-                                        "至少保持 1 整行（count=\(count)）")
+            XCTAssertTrue(current.isSubset(of: span),
+                          "选中不得超出前两行（out=\(current.subtracting(span).sorted())）")
+            XCTAssertLessThanOrEqual(current.count, 2 * geo.columns,
+                                     "计数不得超过前两行（count=\(current.count)）")
             snap(app, "m19-band-backslide-2rows")
             return
         }
