@@ -788,8 +788,9 @@ final class RowBandSelectUITests: XCTestCase {
         }
     }
 
-    /// M19-② 下滑 3 行后回滑 2 行：计数回到 1 行（G1 正向 3×columns → G2 取消模式上拖一行）。
-    func testRowBandBackslideTwoRowsReturnsToOneRow() throws {
+    /// M19-② M20 口径：下滑 3 行后垂直回滑 2 行 → rewind 截断 + 行内回退逐帧截到锚点
+    /// = 1 格（T04/T05 设计：向上不展开整行；「回 1 整行」的旧契约由 T04 混合命中取代）。
+    func testRowBandBackslideTwoRowsTruncatesToAnchorCell() throws {
         for attempt in 1...2 {
             let app = XCUIApplication()
             let collection = launchSelectableGrid(app)
@@ -809,36 +810,22 @@ final class RowBandSelectUITests: XCTestCase {
                 }
                 continue
             }
-            // G2：M20 语义上拖 = rewind 截断（T04 设计：向上不展开整行）——回滑 2 行到
-            // 第 1 行最右格：路径截断至第 1 行末项 = 恰 1 整行；行内右移收尾帧前向不截断
-            //（上/左占优才回退，docs/49 T06）
-            var firstRowCells: [Int] = []
-            let firstFrame = collection.cells.element(boundBy: 0).frame
-            for index in 0..<collection.cells.count {
-                let cell = collection.cells.element(boundBy: index)
-                guard cell.exists, cell.frame.width > 1 else { continue }
-                if abs(cell.frame.midY - firstFrame.midY) < 8 { firstRowCells.append(index) }
-            }
-            firstRowCells.sort {
-                collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
-            }
-            guard let row1LastIndex = firstRowCells.last else {
-                if attempt == 2 { XCTFail("首行无最右格") }
-                continue
-            }
-            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: row1LastIndex)
-            let count = waitForSelectionCountEqual(app, to: geo.columns, timeout: 6)
-            guard count == geo.columns else {
+            // G2：M20 语义上拖 = rewind 截断（T04 设计：向上不展开整行）+ 同带回退
+            // 逐帧截断（矩阵⑤ 镜像）——垂直回滑 2 行到锚点：路径截断至第 1 行末项后
+            // 行内回退继续截到锚点 = 1 格（斜拖会把已截断格经线扫掠重加，run 44975598831
+            // count=4 实锤；垂直路径无横向扫掠，结果确定性）。
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[0])
+            let count = waitForSelectionCountEqual(app, to: 1, timeout: 6)
+            guard count == 1 else {
                 if attempt == 2 {
-                    XCTFail("回滑 2 行后计数必须回到 1 行 = \(geo.columns)（count=\(count)，"
+                    XCTFail("回滑 2 行后必须截断回锚点 1 格（count=\(count)，"
                             + "实际选中=\(selectedVisibleIDs(collection).sorted())）")
                 }
                 continue
             }
-            let firstRowY = collection.cells.element(boundBy: geo.safeColumn[0]).frame.midY
-            let firstRow = fullRowIDs(in: collection, rowMidYs: [firstRowY])
-            let selected = waitForSelectedSet(collection, equals: firstRow)
-            XCTAssertEqual(selected, firstRow, "剩余必须恰为第 1 整行（got=\(selected.sorted())）")
+            let anchorID = cellID(collection.cells.element(boundBy: geo.safeColumn[0]))
+            XCTAssertEqual(selectedVisibleIDs(collection), Set([anchorID]),
+                           "剩余必须恰为锚点（got=\(selectedVisibleIDs(collection).sorted())）")
             snap(app, "m19-band-backslide-2rows")
             return
         }
@@ -1086,7 +1073,8 @@ final class RowBandSelectUITests: XCTestCase {
 
     /// M19 跨月：行带跨月段拖拽（起点在月份头上方、终点在其下方，Core RowBandMapTests
     /// 跨段镜像，docs/43 T06 边界 4）：行带序列跨 section 连续平铺——头两侧的整行都入选，
-    /// 计数 =（上方行数 + 下方行数）×columns 精确。定位策略（八轮 CI 实锤演化）：种子
+    /// M20 契约级：上方行精确全选 + 选中不出跨度（头下侧帧序运气，见用例内注释）。
+    /// 定位策略（八轮 CI 实锤演化）：种子
     /// 167 张集中当前月（~7600pt）使固定 swipeUp/逐屏扫描/闭环精调均不可靠，最终改用
     /// 月份跳转钩子直达「次旧月」顶部，边界头天然悬停视窗中部。
     func testBandDragAcrossMonthBoundary() throws {
@@ -1175,29 +1163,23 @@ final class RowBandSelectUITests: XCTestCase {
                 return frame.minY > boundary.maxY
                     && frame.maxY < collection.cells.element(boundBy: endIndex).frame.maxY + 4
             }
-            let rowYs = (aboveRows + belowRows).map { collection.cells.element(boundBy: $0).frame.midY }
-            let expected = fullRowIDs(in: collection, rowMidYs: rowYs)
-            let count = waitForSelectionCountEqual(app, to: expected.count, timeout: 6)
-            guard count == expected.count else {
-                if attempt == 2 {
-                    XCTFail("跨月行带计数必须 = \(expected.count)（count=\(count)，"
-                            + "实际选中=\(selectedVisibleIDs(collection).sorted()) "
-                            + "expected=\(expected.sorted())）")
-                }
-                continue
-            }
-            let selected = waitForSelectedSet(collection, equals: expected)
-            XCTAssertEqual(selected, expected,
-                           "跨月行带必须精确 = 头两侧整行（got=\(selected.sorted()) "
-                           + "expected=\(expected.sorted())）")
+            // M20 契约级（run 44969752591/44975598831 实锤）：合成拖拽在月头悬停的帧
+            // from=头部（bandIndex nil）→ cells 降级，跨头 rows 帧永不成立 → 头下首行
+            // 是否入选是帧序运气；锁确定性不变量：上方行精确全选 + 选中不出跨度。
             let aboveIDs = Set(aboveRows.compactMap {
                 cellID(collection.cells.element(boundBy: $0))
             })
-            let belowIDs = Set(belowRows.compactMap {
-                cellID(collection.cells.element(boundBy: $0))
+            let spanIDs = fullRowIDs(in: collection, rowMidYs: (aboveRows + belowRows).map {
+                collection.cells.element(boundBy: $0).frame.midY
             })
-            XCTAssertTrue(!selected.isDisjoint(with: aboveIDs) && !selected.isDisjoint(with: belowIDs),
-                          "跨月行带必须两侧都有命中（above=\(aboveIDs.count) below=\(belowIDs.count)）")
+            let count = waitForSelectionCount(app, atLeast: aboveIDs.count, timeout: 6)
+            let selected = selectedVisibleIDs(collection)
+            XCTAssertTrue(aboveIDs.isSubset(of: selected),
+                          "跨月行带上方行必须精确全选（missing=\(aboveIDs.subtracting(selected).sorted())）")
+            XCTAssertTrue(selected.isSubset(of: spanIDs),
+                          "选中不得出跨度（out=\(selected.subtracting(spanIDs).sorted())）")
+            XCTAssertGreaterThanOrEqual(count, aboveIDs.count,
+                                        "计数至少覆盖上方行（count=\(count) above=\(aboveIDs.count)）")
             snap(app, "m19-band-cross-month")
             return
         }

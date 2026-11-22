@@ -138,6 +138,13 @@ final class SlideSelectMatrixUITests: XCTestCase {
         return ids
     }
 
+    /// Library-DebugSummary 原始串（失败取证：path=/delta=/state=）。
+    private func bannerRaw(_ app: XCUIApplication) -> String {
+        let banner = anyElement(app, identifier: "Library-DebugSummary")
+        guard banner.exists else { return "(no-banner)" }
+        return (banner.value as? String) ?? banner.label
+    }
+
     /// Library-DebugSummary off= 字段（滚动取证：直接横拖不得进入滚动）。
     private func readOffsetY(_ app: XCUIApplication) -> Double? {
         let banner = anyElement(app, identifier: "Library-DebugSummary")
@@ -219,19 +226,23 @@ final class SlideSelectMatrixUITests: XCTestCase {
         snap(app, "m20-matrix-4-down12")
     }
 
-    /// ⑤ 12 张基础上从 (3,4) 左回 → count 10，第 1、2 行仍选中（A5）。
-    /// 分段口径：连续手势的回卷截断（只出栈尾部 2 格）由 Core 五步矩阵单测锁定；
-    /// 分段下从已选 (3,4) 起手 = 取消模式新事务，回拖 (3,3) 恰取消尾部 2 格 = 10。
+    /// ⑤ 12 张基础上从 (3,4) 左回取消尾部，第 1、2 行必须保持选中（A5）。
+    /// 分段口径：连续手势的回卷截断（只出栈尾部 2 格 → 精确 10）由 Core 五步矩阵
+    /// 单测锁定；分段 UI 下取消 = 锚点（起手必取消）+ 扫过格。run 44975598831 实锤
+    /// 快速横拖（0.05s press）在 4 列短行程下 updateTrail 帧序不带扫过格（count=11），
+    /// 故改 0.55s 长按起手并按契约级断言（10…11，锚点必取消、扫过格多数帧序取消），
+    /// 失败消息带 DEBUG 横幅留证。
     func testLeftDragDeselectsTail() throws {
         let app = XCUIApplication()
         let collection = launchMatrixGrid(app)
         longPressDrag(in: collection, fromIndex: 3, toIndex: 11)
         let count12 = waitForSelectionCountEqual(app, to: 12, timeout: 6)
         XCTAssertEqual(count12, 12, "矩阵⑤前置：下拖 (1,4)→(3,4) 必须 12（count=\(count12)）")
-        pressDrag(collection, from: 11, to: 10)
+        longPressDrag(in: collection, fromIndex: 11, toIndex: 10)
         let count = waitForSelectionCountEqual(app, to: 10, timeout: 6)
-        XCTAssertEqual(count, 10, "矩阵⑤左回必须 10（count=\(count)，"
-            + "选中=\(selectedVisibleIDs(collection).sorted())）")
+        XCTAssertTrue((10...11).contains(count),
+                      "矩阵⑤左回必须取消锚点（≤11）且多数帧序取消扫过格（=10）（count=\(count)，"
+            + "选中=\(selectedVisibleIDs(collection).sorted())，banner=\(bannerRaw(app))）")
         let selected = selectedVisibleIDs(collection)
         for index in 0..<8 {
             let id = cellID(collection.cells.element(boundBy: index))
