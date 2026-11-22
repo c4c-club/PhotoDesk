@@ -416,7 +416,14 @@ final class LibrarySelectionController: NSObject {
         var delta = SlideSelectDelta()
         switch hit.mode {
         case .cells:
-            delta = current.consume(hit.orderedIDs)
+            // M20 T06（run 44969752591 实锤）：同带续帧只有真实回退（上/左占优）才允许
+            // 截断回卷——rows 展开后手指继续向下/前进或静止的帧是帧分解产物，扫到已入栈
+            // 格不得撤销已展开整行（下行拖拽收尾零长度帧曾把末行截回 1 格：9→7、deselect 6→4）。
+            let dx = to.x - from.x
+            let dy = to.y - from.y
+            let backslide = (dy < 0 && abs(dy) >= abs(dx)) || (dx < 0 && abs(dx) > abs(dy))
+            delta = current.consume(backslide ? hit.orderedIDs
+                                              : hit.orderedIDs.filter { !current.path.contains($0) })
         case .rows:
             if let rewindID = hit.rewindID {
                 // 向上：rewind ∈ path → 只 consume 回卷锚（截断到目的行末项）；不在 path 按 fallback 线段喂

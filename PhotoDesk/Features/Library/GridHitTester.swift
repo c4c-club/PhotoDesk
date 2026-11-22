@@ -336,8 +336,13 @@ final class GridHitTester {
                 paths = hitTestLine(from: from, to: to)
             case .rows:
                 if toBand > fromBand {
-                    paths = map.items(forBandIndices: map.bandSequence(from: fromBand, to: toBand))
+                    let sequence = map.bandSequence(from: fromBand, to: toBand)
+                    paths = map.items(forBandIndices: sequence)
                         .map { IndexPath(item: $0.item, section: $0.section) }
+                    #if DEBUG
+                    // M20 T05 接线后 rowBandHitTest 已不在生产路径，band= 取证改由 trailHitTest 喂
+                    lastBandCount = sequence.count
+                    #endif
                 } else {
                     let band = map.band(at: toBand)
                     if let last = band.items.last {

@@ -99,7 +99,9 @@ final class SlideSelectMatrixUITests: XCTestCase {
     private func selectionCount(_ app: XCUIApplication) -> Int {
         let label = anyElement(app, identifier: "Selection-Count")
         guard label.exists else { return -1 }
-        return Self.parseCount(((label.value as? String) ?? label.label))
+        // Selection-Count 的 accessibilityValue 不是计数字符串（run 44969752591 count 恒 0 实锤），
+        // 与 RowBandSelectUITests 同源只读 label
+        return Self.parseCount(label.label)
     }
 
     @discardableResult

@@ -113,6 +113,38 @@ final class LibrarySelectionControllerTests: XCTestCase {
         XCTAssertEqual(controller.debugTrailPathCount, 2)
     }
 
+    // MARK: - 同带续帧方向语义（M20 T06，run 44969752591 实锤）：前向/静止帧不得截断
+
+    func testRowsDownThenForwardSameBandCellsFrameDoesNotTruncate() throws {
+        armAndDrag(hitID: "a")
+        nextHit = SelectionTrailHit(mode: .rows, orderedIDs: ["a", "b", "c", "d"], rewindID: nil)
+        controller.debugProcessTrail(from: CGPoint(x: 100, y: 200), to: CGPoint(x: 100, y: 400))
+        applied.removeAll()
+        // rows 展开后手指继续向下（含收尾零长度帧）扫到已入栈格：不得撤销已展开整行
+        nextHit = SelectionTrailHit(mode: .cells, orderedIDs: ["b"], rewindID: nil)
+        controller.debugProcessTrail(from: CGPoint(x: 100, y: 400), to: CGPoint(x: 100, y: 408))
+        XCTAssertTrue(applied.isEmpty, "前向同带帧不得截断已展开路径（下行拖拽收尾曾把末行截回 1 格）")
+        XCTAssertEqual(controller.debugTrailPathCount, 4)
+        nextHit = SelectionTrailHit(mode: .cells, orderedIDs: ["d"], rewindID: nil)
+        controller.debugProcessTrail(from: CGPoint(x: 100, y: 408), to: CGPoint(x: 100, y: 408))
+        XCTAssertTrue(applied.isEmpty, "零长度帧必须无净差")
+        XCTAssertEqual(controller.debugTrailPathCount, 4)
+    }
+
+    func testRowsDownThenBackwardSameBandCellsFrameStillTruncates() throws {
+        armAndDrag(hitID: "a")
+        nextHit = SelectionTrailHit(mode: .rows, orderedIDs: ["a", "b", "c", "d"], rewindID: nil)
+        controller.debugProcessTrail(from: CGPoint(x: 100, y: 200), to: CGPoint(x: 100, y: 400))
+        applied.removeAll()
+        // 同带向左回退（矩阵⑤镜像）：真实回退 → 截断撤销尾部（M18 语义保持）
+        nextHit = SelectionTrailHit(mode: .cells, orderedIDs: ["b"], rewindID: nil)
+        controller.debugProcessTrail(from: CGPoint(x: 104, y: 400), to: CGPoint(x: 96, y: 400))
+        XCTAssertEqual(applied.count, 1)
+        XCTAssertEqual(applied.first?.remove, ["c", "d"], "回退帧截断到已访问 b（矩阵⑤ 左回取消尾部）")
+        XCTAssertTrue(applied.first?.add.isEmpty ?? false)
+        XCTAssertEqual(controller.debugTrailPathCount, 2)
+    }
+
     // MARK: - 空锚点：beginTrail 防御性忽略
 
     func testEmptyAnchorBeginTrailIsIgnored() throws {

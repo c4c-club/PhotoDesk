@@ -809,8 +809,24 @@ final class RowBandSelectUITests: XCTestCase {
                 }
                 continue
             }
-            // G2：终点行已选 → 取消模式，上拖一行（3 行 − 2 行 = 1 行）
-            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[1])
+            // G2：M20 语义上拖 = rewind 截断（T04 设计：向上不展开整行）——回滑 2 行到
+            // 第 1 行最右格：路径截断至第 1 行末项 = 恰 1 整行；行内右移收尾帧前向不截断
+            //（上/左占优才回退，docs/49 T06）
+            var firstRowCells: [Int] = []
+            let firstFrame = collection.cells.element(boundBy: 0).frame
+            for index in 0..<collection.cells.count {
+                let cell = collection.cells.element(boundBy: index)
+                guard cell.exists, cell.frame.width > 1 else { continue }
+                if abs(cell.frame.midY - firstFrame.midY) < 8 { firstRowCells.append(index) }
+            }
+            firstRowCells.sort {
+                collection.cells.element(boundBy: $0).frame.minX < collection.cells.element(boundBy: $1).frame.minX
+            }
+            guard let row1LastIndex = firstRowCells.last else {
+                if attempt == 2 { XCTFail("首行无最右格") }
+                continue
+            }
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: row1LastIndex)
             let count = waitForSelectionCountEqual(app, to: geo.columns, timeout: 6)
             guard count == geo.columns else {
                 if attempt == 2 {
@@ -861,8 +877,9 @@ final class RowBandSelectUITests: XCTestCase {
                 }
                 continue
             }
-            // G2：锚点 = 第 3 行（已取消 → 选择模式），回滑到第 2 行 → 整行恢复
-            longPressDrag(in: collection, fromIndex: geo.safeColumn[2], toIndex: geo.safeColumn[1])
+            // G2：M20 语义上拖 = rewind 截断不展开整行（T04 设计），「恢复」= 反向再拖：
+            // 锚点（第 2 行已取消 → 选择模式）下滑到第 3 行 → rebase 整行重选，回 3 整行
+            longPressDrag(in: collection, fromIndex: geo.safeColumn[1], toIndex: geo.safeColumn[2])
             guard waitForSelectionCountEqual(app, to: full, timeout: 6) == full else {
                 if attempt == 2 {
                     XCTFail("回滑恢复必须回 \(full)（count=\(selectionCount(app))，"
